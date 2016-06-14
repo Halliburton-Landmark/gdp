@@ -87,7 +87,7 @@ public class GDP_GCL {
             m.add(k, metadata.get(k));
         }
         
-        estat = Gdp02Library.INSTANCE.gdp_gcl_create(logNameInternal, logdNameInternal,
+        estat = Gdp06Library.INSTANCE.gdp_gcl_create(logNameInternal, logdNameInternal,
                         m.gdp_gclmd_ptr, new PointerByReference(tmpPtr));
         
         GDP.check_EP_STAT(estat);
@@ -121,7 +121,7 @@ public class GDP_GCL {
         this.gclname = name.internal_name();
         
         // open the GCL
-        estat = Gdp02Library.INSTANCE.gdp_gcl_open(ByteBuffer.wrap(this.gclname), 
+        estat = Gdp06Library.INSTANCE.gdp_gcl_open(ByteBuffer.wrap(this.gclname), 
                             iomode.ordinal(), (PointerByReference) null, 
                             gclhByReference);
         GDP.check_EP_STAT(estat);
@@ -140,7 +140,7 @@ public class GDP_GCL {
         object_dir.remove(this.gclh);
         
         // free the associated gdp_gcl_t
-        Gdp02Library.INSTANCE.gdp_gcl_close(this.gclh);
+        Gdp06Library.INSTANCE.gdp_gcl_close(this.gclh);
         
     }
 
@@ -186,7 +186,7 @@ public class GDP_GCL {
         GDP_DATUM datum = new GDP_DATUM();
                 
         // get the datum populated
-        estat = Gdp02Library.INSTANCE.gdp_gcl_read(this.gclh, recno, 
+        estat = Gdp06Library.INSTANCE.gdp_gcl_read(this.gclh, recno, 
                                 datum.gdp_datum_ptr);
         GDP.check_EP_STAT(estat);
 
@@ -222,7 +222,7 @@ public class GDP_GCL {
         Object data = datum_dict.get("data");
         datum.setbuf((byte[]) data);
         
-        estat = Gdp02Library.INSTANCE.gdp_gcl_append(this.gclh,
+        estat = Gdp06Library.INSTANCE.gdp_gcl_append(this.gclh,
                                 datum.gdp_datum_ptr);
         GDP.check_EP_STAT(estat);
 
@@ -257,7 +257,7 @@ public class GDP_GCL {
         Object data = datum_dict.get("data");
         datum.setbuf((byte[]) data);
         
-        estat = Gdp02Library.INSTANCE.gdp_gcl_append_async(this.gclh, 
+        estat = Gdp06Library.INSTANCE.gdp_gcl_append_async(this.gclh, 
                                 datum.gdp_datum_ptr, null, null);
         GDP.check_EP_STAT(estat);
 
@@ -290,7 +290,7 @@ public class GDP_GCL {
     public void subscribe(long firstrec, int numrecs, EP_TIME_SPEC timeout) {
 
         EP_STAT estat;
-        estat = Gdp02Library.INSTANCE
+        estat = Gdp06Library.INSTANCE
                     .gdp_gcl_subscribe(this.gclh, firstrec, numrecs,
                                         timeout, null, null);
 
@@ -310,7 +310,7 @@ public class GDP_GCL {
     public void multiread(long firstrec, int numrecs) {
 
         EP_STAT estat;
-        estat = Gdp02Library.INSTANCE
+        estat = Gdp06Library.INSTANCE
                     .gdp_gcl_multiread(this.gclh, firstrec, numrecs,
                                         null, null);
 
@@ -336,7 +336,7 @@ public class GDP_GCL {
     //     // Returns next data item from subcription or multiread.
     //     // Returns null if the subscription has ended.
     //     GDP_EVENT ev = get_next_event(timeout_msec, time_spec);;
-    //     if (ev.type == Gdp02Library.INSTANCE.GDP_EVENT_DATA) {
+    //     if (ev.type == Gdp06Library.INSTANCE.GDP_EVENT_DATA) {
     //         return ev.datum.data;
     //     } else {
     //         return null;
@@ -348,16 +348,16 @@ public class GDP_GCL {
                             Pointer gclh, EP_TIME_SPEC timeout) {
         
         // Get the event pointer. gclh can be null.
-        PointerByReference gdp_event_ptr = Gdp02Library.INSTANCE
+        PointerByReference gdp_event_ptr = Gdp06Library.INSTANCE
                             .gdp_event_next(gclh, timeout);
 
         // Get the data associated with this event
-        int type = Gdp02Library.INSTANCE.gdp_event_gettype(gdp_event_ptr);
-        PointerByReference datum_ptr = Gdp02Library.INSTANCE
+        int type = Gdp06Library.INSTANCE.gdp_event_gettype(gdp_event_ptr);
+        PointerByReference datum_ptr = Gdp06Library.INSTANCE
                             .gdp_event_getdatum(gdp_event_ptr);
-        EP_STAT event_ep_stat = Gdp02Library.INSTANCE
+        EP_STAT event_ep_stat = Gdp06Library.INSTANCE
                             .gdp_event_getstat(gdp_event_ptr);
-        PointerByReference _gclhByReference = Gdp02Library.INSTANCE
+        PointerByReference _gclhByReference = Gdp06Library.INSTANCE
                             .gdp_event_getgcl(gdp_event_ptr);
         Pointer _gclh = _gclhByReference.getValue();
                             
@@ -377,7 +377,7 @@ public class GDP_GCL {
         gdp_event.put("stat", event_ep_stat);
         
         // free the event structure
-        Gdp02Library.INSTANCE.gdp_event_free(gdp_event_ptr);
+        Gdp06Library.INSTANCE.gdp_event_free(gdp_event_ptr);
         
         return gdp_event;
     }
@@ -446,18 +446,18 @@ public class GDP_GCL {
     //     }
 
     //     // Get the C pointer to next event. This blocks till timeout
-    //     PointerByReference gev = Gdp02Library.INSTANCE
+    //     PointerByReference gev = Gdp06Library.INSTANCE
     //                                 .gdp_event_next(this.gclh, timeout);
 
     //     // Get the data associated with this event
-    //     int type = Gdp02Library.INSTANCE.gdp_event_gettype(gev);
-    //     PointerByReference datum = Gdp02Library.INSTANCE.gdp_event_getdatum(gev);
+    //     int type = Gdp06Library.INSTANCE.gdp_event_gettype(gev);
+    //     PointerByReference datum = Gdp06Library.INSTANCE.gdp_event_getdatum(gev);
 
     //     // Create an object of type GDP_EVENT that we'll return
     //     GDP_EVENT ev = new GDP_EVENT(this.gclh, datum, type);
 
     //     // Free the C data-structure
-    //     Gdp02Library.INSTANCE.gdp_event_free(gev);
+    //     Gdp06Library.INSTANCE.gdp_event_free(gev);
 
     //     return ev;
     // }
