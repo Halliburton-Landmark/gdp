@@ -26,9 +26,16 @@
 #  ----- END LICENSE BLOCK -----
 #
 
+# Version number of library (should match gdp_version.h)
+GDPLIBMAJVER=	0
+GDPLIBMINVER=	5
+
+# These are generally changed on make command line
 DESTDIR=
 LOCALROOT=	/usr
 CRYPTOROOT=	/opt/local
+
+# These generally do not need to be changed
 INSTALLROOT=	${DESTDIR}${LOCALROOT}
 INCDIR=		${INSTALLROOT}/include
 LIBDIR=		${INSTALLROOT}/lib
@@ -41,6 +48,9 @@ ALLDIRS=	${BINDIR} \
 		${INCDIR}/gdp \
 		${MANDIR}/man7 \
 		${MANDIR}/man8
+ADM=		../adm
+LOCALLIBSDIR=	../libs
+LIBNAME=	libgdp
 
 BINALL=
 
@@ -98,15 +108,13 @@ PRIVHFILES=	\
 
 HFILES=		${PUBHFILES} ${PRIVHFILES}
 
-GDPLIBMAJVER=	0
-GDPLIBMINVER=	2
 GDPLIBVER=	${GDPLIBMAJVER}.${GDPLIBMINVER}
 INCALL=		${PUBHFILES}
 LIBALL=		libgdp.a libgdp.so.${GDPLIBVER}
 # files that should be removed on "make clean"
 CLEANALL=	${LIBALL} ${BINALL} ${SBINALL}
 # files that should be publicly installed
-PUBALL=		${SCRIPTS} ${MANALL} ${INCALL}
+PUBALL=		${SCRIPTS} ${MANALL} ${INCALL} ${LIBALL}
 # "make all" targets (may be overlap)
 ALL=		${CLEANALL} ${PUBALL}
 
@@ -160,9 +168,15 @@ ${OBJS}: ${HFILES}
 gdp_version.o: gdp_version.c ${OBJS_MOST} Makefile
 	${CC} ${CFLAGS} -D_CURRENT_DATE_=\"`date +'%Y-%m-%d_%H:%M'`\" -c gdp_version.c
 
+#
+#  Administrative stuff
+#
+
+# cleanup
 clean:
 	-rm -f ${CLEANALL} *.o *.core
 
+# system installation
 install:	${ALLDIRS} ${PUBALL}
 	test -z "${BINALL}"  || ${INSTALL} ${BINALL}  ${BINDIR}
 	test -z "${SBINALL}" || ${INSTALL} ${SBINALL} ${SBINDIR}
@@ -179,7 +193,13 @@ install:	${ALLDIRS} ${PUBALL}
 ${ALLDIRS}:
 	${MKDIR} $@
 
-ADM=		../adm
+# local installation (into source tree, needed for Java & Debian package build)
+install-local:	${LOCALLIBSDIR} ${LIBALL}
+	${INSTALL} ${LIBALL} ${LOCALLIBSDIR}
+	(cd ${LOCALLIBSDIR}; rm -f libgdp.so.${GDPLIBMAJVER}; ln -s libgdp.so.${GDPLIBVER} libgdp.so.${GDPLIBMAJVER})
+	(cd ${LOCALLIBSDIR}; rm -f libgdp.so; ln -s libgdp.so.${GDPLIBMAJVER} libgdp.so)
+	(cd ${LOCALLIBSDIR}; rm -f libgdp.${GDPLIBVER}.dylib; ln -s libgdp.so.${GDPLIBVER} libgdp.${GDPLIBVER}.dylib)
+
 UPDATE_LICENSE=	${ADM}/update-license.sh
 
 update-license:

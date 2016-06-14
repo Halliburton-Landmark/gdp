@@ -60,6 +60,10 @@ install:
 	mkdir -p ${DOCDIR}
 	cp -rp examples ${DOCDIR}
 
+install-local:
+	(cd ep;		make install-local)
+	(cd gdp;	make install-local)
+
 GDPROOT=	~gdp
 GDPALL=		adm/start-* \
 		adm/run-* \

@@ -28,8 +28,16 @@
 #  ----- END LICENSE BLOCK -----
 #
 
+# Version number of library (should match ep_version.h)
+EPLIBMAJVER=	2
+EPLIBMINVER=	3
+
+# These are generally changed on make command line
 DESTDIR=
 LOCALROOT=	/usr
+CRYPTOROOT=	/opt/local
+
+# These generally do not need to be changed
 INSTALLROOT=	${DESTDIR}${LOCALROOT}
 BINDIR=		${INSTALLROOT}/bin
 SBINDIR=	${INSTALLROOT}/sbin
@@ -38,9 +46,9 @@ INCDIR=		${INSTALLROOT}/include
 MANDIR=		${INSTALLROOT}/share/man
 ALLDIRS=	${LIBDIR} \
 		${INCDIR}/ep
-
-INSTALL=	install
-CRYPTOROOT=	/opt/local
+ADM=		../adm
+LOCALLIBSDIR=	../libs
+LIBNAME=	libep
 
 CURDIR=	.
 
@@ -171,76 +179,84 @@ HFILES_NOTYET=	\
 BINALL= \
 	decode-epstat
 
-CC=	cc
+CC=		cc
 PG=
-O=	-O
-WALL=	-Wall
+O=		-O
+WALL=		-Wall
 STD=
 CRYPTOCFLAGS=	-I${CRYPTOROOT}/include
 CRYPTOLFLAGS=	-L${CRYPTOROOT}/lib
 INCLS=		${CRYPTOCFLAGS}
-COPTS=	${PG} -g ${WALL} $O ${STD}
-CFLAGS=	${COPTS} ${INCLS} -I${CURDIR} -I.. -fPIC
-RM=	rm
-LD=	ld
+COPTS=		${PG} -g ${WALL} $O ${STD}
+CFLAGS=		${COPTS} ${INCLS} -I${CURDIR} -I.. -fPIC
+RM=		rm
+LD=		ld
 LDFLAGS=	-L. ${CRYPTOLFLAGS}
-LDLIBS=	libep.a -pthread
-LIBS=	-lcrypto
-LN=	ln
-MV=	mv
-CP=	cp
-MKDIR=	mkdir -p
-RANLIB=	ranlib
-SHARED=	-shared ${CRYPTOLFLAGS}
+LDLIBS=		${LIBNAME}.a -pthread
+LIBS=		-lcrypto
+LN=		ln
+MV=		mv
+CP=		cp
+MKDIR=		mkdir -p
+INSTALL=	install
+RANLIB=		ranlib
+SHARED=		-shared ${CRYPTOLFLAGS}
 #SHARED=	-shared ${CRYPTOLFLAGS} -Wl,-soname,$@
 TIME=
 
-EPLIBMAJVER=	2
-EPLIBMINVER=	1
 EPLIBVER=	${EPLIBMAJVER}.${EPLIBMINVER}
-LIBALL=		libep.a libep.so.${EPLIBVER}
+LIBALL=		${LIBNAME}.a ${LIBNAME}.so.${EPLIBVER}
 INCALL=		${HFILES}
-ALL=		${LIBALL} ${INCALL} ${BINALL}
+# files that should be removed on "make clean"
+CLEANALL=	${LIBALL} ${BINALL} ${SBINALL}
+# files that should be publically installed
+PUBALL=		${CLEANALL} ${SCRIPTS} ${MANALL} ${INCALL}
+# "make all" targets (may overlap)
+ALL=		${CLEANALL} ${PUBALL}
 
 all: ${ALL}
 
-libep.a: ${OBJS}
+${LIBNAME}.a: ${OBJS}
 	${AR} -r $@ ${OBJS}
 	${RANLIB} $@
 
-libep.so.${EPLIBVER}: ${OBJS}
+${LIBNAME}.so.${EPLIBVER}: ${OBJS}
 	${CC} ${SHARED} -o $@ ${OBJS} ${LIBS}
+
+${OBJS}: ${HFILES}
 
 ep_version.o: ep_version.c ${OBJS_MOST} Makefile
 	${CC} ${CFLAGS} -D_CURRENT_DATE_=\"`date +'%Y-%m-%d_%H:%M'`\" -c ep_version.c
-
-#ep_stat.h: ep_status_codes.stat procstatus.py
-#	-mv -f ep_stat.h ep_stat.h~
-#	./procstatus.py < ep_status_codes.stat > ep_stat.h
-#	chmod 444 ep_stat.h
 
 
 #
 #  Administrative stuff
 #
 
+# cleanup
 clean:
-	-${RM} -f ${BINALL} libep.* *.o *.core
+	-${RM} -f ${BINALL} ${LIBNAME}.* *.o *.core
 	-${RM} -rf *.dSYM
 
+# system installation
 install:	${ALLDIRS} ${PUBALL}
 	${CP} ${INCALL} ${INCDIR}/ep
 	${INSTALL} ${LIBALL} ${LIBDIR}
-	(cd ${LIBDIR}; rm -f libep.so.${EPLIBMAJVER}; ln -s libep.so.${EPLIBVER} libep.so.${EPLIBMAJVER})
-	(cd ${LIBDIR}; rm -f libep.so; ln -s libep.so.${EPLIBMAJVER} libep.so)
-	(cd ${LIBDIR}; rm -f libep.${EPLIBVER}.dylib; ln -s libep.so.${EPLIBVER} libep.${EPLIBVER}.dylib)
+	(cd ${LIBDIR}; rm -f ${LIBNAME}.so.${EPLIBMAJVER}; ln -s ${LIBNAME}.so.${EPLIBVER} ${LIBNAME}.so.${EPLIBMAJVER})
+	(cd ${LIBDIR}; rm -f ${LIBNAME}.so; ln -s ${LIBNAME}.so.${EPLIBMAJVER} ${LIBNAME}.so)
+	(cd ${LIBDIR}; rm -f ${LIBNAME}.${EPLIBVER}.dylib; ln -s ${LIBNAME}.so.${EPLIBVER} ${LIBNAME}.${EPLIBVER}.dylib)
 
 ${ALLDIRS}:
 	${MKDIR} $@
 
-${OBJS}: ${HFILES}
+# local installation (into source tree, needed for Java & Debian package build)
+install-local:	${LOCALLIBSDIR} ${LIBALL}
+	${INSTALL} ${LIBALL} ${LOCALLIBSDIR}
+	(cd ${LOCALLIBSDIR}; rm -f ${LIBNAME}.so.${EPLIBMAJVER}; ln -s ${LIBNAME}.so.${EPLIBVER} ${LIBNAME}.so.${EPLIBMAJVER})
+	(cd ${LOCALLIBSDIR}; rm -f ${LIBNAME}.so; ln -s ${LIBNAME}.so.${EPLIBMAJVER} ${LIBNAME}.so)
+	(cd ${LOCALLIBSDIR}; rm -f ${LIBNAME}.${EPLIBVER}.dylib; ln -s ${LIBNAME}.so.${EPLIBVER} ${LIBNAME}.${EPLIBVER}.dylib)
 
-ADM=		../adm
+# license update
 UPDATE_LICENSE=	${ADM}/update-license.sh
 
 update-license:
