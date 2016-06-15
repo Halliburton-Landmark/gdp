@@ -3,26 +3,26 @@ google.charts.load('current', {'packages':['corechart', 'controls']});
 
 deviceData = {
         "logs": [
-            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e5300003", "type": "BLEES", "humanName": 'xyz'},
-            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e570002b", "type": "PowerBlade", "humanName": 'xyz'},
-            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e5700088", "type": "PowerBlade", "humanName": 'xyz'},
-            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e570008b", "type": "PowerBlade", "humanName": 'xyz'},
-            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e570008e", "type": "PowerBlade", "humanName": 'xyz'},
-            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e590000a", "type": "Blink", "humanName": 'xyz'},
+            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e5300003", "type": "BLEES", "humanName": 'immersion BLEE: rear camera pillar'},
+            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e570002b", "type": "PowerBlade", "humanName": 'immersion PowerBlade: primary projector'},
+            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e570008b", "type": "PowerBlade", "humanName": 'immersion PowerBlade: secondary projector'},
+            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e5700088", "type": "PowerBlade", "humanName": 'immersion PowerBlade audience camera'},
+            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e570008e", "type": "PowerBlade", "humanName": 'immersion PowerBlade: speaker camera'},
+            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e590000a", "type": "Blink", "humanName": 'immersion Blink: front wall adjacent to screen'},
 
 
-            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e530000a", "type": "BLEES", "humanName": 'xyz'},
-            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e590000b", "type": "Blink", "humanName": 'xyz'},
-            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e5900019", "type": "Blink", "humanName": 'xyz'},
-            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e5900091", "type": "Blink", "humanName": 'xyz'},
+            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e530000a", "type": "BLEES", "humanName": 'swarm BLEE: inside entrance lobby'},
+            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e5900019", "type": "Blink", "humanName": 'swarm Blink: exit stair door near 490'},
+            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e590000b", "type": "Blink", "humanName": 'swarm Blink: inside entrance lobby'},
+            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e5900091", "type": "Blink", "humanName": 'swarm Blink: 4th floor elevator lobby'},
 
 
-            { "logname": "edu.berkeley.eecs.bwrc.device.c098e5300009", "type": "BLEES", "humanName": 'xyz'},
-            { "logname": "edu.berkeley.eecs.bwrc.device.c098e5300036", "type": "BLEES", "humanName": 'xyz'},
-            { "logname": "edu.berkeley.eecs.bwrc.device.c098e5300054", "type": "BLEES", "humanName": 'xyz'},
-            { "logname": "edu.berkeley.eecs.bwrc.device.c098e530005d", "type": "BLEES", "humanName": 'xyz'},
-            { "logname": "edu.berkeley.eecs.bwrc.device.c098e570008f", "type": "PowerBlade", "humanName": 'xyz'},
-            { "logname": "edu.berkeley.eecs.bwrc.device.c098e590001e", "type": "Blink", "humanName": 'xyz'}],
+            { "logname": "edu.berkeley.eecs.bwrc.device.c098e5300009", "type": "BLEES", "humanName": 'bwrc BLEE: lab rear wall'},
+            { "logname": "edu.berkeley.eecs.bwrc.device.c098e5300036", "type": "BLEES", "humanName": 'bwrc BLEE: rear wall'},
+            { "logname": "edu.berkeley.eecs.bwrc.device.c098e5300054", "type": "BLEES", "humanName": 'bwrc BLEE: hot aisle'},
+            { "logname": "edu.berkeley.eecs.bwrc.device.c098e530005d", "type": "BLEES", "humanName": 'bwrc BLEE: mid wall'},
+            { "logname": "edu.berkeley.eecs.bwrc.device.c098e570008f", "type": "PowerBlade", "humanName": 'bwrc PowerBlade: utility power to sump pump'},
+            { "logname": "edu.berkeley.eecs.bwrc.device.c098e590001e", "type": "Blink", "humanName": 'bwrc Blink'}],
     };
 
 
@@ -31,7 +31,7 @@ function makeForm() {
     var devicePickerString = "";
     for (var i=0; i<deviceData.logs.length; i++) {
         var log = deviceData.logs[i];
-        devicePickerString += "<option value='" + log.logname + "'>" + log.logname + "</option>";
+        devicePickerString += "<option value='" + log.logname + "'>" + log.humanName + "</option>";
     }
     document.getElementById('logname').innerHTML = devicePickerString;
     var timeNow = Date.now()
@@ -86,8 +86,8 @@ function handleQueryResponse(response) {
             //'ui': {'labelStacking': 'vertical'}
         },
         'state': {
-            'range': {'start': new Date(((startTime+endTime)/2)*1000),
-                      'end': new Date(endTime*1000)},
+            //'range': {'start': new Date(((startTime+endTime)/2)*1000),
+            //          'end': new Date(endTime*1000)},
         }
     });
 
