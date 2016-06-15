@@ -216,7 +216,7 @@ acknak(gdp_req_t *req, const char *where, bool reuse_pdu)
 		return GDP_STAT_PROTOCOL_FAIL;
 	}
 
-	ep_dbg_cprintf(Dbg, 8, "%s: received %d\n", where, req->pdu->cmd);
+	ep_dbg_cprintf(Dbg, 20, "%s: received %d\n", where, req->pdu->cmd);
 
 	// we want to re-use caller's datum for (e.g.) read commands
 	if (req->rpdu != NULL && req->rpdu != req->pdu && reuse_pdu)

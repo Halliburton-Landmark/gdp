@@ -126,7 +126,8 @@ _gdp_gcl_cache_add(gdp_gcl_t *gcl, gdp_iomode_t mode)
 
 	if (EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
 	{
-		ep_dbg_cprintf(Dbg, 8, "_gdp_gcl_cache_add(%p): already cached\n", gcl);
+		ep_dbg_cprintf(Dbg, 41, "_gdp_gcl_cache_add(%p): already cached\n",
+				gcl);
 		return;
 	}
 
@@ -146,7 +147,7 @@ _gdp_gcl_cache_add(gdp_gcl_t *gcl, gdp_iomode_t mode)
 	}
 
 	gcl->flags |= GCLF_INCACHE;
-	ep_dbg_cprintf(Dbg, 42, "_gdp_gcl_cache_add: %s => %p\n",
+	ep_dbg_cprintf(Dbg, 40, "_gdp_gcl_cache_add: %s => %p\n",
 			gcl->pname, gcl);
 }
 
@@ -174,7 +175,7 @@ _gdp_gcl_cache_changename(gdp_gcl_t *gcl, gdp_name_t newname)
 	(void) ep_hash_insert(OpenGCLCache, sizeof (gdp_name_t), newname, gcl);
 	ep_thr_mutex_unlock(&GclCacheMutex);
 
-	ep_dbg_cprintf(Dbg, 42, "_gdp_gcl_cache_changename: %s => %p\n",
+	ep_dbg_cprintf(Dbg, 40, "_gdp_gcl_cache_changename: %s => %p\n",
 					gcl->pname, gcl);
 }
 
@@ -290,7 +291,7 @@ _gdp_gcl_cache_drop(gdp_gcl_t *gcl)
 	ep_thr_mutex_unlock(&gcl->mutex);
 	ep_thr_mutex_unlock(&GclCacheMutex);
 
-	ep_dbg_cprintf(Dbg, 42, "_gdp_gcl_cache_drop: %s => %p\n",
+	ep_dbg_cprintf(Dbg, 40, "_gdp_gcl_cache_drop: %s => %p\n",
 			gcl->pname, gcl);
 }
 
@@ -448,7 +449,7 @@ _gdp_gcl_incref(gdp_gcl_t *gcl)
 	ep_thr_mutex_lock(&gcl->mutex);
 	gcl->refcnt++;
 	_gdp_gcl_touch(gcl);
-	ep_dbg_cprintf(Dbg, 44, "_gdp_gcl_incref(%p): %d\n", gcl, gcl->refcnt);
+	ep_dbg_cprintf(Dbg, 51, "_gdp_gcl_incref(%p): %d\n", gcl, gcl->refcnt);
 	ep_thr_mutex_unlock(&gcl->mutex);
 }
 
@@ -474,7 +475,7 @@ _gdp_gcl_decref(gdp_gcl_t **gclp)
 		ep_log(GDP_STAT_BAD_REFCNT, "_gdp_gcl_decref: %p: zero refcnt", gcl);
 	}
 
-	ep_dbg_cprintf(Dbg, 44, "_gdp_gcl_decref(%p): %d\n",
+	ep_dbg_cprintf(Dbg, 51, "_gdp_gcl_decref(%p): %d\n",
 			gcl, gcl->refcnt);
 	ep_thr_mutex_unlock(&gcl->mutex);
 	if (gcl->refcnt == 0 && !EP_UT_BITSET(GCLF_DEFER_FREE, gcl->flags))
