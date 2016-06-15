@@ -351,7 +351,14 @@ public class GDP_GCL {
         PointerByReference gdp_event_ptr = Gdp05Library.INSTANCE
                             .gdp_event_next(gclh, timeout);
 
-        // Get the data associated with this event
+        if (gdp_event_ptr == null) {
+            return new HashMap<String, Object>();
+            //throw new NullPointerException("gdp_event_next(" + gclh + ", " + timeout
+            //        + ") returned null");
+        }
+        // Get the data associated with this event.
+        // If gdp_event_gettype() is passed a NULL, then an assertion is thrown
+        // and process exits.
         int type = Gdp05Library.INSTANCE.gdp_event_gettype(gdp_event_ptr);
         PointerByReference datum_ptr = Gdp05Library.INSTANCE
                             .gdp_event_getdatum(gdp_event_ptr);
