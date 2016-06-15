@@ -40,6 +40,7 @@
 #include <gdp/gdp_gclmd.h>
 
 #include <ep/ep_hash.h>
+#include <ep/ep_hexdump.h>
 #include <ep/ep_log.h>
 #include <ep/ep_mem.h>
 #include <ep/ep_net.h>
@@ -299,7 +300,7 @@ extent_open(gdp_gcl_t *gcl, extent_t *ext)
 				(data_fp = fdopen(fd, "a+")) == NULL)
 		{
 			estat = ep_stat_from_errno(errno);
-			ep_dbg_cprintf(Dbg, 16, "extent_open(%s): %s\n",
+			ep_dbg_cprintf(Dbg, 6, "extent_open(%s): %s\n",
 					data_pbuf, strerror(errno));
 			if (fd >= 0)
 				close(fd);
@@ -409,7 +410,7 @@ success:
 	return estat;
 
 fail1:
-	ep_dbg_cprintf(Dbg, 20, "extent_open: closing fp %p (error)\n", data_fp);
+	ep_dbg_cprintf(Dbg, 10, "extent_open: closing fp %p (error)\n", data_fp);
 	fclose(data_fp);
 fail0:
 	EP_ASSERT_ENSURE(!EP_STAT_ISOK(estat));
@@ -899,7 +900,7 @@ fail1:
 
 
 /*
-**	GCL_PHYSOPEN --- do physical open of a GCL
+**	DISK_OPEN --- do physical open of a GCL
 **
 **		XXX: Should really specify whether we want to start reading:
 **		(a) At the beginning of the log (easy).	 This includes random
@@ -919,9 +920,11 @@ disk_open(gdp_gcl_t *gcl)
 	FILE *index_fp;
 	gcl_physinfo_t *phys;
 	char index_pbuf[GCL_PATH_MAX];
+	const char *phase;
 
 	// allocate space for physical data
 	EP_ASSERT_REQUIRE(gcl->x->physinfo == NULL);
+	phase = "physinfo_alloc";
 	gcl->x->physinfo = phys = physinfo_alloc(gcl);
 	if (phys == NULL)
 	{
@@ -930,10 +933,12 @@ disk_open(gdp_gcl_t *gcl)
 	}
 
 	// open the index file
+	phase = "get_gcl_path(index)";
 	estat = get_gcl_path(gcl, -1, GCL_LXF_SUFFIX,
 					index_pbuf, sizeof index_pbuf);
 	EP_STAT_CHECK(estat, goto fail0);
 	ep_dbg_cprintf(Dbg, 39, "disk_open: opening %s\n", index_pbuf);
+	phase = "open index";
 	fd = open(index_pbuf, O_RDWR | O_APPEND);
 	if (fd < 0 || flock(fd, LOCK_SH) < 0 ||
 			(index_fp = fdopen(fd, "a+")) == NULL)
@@ -948,6 +953,7 @@ disk_open(gdp_gcl_t *gcl)
 	}
 
 	// check for valid index header (distinguish old and new format)
+	phase = "index header read";
 	index_header_t index_header;
 
 	index_header.magic = 0;
@@ -994,6 +1000,7 @@ disk_open(gdp_gcl_t *gcl)
 
 	// create a cache for the index information
 	//XXX should do data too, but that's harder because it's variable size
+	phase = "xcache_create";
 	estat = xcache_create(phys);
 	EP_STAT_CHECK(estat, goto fail0);
 
@@ -1011,6 +1018,7 @@ disk_open(gdp_gcl_t *gcl)
 	**  Find the last extent mentioned in that index.
 	*/
 
+	phase = "initial index read";
 	{
 		index_entry_t xent;
 		if (fseek(phys->index.fp, phys->index.max_offset - SIZEOF_INDEX_RECORD,
@@ -1031,6 +1039,7 @@ disk_open(gdp_gcl_t *gcl)
 		char data_pbuf[GCL_PATH_MAX];
 		struct stat stbuf;
 
+		phase = "get_gcl_path(data)";
 		estat = get_gcl_path(gcl, phys->last_extent + 1, GCL_LDF_SUFFIX,
 						data_pbuf, sizeof data_pbuf);
 		EP_STAT_CHECK(estat, goto fail0);
@@ -1046,6 +1055,7 @@ disk_open(gdp_gcl_t *gcl)
 	**  is "hotter" than old data.
 	*/
 
+	phase = "extent_get";
 	{
 		extent_t *ext = extent_get(gcl, phys->last_extent);
 		estat = extent_open(gcl, ext);
@@ -1054,7 +1064,7 @@ disk_open(gdp_gcl_t *gcl)
 
 	if (ep_dbg_test(Dbg, 20))
 	{
-		ep_dbg_printf("gcl_physopen => ");
+		ep_dbg_printf("disk_open => ");
 		physinfo_dump(phys, ep_dbg_getfile());
 	}
 	return estat;
@@ -1067,8 +1077,8 @@ fail0:
 	{
 		char ebuf[100];
 
-		ep_dbg_printf("gcl_physopen: couldn't open gcl %s:\n\t%s\n",
-				gcl->pname, ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		ep_dbg_printf("disk_open(%s): couldn't open gcl %s:\n\t%s\n",
+				phase, gcl->pname, ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 	return estat;
 }
@@ -1151,9 +1161,11 @@ disk_read(gdp_gcl_t *gcl,
 		{
 			// computed offset is out of range
 			estat = GDP_STAT_CORRUPT_INDEX;
-			ep_log(estat, "gcl_diskread(%s): computed offset %jd out of range (%jd max)",
+			ep_log(estat, "gcl_diskread(%s): computed offset %jd out of range (%jd - %jd)",
 					gcl->pname,
-					(intmax_t) xoff, (intmax_t) phys->index.max_offset);
+					(intmax_t) xoff,
+					(intmax_t) phys->index.header_size,
+					(intmax_t) phys->index.max_offset);
 			goto fail3;
 		}
 		xent = &index_entry;
@@ -1344,10 +1356,13 @@ disk_append(gdp_gcl_t *gcl,
 		size_t slen = evbuffer_get_length(datum->sig);
 		unsigned char *p = evbuffer_pullup(datum->sig, slen);
 
-		if (datum->siglen != slen)
-			ep_dbg_cprintf(Dbg, 1,
-					"disk_append: datum->siglen = %d, slen = %zd\n",
+		if (datum->siglen != slen && ep_dbg_test(Dbg, 1))
+		{
+			ep_dbg_printf("disk_append: datum->siglen = %d, slen = %zd\n",
 					datum->siglen, slen);
+			if (slen > 0)
+				ep_hexdump(p, slen, ep_dbg_getfile(), EP_HEXDUMP_ASCII, 0);
+		}
 		EP_ASSERT_INSIST(datum->siglen == slen);
 		if (slen > 0 && p != NULL)
 			fwrite(p, slen, 1, ext->fp);

@@ -660,6 +660,8 @@ _gdp_pdu_in(gdp_pdu_t *pdu, gdp_chan_t *chan)
 	}
 
 	// ibuf now points at the signature (if any)
+	if (pdu->datum->sig != NULL)
+		gdp_buf_reset(pdu->datum->sig);			// just in case
 	if (pdu->datum->siglen > 0)
 	{
 		size_t l;
@@ -669,7 +671,6 @@ _gdp_pdu_in(gdp_pdu_t *pdu, gdp_chan_t *chan)
 				pdu->datum->siglen, evbuffer_get_length(ibuf));
 		if (pdu->datum->sig == NULL)
 			pdu->datum->sig = gdp_buf_new();
-		gdp_buf_reset(pdu->datum->sig);			// just in case
 
 		l = evbuffer_remove_buffer(ibuf, pdu->datum->sig, pdu->datum->siglen);
 		if (ep_dbg_test(Dbg, 39))
