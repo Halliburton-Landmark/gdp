@@ -1019,6 +1019,11 @@ disk_open(gdp_gcl_t *gcl)
 	*/
 
 	phase = "initial index read";
+	if (phys->index.max_offset == 0)
+	{
+		phys->last_extent = 0;
+	}
+	else
 	{
 		index_entry_t xent;
 		if (fseek(phys->index.fp, phys->index.max_offset - SIZEOF_INDEX_RECORD,
