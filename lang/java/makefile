@@ -32,9 +32,13 @@
 # To update the GDP version, see ../../gdp/gdp_version.h
 # If you change the GDP version, then also update $PTII/configure.in and
 # https://www.terraswarm.org/swarmos/wiki/Main/GDPJavaInterface
-GDP_MAJOR_VERSION=0.6
-GDP_PATCH_VERSION=1
-GDP_JAR=gdp-$(GDP_MAJOR_VERSION)-$(GDP_PATCH_VERSION).jar
+GDPLIBMAJVER=	0
+GDPLIBMINVER=	5
+GDP_PATCH_VERSION=0
+
+GDP_MAJOR_MINOR_VERSION=$(GDPLIBMAJVER).$(GDPLIBMINVER)
+
+GDP_JAR=gdp-$(GDP_MAJOR_MINOR_VERSION)-$(GDP_PATCH_VERSION).jar
 all: jclass
 install: all
 	jar cf $(GDP_JAR) org/terraswarm/gdp/*.class
@@ -89,7 +93,7 @@ LIBEVENT_H_FILES = \
 jna: $(JNAERATOR_JAR) $(JNAERATOR_RUNTIME_JAR) $(GDP_H_FILES) $(LIBEVENT_H_FILES)
 	java -jar $(JNAERATOR_JAR) -runtime JNA -f \
 		-Dgdp_datum_t="void *" -Dgdp_datum="void *" \
-		-library gdp.$(GDP_MAJOR_VERSION) -I ../../gdp -I ../.. \
+		-library gdp.$(GDP_MAJOR_MINOR_VERSION) -I ../../gdp -I ../.. \
 		$(GDP_H_FILES) $(LIBEVENT_H_FILES) \
 		-o . -library event2 -I/usr/include -I/usr/local/include \
                 -package org.terraswarm.gdp  -v  -noJar -noComp

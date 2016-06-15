@@ -76,7 +76,7 @@ public class GDP_NAME {
         // copy to newly created bytebuffer
         tmp.put(this.name);
 
-        byte ret = Gdp06Library.INSTANCE.gdp_name_is_valid(tmp);
+        byte ret = Gdp05Library.INSTANCE.gdp_name_is_valid(tmp);
         if (ret == 0x00) {
             return false;
         } else {
@@ -122,7 +122,7 @@ public class GDP_NAME {
     private byte[] __parse_name(String s) {
         ByteBuffer dst = ByteBuffer.allocate(32); // FIXME
         
-        EP_STAT estat = Gdp06Library.INSTANCE.gdp_parse_name(s, dst);
+        EP_STAT estat = Gdp05Library.INSTANCE.gdp_parse_name(s, dst);
         GDP.check_EP_STAT(estat);
 
         // we don't care if the bytebuffer gets modified. We aren't using
@@ -144,7 +144,7 @@ public class GDP_NAME {
         ByteBuffer printable = ByteBuffer.allocate(this.PNAME_LEN+1);
         
                 
-        Gdp06Library.INSTANCE.gdp_printable_name(internal, printable);
+        Gdp05Library.INSTANCE.gdp_printable_name(internal, printable);
         // no problem, since we don't need bytebuffer interface to this
         // memory anymore.
         

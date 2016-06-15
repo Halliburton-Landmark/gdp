@@ -17,7 +17,7 @@ import org.terraswarm.gdp.NativeSize; // Fixed by cxh in makefile.
  * A class to hold utility functions for the GDP. For the lack of a 
  * better name and to keep things concise, we just call it GDP.
  * Most (if not all) members of this class should be static. The 
- * auto-generated constants in Gdp06Library.java that should be made
+ * auto-generated constants in Gdp05Library.java that should be made
  * available to the users should also ideally be copied here.
  *  
  * @author nitesh mor
@@ -37,7 +37,7 @@ public class GDP {
      */
     public static void gdp_init() {
         EP_STAT estat;
-        estat = Gdp06Library.INSTANCE.gdp_init((Pointer)null);        
+        estat = Gdp05Library.INSTANCE.gdp_init((Pointer)null);        
         check_EP_STAT(estat);        
        
     }
@@ -49,7 +49,7 @@ public class GDP {
      */
     public static void gdp_init(String gdpRouter) {
         EP_STAT estat;
-        estat = Gdp06Library.INSTANCE.gdp_init(gdpRouter);
+        estat = Gdp05Library.INSTANCE.gdp_init(gdpRouter);
         check_EP_STAT(estat);
         
     }
@@ -60,7 +60,7 @@ public class GDP {
      */
     public static void dbg_set(String debug_level) {
 
-        Gdp06Library.INSTANCE.ep_dbg_set(debug_level);
+        Gdp05Library.INSTANCE.ep_dbg_set(debug_level);
     }
 
 
@@ -73,10 +73,10 @@ public class GDP {
     public static boolean check_EP_STAT(EP_STAT estat){
 
         int code = estat.code;
-        int EP_STAT_SEVERITY = (code >>> Gdp06Library._EP_STAT_SEVSHIFT)
-                & ((1 << Gdp06Library._EP_STAT_SEVBITS) - 1);
+        int EP_STAT_SEVERITY = (code >>> Gdp05Library._EP_STAT_SEVSHIFT)
+                & ((1 << Gdp05Library._EP_STAT_SEVBITS) - 1);
 
-        return (EP_STAT_SEVERITY < Gdp06Library.EP_STAT_SEV_WARN);
+        return (EP_STAT_SEVERITY < Gdp05Library.EP_STAT_SEV_WARN);
     }
 
     
