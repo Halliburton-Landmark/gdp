@@ -84,7 +84,7 @@ class GDPcache:
 
     def get(self, tStart, tEnd, numPoints=1000):
         """ return a list of records, *roughly* numPoints long """
-        _startR = self.__findRecNo(tStart)
+        _startR = self.__findRecNo(tStart)+1
         _endR = self.__findRecNo(tEnd)
 
         # can we use multiread?
