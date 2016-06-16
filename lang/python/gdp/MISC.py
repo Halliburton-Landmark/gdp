@@ -36,15 +36,22 @@ import os
 package_directory = os.path.dirname(os.path.abspath(__file__))
 
 # Load the DLLs. Make sure that the files actually exist ###
-gdp = CDLL(os.path.join(package_directory,
+try:
+    gdp = CDLL(os.path.join(package_directory,
            "..", "..", "..", "libs",  "libgdp.so"))
+except OSError:
+    gdp = CDLL(os.path.join(package_directory,
+           "..", "..", "..", "gdp",  "libgdp.so.0.5"))
+
 #ep = CDLL(os.path.join(package_directory,
 #          "..", "..", "..", "libs", "libep.so"))
 try:
     evb = CDLL("libevent.so")       # On linux
 except OSError:
-    evb = CDLL("libevent.dylib")    # On MAC
-
+    try:
+        evb = CDLL("libevent.dylib")    # On Mac
+    except OSError:
+        evb = CDLL("/usr/local/lib/libevent.dylib")    # On Mac, use absolute path
 
 # hack for file pointer. Apparently this works only on Python 2.x and not with 3
 # copied from
