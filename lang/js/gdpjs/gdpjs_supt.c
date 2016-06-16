@@ -239,14 +239,14 @@ gdp_datum_getts_as_string( const gdp_datum_t *datum, bool human )
 
 // From gdp/gdp_stat.h
 
-// #define GDP_STAT_NAK_NOTFOUND GDP_STAT_NEW(ERROR, GDP_COAP_NOTFOUND)
+// #define GDP_STAT_NAK_NOTFOUND GDP_STAT_NEW(ERROR, _GDP_CCODE_NOTFOUND)
 
 // Returns a EP_STAT with severity field ERROR; other fields see below.
 EP_STAT
 gdp_stat_nak_notfound()
 {
 	EP_STAT_32_64 rv;
-    rv.as_EP_STAT  = (GDP_STAT_NEW(ERROR, GDP_COAP_NOTFOUND));
+    rv.as_EP_STAT  = (GDP_STAT_NEW(ERROR, _GDP_CCODE_NOTFOUND));
 #if DEBUG
     fprintf( stderr, "gdp_stat_nak_notfound:"
                      "  Returning GDP_STAT_NAK_NOTFOUND = %x\n", rv.as_32_64_t);

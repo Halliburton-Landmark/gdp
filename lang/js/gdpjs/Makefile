@@ -51,12 +51,14 @@ O=	-O
 WALL=	-Wall
 STD=
 COPTS=	${PG} -g ${WALL} $O ${STD}
-CFLAGS=	${COPTS} ${INCLS} -I${CURDIR} -I.. -I../.. -I../../.. -fPIC
+# /opt/local/include is for Mac OS X.
+CFLAGS=	${COPTS} ${INCLS} -I${CURDIR} -I.. -I../.. -I../../.. -I/opt/local/include -fPIC
 RM=	rm
 LD=	ld
 GDPROOT= ../../..
 LIBROOT= ${GDPROOT}
-LDCRYPTO= -lcrypto
+# /opt/local/lib is for Mac OS X.
+LDCRYPTO= -L/opt/local/lib -lcrypto -lavahi-common -lavahi-client
 LDEVENT2= -levent -levent_pthreads
 LDEP=   -L${LIBROOT}/ep -lep
 LDGDP=  -L${LIBROOT}/gdp -lgdp
