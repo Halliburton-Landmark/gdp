@@ -192,7 +192,7 @@ typedef struct gdp_pdu
 #define GDP_CMD_OPEN_RA			75			// open a GCL for read or append
 #define GDP_CMD_NEWEXTENT		76			// create a new extent for a log
 #define GDP_CMD_FWD_APPEND		77			// forward (replicate) APPEND
-//		128-191			Positive acks
+//		128-191			Positive acks (HTTP 200-263)
 #define GDP_ACK_MIN			128			// minimum ack code
 #define GDP_ACK_SUCCESS			_GDP_ACK_FROM_CODE(SUCCESS)				// 128
 #define GDP_ACK_CREATED			_GDP_ACK_FROM_CODE(CREATED)				// 129
@@ -201,7 +201,7 @@ typedef struct gdp_pdu
 #define GDP_ACK_CHANGED			_GDP_ACK_FROM_CODE(CHANGED)				// 132
 #define GDP_ACK_CONTENT			_GDP_ACK_FROM_CODE(CONTENT)				// 133
 #define GDP_ACK_MAX			191			// maximum ack code
-//		192-223			Negative acks, client side (CoAP, HTTP)
+//		192-223			Negative acks, client side (CoAP, HTTP 400-431)
 #define GDP_NAK_C_MIN		192			// minimum client-side nak code
 #define GDP_NAK_C_BADREQ		_GDP_NAK_C_FROM_CODE(BADREQ)			// 192
 #define GDP_NAK_C_UNAUTH		_GDP_NAK_C_FROM_CODE(UNAUTH)			// 193
@@ -215,8 +215,9 @@ typedef struct gdp_pdu
 #define GDP_NAK_C_PRECONFAILED	_GDP_NAK_C_FROM_CODE(PRECONFAILED)		// 204
 #define GDP_NAK_C_TOOLARGE		_GDP_NAK_C_FROM_CODE(TOOLARGE)			// 205
 #define GDP_NAK_C_UNSUPMEDIA	_GDP_NAK_C_FROM_CODE(UNSUPMEDIA)		// 207
+#define GDP_NAK_C_REC_DUP		_GDP_NAK_C_FROM_CODE(DUP_RECORD)		// 223
 #define GDP_NAK_C_MAX		223			// maximum client-side nak code
-//		224-239			Negative acks, server side (CoAP, HTTP)
+//		224-239			Negative acks, server side (CoAP, HTTP 500-515)
 #define GDP_NAK_S_MIN		224			// minimum server-side nak code
 #define GDP_NAK_S_INTERNAL		_GDP_NAK_S_FROM_CODE(INTERNAL)			// 224
 #define GDP_NAK_S_NOTIMPL		_GDP_NAK_S_FROM_CODE(NOTIMPL)			// 225
@@ -224,7 +225,7 @@ typedef struct gdp_pdu
 #define GDP_NAK_S_SVCUNAVAIL	_GDP_NAK_S_FROM_CODE(SVCUNAVAIL)		// 227
 #define GDP_NAK_S_GWTIMEOUT		_GDP_NAK_S_FROM_CODE(GWTIMEOUT)			// 228
 #define GDP_NAK_S_PROXYNOTSUP	_GDP_NAK_S_FROM_CODE(PROXYNOTSUP)		// 229
-#define GDP_NAK_S_LOSTSUB		239			// lost subscription
+#define GDP_NAK_S_LOSTSUB		_GDP_NAK_S_FROM_CODE(LOST_SUBSCR)		// 239
 #define GDP_NAK_S_MAX		239			// maximum server-side nak code
 //		240-254			Negative acks, routing layer
 #define GDP_NAK_R_MIN		240			// minimum routing layer nak code

@@ -493,9 +493,22 @@ cmd_append(gdp_req_t *req)
 		// XXX TEMPORARY: if no key, allow any record number XXX
 		// (for compatibility with older clients) [delete if condition]
 		if (GDP_PROTO_MIN_VERSION > 2 || req->pdu->ver > 2)
-			return gdpd_gcl_error(req->pdu->dst,
+		{
+			if (req->pdu->datum->recno <= req->gcl->nrecs)
+			{
+				// may be a duplicate append
+				// XXX check that records match?
+				return gdpd_gcl_error(req->pdu->dst,
+						"cmd_append: writing duplicate record",
+						GDP_STAT_RECORD_DUPLICATED, GDP_STAT_NAK_CONFLICT);
+			}
+			else
+			{
+				return gdpd_gcl_error(req->pdu->dst,
 						"cmd_append: record sequence error",
 						GDP_STAT_RECNO_SEQ_ERROR, GDP_STAT_NAK_FORBIDDEN);
+			}
+		}
 	}
 
 	if (req->gcl->digest == NULL)

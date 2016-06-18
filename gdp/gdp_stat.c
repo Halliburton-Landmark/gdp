@@ -69,8 +69,8 @@ static struct ep_stat_to_string Stats[] =
 	{ GDP_STAT_DEAD_DAEMON,				"lost connection to GDP",		},
 	{ GDP_STAT_GCL_VERSION_MISMATCH,	"gcl version mismatch",			},
 	{ GDP_STAT_READONLY,				"cannot update read-only object",	},
-	{ GDP_STAT_NOTFOUND,				"cannot find requested object",	},
-	{ GDP_STAT_PDU_CORRUPT,				"corrupt pdu",					},
+	{ GDP_STAT_NOTFOUND,				"cannot find requested object",		},
+	{ GDP_STAT_PDU_CORRUPT,				"corrupt pdu",						},
 	{ GDP_STAT_SKEY_REQUIRED,			"secret key required",				},
 	{ GDP_STAT_GCL_READ_ERROR,			"GCL read error",					},
 	{ GDP_STAT_RECNO_SEQ_ERROR,			"record out of sequence",			},
@@ -79,6 +79,8 @@ static struct ep_stat_to_string Stats[] =
 	{ GDP_STAT_RECORD_EXPIRED,			"record expired",					},
 	{ GDP_STAT_DEAD_REQ,				"request freed while in use",		},
 	{ GDP_STAT_BAD_REFCNT,				"invalid reference count",			},
+	{ GDP_STAT_RECORD_MISSING,			"record missing (look elsewhere)",	},
+	{ GDP_STAT_RECORD_DUPLICATED,		"record duplicated",				},
 
 	{ GDP_STAT_NAK_BADREQ,				"400 bad request",					},
 	{ GDP_STAT_NAK_UNAUTH,				"401 unauthorized",					},
@@ -92,6 +94,7 @@ static struct ep_stat_to_string Stats[] =
 	{ GDP_STAT_NAK_PRECONFAILED,		"412 precondition failed",			},
 	{ GDP_STAT_NAK_TOOLARGE,			"413 request entity too large",		},
 	{ GDP_STAT_NAK_UNSUPMEDIA,			"415 unsupported media type",		},
+	{ GDP_STAT_NAK_DUP_RECORD,			"431 duplicate record",				},
 
 	{ GDP_STAT_NAK_INTERNAL,			"500 internal server error",		},
 	{ GDP_STAT_NAK_NOTIMPL,				"501 not implemented",				},
@@ -99,6 +102,7 @@ static struct ep_stat_to_string Stats[] =
 	{ GDP_STAT_NAK_SVCUNAVAIL,			"503 service unavailable",			},
 	{ GDP_STAT_NAK_GWTIMEOUT,			"504 gateway timeout",				},
 	{ GDP_STAT_NAK_PROXYNOTSUP,			"505 proxying not supported",		},
+	{ GDP_STAT_NAK_LOST_SUBSCR,			"515 lost subscription",			},
 
 	{ GDP_STAT_NAK_NOROUTE,				"600 no route available",			},
 

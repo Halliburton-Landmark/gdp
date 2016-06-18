@@ -1112,6 +1112,42 @@ disk_close(gdp_gcl_t *gcl)
 */
 
 static EP_STAT
+fseek_to_index_recno(
+		struct physinfo *phys,
+		gdp_recno_t recno,
+		gdp_pname_t gclpname)
+{
+	off_t xoff;
+
+	xoff = (recno - phys->index.min_recno) * SIZEOF_INDEX_RECORD +
+			phys->index.header_size;
+	ep_dbg_cprintf(Dbg, 14,
+			"recno=%" PRIgdp_recno ", min_recno=%" PRIgdp_recno
+			", index_hdrsize=%zd, xoff=%jd\n",
+			recno, phys->min_recno,
+			phys->index.header_size, (intmax_t) xoff);
+	if (xoff >= phys->index.max_offset || xoff < phys->index.header_size)
+	{
+		// computed offset is out of range
+		ep_log(GDP_STAT_CORRUPT_INDEX,
+				"fseek_to_index_recno(%s): computed offset %jd"
+				" out of range (%jd - %jd)",
+				gclpname,
+				(intmax_t) xoff,
+				(intmax_t) phys->index.header_size,
+				(intmax_t) phys->index.max_offset);
+		return GDP_STAT_CORRUPT_INDEX;
+	}
+
+	if (fseek(phys->index.fp, xoff, SEEK_SET) < 0)
+	{
+		return posix_error(errno, "fseek_to_index_recno: fseek failed");
+	}
+
+	return EP_STAT_OK;
+}
+
+static EP_STAT
 disk_read(gdp_gcl_t *gcl,
 		gdp_datum_t *datum)
 {
@@ -1150,36 +1186,13 @@ disk_read(gdp_gcl_t *gcl,
 	}
 	else
 	{
-		off_t xoff;
+		xent = &index_entry;
 
 		// recno is not in the index cache: read it from disk
 		flockfile(phys->index.fp);
 
-		xoff = (datum->recno - phys->index.min_recno) * SIZEOF_INDEX_RECORD +
-				phys->index.header_size;
-		ep_dbg_cprintf(Dbg, 14,
-				"recno=%" PRIgdp_recno ", min_recno=%" PRIgdp_recno
-				", index_hdrsize=%zd, xoff=%jd\n",
-				datum->recno, phys->min_recno,
-				phys->index.header_size, (intmax_t) xoff);
-		if (xoff >= phys->index.max_offset || xoff < phys->index.header_size)
-		{
-			// computed offset is out of range
-			estat = GDP_STAT_CORRUPT_INDEX;
-			ep_log(estat, "gcl_diskread(%s): computed offset %jd out of range (%jd - %jd)",
-					gcl->pname,
-					(intmax_t) xoff,
-					(intmax_t) phys->index.header_size,
-					(intmax_t) phys->index.max_offset);
-			goto fail3;
-		}
-		xent = &index_entry;
-
-		if (fseek(phys->index.fp, xoff, SEEK_SET) < 0)
-		{
-			estat = posix_error(errno, "gcl_diskread: fseek failed");
-			goto fail3;
-		}
+		estat = fseek_to_index_recno(phys, datum->recno, gcl->pname);
+		EP_STAT_CHECK(estat, goto fail3);
 		if (fread(xent, SIZEOF_INDEX_RECORD, 1, phys->index.fp) < 1)
 		{
 			estat = posix_error(errno, "gcl_diskread: fread failed");
@@ -1195,6 +1208,12 @@ disk_read(gdp_gcl_t *gcl,
 				", offset=%jd, rsvd=%" PRIu32 "\n",
 				xent->recno, xent->extent,
 				(intmax_t) xent->offset, xent->reserved); 
+
+		if (xent->offset == 0)
+		{
+			// we don't have this record available
+			estat = GDP_STAT_RECORD_MISSING;
+		}
 
 fail3:
 		funlockfile(phys->index.fp);
@@ -1238,6 +1257,11 @@ fail3:
 				", sigmeta 0x%x, dlen %" PRId32 ", offset %" PRId64 "\n",
 				log_record.recno, log_record.sigmeta, log_record.data_length,
 				xent->offset);
+
+	if (log_record.recno != datum->recno)
+		EP_ASSERT_FAILURE("gcl_diskread: recno mismatch: wanted %" PRIgdp_recno
+				", got %" PRIgdp_recno,
+				datum->recno, log_record.recno);
 
 	datum->recno = log_record.recno;
 	memcpy(&datum->ts, &log_record.timestamp, sizeof datum->ts);
@@ -1334,7 +1358,7 @@ disk_append(gdp_gcl_t *gcl,
 	EP_STAT_CHECK(estat, return estat);
 
 	memset(&log_record, 0, sizeof log_record);
-	log_record.recno = ep_net_hton64(phys->max_recno + 1);
+	log_record.recno = datum->recno;
 	log_record.timestamp = datum->ts;
 	ep_net_hton_timespec(&log_record.timestamp);
 	log_record.data_length = ep_net_hton32(dlen);
@@ -1386,6 +1410,8 @@ disk_append(gdp_gcl_t *gcl,
 	index_entry.reserved = 0;
 
 	// write index record
+	estat = fseek_to_index_recno(phys, index_entry.recno, gcl->pname);
+	EP_STAT_CHECK(estat, goto fail0);
 	fwrite(&index_entry, sizeof index_entry, 1, phys->index.fp);
 
 	// commit
@@ -1401,9 +1427,10 @@ disk_append(gdp_gcl_t *gcl,
 		ext->max_offset += record_size;
 	}
 
+fail0:
 	ep_thr_rwlock_unlock(&phys->lock);
 
-	return EP_STAT_OK;
+	return estat;
 }
 
 

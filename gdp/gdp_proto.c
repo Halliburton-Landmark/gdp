@@ -605,7 +605,7 @@ static dispatch_ent_t	DispatchTable[256] =
 	NOENT,				// 220
 	NOENT,				// 221
 	NOENT,				// 222
-	NOENT,				// 223
+	{ nak_client,		"NAK_C_REC_DUP"			},			// 223
 	{ nak_server,		"NAK_S_INTERNAL"		},			// 224
 	{ nak_server,		"NAK_S_NOTIMPL"			},			// 225
 	{ nak_server,		"NAK_S_BADGATEWAY"		},			// 226
@@ -620,7 +620,7 @@ static dispatch_ent_t	DispatchTable[256] =
 	NOENT,				// 235
 	NOENT,				// 236
 	NOENT,				// 237
-	NOENT,				// 238
+	{ nak_server,		"NAK_S_REC_MISSING"		},			// 238
 	{ nak_server,		"NAK_S_LOSTSUB"			},			// 239
 	{ nak_router,		"NAK_R_NOROUTE"			},			// 240
 	NOENT,				// 241

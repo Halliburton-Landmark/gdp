@@ -78,12 +78,15 @@ extern void		_gdp_stat_init(void);
 #define GDP_STAT_RECORD_EXPIRED			GDP_STAT_NEW(WARN, 30)
 #define GDP_STAT_DEAD_REQ				GDP_STAT_NEW(ERROR, 31)
 #define GDP_STAT_BAD_REFCNT				GDP_STAT_NEW(ABORT, 32)
+#define GDP_STAT_RECORD_MISSING			GDP_STAT_NEW(WARN, 33)
+#define GDP_STAT_RECORD_DUPLICATED		GDP_STAT_NEW(WARN, 34)
 
 
 /*
 **  Both GDP ACK/NAK commands and status codes are based on status
 **  codes from CoAP and HTTP, which are themselves related.  In most
 **  (but not all) cases the CoAP codes are more appropriate.
+**  There are also some codes that have no CoAP or HTTP equivalents.
 **
 **  This list uses the HTTP-style (three digit) representation, and
 **  will be massaged later into both status codes and PDU commands.
@@ -125,6 +128,7 @@ extern void		_gdp_stat_init(void);
 											// (HTTP 415 Request URI Too Long)
 											// (HTTP 416 Requested Range Not Satisficable)
 											// (HTTP 417 Expectation Failed)
+#define _GDP_CCODE_DUP_RECORD		431		// GDP Duplicate Record
 
 #define _GDP_CCODE_INTERNAL			500		// HTTP/CoAP Internal Server Error
 #define _GDP_CCODE_NOTIMPL			501		// HTTP/CoAP Not Implemented
@@ -133,6 +137,7 @@ extern void		_gdp_stat_init(void);
 #define _GDP_CCODE_GWTIMEOUT		504		// HTTP/CoAP Gateway Timeout
 #define _GDP_CCODE_PROXYNOTSUP		505		// CoAP Proxying Not Supported
 											// (HTTP 505 HTTP Version Not Supported)
+#define _GDP_CCODE_LOST_SUBSCR		515		// GDP Lost Subscription
 
 #define _GDP_CCODE_NOROUTE			600		// no advertisement found for name
 
@@ -157,6 +162,7 @@ extern void		_gdp_stat_init(void);
 #define GDP_STAT_NAK_PRECONFAILED	GDP_STAT_NEW(ERROR, _GDP_CCODE_PRECONFAILED)
 #define GDP_STAT_NAK_TOOLARGE		GDP_STAT_NEW(ERROR, _GDP_CCODE_TOOLARGE)
 #define GDP_STAT_NAK_UNSUPMEDIA		GDP_STAT_NEW(ERROR, _GDP_CCODE_UNSUPMEDIA)
+#define GDP_STAT_NAK_DUP_RECORD		GDP_STAT_NEW(WARN, _GDP_CCODE_DUP_RECORD)
 
 #define GDP_STAT_NAK_INTERNAL		GDP_STAT_NEW(SEVERE, _GDP_CCODE_INTERNAL)
 #define GDP_STAT_NAK_NOTIMPL		GDP_STAT_NEW(SEVERE, _GDP_CCODE_NOTIMPL)
@@ -164,6 +170,7 @@ extern void		_gdp_stat_init(void);
 #define GDP_STAT_NAK_SVCUNAVAIL		GDP_STAT_NEW(SEVERE, _GDP_CCODE_SVCUNAVAIL)
 #define GDP_STAT_NAK_GWTIMEOUT		GDP_STAT_NEW(SEVERE, _GDP_CCODE_GWTIMEOUT)
 #define GDP_STAT_NAK_PROXYNOTSUP	GDP_STAT_NEW(SEVERE, _GDP_CCODE_PROXYNOTSUP)
+#define GDP_STAT_NAK_LOST_SUBSCR	GDP_STAT_NEW(WARN, _GDP_CCODE_LOST_SUBSCR)
 
 #define GDP_STAT_NAK_NOROUTE		GDP_STAT_NEW(ERROR, _GDP_CCODE_NOROUTE)
 
