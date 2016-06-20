@@ -765,6 +765,9 @@ a binary will show you which debug flags are available
 including a short description.  (The `what` program isn't available
 on Linux; it can be simulated using `strings | grep '@(#)'`).
 
+To enable debugging for all patterns, use "`*=`_level_", for
+example "`*=18`".
+
 ### Directory Structure
 
 * ep --- A library of C utility functions.  This is a stripped
