@@ -114,7 +114,7 @@ ${ALLDIRS}:
 	${MKDIR} $@
 
 run: all
-	./runTests.sh
+	./setupAndRun.sh ./runTests.sh
 
 ADM=		../adm
 UPDATE_LICENSE=	${ADM}/update-license.sh
