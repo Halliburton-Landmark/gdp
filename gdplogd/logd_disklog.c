@@ -1126,7 +1126,7 @@ fseek_to_index_recno(
 			", index_hdrsize=%zd, xoff=%jd\n",
 			recno, phys->min_recno,
 			phys->index.header_size, (intmax_t) xoff);
-	if (xoff >= phys->index.max_offset || xoff < phys->index.header_size)
+	if (xoff < phys->index.header_size || xoff > phys->index.max_offset)
 	{
 		// computed offset is out of range
 		ep_log(GDP_STAT_CORRUPT_INDEX,
