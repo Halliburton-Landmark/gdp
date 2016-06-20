@@ -113,6 +113,9 @@ clean:
 ${ALLDIRS}:
 	${MKDIR} $@
 
+run: all
+	./runTests.sh
+
 ADM=		../adm
 UPDATE_LICENSE=	${ADM}/update-license.sh
 
