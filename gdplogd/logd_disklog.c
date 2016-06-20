@@ -1342,7 +1342,7 @@ disk_append(gdp_gcl_t *gcl,
 
 	if (ep_dbg_test(Dbg, 14))
 	{
-		ep_dbg_printf("gcl_physappend ");
+		ep_dbg_printf("disk_append ");
 		_gdp_datum_dump(datum, ep_dbg_getfile());
 	}
 
@@ -1358,7 +1358,7 @@ disk_append(gdp_gcl_t *gcl,
 	EP_STAT_CHECK(estat, return estat);
 
 	memset(&log_record, 0, sizeof log_record);
-	log_record.recno = datum->recno;
+	log_record.recno = ep_net_hton64(datum->recno);
 	log_record.timestamp = datum->ts;
 	ep_net_hton_timespec(&log_record.timestamp);
 	log_record.data_length = ep_net_hton32(dlen);
@@ -1400,7 +1400,7 @@ disk_append(gdp_gcl_t *gcl,
 	else if (datum->siglen > 0)
 	{
 		// "can't happen"
-		ep_app_abort("gcl_physappend: siglen = %d but no signature",
+		ep_app_abort("disk_append: siglen = %d but no signature",
 				datum->siglen);
 	}
 
@@ -1410,15 +1410,15 @@ disk_append(gdp_gcl_t *gcl,
 	index_entry.reserved = 0;
 
 	// write index record
-	estat = fseek_to_index_recno(phys, index_entry.recno, gcl->pname);
+	estat = fseek_to_index_recno(phys, datum->recno, gcl->pname);
 	EP_STAT_CHECK(estat, goto fail0);
 	fwrite(&index_entry, sizeof index_entry, 1, phys->index.fp);
 
 	// commit
 	if (fflush(ext->fp) < 0 || ferror(ext->fp))
-		estat = posix_error(errno, "gcl_physappend: cannot flush data");
+		estat = posix_error(errno, "disk_append: cannot flush data");
 	else if (fflush(phys->index.fp) < 0 || ferror(ext->fp))
-		estat = posix_error(errno, "gcl_physappend: cannot flush index");
+		estat = posix_error(errno, "disk_append: cannot flush index");
 	else
 	{
 		xcache_put(phys, index_entry.recno, index_entry.offset);
