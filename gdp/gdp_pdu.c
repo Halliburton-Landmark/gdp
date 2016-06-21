@@ -196,11 +196,19 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 	size_t dlen;
 	size_t hdrlen;
 	size_t offset;
-	struct evbuffer *obuf = bufferevent_get_output(chan->bev);
+	struct evbuffer *obuf;
 	uint8_t sigbuf[EP_CRYPTO_MAX_SIG];
 	bool use_sigbuf = false;
 
 	EP_ASSERT_POINTER_VALID(pdu);
+
+        // avoid segfault if the daemon is not running
+        if (chan == NULL)
+        {
+            return GDP_STAT_DEAD_DAEMON;
+        }
+
+        obuf = bufferevent_get_output(chan->bev);
 
 	if (!gdp_name_is_valid(pdu->src))
 	{
