@@ -70,8 +70,8 @@ ep_app_getprogname(void)
 
 static void
 printmessage(const char *tag,
-		const char *fg,
 		const char *bg,
+		const char *fg,
 		const char *fmt,
 		va_list av)
 {
@@ -82,11 +82,10 @@ printmessage(const char *tag,
 	if (bg == NULL)
 		bg = "";
 
-	fprintf(stderr, "%s%s", fg, bg);
+	fprintf(stderr, "%s%s%s[%s]%s%s%s ",
+			fg, bg, EpVid->vidinv, tag, EpVid->vidnorm, fg, bg);
 	if ((progname = ep_app_getprogname()) != NULL)
 		fprintf(stderr, "%s: ", progname);
-	fprintf(stderr, "%s%s%s%s%s: ",
-			EpVid->vidinv, tag, EpVid->vidnorm, fg, bg);
 	if (fmt != NULL)
 		vfprintf(stderr, fmt, av);
 	else
@@ -120,7 +119,7 @@ ep_app_info(
 
 	errno = 0;
 	va_start(av, fmt);
-	printmessage("INFO", EpVid->vidfgblack, EpVid->vidbgcyan, fmt, av);
+	printmessage("INFO", EpVid->vidbgblack, EpVid->vidfgcyan, fmt, av);
 	va_end(av);
 
 	if (EP_UT_BITSET(EP_APP_FLAG_LOGINFOS, OperationFlags))
@@ -152,7 +151,7 @@ ep_app_warn(
 	va_list av;
 
 	va_start(av, fmt);
-	printmessage("WARNING", EpVid->vidfgblack, EpVid->vidbgyellow, fmt, av);
+	printmessage("WARNING", EpVid->vidbgblack, EpVid->vidfgyellow, fmt, av);
 	va_end(av);
 
 	if (EP_UT_BITSET(EP_APP_FLAG_LOGWARNINGS, OperationFlags))
@@ -185,7 +184,7 @@ ep_app_error(
 	va_list av;
 
 	va_start(av, fmt);
-	printmessage("ERROR", EpVid->vidfgwhite, EpVid->vidbgred, fmt, av);
+	printmessage("ERROR", EpVid->vidbgwhite, EpVid->vidfgred, fmt, av);
 	va_end(av);
 
 	if (EP_UT_BITSET(EP_APP_FLAG_LOGERRORS, OperationFlags))
@@ -219,7 +218,7 @@ ep_app_fatal(
 	va_list av;
 
 	va_start(av, fmt);
-	printmessage("FATAL", EpVid->vidfgyellow, EpVid->vidbgred, fmt, av);
+	printmessage("FATAL", EpVid->vidbgyellow, EpVid->vidfgred, fmt, av);
 	va_end(av);
 
 	if (EP_UT_BITSET(EP_APP_FLAG_LOGFATALS, OperationFlags))
@@ -255,7 +254,7 @@ ep_app_abort(
 	va_list av;
 
 	va_start(av, fmt);
-	printmessage("ABORT", EpVid->vidfgyellow, EpVid->vidbgred, fmt, av);
+	printmessage("ABORT", EpVid->vidbgyellow, EpVid->vidfgred, fmt, av);
 	va_end(av);
 
 	if (EP_UT_BITSET(EP_APP_FLAG_LOGABORTS, OperationFlags))
