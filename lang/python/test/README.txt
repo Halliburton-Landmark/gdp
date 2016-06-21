@@ -3,8 +3,9 @@ To start up the gdp_router and gdplogd and then run the tests, use:
   ./run.sh
 
 That script invokes the ../../../test/setupAndRun.sh script, which in turn
-invokes _internalRunPythonTests.sh
+invokes ../../../test/_internalRunPythonTests.sh
 
+See ../../../test/README.txt for details.
 
 If the daemons are already running, then to create a log and run the tests, use:
 

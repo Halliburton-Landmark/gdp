@@ -30,21 +30,7 @@
 Invoke the executables in this directory using Python 
 so that we can get the output in JUnit compatible xml.
 
-To start up the gdp_router, gdplogd and then run the tests:
-
-./setupAndRun.sh ./_internalRunPythonTests.sh run_tests.py 
-
-To create JUnit-compatible output:
-
-./setupAndRun.sh ./_internalRunPythonTests.sh run_tests.py --junitxml=../reports/junit/gdpTest.xml
-
-If the daemons are already running, then to create a log and run the tests, use:
-
-export logName=gdp.test.newLog.$RANDOM
-../apps/gcl-create -k none -s `hostname` $logName
-py.test --logName=$logName run_tests.py
-
-
+See README.txt for details.
 """
 
 import socket

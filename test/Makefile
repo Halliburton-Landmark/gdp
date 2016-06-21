@@ -98,6 +98,7 @@ CFLAGS=		${COPTS} ${INCS}
 MKDIR=		mkdir -p
 
 all:	${ALL}
+	@echo "To actually run the tests, run make allTests"
 
 t_fwd_append:	t_fwd_append.o
 	${CC} -o $@ t_fwd_append.o ${LDFLAGS}
@@ -114,11 +115,11 @@ ${ALLDIRS}:
 	${MKDIR} $@
 
 run: all
-	./setupAndRun.sh ./runTests.sh
+	./run.sh
 
-allTests:
-	(cd ../lang/python/test; ./run.sh)
-	${MAKE} run
+allTests: all
+	-(cd ../lang/python/test; ./run.sh)
+	-./run.sh
 
 ADM=		../adm
 UPDATE_LICENSE=	${ADM}/update-license.sh
