@@ -195,7 +195,7 @@ _gdp_chan_open(const char *gdp_addr,
 		chan->bev = bufferevent_socket_new(GdpIoEventBase,
 						-1,
 						BEV_OPT_CLOSE_ON_FREE | BEV_OPT_THREADSAFE |
-						BEV_OPT_DEFER_CALLBACKS);
+						BEV_OPT_DEFER_CALLBACKS | BEV_OPT_UNLOCK_CALLBACKS);
 		*pchan = chan;
 	}
 	else
