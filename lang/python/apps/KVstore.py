@@ -154,6 +154,10 @@ records covered by the current checkpoint record.
 
 """
 
+import sys
+sys.path.append("../")
+                # So that we can actually load the python_api module
+
 import gdp      # load the main package
 import cPickle  # for serialization
 import threading

@@ -7,8 +7,8 @@
 
 # Process arguments
 
-if [ $# -ne 1 ]; then
-    echo "$0: Usage: $0 runScript"
+if [ $# -lt 1 ]; then
+    echo "$0: Usage: $0 runScript [args]"
 fi
 
 runScript=$1
@@ -20,7 +20,9 @@ fi
 set -u
 
 # See if the gdplogd directory is present.
-sourceDirectory=`dirname $0`/../..
+grandparentDirectory=`dirname $0`/../..
+sourceDirectory=`cd $grandparentDirectory; pwd`
+
 gdplogd=$sourceDirectory/gdp/gdplogd/gdplogd
 
 if [ ! -x "$gdplogd" ]; then
@@ -104,6 +106,7 @@ sleep 2
 cd "$startingDirectory"
 logName=gdp.runTests.$RANDOM
 echo "#### Creating log $logName"
+echo "Command to create a log: $sourceDirectory/gdp/apps/gcl-create -k none -s `hostname` $logName"
 $sourceDirectory/gdp/apps/gcl-create -k none -s `hostname` $logName
 returnValue=$?
 if [ $returnValue -eq 73 ]; then
@@ -111,7 +114,8 @@ if [ $returnValue -eq 73 ]; then
 fi
 
 # Run all the tests!
-$runScript $logName
+echo "$@ $logName"
+$@ $logName
 overallReturnValue=$?
 
 echo "#### $0: Stopping gdplogd and gdp_router"

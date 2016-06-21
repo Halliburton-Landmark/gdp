@@ -5,10 +5,11 @@
 # An alternative way is to run gdp/test/setupAndRun.sh, which will start the daemons:
 #   ../../../test/setupAndRun.sh ./runPythonTests.sh
 
-if [ $# -ne 1 ]; then
-    echo "$0: Usage: $0 logName"
+if [ $# -lt 1 ]; then
+    echo "$0: Usage: $0 logName [py.test args]"
 fi
-logName=$1
+# Get the last argument
+logName="${@: -1}"
 
 # Run the tests
 
@@ -25,8 +26,12 @@ function runTest () {
     fi
 }
 
-runTest ./rw_test.py $logName
+echo "Command: py.test ${@:1:$(($#-1))} --logName=$logName"
+runTest py.test ${@:1:$(($#-1))} --logName=$logName
 
+#newLog=gdp.runPythonTests.newLog.$RANDOM
+#../../../apps/gcl-create -k none -s ealmac23.local $newLog
+#runTest ./KVstore.py $newLog
 
 if [ $overallReturnValue != 0 ]; then
     exit $overallReturnValue
