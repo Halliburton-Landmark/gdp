@@ -4,10 +4,10 @@
     <meta content="text/html; charset=windows-1252" http-equiv="content-type">
     <title>Global Data Plane Programmatic API</title>
     <style type="text/css">
-.warning {  
-  font-weight: bold;  
-  font-style: italic;  
-  color: red;  
+.warning {
+  font-weight: bold;
+  font-style: italic;
+  color: red;
   background-color: #ffff99;
 }
 .command {
@@ -36,7 +36,7 @@
   <body>
     <h1>Global Data Plane Programmatic API </h1>
     <h4>Editor: Eric Allman, U.C. Berkeley Swarm Lab, eric@cs.berkeley.edu<br>
-      Version 0.74, 2015-10-04</h4>
+      Version 0.75, 2016-06-21</h4>
     <p>This document describes the procedural programmatic interface to the
       Global Data Plane.&nbsp; The native code is written in C for maximum
       flexibility and performance, but it is expected that most applications
@@ -711,8 +711,7 @@ void (*cbfunc)(gdp_event_t *gev)
     <p>There is potentially a huge amount of information that might be provided
       when a GCL is opened.&nbsp; Because this set is open-ended, it is
       abstracted out into a separate API.&nbsp; The <code class="datatype">gdp_gcl_open_info_t</code>
-      datastructure encapsulates this information and can be passed into <code
-        class="function">gdp_gcl_open</code>.</p>
+      datastructure encapsulates this information and can be passed into <code class="function">gdp_gcl_open</code>.</p>
     <hr>
     <h4>Name</h4>
     <p>gdp_gcl_open_info_new &mdash; create new open information datastructure</p>
@@ -780,7 +779,7 @@ void gdp_datum_print(const gdp_datum_t *datum,
         the <span class="manifest">GDP_DATUM_PRTEXT</span> bit, it shows the
         datum as plain text (the default shows it as a hex dump).&nbsp; It is up
         to the caller to determine that the datum is printable.&nbsp; If the <span
-          class="manifest">GDP_DATUM_PRSIG</span> bit is set, signature
+class="manifest">GDP_DATUM_PRSIG</span> bit is set, signature
         information is included.&nbsp; If the <span class="manifest">GDP_DATUM_PRDEBUG</span>
         flag is set, additional information about the datum is printed.</li>
     </ul>
@@ -940,7 +939,7 @@ typedef struct
       man page for details.&nbsp; The public part of the key is inserted into
       the log metadata and stored with the log.&nbsp; The secret part is stored
       somewhere on your local filesystem, typically <span class="filename">KEYS/<span
-          class="variable">gcl-id</span>.pem</span>.&nbsp; Normally <span class="command">gcl-create</span>
+class="variable">gcl-id</span>.pem</span>.&nbsp; Normally <span class="command">gcl-create</span>
       will encrypt the secret key with another key entered from the command
       line, although this can also be turned off.</p>
     <p>When a GDP application attempts to open a log using <span class="function">gdp_gcl_open</span>,
@@ -952,7 +951,7 @@ typedef struct
       key password.&nbsp; The default path is "<span class="filename">.</span>",
       "<span class="filename">KEYS</span>", "<span class="filename">~/.swarm/gdp/keys</span>",
       "<span class="filename">/usr/local/etc/swarm/gdp/keys</span>", and "<span
-        class="filename">/etc/swarm/gdp/keys</span>".</p>
+class="filename">/etc/swarm/gdp/keys</span>".</p>
     <p>Once the secret key has been located and decrypted, all further append
       requests will be signed using the secret key and verified by the log
       daemon against the public key in the log metadata.</p>
@@ -1022,11 +1021,11 @@ typedef struct
     <p>The following pseudo-code example excerpts from <tt>apps/gdp-writer.c</tt>.
     </p>
     <pre>#include &lt;gdp/gdp.h&gt;<br>#include &lt;stdio.h&gt;<br>#include &lt;string.h&gt;<br><br>int main(int argc, char **argv)<br>{<br>	gdp_tcl_t *gcl;<br>	EP_STAT estat;<br>	gdp_name_t gcliname;	// internal name of GCL<br>	gdp_datum_t *d;<br><br>	// general startup and initialization<br>	if (argc &lt; 2)<br>		usage_error();<br>	estat = gdp_init();<br>	if (!EP_STAT_ISOK(estat))<br>		initialization_error(estat);<br>	d = gdp_datum_new();
-<br><br>	// parse command line name to internal format<br>	estat = gdp_gcl_parse_name(argv[1], gcliname);<br>	if (!EP_STAT_ISOK(estat))<br>		name_syntax_error();<br><br>	// attempt to create that name<br>	estat = gdp_gcl_create(gcliname, &amp;gcl);<br>	if (!EP_STAT_ISOK(estat))<br>		creation_error(estat);<br><br>	// read lines from standard input<br>	while (fgets(buf, sizeof buf, stdin) != NULL)<br>	{<br>		char *p = strchr(buf, '\n');<br>		if (p != NULL)<br>			*p = '\0';<br><br>		// write them to the dataplane<br>		if (gdp_buf_write(gdp_datum_getbuf(datum), buf, strlen(buf)) &lt; 0)<br>                        estat = GDP_STAT_BUFFER_FAILURE;<br>                else<br>                        estat = gdp_gcl_append(gcl, datum);<br>		EP_STAT_CHECK(estat, break);<br>	}<br><br>	// cleanup and exit<br>	gdp_gcl_close(gcl);<br>	exit(!EP_STAT_ISOK(estat));<br>}</pre>
+<br><br>	// parse command line name to internal format<br>	estat = gdp_gcl_parse_name(argv[1], gcliname);<br>	if (!EP_STAT_ISOK(estat))<br>		name_syntax_error();<br><br>	// attempt to create that name<br>	estat = gdp_gcl_create(gcliname, &amp;gcl);<br>	if (!EP_STAT_ISOK(estat))<br>		creation_error(estat);<br><br>	// read lines from standard input<br>	while (fgets(buf, sizeof buf, stdin) != NULL)<br>	{<br>		char *p = strchr(buf, '\n');<br>		if (p != NULL)<br>			*p = '\0';<br><br>		// write them to the dataplane<br>		if (gdp_buf_write(gdp_datum_getbuf(d), buf, strlen(buf)) &lt; 0)<br>                        estat = GDP_STAT_BUFFER_FAILURE;<br>                else<br>                        estat = gdp_gcl_append(gcl, d);<br>		EP_STAT_CHECK(estat, break);<br>	}<br><br>	// cleanup and exit<br>	gdp_gcl_close(gcl);<br>	exit(!EP_STAT_ISOK(estat));<br>}</pre>
     <hr size="2" width="100%">
     <p>This example is a similar excerpt from apps/gdp-reader.c (without using
       subscriptions):</p>
-    <pre>#include &lt;gdp/gdp.h&gt;<br><br>int main(int argc, char **argv)<br>{<br>	gdp_tcl_t *gcl;<br>	EP_STAT estat;<br>	gdp_name_t gcliname;	// internal name of GCL<br>	gdp_datum_t *d;<br>	gdp_recno_t recno;<br><br>	// general startup and initialization<br>	if (argc &lt; 2)<br>		usage_error();<br>	estat = gdp_init();<br>	if (!EP_STAT_ISOK(estat))<br>		initialization_error(estat);<br>	d = gdp_datum_new();
+    <pre>#include &lt;gdp/gdp.h&gt;<br><br>int main(int argc, char **argv)<br>{<br>	gdp_gcl_t *gcl;<br>	EP_STAT estat;<br>	gdp_name_t gcliname;	// internal name of GCL<br>	gdp_datum_t *d;<br>	gdp_recno_t recno;<br><br>	// general startup and initialization<br>	if (argc &lt; 2)<br>		usage_error();<br>	estat = gdp_init();<br>	if (!EP_STAT_ISOK(estat))<br>		initialization_error(estat);<br>	d = gdp_datum_new();
 <br><br>	// parse command line name to internal format<br>	estat = gdp_gcl_parse_name(argv[1], gcliname);<br>	if (!EP_STAT_ISOK(estat))<br>		name_syntax_error();
 <br>	// attempt to open the GCL<br>	estat = gdp_gcl_open(gcliname, GDP_MODE_RO, &amp;gcl);<br>	if (!EP_STAT_ISOK(estat))<br>		open_error(estat, argv[1]);<br>
 &nbsp;	recno = 1;<br>	for (;;)<br>	{<br>		estat = gdp_gcl_read(gcl, recno++, d);<br>		EP_STAT_CHECK(estat, break);<br>		gdp_datum_print(d, stdout);<br>	}<br>	exit(0);<br>}</pre>
@@ -1143,5 +1142,6 @@ typedef struct
         </tr>
       </tbody>
     </table>
-  </body>
-</html>
+
+
+</body></html>
