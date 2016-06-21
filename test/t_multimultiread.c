@@ -8,6 +8,7 @@ cc -I. t_multimultiread.c -Lep -Lgdp -lgdp -lep -levent -levent_pthreads -pthrea
 
 #include <ep/ep_app.h>
 #include <ep/ep_dbg.h>
+#include <ep/ep_string.h>
 #include <ep/ep_time.h>
 
 #include <getopt.h>
@@ -20,8 +21,10 @@ static EP_DBG	Dbg = EP_DBG_INIT("multimultiread", "GDP multiple multireader test
 EP_STAT
 multiread_print_event(gdp_event_t *gev)
 {
-	printf(">>> Event type %d, udata %p\n",
-			gdp_event_gettype(gev), gdp_event_getudata(gev));
+	printf("%s>>> Event type %d, udata %p%s\n",
+			EpVid->vidbgblue,
+			gdp_event_gettype(gev), gdp_event_getudata(gev),
+			EpVid->vidnorm);
 
 	// decode it
 	switch (gdp_event_gettype(gev))
