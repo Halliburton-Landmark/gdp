@@ -246,16 +246,19 @@ _gdp_gcl_subscribe(gdp_gcl_t *gcl,
 		// the req is still on the channel list
 
 		// start a subscription poker thread if needed
-		long poke = ep_adm_getlongparam("swarm.gdp.subscr.pokeintvl", 60L);
-		if (poke > 0 && !EP_UT_BITSET(GDP_CHAN_HAS_SUB_THR, chan->flags))
+		if (cmd == GDP_CMD_SUBSCRIBE)
 		{
-			int istat = pthread_create(&chan->sub_thr_id, NULL,
-								subscr_poker_thread, chan);
-			if (istat != 0)
+			long poke = ep_adm_getlongparam("swarm.gdp.subscr.pokeintvl", 60L);
+			if (poke > 0 && !EP_UT_BITSET(GDP_CHAN_HAS_SUB_THR, chan->flags))
 			{
-				EP_STAT spawn_stat = ep_stat_from_errno(istat);
+				int istat = ep_thr_spawn(&chan->sub_thr_id, 
+									subscr_poker_thread, chan);
+				if (istat != 0)
+				{
+					EP_STAT spawn_stat = ep_stat_from_errno(istat);
 
-				ep_log(spawn_stat, "_gdp_gcl_subscribe: thread spawn failure");
+					ep_log(spawn_stat, "_gdp_gcl_subscribe: thread spawn failure");
+				}
 			}
 		}
 	}
