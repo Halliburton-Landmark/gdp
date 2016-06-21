@@ -116,6 +116,10 @@ ${ALLDIRS}:
 run: all
 	./setupAndRun.sh ./runTests.sh
 
+allTests:
+	(cd ../lang/python/test; ./run.sh)
+	${MAKE} run
+
 ADM=		../adm
 UPDATE_LICENSE=	${ADM}/update-license.sh
 
