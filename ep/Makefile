@@ -29,8 +29,8 @@
 #
 
 # Version number of library (should match ep_version.h)
-EPLIBMAJVER=	2
-EPLIBMINVER=	3
+EPLIBMAJVER=	3
+EPLIBMINVER=	0
 
 # These are generally changed on make command line
 DESTDIR=

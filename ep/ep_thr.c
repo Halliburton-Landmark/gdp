@@ -91,16 +91,19 @@ diagnose_thr_err(int err, const char *where)
 }
 
 static void
-printtrace(void *lock, const char *where)
+printtrace(void *lock, const char *where,
+		const char *file, int line, const char *name)
 {
 	pthread_t self = pthread_self();
 
-	ep_dbg_printf("ep_thr_%s %p [%p]%s\n", where, lock, self,
+	ep_dbg_printf("ep_thr_%s %s:%d %p (%s) [%p]%s\n",
+			where, file, line, lock, name, self,
 			_EpThrUsePthreads ? "" : " (ignored)");
 }
 
 #define TRACE(lock, where)	\
-		if (ep_dbg_test(Dbg, 99)) printtrace(lock, where)
+		if (ep_dbg_test(Dbg, 99))	\
+			printtrace(lock, where, file, line, name)
 
 void
 _ep_thr_init(void)
@@ -113,9 +116,34 @@ _ep_thr_init(void)
 **  Basics
 */
 
+int
+ep_thr_spawn(EP_THR *thidp, void *(*thfunc)(void *), void *arg)
+{
+	int r;
+
+	// to make it compile
+	const char *file = NULL;
+	int line = 0;
+	const char *name = NULL;
+
+	TRACE(NULL, "spawn");
+	if (!_EpThrUsePthreads)
+		return EPERM;
+	r = pthread_create(thidp, NULL, thfunc, arg);
+	if (r != 0)
+		diagnose_thr_err(errno, "spawn");
+	return r;
+}
+
+
 void
 ep_thr_yield(void)
 {
+	// to make it compile
+	const char *file = NULL;
+	int line = 0;
+	const char *name = NULL;
+
 	TRACE(NULL, "yield");
 	if (!_EpThrUsePthreads)
 		return;
@@ -129,7 +157,8 @@ ep_thr_yield(void)
 */
 
 int
-ep_thr_mutex_init(EP_THR_MUTEX *mtx, int type)
+_ep_thr_mutex_init(EP_THR_MUTEX *mtx, int type,
+		const char *file, int line, const char *name)
 {
 	int err;
 	pthread_mutexattr_t attr;
@@ -161,7 +190,8 @@ ep_thr_mutex_init(EP_THR_MUTEX *mtx, int type)
 }
 
 int
-ep_thr_mutex_destroy(EP_THR_MUTEX *mtx)
+_ep_thr_mutex_destroy(EP_THR_MUTEX *mtx,
+		const char *file, int line, const char *name)
 {
 	int err;
 
@@ -175,7 +205,8 @@ ep_thr_mutex_destroy(EP_THR_MUTEX *mtx)
 }
 
 int
-ep_thr_mutex_lock(EP_THR_MUTEX *mtx)
+_ep_thr_mutex_lock(EP_THR_MUTEX *mtx,
+		const char *file, int line, const char *name)
 {
 	int err;
 
@@ -190,7 +221,8 @@ ep_thr_mutex_lock(EP_THR_MUTEX *mtx)
 }
 
 int
-ep_thr_mutex_trylock(EP_THR_MUTEX *mtx)
+_ep_thr_mutex_trylock(EP_THR_MUTEX *mtx,
+		const char *file, int line, const char *name)
 {
 	int err;
 
@@ -209,7 +241,8 @@ ep_thr_mutex_trylock(EP_THR_MUTEX *mtx)
 }
 
 int
-ep_thr_mutex_unlock(EP_THR_MUTEX *mtx)
+_ep_thr_mutex_unlock(EP_THR_MUTEX *mtx,
+		const char *file, int line, const char *name)
 {
 	int err;
 
@@ -224,7 +257,7 @@ ep_thr_mutex_unlock(EP_THR_MUTEX *mtx)
 }
 
 int
-ep_thr_mutex_check(EP_THR_MUTEX *mtx)
+_ep_thr_mutex_check(EP_THR_MUTEX *mtx)
 {
 	CHECKMTX(mtx, "check ===");
 	return 0;
@@ -236,7 +269,8 @@ ep_thr_mutex_check(EP_THR_MUTEX *mtx)
 */
 
 int
-ep_thr_cond_init(EP_THR_COND *cv)
+_ep_thr_cond_init(EP_THR_COND *cv,
+		const char *file, int line, const char *name)
 {
 	int err;
 
@@ -250,7 +284,8 @@ ep_thr_cond_init(EP_THR_COND *cv)
 }
 
 int
-ep_thr_cond_destroy(EP_THR_COND *cv)
+_ep_thr_cond_destroy(EP_THR_COND *cv,
+		const char *file, int line, const char *name)
 {
 	int err;
 
@@ -264,7 +299,8 @@ ep_thr_cond_destroy(EP_THR_COND *cv)
 }
 
 int
-ep_thr_cond_signal(EP_THR_COND *cv)
+_ep_thr_cond_signal(EP_THR_COND *cv,
+		const char *file, int line, const char *name)
 {
 	int err;
 
@@ -279,7 +315,8 @@ ep_thr_cond_signal(EP_THR_COND *cv)
 }
 
 int
-ep_thr_cond_wait(EP_THR_COND *cv, EP_THR_MUTEX *mtx, EP_TIME_SPEC *timeout)
+_ep_thr_cond_wait(EP_THR_COND *cv, EP_THR_MUTEX *mtx, EP_TIME_SPEC *timeout,
+		const char *file, int line, const char *name)
 {
 	int err;
 
@@ -308,7 +345,8 @@ ep_thr_cond_wait(EP_THR_COND *cv, EP_THR_MUTEX *mtx, EP_TIME_SPEC *timeout)
 }
 
 int
-ep_thr_cond_broadcast(EP_THR_COND *cv)
+_ep_thr_cond_broadcast(EP_THR_COND *cv,
+		const char *file, int line, const char *name)
 {
 	int err;
 
@@ -328,7 +366,8 @@ ep_thr_cond_broadcast(EP_THR_COND *cv)
 */
 
 int
-ep_thr_rwlock_init(EP_THR_RWLOCK *rwl)
+_ep_thr_rwlock_init(EP_THR_RWLOCK *rwl,
+		const char *file, int line, const char *name)
 {
 	int err;
 
@@ -341,7 +380,8 @@ ep_thr_rwlock_init(EP_THR_RWLOCK *rwl)
 }
 
 int
-ep_thr_rwlock_destroy(EP_THR_RWLOCK *rwl)
+_ep_thr_rwlock_destroy(EP_THR_RWLOCK *rwl,
+		const char *file, int line, const char *name)
 {
 	int err;
 
@@ -354,7 +394,8 @@ ep_thr_rwlock_destroy(EP_THR_RWLOCK *rwl)
 }
 
 int
-ep_thr_rwlock_rdlock(EP_THR_RWLOCK *rwl)
+_ep_thr_rwlock_rdlock(EP_THR_RWLOCK *rwl,
+		const char *file, int line, const char *name)
 {
 	int err;
 
@@ -367,7 +408,8 @@ ep_thr_rwlock_rdlock(EP_THR_RWLOCK *rwl)
 }
 
 int
-ep_thr_rwlock_tryrdlock(EP_THR_RWLOCK *rwl)
+_ep_thr_rwlock_tryrdlock(EP_THR_RWLOCK *rwl,
+		const char *file, int line, const char *name)
 {
 	int err;
 
@@ -380,7 +422,8 @@ ep_thr_rwlock_tryrdlock(EP_THR_RWLOCK *rwl)
 }
 
 int
-ep_thr_rwlock_wrlock(EP_THR_RWLOCK *rwl)
+_ep_thr_rwlock_wrlock(EP_THR_RWLOCK *rwl,
+		const char *file, int line, const char *name)
 {
 	int err;
 
@@ -393,7 +436,8 @@ ep_thr_rwlock_wrlock(EP_THR_RWLOCK *rwl)
 }
 
 int
-ep_thr_rwlock_trywrlock(EP_THR_RWLOCK *rwl)
+_ep_thr_rwlock_trywrlock(EP_THR_RWLOCK *rwl,
+		const char *file, int line, const char *name)
 {
 	int err;
 
@@ -406,7 +450,8 @@ ep_thr_rwlock_trywrlock(EP_THR_RWLOCK *rwl)
 }
 
 int
-ep_thr_rwlock_unlock(EP_THR_RWLOCK *rwl)
+_ep_thr_rwlock_unlock(EP_THR_RWLOCK *rwl,
+		const char *file, int line, const char *name)
 {
 	int err;
 

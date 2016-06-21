@@ -77,39 +77,93 @@
 **	went for simplicity.
 */
 
+typedef pthread_t		EP_THR;
+
+extern int	ep_thr_spawn(EP_THR *th, void *(*thfunc)(void *), void *arg);
 extern void	ep_thr_yield(void);
 
 typedef pthread_mutex_t		EP_THR_MUTEX;
 #  define	EP_THR_MUTEX_INITIALIZER	= PTHREAD_MUTEX_INITIALIZER
-extern int	ep_thr_mutex_init(EP_THR_MUTEX *mtx, int type);
-extern int	ep_thr_mutex_destroy(EP_THR_MUTEX *mtx);
-extern int	ep_thr_mutex_lock(EP_THR_MUTEX *mtx);
-extern int	ep_thr_mutex_trylock(EP_THR_MUTEX *mtx);
-extern int	ep_thr_mutex_unlock(EP_THR_MUTEX *mtx);
-extern int	ep_thr_mutex_check(EP_THR_MUTEX *mtx);
+extern int	_ep_thr_mutex_init(EP_THR_MUTEX *mtx, int type,
+				const char *file, int line, const char *name);
 #define		EP_THR_MUTEX_NORMAL		PTHREAD_MUTEX_NORMAL
 #define		EP_THR_MUTEX_ERRORCHECK		PTHREAD_MUTEX_ERRORCHECK
 #define		EP_THR_MUTEX_RECURSIVE		PTHREAD_MUTEX_RECURSIVE
 #define		EP_THR_MUTEX_DEFAULT		PTHREAD_MUTEX_DEFAULT
+extern int	_ep_thr_mutex_destroy(EP_THR_MUTEX *mtx,
+				const char *file, int line, const char *name);
+extern int	_ep_thr_mutex_lock(EP_THR_MUTEX *mtx,
+				const char *file, int line, const char *name);
+extern int	_ep_thr_mutex_trylock(EP_THR_MUTEX *mtx,
+				const char *file, int line, const char *name);
+extern int	_ep_thr_mutex_unlock(EP_THR_MUTEX *mtx,
+				const char *file, int line, const char *name);
+extern int	ep_thr_mutex_check(EP_THR_MUTEX *mtx);
+#define		ep_thr_mutex_init(mtx, type)	_ep_thr_mutex_init(mtx, type, \
+				__FILE__, __LINE__, #mtx)
+#define		ep_thr_mutex_destroy(mtx)	_ep_thr_mutex_destroy(mtx, \
+				__FILE__, __LINE__, #mtx)
+#define		ep_thr_mutex_lock(mtx)		_ep_thr_mutex_lock(mtx, \
+				__FILE__, __LINE__, #mtx)
+#define		ep_thr_mutex_trylock(mtx)	_ep_thr_mutex_trylock(mtx, \
+				__FILE__, __LINE__, #mtx)
+#define		ep_thr_mutex_unlock(mtx)	_ep_thr_mutex_unlock(mtx, \
+				__FILE__, __LINE__, #mtx)
 
 typedef pthread_cond_t		EP_THR_COND;
 #  define	EP_THR_COND_INITIALIZER		= PTHREAD_COND_INITIALIZER
-extern int	ep_thr_cond_init(EP_THR_COND *cv);
-extern int	ep_thr_cond_destroy(EP_THR_COND *cv);
-extern int	ep_thr_cond_signal(EP_THR_COND *cv);
-extern int	ep_thr_cond_wait(EP_THR_COND *cv, EP_THR_MUTEX *mtx,
-				EP_TIME_SPEC *timeout);
-extern int	ep_thr_cond_broadcast(EP_THR_COND *cv);
+extern int	_ep_thr_cond_init(EP_THR_COND *cv,
+				const char *file, int line, const char *name);
+extern int	_ep_thr_cond_destroy(EP_THR_COND *cv,
+				const char *file, int line, const char *name);
+extern int	_ep_thr_cond_signal(EP_THR_COND *cv,
+				const char *file, int line, const char *name);
+extern int	_ep_thr_cond_wait(EP_THR_COND *cv, EP_THR_MUTEX *mtx,
+				EP_TIME_SPEC *timeout,
+				const char *file, int line, const char *name);
+extern int	_ep_thr_cond_broadcast(EP_THR_COND *cv,
+				const char *file, int line, const char *name);
+#define		ep_thr_cond_init(cv)		_ep_thr_cond_init(cv, \
+				__FILE__, __LINE__, #cv)
+#define		ep_thr_cond_destroy(cv)		_ep_thr_cond_destroy(cv, \
+				__FILE__, __LINE__, #cv)
+#define		ep_thr_cond_signal(cv)		_ep_thr_cond_signal(cv, \
+				__FILE__, __LINE__, #cv)
+#define		ep_thr_cond_wait(cv, mtx, tout)	_ep_thr_cond_wait(cv, mtx, tout, \
+				__FILE__, __LINE__, #cv)
+#define		ep_thr_cond_broadcast(cv)	_ep_thr_cond_broadcast(cv, \
+				__FILE__, __LINE__, #cv)
 
 typedef pthread_rwlock_t	EP_THR_RWLOCK;
 #  define	EP_THR_RWLOCK_INITIALIZER	= PTHREAD_RWLOCK_INITIALIZER
-extern int	ep_thr_rwlock_init(EP_THR_RWLOCK *rwl);
-extern int	ep_thr_rwlock_destroy(EP_THR_RWLOCK *rwl);
-extern int	ep_thr_rwlock_rdlock(EP_THR_RWLOCK *rwl);
-extern int	ep_thr_rwlock_tryrdlock(EP_THR_RWLOCK *rwl);
-extern int	ep_thr_rwlock_wrlock(EP_THR_RWLOCK *rwl);
-extern int	ep_thr_rwlock_trywrlock(EP_THR_RWLOCK *rwl);
-extern int	ep_thr_rwlock_unlock(EP_THR_RWLOCK *rwl);
+extern int	_ep_thr_rwlock_init(EP_THR_RWLOCK *rwl,
+				const char *file, int line, const char *name);
+extern int	_ep_thr_rwlock_destroy(EP_THR_RWLOCK *rwl,
+				const char *file, int line, const char *name);
+extern int	_ep_thr_rwlock_rdlock(EP_THR_RWLOCK *rwl,
+				const char *file, int line, const char *name);
+extern int	_ep_thr_rwlock_tryrdlock(EP_THR_RWLOCK *rwl,
+				const char *file, int line, const char *name);
+extern int	_ep_thr_rwlock_wrlock(EP_THR_RWLOCK *rwl,
+				const char *file, int line, const char *name);
+extern int	_ep_thr_rwlock_trywrlock(EP_THR_RWLOCK *rwl,
+				const char *file, int line, const char *name);
+extern int	_ep_thr_rwlock_unlock(EP_THR_RWLOCK *rwl,
+				const char *file, int line, const char *name);
+#define		ep_thr_rwlock_init(rwl)		_ep_thr_rwlock_init(rwl, \
+				__FILE__, __LINE__, #rwl)
+#define		ep_thr_rwlock_destroy(rwl)	_ep_thr_rwlock_destroy(rwl, \
+				__FILE__, __LINE__, #rwl)
+#define		ep_thr_rwlock_rdlock(rwl)	_ep_thr_rwlock_rdlock(rwl, \
+				__FILE__, __LINE__, #rwl)
+#define		ep_thr_rwlock_tryrdlock(rwl)	_ep_thr_rwlock_tryrdlock(rwl, \
+				__FILE__, __LINE__, #rwl)
+#define		ep_thr_rwlock_wrlock(rwl)	_ep_thr_rwlock_wrlock(rwl, \
+				__FILE__, __LINE__, #rwl)
+#define		ep_thr_rwlock_trywrlock(rwl)	_ep_thr_rwlock_trywrlock(rwl, \
+				__FILE__, __LINE__, #rwl)
+#define		ep_thr_rwlock_unlock(rwl)	_ep_thr_rwlock_unlock(rwl, \
+				__FILE__, __LINE__, #rwl)
 
 /*
 **  Thread pool declarations
