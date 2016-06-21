@@ -49,7 +49,7 @@
 typedef struct gdp_chan		gdp_chan_t;
 typedef struct gdp_req		gdp_req_t;
 
-extern pthread_t	_GdpIoEventLoopThread;
+extern EP_THR		_GdpIoEventLoopThread;
 extern gdp_chan_t	*_GdpChannel;		// our primary app-level protocol port
 extern gdp_name_t	_GdpMyRoutingName;	// source name for PDUs
 extern bool			_GdpLibInitialized;	// are we initialized?
@@ -100,7 +100,7 @@ struct gdp_chan
 	void				(*process)(		// called to process a PDU
 							gdp_pdu_t *pdu,
 							gdp_chan_t *chan);
-	pthread_t			sub_thr_id;		// subscription poker thread id
+	EP_THR				sub_thr_id;		// subscription poker thread id
 };
 
 /* Channel states */
@@ -550,7 +550,7 @@ const char		*_gdp_proto_cmd_name(		// return printable cmd name
 */
 
 EP_STAT			_gdp_start_event_loop_thread(
-						pthread_t *thr,
+						EP_THR *thr,
 						struct event_base *evb,
 						const char *where);
 

@@ -372,7 +372,7 @@ _gdp_pdu_process(gdp_pdu_t *pdu, gdp_chan_t *chan)
 **		GdpIoEventLoopThread is also used by gdplogd, hence non-static.
 */
 
-pthread_t		_GdpIoEventLoopThread;
+EP_THR			_GdpIoEventLoopThread;
 
 static void
 event_loop_timeout(int fd, short what, void *eli_)
@@ -435,7 +435,7 @@ run_event_loop(void *eli_)
 }
 
 EP_STAT
-_gdp_start_event_loop_thread(pthread_t *thr,
+_gdp_start_event_loop_thread(EP_THR *thr,
 		struct event_base *evb,
 		const char *where)
 {
@@ -443,7 +443,7 @@ _gdp_start_event_loop_thread(pthread_t *thr,
 
 	eli->evb = evb;
 	eli->where = where;
-	if (pthread_create(thr, NULL, run_event_loop, eli) != 0)
+	if (ep_thr_spawn(thr, run_event_loop, eli) != 0)
 		return init_error("cannot create event loop thread", where);
 	else
 		return EP_STAT_OK;
