@@ -58,7 +58,7 @@ static struct ev_head	ActiveList		= STAILQ_HEAD_INITIALIZER(ActiveList);
 static EP_THR_MUTEX		CallbackListMutex	EP_THR_MUTEX_INITIALIZER;
 static EP_THR_COND		CallbackListSig		EP_THR_COND_INITIALIZER;
 static struct ev_head	CallbackList		= STAILQ_HEAD_INITIALIZER(CallbackList);
-static pthread_t		CallbackThread;
+static EP_THR			CallbackThread;
 static bool				CallbackThreadStarted	= false;
 
 
@@ -222,11 +222,10 @@ _gdp_event_thread(void *ctx)
 
 		// get the next event off the list
 		ep_thr_mutex_lock(&CallbackListMutex);
-		do
+		while ((gev = STAILQ_FIRST(&CallbackList)) == NULL)
 		{
 			ep_thr_cond_wait(&CallbackListSig, &CallbackListMutex, NULL);
-			gev = STAILQ_FIRST(&CallbackList);
-		} while (gev == NULL);
+		}
 		STAILQ_REMOVE_HEAD(&CallbackList, queue);
 		ep_thr_mutex_unlock(&CallbackListMutex);
 
@@ -263,8 +262,7 @@ _gdp_event_setcb(
 	// if using callbacks, make sure we have a callback thread running
 	if (cbfunc != NULL && !CallbackThreadStarted)
 	{
-		int err = pthread_create(&CallbackThread, NULL,
-						&_gdp_event_thread, NULL);
+		int err = ep_thr_spawn(&CallbackThread, &_gdp_event_thread, NULL);
 		if (err != 0 && ep_dbg_test(Dbg, 1))
 			ep_log(ep_stat_from_errno(err),
 					"_gdp_gcl_setcb: cannot start callback thread");
