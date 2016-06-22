@@ -17,6 +17,7 @@ test-net/gdp_router
 uhb/mqtt-gateway/mqtt-gdp-gateway
 test/t_fwd_append
 test/t_multimultiread
+test/t_sub_and_append
 KEYS
 lang/js/apps/gdpREST_server/node_modules
 scgilib/helloworld
