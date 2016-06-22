@@ -42,17 +42,19 @@ def test_t_fwd_append(logName):
     subprocess.check_call(["./t_fwd_append", "-D *=18", logName, socket.gethostname()])
 
 # Create the x00 log for use in other tests.  If the log already
-# exists, then gcl-create returns 73, which can be ignored.
+# exists, then gcl-create returns 1, which can be ignored.
 def test_gcl_create():
     try:
         subprocess.check_call(["../apps/gcl-create", "-k", "none", "-s", socket.gethostname(), "x00"]);
-    except  CalledProcessError as ex:
-        if e.returncode != 73:
+    except  subprocess.CalledProcessError as e:
+        returncode = e.returncode
+        if returncode != 1:
+            print returncode
             raise
 
 # Uses the x00 log.
 def test_t_multimultiread(logName):
-    subprocess.check_call(["./t_multimultiread", "-D *=20"], shell=True)
+    subprocess.check_call(["./t_multimultiread", "-D *=99"], shell=True)
 
 # Uses the x00 log.
 def test_t_sub_and_append(logName):
