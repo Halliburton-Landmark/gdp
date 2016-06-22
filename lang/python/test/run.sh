@@ -1,3 +1,3 @@
 #!/bin/sh
 # See README.txt
-../../../test/setupAndRun.sh ./_internalRunPythonTests.sh $@
+../../../test/setupAndRun.sh ../../../test/_internalRunPythonTests.sh $@
