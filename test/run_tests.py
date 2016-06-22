@@ -48,13 +48,13 @@ def test_gcl_create():
         subprocess.check_call(["../apps/gcl-create", "-k", "none", "-s", socket.gethostname(), "x00"]);
     except  subprocess.CalledProcessError as e:
         returncode = e.returncode
-        if returncode != 1:
+        if returncode != 73:
             print returncode
             raise
 
 # Uses the x00 log.
 def test_t_multimultiread(logName):
-    subprocess.check_call(["./t_multimultiread", "-D *=99"], shell=True)
+    subprocess.check_call(["./t_multimultiread"])
 
 # Uses the x00 log.
 def test_t_sub_and_append(logName):
