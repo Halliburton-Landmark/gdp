@@ -1,7 +1,7 @@
 /* vim: set ai sw=4 sts=4 ts=4 : */
 
 /*  To compile:
-cc -I. t_multimultiread.c -Lep -Lgdp -lgdp -lep -levent -levent_pthreads -pthread -lcrypto -lavahi-client -lavahi-common
+cc -I. t_sub_and_append.c -Lep -Lgdp -lgdp -lep -levent -levent_pthreads -pthread -lcrypto -lavahi-client -lavahi-common
 */
 
 #include <gdp/gdp.h>
@@ -15,7 +15,7 @@ cc -I. t_multimultiread.c -Lep -Lgdp -lgdp -lep -levent -levent_pthreads -pthrea
 #include <stdio.h>
 #include <unistd.h>
 
-static EP_DBG	Dbg = EP_DBG_INIT("t_multimultiread", "GDP multiple multireader test");
+static EP_DBG	Dbg = EP_DBG_INIT("t_sub_and_append", "Subscribe and Append in one process test");
 
 
 void
@@ -36,7 +36,7 @@ print_event(gdp_event_t *gev)
 
 	  case GDP_EVENT_EOS:
 		// "end of subscription": no more data will be returned
-		fprintf(stderr, "End of multiread\n");
+		fprintf(stderr, "End of multiread/subscription\n");
 		break;
 
 	  case GDP_EVENT_SHUTDOWN:
@@ -55,6 +55,12 @@ print_event(gdp_event_t *gev)
 }
 
 
+void
+multiread_cb(gdp_event_t *gev)
+{
+	(void) print_event(gev);
+}
+
 
 /*
 **  DO_MULTIREAD --- subscribe or multiread
@@ -72,7 +78,7 @@ do_multiread(gdp_gcl_t *gcl,
 	EP_STAT estat;
 	void (*cbfunc)(gdp_event_t *) = NULL;
 
-	cbfunc = print_event;
+	cbfunc = multiread_cb;
 
 	// make the flags more user-friendly
 	if (firstrec == 0)
@@ -102,6 +108,7 @@ main(int argc, char **argv)
 {
 	gdp_gcl_t *gcl;
 	gdp_name_t gclname;
+	gdp_datum_t *d;
 	EP_STAT estat;
 	char ebuf[60];
 	int opt;
@@ -124,17 +131,25 @@ main(int argc, char **argv)
 	estat = gdp_parse_name("x00", gclname);
 	ep_app_info("gdp_parse_name: %s", ep_stat_tostr(estat, ebuf, sizeof ebuf));
 
-	estat = gdp_gcl_open(gclname, GDP_MODE_RO, NULL, &gcl);
+	estat = gdp_gcl_open(gclname, GDP_MODE_RA, NULL, &gcl);
 	ep_app_info("gdp_gcl_open: %s", ep_stat_tostr(estat, ebuf, sizeof ebuf));
 
-	estat = do_multiread(gcl, 1, 0, (void *) 1);
-	ep_app_info("1: %s", ep_stat_tostr(estat, ebuf, sizeof ebuf));
-	estat = do_multiread(gcl, 1, 0, (void *) 2);
-	ep_app_info("2: %s", ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	estat = gdp_gcl_subscribe(gcl, 0, 0, NULL, print_event, NULL);
+	ep_app_info("gdp_gcl_subscribe: %s", ep_stat_tostr(estat, ebuf, sizeof ebuf));
 
-	// hang for an hour waiting for events
+	d = gdp_datum_new();
+	gdp_buf_printf(gdp_datum_getbuf(d), "one");
+	estat = gdp_gcl_append(gcl, d);
+	ep_app_info("gdp_gcl_append1: %s", ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	gdp_buf_reset(gdp_datum_getbuf(d));
+
+	gdp_buf_printf(gdp_datum_getbuf(d), "two");
+	estat = gdp_gcl_append(gcl, d);
+	ep_app_info("gdp_gcl_append2: %s", ep_stat_tostr(estat, ebuf, sizeof ebuf));
+
+	// hang for a minute waiting for events
 	ep_app_info("sleeping");
-	sleep(3600);
+	sleep(60);
 
 	return 0;
 }
