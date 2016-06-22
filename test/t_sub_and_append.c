@@ -147,9 +147,9 @@ main(int argc, char **argv)
 	estat = gdp_gcl_append(gcl, d);
 	ep_app_info("gdp_gcl_append2: %s", ep_stat_tostr(estat, ebuf, sizeof ebuf));
 
-	// hang for a minute waiting for events
+	// hang for 5 seconds waiting for events
 	ep_app_info("sleeping");
-	sleep(60);
+	sleep(5);
 
 	return 0;
 }

@@ -132,9 +132,9 @@ main(int argc, char **argv)
 	estat = do_multiread(gcl, 1, 0, (void *) 2);
 	ep_app_info("2: %s", ep_stat_tostr(estat, ebuf, sizeof ebuf));
 
-	// hang for an hour waiting for events
+	// hang for 5 seconds waiting for events
 	ep_app_info("sleeping");
-	sleep(3600);
+	sleep(5);
 
 	return 0;
 }
