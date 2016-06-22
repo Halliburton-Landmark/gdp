@@ -29,6 +29,7 @@
 BINALL= \
 		t_fwd_append \
 		t_multimultiread \
+		t_sub_and_append \
 
 SBINALL=
 
@@ -105,6 +106,9 @@ t_fwd_append:	t_fwd_append.o
 
 t_multimultiread:	t_multimultiread.o
 	${CC} -o $@ t_multimultiread.o ${LDFLAGS}
+
+t_sub_and_append:	t_sub_and_append.o
+	${CC} -o $@ t_sub_and_append.o ${LDFLAGS}
 
 ${CLEANALL}:	${LIBROOT}/gdp/libgdp.a ${LIBROOT}/ep/libep.a
 
