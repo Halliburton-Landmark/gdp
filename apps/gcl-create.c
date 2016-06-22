@@ -285,12 +285,9 @@ main(int argc, char **argv)
 		{
 			// oops, we shouldn't be able to open it
 			(void) gdp_gcl_close(gcl);
-			if (quiet)
-			{
-				// don't print an error, but do give an exit status
-				exit(EX_CANTCREAT);
-			}
-			ep_app_fatal("Cannot create %s: already exists", gclxname);
+			if (!quiet)
+				ep_app_error("Cannot create %s: already exists", gclxname);
+			exit(EX_CANTCREAT);
 		}
 	}
 
