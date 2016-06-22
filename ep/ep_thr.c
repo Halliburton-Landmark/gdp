@@ -232,8 +232,9 @@ _ep_thr_mutex_trylock(EP_THR_MUTEX *mtx,
 	CHECKMTX(mtx, "trylock >>>");
 	if ((err = pthread_mutex_trylock(mtx)) != 0)
 	{
-		// not an error if it's a "resource busy" error
-		if (err != EBUSY)
+		// ignore "resource busy" and "resource deadlock avoided" errors
+		// (EDEADLK should only occur if libep.thr.mutex.type=errorcheck)
+		if (err != EBUSY && err != EDEADLK)
 			diagnose_thr_err(err, "mutex_trylock");
 	}
 	CHECKMTX(mtx, "trylock <<<");
