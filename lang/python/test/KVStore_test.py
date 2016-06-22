@@ -27,34 +27,14 @@
 # ----- END LICENSE BLOCK -----
 
 """
-Invoke the executables in this directory using Python 
-so that we can get the output in JUnit compatible xml.
-
-See README.txt for details.
+Invoke the __selftest() method in ../apps/KVstore.py 
+See README.txt for instructions on how to invoke this test.
 """
 
-import socket
-import subprocess
+import sys
+sys.path.append("../apps")
+import KVstore
 
-# Parsing the logName command line argument is set up in conftest.py.
+def test_KVStore(logName):
+    KVstore.__selftest(logName)
 
-def test_t_fwd_append(logName):
-    subprocess.check_call(["./t_fwd_append", "-D *=18", logName, socket.gethostname()])
-
-# Create the x00 log for use in other tests.  If the log already
-# exists, then gcl-create returns 73, which can be ignored.
-def test_gcl_create():
-    try:
-        subprocess.check_call(["../apps/gcl-create", "-k", "none", "-s", socket.gethostname(), "x00"]);
-    except  CalledProcessError as ex:
-        if e.returncode != 73:
-            raise
-
-# Uses the x00 log.
-def test_t_multimultiread(logName):
-    subprocess.check_call(["./t_multimultiread", "-D *=20"], shell=True)
-
-# Uses the x00 log.
-def test_t_sub_and_append(logName):
-    subprocess.check_call(["./t_sub_and_append"])
-    

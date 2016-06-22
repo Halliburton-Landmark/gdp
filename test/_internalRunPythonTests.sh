@@ -27,7 +27,7 @@ function runTest () {
 }
 
 echo "Command: py.test ${@:1:$(($#-1))} --logName=$logName"
-runTest py.test ${@:1:$(($#-1))} --logName=$logName
+runTest py.test -v ${@:1:$(($#-1))} --logName=$logName
 
 #newLog=gdp.runPythonTests.newLog.$RANDOM
 #../../../apps/gcl-create -k none -s ealmac23.local $newLog

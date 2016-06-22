@@ -60,9 +60,9 @@ main(int argc, char **argv)
 	estat = gdp_gcl_append(gcl, d);
 	test_message(estat, "gdp_gcl_append2");
 
-	// hang for a minute waiting for events
+	// hang for 5 seconds waiting for events
 	ep_app_info("sleeping");
-	sleep(60);
+	sleep(5);
 
 	return 0;
 }
