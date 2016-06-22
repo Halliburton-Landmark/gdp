@@ -88,7 +88,8 @@ INCAVAHI=
 LIBAVAHI=	-lavahi-client -lavahi-common
 INCS=		${INCSEARCH} ${INCGDP} ${INCEP} \
 		${INCJANSSON} ${INCEVENT2} ${INCCRYPTO} ${INCAVAHI}
-LDFLAGS=	${LIBSEARCH} ${LIBGDP} ${LIBEP} \
+LDFLAGS=	t_common_support.o \
+		${LIBSEARCH} ${LIBGDP} ${LIBEP} \
 		${LIBJANSSON} ${LIBEVENT2} ${LIBCRYPTO} ${LIBAVAHI}
 PG=
 O=		-O
@@ -101,13 +102,13 @@ MKDIR=		mkdir -p
 all:	${ALL}
 	@echo "To actually run the tests, run make allTests"
 
-t_fwd_append:	t_fwd_append.o
+t_fwd_append:	t_fwd_append.o t_common_support.o
 	${CC} -o $@ t_fwd_append.o ${LDFLAGS}
 
-t_multimultiread:	t_multimultiread.o
+t_multimultiread:	t_multimultiread.o t_common_support.o
 	${CC} -o $@ t_multimultiread.o ${LDFLAGS}
 
-t_sub_and_append:	t_sub_and_append.o
+t_sub_and_append:	t_sub_and_append.o t_common_support.o
 	${CC} -o $@ t_sub_and_append.o ${LDFLAGS}
 
 ${CLEANALL}:	${LIBROOT}/gdp/libgdp.a ${LIBROOT}/ep/libep.a

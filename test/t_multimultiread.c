@@ -4,55 +4,11 @@
 cc -I. t_multimultiread.c -Lep -Lgdp -lgdp -lep -levent -levent_pthreads -pthread -lcrypto -lavahi-client -lavahi-common
 */
 
-#include <gdp/gdp.h>
-
-#include <ep/ep_app.h>
-#include <ep/ep_dbg.h>
-#include <ep/ep_string.h>
-#include <ep/ep_time.h>
+#include "t_common_support.h"
 
 #include <getopt.h>
-#include <stdio.h>
-#include <unistd.h>
 
 static EP_DBG	Dbg = EP_DBG_INIT("t_multimultiread", "GDP multiple multireader test");
-
-
-void
-print_event(gdp_event_t *gev)
-{
-	printf("%s>>> Event type %d, udata %p%s\n",
-			EpVid->vidbgblue,
-			gdp_event_gettype(gev), gdp_event_getudata(gev),
-			EpVid->vidnorm);
-
-	// decode it
-	switch (gdp_event_gettype(gev))
-	{
-	  case GDP_EVENT_DATA:
-		// this event contains a data return
-		gdp_datum_print(gdp_event_getdatum(gev), stdout, GDP_DATUM_PRTEXT);
-		break;
-
-	  case GDP_EVENT_EOS:
-		// "end of subscription": no more data will be returned
-		fprintf(stderr, "End of multiread\n");
-		break;
-
-	  case GDP_EVENT_SHUTDOWN:
-		// log daemon has shut down, meaning we lose our subscription
-		fprintf(stderr, "log daemon shutdown\n");
-		break;
-
-	  default:
-		// should be ignored, but we print it since this is a test program
-		fprintf(stderr, "Unknown event type %d\n", gdp_event_gettype(gev));
-
-		// just in case we get into some crazy loop.....
-		sleep(1);
-		break;
-	}
-}
 
 
 
@@ -103,7 +59,6 @@ main(int argc, char **argv)
 	gdp_gcl_t *gcl;
 	gdp_name_t gclname;
 	EP_STAT estat;
-	char ebuf[60];
 	int opt;
 
 	while ((opt = getopt(argc, argv, "D:")) > 0)
@@ -117,24 +72,24 @@ main(int argc, char **argv)
 	}
 
 	estat = gdp_init(NULL);
-	ep_app_info("gdp_init: %s", ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	test_message(estat, "gdp_init");
 
 	ep_time_nanosleep(INT64_C(100000000));
 
 	estat = gdp_parse_name("x00", gclname);
-	ep_app_info("gdp_parse_name: %s", ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	test_message(estat, "gdp_parse_name");
 
 	estat = gdp_gcl_open(gclname, GDP_MODE_RO, NULL, &gcl);
-	ep_app_info("gdp_gcl_open: %s", ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	test_message(estat, "gdp_gcl_open");
 
 	estat = do_multiread(gcl, 1, 0, (void *) 1);
-	ep_app_info("1: %s", ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	test_message(estat, "1");
 	estat = do_multiread(gcl, 1, 0, (void *) 2);
-	ep_app_info("2: %s", ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	test_message(estat, "2");
 
-	// hang for an hour waiting for events
+	// hang for a minute waiting for events
 	ep_app_info("sleeping");
-	sleep(3600);
+	sleep(60);
 
 	return 0;
 }
