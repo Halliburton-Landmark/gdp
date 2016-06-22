@@ -39,9 +39,22 @@ import subprocess
 # Parsing the logName command line argument is set up in conftest.py.
 
 def test_t_fwd_append(logName):
-    subprocess.call(["./t_fwd_append", logName, socket.gethostname()])
+    subprocess.check_call(["./t_fwd_append", "-D *=18", logName, socket.gethostname()])
 
+# Create the x00 log for use in other tests.  If the log already
+# exists, then gcl-create returns 73, which can be ignored.
+def test_gcl_create():
+    try:
+        subprocess.check_call(["../apps/gcl-create", "-k", "none", "-s", socket.gethostname(), "x00"]);
+    except  CalledProcessError as ex:
+        if e.returncode != 73:
+            raise
+
+# Uses the x00 log.
 def test_t_multimultiread(logName):
-    # Create the x00 log
-    subprocess.call(["../apps/gcl-create", "-k", "none", "-s", socket.gethostname(), "x00"]);
-    subprocess.call(["./t_multimultiread"])
+    subprocess.check_call(["./t_multimultiread", "-D *=20"], shell=True)
+
+# Uses the x00 log.
+def test_t_sub_and_append(logName):
+    subprocess.check_call(["./t_sub_and_append"])
+    
