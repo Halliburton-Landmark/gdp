@@ -427,11 +427,13 @@ var libgdp = ffi.Library( GDP_DIR + '/libs/libgdp', {
 // From gdp/gdp_event.h
 //CJS // allocate an event
 //CJS extern EP_STAT                  _gdp_event_new(gdp_event_t **gevp);
-   '_gdp_event_new': [ EP_STAT, [ gdp_event_tPtrPtr ] ],
+// _gdp_event_new is no longer present.
+//   '_gdp_event_new': [ EP_STAT, [ gdp_event_tPtrPtr ] ],
 
 //CJS // add an event to the active queue
 //CJS extern void                      _gdp_event_trigger(gdp_event_t *gev);
-   '_gdp_event_trigger': [ 'void', [ gdp_event_tPtr ] ],
+// _gdp_event_trigger is no longer present.
+//   '_gdp_event_trigger': [ 'void', [ gdp_event_tPtr ] ],
 
 // From gdp/gdp.h
 //CJS // initialize the library
