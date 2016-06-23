@@ -52,9 +52,13 @@ def test_gcl_create():
             print returncode
             raise
 
-# Uses the x00 log.
+# Uses logName, which has some data.
 def test_t_multimultiread(logName):
-    subprocess.check_call(["./t_multimultiread"])
+    subprocess.check_call(["./t_multimultiread", "-D gdp.proto=37", logName])
+
+# Uses the x00 log, which is new at this point.
+def test_t_multimultiread_x00(logName):
+    subprocess.check_call(["./t_multimultiread", "-D gdp.proto=37", "x00"])
 
 # Uses the x00 log.
 def test_t_sub_and_append(logName):
