@@ -54,15 +54,15 @@ fi
 # Create the ep_adm_params directory.
 # When running, we set the EP_PARAM_PATH variable.
 
-EP_ADM_PARAMS=$sourceDirectory/ep_adm_params
+EP_PARAM_PATH=$sourceDirectory/ep_adm_params
 
-if [ ! -d "$EP_ADM_PARAMS" ]; then
-   mkdir -p "$EP_ADM_PARAMS"
+if [ ! -d "$EP_PARAM_PATH" ]; then
+   mkdir -p "$EP_PARAM_PATH"
 fi
 
-export EP_ADM_PARAMS=`cd $EP_ADM_PARAMS; pwd`
+export EP_PARAM_PATH=`cd $EP_PARAM_PATH; pwd`
 
-echo "swarm.gdp.routers=localhost" > "$EP_ADM_PARAMS/gdp"
+echo "swarm.gdp.routers=localhost" > "$EP_PARAM_PATH/gdp"
 
 ######
 # The default directory is /var/swarm/gdp/gcls, which must be created
@@ -75,11 +75,11 @@ echo "#### $0: Removing $GCLS and then recreating it."
 rm -rf $GCLS
 mkdir -p "$GCLS"
 
-echo "swarm.gdplogd.gcl.dir=$GCLS" > "$EP_ADM_PARAMS/gdplogd"
+echo "swarm.gdplogd.gcl.dir=$GCLS" > "$EP_PARAM_PATH/gdplogd"
 
-echo "#### $0: Set up $EP_ADM_PARAMS"
+echo "#### $0: Set up $EP_PARAM_PATH"
 echo " To run with these settings from the command line, use:"
-echo "    export EP_ADM_PARAMS=$EP_ADM_PARAMS"
+echo "    export EP_PARAM_PATH=$EP_PARAM_PATH"
 
 echo "#### $0: Starting gdp_router"
 # pkill -f matches against the full argument list.
