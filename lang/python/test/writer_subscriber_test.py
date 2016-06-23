@@ -53,7 +53,7 @@ def main(name_str):
     gcl_handle_subscriber.subscribe(0, 0, None)
 
     count = 0
-    while True:
+    while count < 10:
         count += 1
         line = str(count)
         # Create a minimalist datum dictionary
