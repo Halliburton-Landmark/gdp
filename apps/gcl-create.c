@@ -480,7 +480,7 @@ main(int argc, char **argv)
 
 		if (!EP_STAT_ISOK(estat))
 		{
-			ep_app_abort("Couldn't write secret key to %s; giving up",
+			ep_app_abort("Couldn't write secret key to %s",
 					localkeyfile);
 		}
 	}
