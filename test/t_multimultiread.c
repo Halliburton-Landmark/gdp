@@ -7,6 +7,7 @@ cc -I. t_multimultiread.c -Lep -Lgdp -lgdp -lep -levent -levent_pthreads -pthrea
 #include "t_common_support.h"
 
 #include <getopt.h>
+#include <sysexits.h>
 
 static EP_DBG	Dbg = EP_DBG_INIT("t_multimultiread", "GDP multiple multireader test");
 
@@ -53,6 +54,20 @@ do_multiread(gdp_gcl_t *gcl,
 	return estat;
 }
 
+
+void
+usage(void)
+{
+	fprintf(stderr,
+			"Usage: %s [-D dbgspec] [-n maxrecs] [-r nreaders] [log_name]\n"
+			"    -D  set debugging flags\n"
+			"    -n  set maximum number of records returned\n"
+			"    -r  set number of readers (default 2)\n"
+			"log_name (default \"x00\") must already exist\n",
+			ep_app_getprogname());
+	exit(EX_USAGE);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -60,41 +75,58 @@ main(int argc, char **argv)
 	gdp_name_t gclname;
 	EP_STAT estat;
 	int opt;
+	char *gclxname = "x00";
+	int nreaders = 2;
+	int maxrecs = 0;
+	bool show_usage = false;
 
-	while ((opt = getopt(argc, argv, "D:")) > 0)
+	while ((opt = getopt(argc, argv, "D:n:r:")) > 0)
 	{
 		switch (opt)
 		{
 		  case 'D':
 			ep_dbg_set(optarg);
 			break;
+
+		  case 'n':
+			maxrecs = atoi(optarg);
+			break;
+
+		  case 'r':
+			nreaders = atoi(optarg);
+			break;
+
+		  case '?':
+			show_usage = true;
+			break;
 		}
 	}
-
 	argc -= optind;
 	argv += optind;
 
-	char *log_xname;
-	if (argc < 1)
-            log_xname = strdup("x00");
-        else
-            log_xname = argv[0];
+	if (show_usage || argc > 1)
+		usage();
+
+	if (argc > 0)
+		gclxname = argv[0];
 
 	estat = gdp_init(NULL);
 	test_message(estat, "gdp_init");
 
 	ep_time_nanosleep(INT64_C(100000000));
 
-	estat = gdp_parse_name(log_xname, gclname);
+	estat = gdp_parse_name(gclxname, gclname);
 	test_message(estat, "gdp_parse_name");
 
 	estat = gdp_gcl_open(gclname, GDP_MODE_RO, NULL, &gcl);
 	test_message(estat, "gdp_gcl_open");
 
-	estat = do_multiread(gcl, 1, 0, (void *) 1);
-	test_message(estat, "1");
-	estat = do_multiread(gcl, 1, 0, (void *) 2);
-	test_message(estat, "2");
+	long i;
+	for (i = 1; i <= nreaders; i++)
+	{
+		estat = do_multiread(gcl, 1, maxrecs, (void *) i);
+		test_message(estat, "reader %ld", i);
+	}
 
 	// hang for 5 seconds waiting for events
 	ep_app_info("sleeping");
