@@ -274,10 +274,7 @@ _gdp_gcl_create(gdp_name_t gclname,
 
 fail0:
 	if (gcl != NULL)
-	{
-		EP_ASSERT_INSIST(gcl->refcnt == 1);
 		_gdp_gcl_decref(&gcl);
-	}
 	if (req != NULL)
 		_gdp_req_free(&req);
 
