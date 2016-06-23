@@ -126,16 +126,13 @@ worker_thread(void *a)
 		// see if there is anything to do
 		ep_thr_mutex_lock(&Pool.mutex);
 		Pool.free_threads++;
-		if (STAILQ_FIRST(&Pool.work) == NULL)
+		while ((tw = STAILQ_FIRST(&Pool.work)) == NULL)
 		{
 			// no, wait for something
 			ep_thr_cond_wait(&Pool.has_work, &Pool.mutex, NULL);
-			ep_thr_mutex_unlock(&Pool.mutex);
-			continue;
 		}
 
 		// yes, please run it! (but don't stay locked)
-		tw = STAILQ_FIRST(&Pool.work);
 		STAILQ_REMOVE_HEAD(&Pool.work, next);
 		Pool.free_threads--;
 		ep_thr_mutex_unlock(&Pool.mutex);
