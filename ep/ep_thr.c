@@ -152,6 +152,13 @@ ep_thr_yield(void)
 }
 
 
+EP_THR
+ep_thr_gettid(void)
+{
+	return pthread_self();
+}
+
+
 /*
 **  Mutex implementation
 */

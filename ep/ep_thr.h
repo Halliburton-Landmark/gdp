@@ -81,6 +81,7 @@ typedef pthread_t		EP_THR;
 
 extern int	ep_thr_spawn(EP_THR *th, void *(*thfunc)(void *), void *arg);
 extern void	ep_thr_yield(void);
+extern EP_THR	ep_thr_gettid(void);
 
 typedef pthread_mutex_t		EP_THR_MUTEX;
 #  define	EP_THR_MUTEX_INITIALIZER	= PTHREAD_MUTEX_INITIALIZER

@@ -96,6 +96,7 @@ struct thr_pool
 	int		num_threads;	// number of running threads
 	int		min_threads;	// minimum number of running threads
 	int		max_threads;	// maximum number of running threads
+	int		max_par_threads; // maximum number of parallel threads
 	struct tworkq	work;		// active work list
 	bool		initialized:1;	// set if initialized
 };
@@ -135,6 +136,10 @@ worker_thread(void *a)
 		// yes, please run it! (but don't stay locked)
 		STAILQ_REMOVE_HEAD(&Pool.work, next);
 		Pool.free_threads--;
+
+		// keep stats for testing
+		if (Pool.num_threads - Pool.free_threads > Pool.max_par_threads)
+			Pool.max_par_threads = Pool.num_threads - Pool.free_threads;
 		ep_thr_mutex_unlock(&Pool.mutex);
 
 		tw->func(tw->arg);
