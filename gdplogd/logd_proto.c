@@ -190,6 +190,14 @@ cmd_create(gdp_req_t *req)
 		return GDP_STAT_GCL_NAME_INVALID;
 	}
 
+	// make sure we aren't creating a log with our name
+	if (memcmp(gclname, _GdpMyRoutingName, sizeof _GdpMyRoutingName) == 0)
+	{
+		return gdpd_gcl_error(gclname,
+				"cmd_create: cannot create a log with same name as logd",
+				GDP_STAT_GCL_NAME_INVALID, GDP_STAT_NAK_FORBIDDEN);
+	}
+
 	{
 		gdp_pname_t pbuf;
 
