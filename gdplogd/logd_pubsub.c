@@ -39,8 +39,6 @@
 static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.pubsub",
 								"GDP Log Daemon pub/sub handling");
 
-#define SECONDS					* INT64_C(1000000000)
-
 
 /*
 **  SUB_SEND_MESSAGE_NOTIFICATION --- inform a subscriber of a new message

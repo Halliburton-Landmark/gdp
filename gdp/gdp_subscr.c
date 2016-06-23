@@ -42,7 +42,6 @@
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.subscr", "GDP subscriptions");
 
-#define SECONDS		* INT64_C(1000000000)
 
 /*
 **  Subscription disappeared; remove it from list

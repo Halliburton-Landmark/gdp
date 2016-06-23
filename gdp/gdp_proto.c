@@ -64,8 +64,6 @@ static uint8_t	RoutingLayerAddr[32] =
 **		where a command can return multiple values (e.g., subscribe).
 */
 
-#define MILLISECONDS		* INT64_C(1000000)
-
 EP_STAT
 _gdp_invoke(gdp_req_t *req)
 {

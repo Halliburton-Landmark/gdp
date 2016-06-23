@@ -664,6 +664,10 @@ post_subscribe(gdp_req_t *req)
 
 		// if we didn't successfully send a record, terminate
 		EP_STAT_CHECK(estat, break);
+
+		// DEBUG: force records to be interspersed
+		if (ep_dbg_test(Dbg, 101))
+			ep_time_nanosleep(1 MILLISECONDS);
 	}
 
 	if (req->numrecs < 0 || !EP_UT_BITSET(GDP_REQ_SUBUPGRADE, req->flags))

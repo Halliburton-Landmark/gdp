@@ -604,4 +604,13 @@ struct event_loop_info
 EP_STAT			_gdp_evloop_init(void);		// start event loop
 
 
+/*
+**  Convenience macros
+*/
+
+#define MICROSECONDS	* INT64_C(1000)
+#define MILLISECONDS	* INT64_C(1000000)
+#define SECONDS			* INT64_C(1000000000)
+
+
 #endif // _GDP_PRIV_H_
