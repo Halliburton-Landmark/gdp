@@ -71,12 +71,21 @@ main(int argc, char **argv)
 		}
 	}
 
+	argc -= optind;
+	argv += optind;
+
+	char *log_xname;
+	if (argc < 1)
+            log_xname = strdup("x00");
+        else
+            log_xname = argv[0];
+
 	estat = gdp_init(NULL);
 	test_message(estat, "gdp_init");
 
 	ep_time_nanosleep(INT64_C(100000000));
 
-	estat = gdp_parse_name("x00", gclname);
+	estat = gdp_parse_name(log_xname, gclname);
 	test_message(estat, "gdp_parse_name");
 
 	estat = gdp_gcl_open(gclname, GDP_MODE_RO, NULL, &gcl);
