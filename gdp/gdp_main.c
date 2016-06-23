@@ -138,9 +138,9 @@ gdp_pdu_proc_cmd(void *pdu_)
 	gdp_req_t *req = NULL;
 	int resp;
 
-	ep_dbg_cprintf(Dbg, 50,
-			"gdp_pdu_proc_cmd(%s)\n",
-			_gdp_proto_cmd_name(cmd));
+	ep_dbg_cprintf(Dbg, 40,
+			"gdp_pdu_proc_cmd(%s, thread 0x%p)\n",
+			_gdp_proto_cmd_name(cmd), ep_thr_gettid());
 
 	gcl = _gdp_gcl_cache_get(pdu->dst, 0);
 
@@ -183,7 +183,7 @@ gdp_pdu_proc_cmd(void *pdu_)
 	// send response PDU if appropriate
 	if (GDP_CMD_NEEDS_ACK(cmd))
 	{
-		ep_dbg_cprintf(Dbg, 41,
+		ep_dbg_cprintf(Dbg, 47,
 				"gdp_pdu_proc_cmd: sending %zd bytes\n",
 				evbuffer_get_length(req->pdu->datum->dbuf));
 		req->pdu->cmd = resp;
@@ -194,6 +194,7 @@ gdp_pdu_proc_cmd(void *pdu_)
 	// do command post processing
 	if (req->postproc)
 	{
+		ep_dbg_cprintf(Dbg, 44, "gdp_pdu_proc_cmd: doing post processing\n");
 		(req->postproc)(req);
 		req->postproc = NULL;
 	}
