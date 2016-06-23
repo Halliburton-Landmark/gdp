@@ -34,6 +34,7 @@
 #include <ep/ep_app.h>
 #include <ep/ep_dbg.h>
 #include <ep/ep_hash.h>
+#include <ep/ep_prflags.h>
 
 #include "gdp.h"
 #include "gdp_event.h"
@@ -155,6 +156,16 @@ _gdp_gcl_freehandle(gdp_gcl_t *gcl)
 **  _GDP_GCL_DUMP --- print a GCL (for debugging)
 */
 
+EP_PRFLAGS_DESC	GclFlags[] =
+{
+	{ GCLF_DROPPING,		GCLF_DROPPING,			"DROPPING"			},
+	{ GCLF_INCACHE,			GCLF_INCACHE,			"INCACHE"			},
+	{ GCLF_ISLOCKED,		GCLF_ISLOCKED,			"ISLOCKED"			},
+	{ GCLF_INUSE,			GCLF_INUSE,				"INUSE"				},
+	{ GCLF_DEFER_FREE,		GCLF_DEFER_FREE,		"DEFER_FREE"		},
+	{ 0, 0, NULL }
+};
+
 void
 _gdp_gcl_dump(
 		const gdp_gcl_t *gcl,
@@ -183,9 +194,12 @@ _gdp_gcl_dump(
 		if (detail >= GDP_PR_BASIC)
 		{
 			fprintf(fp, "\tiomode = %d, refcnt = %d, reqs = %p, nrecs = %"
-					PRIgdp_recno "\n",
+					PRIgdp_recno "\n"
+					"\tflags = ",
 					gcl->iomode, gcl->refcnt, LIST_FIRST(&gcl->reqs),
 					gcl->nrecs);
+			ep_prflags(gcl->flags, GclFlags, fp);
+			fprintf(fp, "\n");
 			if (detail >= GDP_PR_DETAILED)
 			{
 				char tbuf[40];
