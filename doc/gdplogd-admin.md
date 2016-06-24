@@ -49,3 +49,17 @@ The messages are from the following list:
       if the log is in the cache.
     * `size` --- the size of the on-disk extent files for the log.
       Only the extents currently open are included.
+
+### Example
+
+This shows the output from one log open and two snapshots.
+
+    2016-06-24T20:44:18.673694000Z log-open log-name=u6Uy1qETHk2ntODficWLFgNmoeKDly-qk6yQN1EcZow; status=OK
+    2016-06-24T20:44:28.675471000Z log-snapshot name=K5d008wsNPKURynbeh5koBMLXfZHt0iC_-VZqoLqpvA; in-cache=false
+    2016-06-24T20:44:28.675931000Z log-snapshot name=b5IEO6R2DM8S0cikYtB24Cqeyt0B9eatyLnn2qCl5WQ; in-cache=false
+    2016-06-24T20:44:28.676431000Z log-snapshot name=u6Uy1qETHk2ntODficWLFgNmoeKDly-qk6yQN1EcZow; in-cache=true; nrecs=2; size=0
+    2016-06-24T20:44:28.676555000Z log-snapshot name=zf-Jke7aELKuoS6vYT60XPnWhrxcGWImHEFzyU-Dyf0; in-cache=false
+    2016-06-24T20:44:38.673993000Z log-snapshot name=K5d008wsNPKURynbeh5koBMLXfZHt0iC_-VZqoLqpvA; in-cache=false
+    2016-06-24T20:44:38.674336000Z log-snapshot name=b5IEO6R2DM8S0cikYtB24Cqeyt0B9eatyLnn2qCl5WQ; in-cache=false
+    2016-06-24T20:44:38.674702000Z log-snapshot name=u6Uy1qETHk2ntODficWLFgNmoeKDly-qk6yQN1EcZow; in-cache=true; nrecs=2; size=0
+    2016-06-24T20:44:38.674815000Z log-snapshot name=zf-Jke7aELKuoS6vYT60XPnWhrxcGWImHEFzyU-Dyf0; in-cache=false
