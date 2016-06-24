@@ -136,6 +136,14 @@ extern void		sub_send_message_notification(
 **			on-disk (or in-memory) structure.
 */
 
+// status structure (for administrative use in gdplogd)
+struct gcl_phys_stats
+{
+	gdp_recno_t		nrecs;			// number of records
+	int64_t			size;			// size in bytes
+};
+
+// the service switch entry
 struct gcl_phys_impl
 {
 	EP_STAT		(*init)(void);
@@ -162,6 +170,9 @@ struct gcl_phys_impl
 							gdp_name_t name,
 							void *ctx),
 						void *ctx);
+	void		(*getstats)(
+						gdp_gcl_t *gcl,
+						struct gcl_phys_stats *stats);
 };
 
 // known implementations

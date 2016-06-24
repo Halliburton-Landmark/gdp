@@ -1616,6 +1616,29 @@ disk_foreach(void (*func)(gdp_name_t, void *), void *ctx)
 }
 
 
+/*
+**  Deliver statistics for management visualization
+*/
+
+static void
+disk_getstats(
+		gdp_gcl_t *gcl,
+		struct gcl_phys_stats *st)
+{
+	int exno;
+	gcl_physinfo_t *phys = gcl->x->physinfo;
+
+	st->nrecs = gcl->nrecs;
+	st->size = 0;
+	for (exno = 0; exno < phys->last_extent; exno++)
+	{
+		extent_t *ext = phys->extents[exno];
+		if (ext != NULL && ext->fp != NULL)
+			st->size += fsizeof(ext->fp);
+	}
+}
+
+
 struct gcl_phys_impl	GdpDiskImpl =
 {
 	.init =			disk_init,
@@ -1629,4 +1652,5 @@ struct gcl_phys_impl	GdpDiskImpl =
 	.newextent =	disk_newextent,
 #endif
 	.foreach =		disk_foreach,
+	.getstats =		disk_getstats,
 };

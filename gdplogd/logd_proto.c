@@ -29,6 +29,7 @@
 */
 
 #include "logd.h"
+#include "logd_admin.h"
 #include "logd_pubsub.h"
 
 #include <gdp/gdp_gclmd.h>
@@ -251,6 +252,14 @@ fail1:
 	_gdp_gcl_decref(&req->gcl);
 
 fail0:
+	{
+		char ebuf[60];
+
+		admin_post_stats(ADMIN_LOG_EXIST, "log-create",
+				"log-name", gcl->pname,
+				"status", ep_stat_tostr(estat, ebuf, sizeof ebuf),
+				NULL, NULL);
+	}
 	return estat;
 }
 
@@ -290,6 +299,14 @@ cmd_open(gdp_req_t *req)
 		_gdp_gclmd_serialize(gcl->gclmd, req->pdu->datum->dbuf);
 	}
 
+	{
+		char ebuf[60];
+
+		admin_post_stats(ADMIN_LOG_OPEN, "log-open",
+				"log-name", gcl->pname,
+				"status", ep_stat_tostr(estat, ebuf, sizeof ebuf),
+				NULL, NULL);
+	}
 	req->pdu->datum->recno = gcl->nrecs;
 
 	_gdp_gcl_decref(&req->gcl);

@@ -92,6 +92,8 @@ extern FILE		*ep_fopensmem(		// open a static memory buffer
 				void *buf,		// buffer
 				size_t bufsz,		// size of buffer
 				const char *mode);	// mode, e.g., r, w
+extern FILE		*ep_fopen_syslog(	// open a syslog channel
+				int pri);		// message priority
 extern size_t		ep_fread_unlocked(	// unlocked version of fread
 				void *buf,		// buffer area
 				size_t sz,		// size of one item

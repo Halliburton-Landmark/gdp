@@ -65,6 +65,7 @@ OBJS_MOST=	\
 	ep_crypto_vrfy.o \
 	ep_dbg.o \
 	ep_dumpfds.o \
+	ep_fopen_syslog.o \
 	ep_fopensmem.o \
 	ep_fread_unlocked.o \
 	ep_funclist.o \

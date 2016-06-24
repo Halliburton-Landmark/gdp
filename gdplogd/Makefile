@@ -99,6 +99,7 @@ MKDIR=		mkdir -p
 
 OBJS=	\
 		logd.o \
+		logd_admin.o \
 		logd_adv.o \
 		logd_disklog.o \
 		logd_gcl.o \
@@ -107,6 +108,7 @@ OBJS=	\
 
 HDEPS=	\
 		logd.h \
+		logd_admin.h \
 		logd_disklog.h \
 		logd_pubsub.h \
 		${INCROOT}/gdp/gdp.h \
