@@ -558,7 +558,7 @@ a_read_datum(scgi_request *req, gdp_name_t gcliname, gdp_recno_t recno)
 			FILE *fp;
 			gdp_pname_t gclpname;
 
-			fp = ep_fopensmem(rbuf, sizeof rbuf, "w");
+			fp = ep_fopen_smem(rbuf, sizeof rbuf, "w");
 			if (fp == NULL)
 			{
 				char nbuf[40];
@@ -903,7 +903,7 @@ pfx_kv(scgi_request *req, char *uri)
 		FILE *fp;
 		char rbuf[2000];
 
-		fp = ep_fopensmem(rbuf, sizeof rbuf, "w");
+		fp = ep_fopen_smem(rbuf, sizeof rbuf, "w");
 		if (fp == NULL)
 		{
 			char nbuf[40];

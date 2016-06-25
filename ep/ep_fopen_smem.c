@@ -107,7 +107,7 @@ memclose(void *cookie)
 
 
 FILE *
-ep_fopensmem(void *buf,
+ep_fopen_smem(void *buf,
 	size_t size,
 	const char *mode)
 {

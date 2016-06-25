@@ -88,7 +88,7 @@ extern const char	*ep_adm_getstrparam(	// get string param value
 				const char *name,	// name of param
 				const char *def);	// default value
 
-extern FILE		*ep_fopensmem(		// open a static memory buffer
+extern FILE		*ep_fopen_smem(		// open a static memory buffer
 				void *buf,		// buffer
 				size_t bufsz,		// size of buffer
 				const char *mode);	// mode, e.g., r, w

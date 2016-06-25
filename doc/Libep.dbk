@@ -839,7 +839,7 @@ ep_lib_init(uint32_t flags)</programlisting>
       <title>Opening Memory as a File</title>
 
       <programlisting>    FILE *
-    ep_fopensmem(void *buf,           // block of memory to open
+    ep_fopen_smem(void *buf,          // block of memory to open
         size_t bsize,                 // size of that memory
         const char *mode)             // fopen(3) mode string</programlisting>
     </section>
