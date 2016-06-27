@@ -1,19 +1,19 @@
 #!/bin/sh
 # Check for gdplogd and gdp_router first, then create directories,
-# then run the script named as an argument, then kill the daemons.
+# then run the script optionally named as an argument, then kill the daemons.
 
 # To use this script, create a script that runs the local tests that takes
 # a logName as an argument.
 
 # Process arguments
 
-if [ $# -lt 1 ]; then
-    echo "$0: Usage: $0 runScript [args]"
-fi
-
-runScript=$1
-if [ ! -x $runScript ]; then
-    echo "$0: $runScript is not present or not executable"
+runScript=""
+if [ $# -ge 1 ]; then
+    runScript=$1
+    if [ ! -x $runScript ]; then
+        echo "$0: $runScript is not present or not executable"
+        exit 2
+    fi
 fi
 
 # Exit if we use a previously unset variable.
@@ -113,10 +113,17 @@ if [ $returnValue -eq 73 ]; then
     echo "$0: Error: Log $logName already existed?"
 fi
 
-# Run all the tests!
-echo "$@ $logName"
-$@ $logName
-overallReturnValue=$?
+if [ $# -ge 1 ]; then
+    # Run all the tests!
+    echo "$0: Invoking $@ $logName"
+    $@ $logName
+    overallReturnValue=$?
+else
+    echo "$0: called with no arguments, gdp daemons running:"
+    ps auxgw | grep gdp
+    echo "$0: Sleeping..."
+    sleep 9999999
+fi
 
 echo "#### $0: Stopping gdplogd and gdp_router"
 kill $gdplogdPid $gdp_routerPid
