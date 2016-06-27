@@ -355,6 +355,8 @@ mosquitto_run(const char *mqtt_broker,
 			*p++ = '\0';
 			mqtt_port = atol(p);
 		}
+		ep_dbg_cprintf(Dbg, 1,
+				"mosquitto_connect(%s:%d)\n", broker, mqtt_port);
 		istat = mosquitto_connect(mosq, broker, mqtt_port, 60);
 		ep_mem_free(broker);
 		if (istat != 0)
