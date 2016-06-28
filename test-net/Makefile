@@ -15,6 +15,8 @@
 .DEFAULT_GOAL = gdp-logds
 all = gdp-logds
 
+GDP_BASEIMAGE_DOCKERFILE = Dockerfile.baseimage
+
 GDP_ROOT = ../
 GDP_LOGD_DOCKERFILE = Dockerfile.gdplogd
 GDP_LOGD_VERSION = 0.3-1
@@ -48,20 +50,28 @@ $(PIPEWORK):
 $(GDP_ROUTER_ROOT):
 	git clone repoman@repo.eecs.berkeley.edu:projects/swarmlab/gdp_router.git
 
-gdp-router-docker-image: $(GDP_ROUTER_ROOT) $(GDP_ROUTER_DOCKERFILE)
+.gdp-docker-baseimage:
+	cp $(GDP_BASEIMAGE_DOCKERFILE) Dockerfile
+	docker build -t gdp-baseimage .
+	rm -f Dockerfile
+	touch $@
+
+.gdp-router-docker-image: $(GDP_ROUTER_ROOT) $(GDP_ROUTER_DOCKERFILE)
 	$(GDP_ROUTER_ROOT)/deb-pkg/package.sh $(GDP_ROUTER_VERSION)
 	cp $(GDP_ROUTER_DOCKERFILE) Dockerfile
 	docker build -t gdp-router .
 	rm -f Dockerfile
+	touch $@
 
-gdp-logd-docker-image: $(GDP_ROOT) $(GDP_LOGD_DOCKERFILE)
+.gdp-logd-docker-image: $(GDP_ROOT) $(GDP_LOGD_DOCKERFILE)
 	$(GDP_ROOT)/deb-pkg/package-server.sh $(GDP_LOGD_VERSION)
 	mv $(GDP_ROOT)/gdp-server_$(GDP_LOGD_VERSION)_amd64.deb .
 	cp $(GDP_LOGD_DOCKERFILE) Dockerfile
 	docker build -t gdplogd .
 	rm -f Dockerfile
+	touch $@
 
-images: gdp-router-docker-image gdp-logd-docker-image
+images: .gdp-docker-baseimage .gdp-router-docker-image .gdp-logd-docker-image
 
 # Start the gdp routers
 gdp-routers: $(PIPEWORK) 
@@ -94,6 +104,8 @@ gdp-logds: $(PIPEWORK) gdp-routers
 logd_containers := $(shell docker ps -a -q --filter="name=gdp-logd_*")
 router_containers := $(shell docker ps -a -q --filter="name=gdp-router_*")
 
+
+# Just shut down the docker containers, but keep the images around
 clean:
 	rm -rf gdp-router*.deb gdp-server*.deb
 	rm -f Dockerfile
@@ -112,5 +124,12 @@ clean:
 	-sudo ip link set br1 down
 	-sudo brctl delbr br1
 
+# Clean the router and log-server image. Useful when you want to deploy new code
 clean-images: clean
 	-docker rmi gdp-router gdplogd
+	-rm -f .gdp-router-docker-image .gdp-logd-docker-image 
+
+# Clean everything (including the base image with pre-requisites)
+clean-all: clean clean-images
+	-docker rmi gdp-baseimage
+	-rm -f .gdp-docker-baseimage

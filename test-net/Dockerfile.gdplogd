@@ -1,24 +1,18 @@
 ## Docker image to run gdp-server
 
-# Based on ubuntu
-FROM ubuntu:14.04
+# Based on gdp-baseimage (which already has the pre-requisites)
+FROM gdp-baseimage
 
 MAINTAINER Nitesh Mor <mor@eecs.berkeley.edu>
 
 # stop stupid debconf errors
 ENV DEBIAN_FRONTEND noninteractive
 
-# Update package list
-RUN apt-get update
-
 # fetch debian package
 ADD gdp-server*.deb /
 
-# install debian package, this will fail -- we will fix that in next step
+# install debian package, this ideally shouldn't fail on dependencies
 RUN dpkg -i /gdp-server*.deb || true
-
-# fix the dependencies
-RUN apt-get -f install -y || true
 
 # Make sure we can overwrite /etc/ep_adm_params/gdplogd as user gdp later on
 RUN chmod -R a+w /etc/ep_adm_params

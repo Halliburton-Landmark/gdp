@@ -1,0 +1,20 @@
+## Docker image to run gdp-server
+
+# Based on ubuntu
+FROM ubuntu:14.04
+
+MAINTAINER Nitesh Mor <mor@eecs.berkeley.edu>
+
+# stop stupid debconf errors
+ENV DEBIAN_FRONTEND noninteractive
+
+# Update package list
+RUN apt-get update
+
+# Install required packages for gdp-router
+RUN apt-get install -y python python-twisted
+
+# Install required packages for gdplogd
+RUN apt-get install -y libevent-dev libssl-dev libjansson-dev avahi-daemon libavahi-client3
+
+# This should be a good starting point for gdplogd and gdp-router image
