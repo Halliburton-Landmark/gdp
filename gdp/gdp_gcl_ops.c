@@ -732,6 +732,11 @@ fail0:
 **
 **		Forwards an APPEND command to a different server.  This is one
 **		of the few commands that is directed directly to a gdplogd instance.
+**
+**		Note: Unlike other calls, the datum is not cleared.  This is
+**		because we expect this to be used multiple times on a single
+**		datum.  When all copies are sent, the caller must call
+**		gdp_buf_drain(datum, gdp_buf_getlength(datum)).
 */
 
 EP_STAT
@@ -769,7 +774,8 @@ _gdp_gcl_fwd_append(
 	memcpy(req->pdu->dst, to_server, sizeof req->pdu->dst);
 
 	// copy the existing datum, including metadata
-	gdp_buf_copy(datum->dbuf, req->pdu->datum->dbuf);
+	size_t l = gdp_buf_getlength(datum->dbuf);
+	gdp_buf_write(req->pdu->datum->dbuf, gdp_buf_getptr(datum->dbuf, l), l);
 	req->pdu->datum->recno = datum->recno;
 	req->pdu->datum->ts = datum->ts;
 	req->pdu->datum->sigmdalg = datum->sigmdalg;
@@ -777,8 +783,9 @@ _gdp_gcl_fwd_append(
 	EP_ASSERT_INSIST(req->pdu->datum->sig == NULL);
 	if (datum->sig != NULL)
 	{
+		l = gdp_buf_getlength(datum->sig);
 		req->pdu->datum->sig = gdp_buf_new();
-		gdp_buf_copy(datum->sig, req->pdu->datum->sig);
+		gdp_buf_write(req->pdu->datum->sig, gdp_buf_getptr(datum->sig, l), l);
 	}
 
 	// XXX should we take a callback function?
