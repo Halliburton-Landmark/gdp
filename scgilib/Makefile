@@ -1,8 +1,10 @@
-O=		-O
+CC=		cc
 PG=
 WALL=		-Wall
+G=		-g
+O=		-O
 STD=
-COPTS=		${PG} -g ${WALL} $O ${STD}
+COPTS=		${PG} ${WALL} $G $O ${STD}
 CFLAGS=		${COPTS} ${INCS}
 ALL=		helloworld
 

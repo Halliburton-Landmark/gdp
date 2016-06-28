@@ -182,13 +182,14 @@ BINALL= \
 
 CC=		cc
 PG=
-O=		-O
 WALL=		-Wall
+G=		-g
+O=		-O
 STD=
+COPTS=		${PG} ${WALL} $G $O ${STD}
 CRYPTOCFLAGS=	-I${CRYPTOROOT}/include
 CRYPTOLFLAGS=	-L${CRYPTOROOT}/lib
 INCLS=		${CRYPTOCFLAGS}
-COPTS=		${PG} -g ${WALL} $O ${STD}
 CFLAGS=		${COPTS} ${INCLS} -I${CURDIR} -I.. -fPIC
 RM=		rm
 LD=		ld

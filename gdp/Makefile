@@ -137,11 +137,13 @@ LIBSEARCH=	-L${CRYPTOROOT}/lib \
 		-L${LOCAL1}/lib \
 		-L${LOCAL2}/lib
 LDFLAGS= 	${LIBSEARCH} ${LIBEP} ${LIBEVENT2} ${LIBCRYPTO} ${LIBAVAHI}
+CC=		cc
 PG=
-O=		-O
 WALL=		-Wall
+G=		-g
+O=		-O
 STD=
-COPTS=		${PG} -g ${WALL} $O ${STD}
+COPTS=		${PG} ${WALL} $G $O ${STD}
 CFLAGS=		${COPTS} ${INCS} -fPIC
 
 LN=		ln

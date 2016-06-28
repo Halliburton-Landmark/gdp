@@ -100,10 +100,11 @@ INCS=		${INCSEARCH} ${INCGDP} ${INCEP} \
 LDFLAGS=	${LIBSEARCH} ${LIBGDP} ${LIBEP} \
 		${LIBJANSSON} ${LIBEVENT2} ${LIBCRYPTO} ${LIBAVAHI}
 PG=
-O=		-O
 WALL=		-Wall
+G=		-g
+O=		-O
 STD=
-COPTS=		${PG} -g ${WALL} $O ${STD}
+COPTS=		${PG} ${WALL} $G $O ${STD}
 CFLAGS=		${COPTS} ${INCS}
 MKDIR=		mkdir -p
 
