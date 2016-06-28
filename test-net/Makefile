@@ -1,7 +1,14 @@
 
 # Run as follows:
-#   make images
-#   make 
+# ===============
+# To setup things (including building images and running containers)
+# $ make 
+
+# To cleanup the container images (but keep the base image around)
+# $ make clean
+
+# To cleanup everything (including the base image)
+# $ make clean-all
 
 
 # Launch multiple docker instances for gdp-routers/log-servers in a 
@@ -105,7 +112,8 @@ logd_containers := $(shell docker ps -a -q --filter="name=gdp-logd_*")
 router_containers := $(shell docker ps -a -q --filter="name=gdp-router_*")
 
 
-# Just shut down the docker containers, but keep the images around
+# shut down the docker containers, cleanup the router and log-server images, but
+#       keep the baseimage around
 clean:
 	rm -rf gdp-router*.deb gdp-server*.deb
 	rm -f Dockerfile
@@ -123,13 +131,13 @@ clean:
 	fi
 	-sudo ip link set br1 down
 	-sudo brctl delbr br1
-
-# Clean the router and log-server image. Useful when you want to deploy new code
-clean-images: clean
 	-docker rmi gdp-router gdplogd
 	-rm -f .gdp-router-docker-image .gdp-logd-docker-image 
 
+# Just for back compatibility
+clean-images: clean
+
 # Clean everything (including the base image with pre-requisites)
-clean-all: clean clean-images
+clean-all: clean
 	-docker rmi gdp-baseimage
 	-rm -f .gdp-docker-baseimage
