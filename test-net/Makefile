@@ -56,14 +56,14 @@ $(GDP_ROUTER_ROOT):
 	rm -f Dockerfile
 	touch $@
 
-.gdp-router-docker-image: $(GDP_ROUTER_ROOT) $(GDP_ROUTER_DOCKERFILE)
+.gdp-router-docker-image: $(GDP_ROUTER_ROOT) $(GDP_ROUTER_DOCKERFILE) .gdp-docker-baseimage
 	$(GDP_ROUTER_ROOT)/deb-pkg/package.sh $(GDP_ROUTER_VERSION)
 	cp $(GDP_ROUTER_DOCKERFILE) Dockerfile
 	docker build -t gdp-router .
 	rm -f Dockerfile
 	touch $@
 
-.gdp-logd-docker-image: $(GDP_ROOT) $(GDP_LOGD_DOCKERFILE)
+.gdp-logd-docker-image: $(GDP_ROOT) $(GDP_LOGD_DOCKERFILE) .gdp-docker-baseimage
 	$(GDP_ROOT)/deb-pkg/package-server.sh $(GDP_LOGD_VERSION)
 	mv $(GDP_ROOT)/gdp-server_$(GDP_LOGD_VERSION)_amd64.deb .
 	cp $(GDP_LOGD_DOCKERFILE) Dockerfile
@@ -74,7 +74,7 @@ $(GDP_ROUTER_ROOT):
 images: .gdp-docker-baseimage .gdp-router-docker-image .gdp-logd-docker-image
 
 # Start the gdp routers
-gdp-routers: $(PIPEWORK) 
+gdp-routers: $(PIPEWORK) .gdp-router-docker-image
 	@sudo ls / > /dev/null    # So that IP configuration is right after container start
 	-@rm -f $(TMP_FILE)
 	@for IP in $(ROUTER_IPS); do \
@@ -89,7 +89,7 @@ gdp-routers: $(PIPEWORK)
 
 
 # Start the logd's
-gdp-logds: $(PIPEWORK) gdp-routers
+gdp-logds: $(PIPEWORK) gdp-routers .gdp-logd-docker-image
 	@sudo ls / > /dev/null  # So that IP configuration doesn't wait for user to enter password
 	for ROUTER_IP in $(ROUTER_IPS); do \
 	    for i in `seq 1 $(NUM_LOGDS_PER_ROUTER)` ; do \
