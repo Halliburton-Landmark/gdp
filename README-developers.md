@@ -1,0 +1,36 @@
+<!-- Use "pandoc -sS -o README-developers.html README-developers.md" to process this to HTML -->
+
+DEVELOPING THE GLOBAL DATAPLANE
+===============================
+
+This file describes things that someone working on developing the
+GDP should know.  It is incomplete.
+
+See the files `README-compiling.md` and `README-admin.md`
+before you read this file.
+
+
+Setting Debug Flags
+-------------------
+
+You can turn on debugging output using a command line flag,
+conventionally "`-D`_pattern_`=`_level_".  The _pattern_ specifies
+which flags should be set and _level_ specifies how much
+should be printed; zero indicates no output, and more output
+is added as the values increase.
+
+By convention _level_ is no greater than 127, and values 100
+and above may modify the base behavior of the program (i.e.,
+do more than just printing information).
+
+Each debug flag has a hierarchical name with (by convention)
+"." as the separator, for example, "`gdp.proto`" to indicate
+the protocol processing of the GDP.  The "what(1)" program on
+a binary will show you which debug flags are available
+including a short description.  (The `what` program isn't available
+on Linux; it can be simulated using `strings | grep '@(#)'`).
+
+To enable debugging for all patterns, use "`*=`_level_", for
+example "`*=18`".
+
+<!-- vim: set ai sw=4 sts=4 ts=4 : -->
