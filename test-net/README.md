@@ -44,9 +44,9 @@ Some basic docker commands:
 
     docker logs <container-name>
 >   Displays the console output of a specified container.
-    Pass argument '-f' for equivalent behavior as 'tail -f'
+    Pass argument `-f` for equivalent behavior as `tail -f`
     container-names are found using `docker ps`, they are of the form 
-    gdp-router_172.30.0.* or gdp-logd_172.30.*.*. 
+    `gdp-router_172.30.0.*` or `gdp-logd_172.30.*.*.` 
 
     docker kill <container-name>
 >   Kill a running container (does not remove the container files from disk)
