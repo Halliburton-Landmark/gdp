@@ -78,7 +78,7 @@ extern int			gdp_buf_write(
 						const void *in,
 						size_t sz);
 
-extern int			gdp_buf_copy(
+extern int			gdp_buf_move(
 						gdp_buf_t *ibuf,
 						gdp_buf_t *obuf);
 

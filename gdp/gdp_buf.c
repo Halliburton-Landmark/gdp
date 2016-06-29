@@ -162,10 +162,11 @@ gdp_buf_printf(gdp_buf_t *buf, const char *fmt, ...)
 /*
 **  Append the contents of one buffer onto another.
 **		Returns 0 on success, -1 on failure.
+**		This removes the data from ibuf and appends it to obuf.
 */
 
 int
-gdp_buf_copy(gdp_buf_t *ibuf, gdp_buf_t *obuf)
+gdp_buf_move(gdp_buf_t *ibuf, gdp_buf_t *obuf)
 {
 	return evbuffer_add_buffer(obuf, ibuf);
 }
