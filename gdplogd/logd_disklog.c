@@ -357,14 +357,14 @@ extent_open(gdp_gcl_t *gcl, extent_t *ext)
 	ext->max_offset = fsizeof(data_fp);
 
 	// interpret data (for the entire log)
-	gcl->x->n_md_entries = ext_hdr.n_md_entries;
 	gcl->x->log_type = ext_hdr.log_type;
-
-	if (gcl->x->n_md_entries >= 0)
+	if (gcl->gclmd != NULL)
 	{
-		// this is not the first extent opened, so we have the metadata
+		// we've already read the metadata; no need to do it again
 		goto success;
 	}
+
+	gcl->x->n_md_entries = ext_hdr.n_md_entries;
 
 	// read metadata entries
 	if (ext_hdr.n_md_entries > 0)
@@ -675,8 +675,6 @@ static gcl_physinfo_t *
 physinfo_alloc(gdp_gcl_t *gcl)
 {
 	gcl_physinfo_t *phys = ep_mem_zalloc(sizeof *phys);
-
-	gcl->x->n_md_entries = -1;
 
 	if (ep_thr_rwlock_init(&phys->lock) != 0)
 		goto fail1;
