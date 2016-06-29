@@ -40,8 +40,8 @@ Adjust Administrative Parameters
 If you want to change parameters such as socket numbers or the
 GCL directory you can do so without recompiling.  Configuration
 files are simple "name=value" pairs, one per line.  There is
-a built-in search path "`.ep_adm_params:~/.ep_adm_params:\
-/usr/local/etc/ep_adm_params:/etc/ep_adm_params`"
+a built-in search path
+"`.ep_adm_params:~/.ep_adm_params:/usr/local/etc/ep_adm_params:/etc/ep_adm_params`"
 that can be overridden the `EP_PARAM_PATH` environment variable.
 (Note: if a program is running setuid then only the two
 system paths are searched, and `EP_PARAM_PATH` is ignored.)
@@ -55,27 +55,33 @@ probably live) are:
 
 `swarm.gdp.routers`			(file: `gdp`)
 
-> A semicolon-separated list of host names or IP
-> addresses to search to find a running routing node.
-> This defaults to 127.0.0.1.  If you have a local
-> routing node you should name it first, followed
-> by "gdp-01.eecs.berkeley.edu; gdp-02.eecs.berkeley.edu"
-> (these are run by us for your convenience).  This
-> parameter is only consulted if Zeroconf fails.
+<quote>
+A semicolon-separated list of host names or IP
+addresses to search to find a running routing node.
+This defaults to 127.0.0.1.  If you have a local
+routing node you should name it first, followed
+by "gdp-01.eecs.berkeley.edu; gdp-02.eecs.berkeley.edu"
+(these are run by us for your convenience).  This
+parameter is only consulted if Zeroconf fails.
+</quote>
 
 `swarm.gdplogd.gcl.dir`		(file: `gdplogd`)
 
-> This is the name of the directory you created in
-> the previous step.  It only applies on nodes that
-> are running a log daemon.
+<quote>
+This is the name of the directory you created in
+the previous step.  It only applies on nodes that
+are running a log daemon.
+</quote>
 
 `swarm.gdplogd.gdpname`		(file: `gdplogd`)
 
-> This is a user-friendly name for the name of the
-> log daemon.  You'll need this for creating GCLs,
-> as described below.  If you don't specify this,
-> the name is chosen randomly each time gdplogd
-> starts up, which would be very inconvenient.
+<quote>
+This is a user-friendly name for the name of the
+log daemon.  You'll need this for creating GCLs,
+as described below.  If you don't specify this,
+the name is chosen randomly each time gdplogd
+starts up, which would be very inconvenient.
+</quote>
 
 ### Example
 
@@ -106,11 +112,13 @@ scale as well as Version 2.
 
 ### Version 1
 
-> Note:
-> This version is deprecated; however, it can still be useful
-> when debugging the GDP.  In a test environment with only
-> one router node it requires no configuration.  If you are not
-> debugging the GDP itself, please move on to Version 2.
+<quote>
+Note:
+This version is deprecated; however, it can still be useful
+when debugging the GDP.  In a test environment with only
+one router node it requires no configuration.  If you are not
+debugging the GDP itself, please move on to Version 2.
+</quote>
 
 Version 1 of the router is in it's own separate repository at:
 `https://repo.eecs.berkeley.edu/git/projects/swarmlab/gdp_router.git`.
@@ -173,35 +181,44 @@ it takes these parameters:
 
 * `-D` _debug-spec_
 
-> Turn on debugging.  See [Setting Debug Flags](#"Setting Debug Flags")
-> below for more information.  Implies `-F`.
+<quote>
+Turn on debugging.  See [Setting Debug Flags](#"Setting Debug Flags")
+below for more information.  Implies `-F`.
 
 * `-F`
 
-> Run in foreground.  At the moment, `gdplogd` always runs
-> in foreground, but the intent is that it will default
-> to background mode without this flag.
+<quote>
+Run in foreground.  At the moment, `gdplogd` always runs
+in foreground, but the intent is that it will default
+to background mode without this flag.
+</quote>
 
 * `-G` _gdp-addr_
 
-> Use _gdp-addr_ as the address of the routing layer
-> daemon.  Defaults to `localhost:8007`.  Can also be set
-> with the `swarm.gdp.routers` administrative parameter.
-> See [Changing Parameters](#"Changing Parameters") below for more
+<quote>
+Use _gdp-addr_ as the address of the routing layer
+daemon.  Defaults to `localhost:8007`.  Can also be set
+with the `swarm.gdp.routers` administrative parameter.
+See [Changing Parameters](#"Changing Parameters") below for more
 information.
+</quote>
 
 * `-N` _routing-name_
 
-> Sets the GDP routing name, overriding the
-> `swarm.gdplogd.gdpname` configuration value.
+<quote>
+Sets the GDP routing name, overriding the
+`swarm.gdplogd.gdpname` configuration value.
+</quote>
 
 * `-n` _workers_
 
-> Start up _workers_ worker threads.  Defaults to a
-> minimum of one thread which can expand up to twice
-> the number of cores available.  Can also be set (with
-> finer control) using the `libep.thr.pool.min_workers`
-> and `libep.thr.pool.max_workers` parameters.
+<quote>
+Start up _workers_ worker threads.  Defaults to a
+minimum of one thread which can expand up to twice
+the number of cores available.  Can also be set (with
+finer control) using the `libep.thr.pool.min_workers`
+and `libep.thr.pool.max_workers` parameters.
+</quote>
 
 Creating a GCL
 --------------
@@ -212,9 +229,9 @@ store the log.  This can be set as an administrative parameter,
 and the internal form is printed out as the log server starts up.
 We run three log servers at Berkeley you can use:
 
-		edu.berkeley.eecs.gdp-01.gdplogd
-		edu.berkeley.eecs.gdp-02.gdplogd
-		edu.berkeley.eecs.gdp-03.gdplogd
+	edu.berkeley.eecs.gdp-01.gdplogd
+	edu.berkeley.eecs.gdp-02.gdplogd
+	edu.berkeley.eecs.gdp-03.gdplogd
 
 You can set a default server on which to create logs using the
 `swarm.gdp.gcl-create.server` administrative parameter, or on
@@ -230,7 +247,7 @@ _institution_`.`_project_`.`_user_`.`_name_.  For example,
 would be a reasonable choice.  To actually create the log on
 a given server, use
 
->	`gcl-create -s` _servername_ _logname_
+		`gcl-create -s` _servername_ _logname_
 
 where the `-s` flag is optional.  For example, if the
 `swarm.gdp.gcl-create.server` default value is set to
