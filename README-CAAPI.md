@@ -23,17 +23,17 @@ is not being maintained due to lack of use.)
 2.	The instructions for SCGI configuration for lighttpd are totally
 	wrong.  The configuration file you actually need is:
 
-			server.modules += ( "mod_scgi" )
+		server.modules += ( "mod_scgi" )
 
-			scgi.server = (
-				"/gdp/v1/" =>
-					( "gdp" =>
-						( "host"  => "127.0.0.1",
-						  "port" => 8001,
-						  "check-local" => "disable",
-						)
+		scgi.server = (
+			"/gdp/v1/" =>
+				( "gdp" =>
+					( "host"  => "127.0.0.1",
+					  "port" => 8001,
+					  "check-local" => "disable",
 					)
 				)
+			)
 
 	(Normally in `/usr/local/etc/lighttpd/conf.c/scgi.conf`) This will
 	tell lighttpd to connect to an SCGI server on the local machine,
@@ -53,7 +53,7 @@ is not being maintained due to lack of use.)
 
 4.	Start the lighttpd server, for example using:
 
-			lighttpd -f /usr/local/etc/lighttpd/lighttpd.conf -D
+		lighttpd -f /usr/local/etc/lighttpd/lighttpd.conf -D
 
 	This assumes that your configuration is in
 	`/usr/local/etc/lighttpd`.  The `-D` says to run in foreground

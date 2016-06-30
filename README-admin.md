@@ -15,7 +15,7 @@ Create a user (or choose an existing user) to own the on-disk
 files.  These instructions will assume a new user named
 gdp, group gdp; on Debian/Ubuntu:
 
-		sudo adduser --system --group gdp
+	sudo adduser --system --group gdp
 
 You'll have to select a location to store the log data.  For
 obvious reasons this should be on a filesystem that has a
@@ -23,12 +23,12 @@ reasonable amount of free space.  The default is
 `/var/swarm/gdp/gcls`.  You'll probably have to be root to
 create this directory:
 
-		sudo mkdir -p /var/swarm/gdp/gcls
-		sudo chown -R gdp:gdp /var/swarm
+	sudo mkdir -p /var/swarm/gdp/gcls
+	sudo chown -R gdp:gdp /var/swarm
 
 The directory should be mode 700 or 750, owned by gdp:gdp:
 
-		sudo chmod 750 /var/swarm/gdp/gcls
+	sudo chmod 750 /var/swarm/gdp/gcls
 
 Mode 750 is just to allow users in the gdp group to be able
 to peek into the directory.  This should be limited to
@@ -55,48 +55,40 @@ probably live) are:
 
 `swarm.gdp.routers`			(file: `gdp`)
 
-<quote>
-A semicolon-separated list of host names or IP
+> A semicolon-separated list of host names or IP
 addresses to search to find a running routing node.
 This defaults to 127.0.0.1.  If you have a local
 routing node you should name it first, followed
 by "gdp-01.eecs.berkeley.edu; gdp-02.eecs.berkeley.edu"
 (these are run by us for your convenience).  This
 parameter is only consulted if Zeroconf fails.
-</quote>
 
 `swarm.gdplogd.gcl.dir`		(file: `gdplogd`)
 
-<quote>
-This is the name of the directory you created in
+> This is the name of the directory you created in
 the previous step.  It only applies on nodes that
 are running a log daemon.
-</quote>
 
 `swarm.gdplogd.gdpname`		(file: `gdplogd`)
 
-<quote>
-This is a user-friendly name for the name of the
+> This is a user-friendly name for the name of the
 log daemon.  You'll need this for creating GCLs,
 as described below.  If you don't specify this,
 the name is chosen randomly each time gdplogd
 starts up, which would be very inconvenient.
-</quote>
 
 ### Example
 
 In file `/usr/local/etc/ep_adm_params/gdp`:
 
-		swarm.gdp.routers=mygdp.example.com; gdp-01.eecs.berkeley.edu; \
-			gdp-02.eecs.berkeley.edu
+	swarm.gdp.routers=mygdp.example.com; gdp-01.eecs.berkeley.edu; gdp-02.eecs.berkeley.edu
 
-[This example is line wrapped to fit; when you create
-the file it must be on one line.] This tells application
+This tells application
 programs where to look for routers if Zeroconf fails.
 In file `/usr/local/etc/ep_adm_params/gdplogd`:
 
-		swarm.gdplogd.gcl.dir=/var/swarm/gdp/gcls
-		swarm.gdplogd.gdpname=com.example.mygdp.gdplogd
+	swarm.gdplogd.gcl.dir=/var/swarm/gdp/gcls
+	swarm.gdplogd.gdpname=com.example.mygdp.gdplogd
 
 This tells `gdplogd` where to store GCL log data (only needed if not
 using the default, which is what is shown here) and what name to use
@@ -112,13 +104,11 @@ scale as well as Version 2.
 
 ### Version 1
 
-<quote>
-Note:
+> Note:
 This version is deprecated; however, it can still be useful
 when debugging the GDP.  In a test environment with only
 one router node it requires no configuration.  If you are not
 debugging the GDP itself, please move on to Version 2.
-</quote>
 
 Version 1 of the router is in it's own separate repository at:
 `https://repo.eecs.berkeley.edu/git/projects/swarmlab/gdp_router.git`.
@@ -147,7 +137,7 @@ which are described in detail in `gdp_router/README.md`.  The most
 important flag is "`-r`", which takes the list of known
 routers as the argument.  For example:
 
-    gdp-router.py -r gdp-routers.list
+	gdp-router.py -r gdp-routers.list
 
 There is no automated startup for this version of the router.
 You will have to manually start it up every time the host system
@@ -157,7 +147,7 @@ reboots.
 
 Version 2 of the router is in it's own separate repository at:
 
-`repoman@repo.eecs.berkeley.edu:projects/swarmlab/gdp_router_click.git`
+	repoman@repo.eecs.berkeley.edu:projects/swarmlab/gdp_router_click.git`
 
 You can get this the same way as the GDP base code, but use
 "`gdp_router_click`" instead of "`gdp`".
@@ -181,44 +171,35 @@ it takes these parameters:
 
 * `-D` _debug-spec_
 
-<quote>
-Turn on debugging.  See [Setting Debug Flags](#"Setting Debug Flags")
+> Turn on debugging.  See [Setting Debug Flags](#"Setting Debug Flags")
 below for more information.  Implies `-F`.
 
 * `-F`
 
-<quote>
-Run in foreground.  At the moment, `gdplogd` always runs
+> Run in foreground.  At the moment, `gdplogd` always runs
 in foreground, but the intent is that it will default
 to background mode without this flag.
-</quote>
 
 * `-G` _gdp-addr_
 
-<quote>
-Use _gdp-addr_ as the address of the routing layer
+> Use _gdp-addr_ as the address of the routing layer
 daemon.  Defaults to `localhost:8007`.  Can also be set
 with the `swarm.gdp.routers` administrative parameter.
 See [Changing Parameters](#"Changing Parameters") below for more
 information.
-</quote>
 
 * `-N` _routing-name_
 
-<quote>
-Sets the GDP routing name, overriding the
+> Sets the GDP routing name, overriding the
 `swarm.gdplogd.gdpname` configuration value.
-</quote>
 
 * `-n` _workers_
 
-<quote>
-Start up _workers_ worker threads.  Defaults to a
+> Start up _workers_ worker threads.  Defaults to a
 minimum of one thread which can expand up to twice
 the number of cores available.  Can also be set (with
 finer control) using the `libep.thr.pool.min_workers`
 and `libep.thr.pool.max_workers` parameters.
-</quote>
 
 Creating a GCL
 --------------
@@ -242,20 +223,20 @@ recommend using a name that is unlikely to clash with other
 logs, either similar to the gdplogd example above or using
 _institution_`.`_project_`.`_user_`.`_name_.  For example,
 
-		edu.berkeley.eecs.swarmlab.eric.sensor23
+	edu.berkeley.eecs.swarmlab.eric.sensor23
 
 would be a reasonable choice.  To actually create the log on
 a given server, use
 
-		`gcl-create -s` _servername_ _logname_
+> `gcl-create -s` _servername_ _logname_
 
 where the `-s` flag is optional.  For example, if the
 `swarm.gdp.gcl-create.server` default value is set to
 `edu.berkeley.eecs.gdp-01.gdplogd`, the following two commands
 are equivalent:
 
-		gcl-create -s edu.berkeley.eecs.gdp-01.gdplogd edu.berkeley.eecs.swarmlab.eric.sensor23
-		gcl-create edu.berkeley.eecs.swarmlab.eric.sensor23
+	gcl-create -s edu.berkeley.eecs.gdp-01.gdplogd edu.berkeley.eecs.swarmlab.eric.sensor23
+	gcl-create edu.berkeley.eecs.swarmlab.eric.sensor23
 
 The good news is that this the only time you'll need to know
 the name of the log server.
@@ -294,92 +275,92 @@ have to change any of these.
 	for a response before timing out a GDP request.  Defaults
 	to 10000 (ten seconds).
 
-* `swarm.gdp.invoke.retries` --- the number of times to re-send a
+* `swarm.gdp.invoke.retries` &mdash; the number of times to re-send a
 	request when no response is received.  Defaults to 3
 	(meaning that the request may be sent up to 4 times
 	total).
 
-* `swarm.gdp.invoke.retrydelay` --- the number of milliseconds
+* `swarm.gdp.invoke.retrydelay` &mdash; the number of milliseconds
 	between retry attempts.  Defaults to 5000 (five seconds).
 
-* `swarm.gdp.crypto.key.path` --- path name to search for secret
+* `swarm.gdp.crypto.key.path` &mdash; path name to search for secret
 	keys when writing a log.  Defaults to
 	`.:KEYS:~/.swarm/gdp/keys:/usr/local/etc/swarm/gdp/keys:/etc/swarm/gdp/keys`.
 
-* `swarm.gdp.crypto.key.dir` --- the directory in which to store the
+* `swarm.gdp.crypto.key.dir` &mdash; the directory in which to store the
 	secret keys when creating a GCL.  Defaults to `KEYS`.
 	Can be overridden by gcl-create `-K` flag.
 
-* `swarm.gdp.crypto.hash.alg` --- the default hashing algorithm.
+* `swarm.gdp.crypto.hash.alg` &mdash; the default hashing algorithm.
 	Defaults to `sha256`.  Can be overridden by gcl-create
 	`-h` _alg_ flag.
 
-* `swarm.gdp.crypto.sign.alg` --- the default signing algorithm.
+* `swarm.gdp.crypto.sign.alg` &mdash; the default signing algorithm.
 	Defaults to `ec`.  Can be overridden by gcl-create
 	`-k` flag.
 
-* `swarm.gdp.crypto.keyenc.alg` --- the default secret key encryption
+* `swarm.gdp.crypto.keyenc.alg` &mdash; the default secret key encryption
 	algorithm.  Defaults to "aes192".  A value of "none"
 	turns off encryption.  Can be overridden by gcl-create
 	`-e` flag.
 
-* `swarm.gdp.crypto.ec.curve` --- the default curve to use when
+* `swarm.gdp.crypto.ec.curve` &mdash; the default curve to use when
 	creating an EC key.  Defaults to sect283r1 (subject
 	to change).  Can be overridden by gcl-create `-c` flag.
 
-* `swarm.gdp.crypto.dsa.keylen` --- the default size of an RSA
+* `swarm.gdp.crypto.dsa.keylen` &mdash; the default size of an RSA
 	signature key in bits.  Defaults to 2048.  Can be
 	overridden by gcl-create `-b` flag.
 
-* `swarm.gdp.crypto.rsa.keylen` --- the default size of an RSA
+* `swarm.gdp.crypto.rsa.keylen` &mdash; the default size of an RSA
 	signature key in bits.  Defaults to 2048.  Can be
 	overridden by gcl-create `-b` flag.
 
-* `swarm.gdp.crypto.rsa.keyexp` --- the exponent for an RSA signature
+* `swarm.gdp.crypto.rsa.keyexp` &mdash; the exponent for an RSA signature
 	key.  Defaults to 3.
 
-* `swarm.gdp.syslog.facility` --- the name of the log facility to use
+* `swarm.gdp.syslog.facility` &mdash; the name of the log facility to use
 	(see syslog(3) for details).  The `gdp` in the name
 	can be replaced by an individual program name to set a
 	value that applies only to that program, e.g.,
 	`swarm.gdplogd.log.facility`.  If both are set, the more
 	specific name wins.  Defaults to `local4`.
 
-* `swarm.gdp.zeroconf.domain` --- the domain searched in zeroconf
+* `swarm.gdp.zeroconf.domain` &mdash; the domain searched in zeroconf
 	queries.  Defaults to `local`.
 
-* `swarm.gdp.zeroconf.enable` --- enable zeroconf lookup when programs
+* `swarm.gdp.zeroconf.enable` &mdash; enable zeroconf lookup when programs
 	start up.  Defaults to `true`.
 
-* `swarm.gdp.zeroconf.proto` --- the protocol used in zeroconf queries.
+* `swarm.gdp.zeroconf.proto` &mdash; the protocol used in zeroconf queries.
 	Defaults to `_gdp._tcp`.
 
-* `swarm.gdplogd.gcl.dir` --- the directory in which log data will
+* `swarm.gdplogd.gcl.dir` &mdash; the directory in which log data will
 	be stored.  Defaults to `/var/swarm/gdp/gcls`.
 
-* `swarm.gdplogd.reclaim.interval` --- how often to wake up to
+* `swarm.gdplogd.reclaim.interval` &mdash; how often to wake up to
 	reclaim unused resources.  Defaults to 15 (seconds).
 
-* `swarm.gdplogd.reclaim.age` --- how long a GCL is permitted to
+* `swarm.gdplogd.reclaim.age` &mdash; how long a GCL is permitted to
 	sit idle before its resources are reclaimed.  Defaults
 	to 300 (seconds, i.e., five minutes).
 
-* `swarm.gdplogd.gdpname` --- the name to use as the source address
+* `swarm.gdplogd.gdpname` &mdash; the name to use as the source address
 	for protocol initiating from this program.  If not set,
 	a random name is made up when the program is started.
 	Generally speaking, you will want to set this parameter;
 	I recommend reverse-dns addresses, e.g.,
 
-		swarm.gdplogd.gdpname=edu.berkeley.eecs.gdp-01.gdplogd.
+	swarm.gdplogd.gdpname=edu.berkeley.eecs.gdp-01.gdplogd.
 
-* `swarm.gdplogd.runasuser` --- the name of the UNIX account to
+* `swarm.gdplogd.runasuser` &mdash; the name of the UNIX account to
 	switch to if gdplogd is started as root.  Generally
 	it is better if gdplogd is *not* run as root; this
 	parameter avoids mistakes.  If the named account does
 	not exist it defaults to 1:1 (user daemon on most
 	systems).
 
-* `swarm.gdplogd.crypto.strictness` --- how strictly signatures
+* `swarm.gdplogd.crypto.strictness` &mdash; how strictly signatures
 	are enforced.  This is a sequence of comma-separated
 	words where only the first letter is significant.
 	Values are `verify` (signature must verify if it
@@ -387,38 +368,38 @@ have to change any of these.
 	GCL has a public key), and/or `pubkeyreq` (public
 	key is required).  For now, defaults to `verify`.
 
-* `swarm.gdplogd.subscr.timeout` --- how long a subscription will
+* `swarm.gdplogd.subscr.timeout` &mdash; how long a subscription will
 	be kept active without being refreshed (essentially,
 	the length of a "lease" on the subscription).  Defaults
 	to 600 (seconds).
 
 
-* `swarm.rest.kv.gclname` --- the name of the GCL to use for the
+* `swarm.rest.kv.gclname` &mdash; the name of the GCL to use for the
 	key-value store.  Defaults to "swarm.rest.kv.gcl".
 
-* `swarm.rest.prefix` --- the REST prefix (e.g., `/gdp/v1/`).
+* `swarm.rest.prefix` &mdash; the REST prefix (e.g., `/gdp/v1/`).
 
-* `swarm.rest.scgi.port` --- the port number for the SCGI server to
+* `swarm.rest.scgi.port` &mdash; the port number for the SCGI server to
 	listen on.  If you change this you'll also have to
 	change the lighttpd configuration.  Defaults to 8001.
 
-* `swarm.rest.scgi.pollinterval` --- how often to poll for SCGI
+* `swarm.rest.scgi.pollinterval` &mdash; how often to poll for SCGI
 	connections (in microseconds).  Defaults to 100000
 	(100 msec).
 
 
-* `libep.crypto.dev` --- whether or not to try to use `/dev/crypto`
+* `libep.crypto.dev` &mdash; whether or not to try to use `/dev/crypto`
 	for hardware acceleration.  Defaults to true.
 
-* `libep.time.accuracy` --- the value filled in for the "accuracy"
+* `libep.time.accuracy` &mdash; the value filled in for the "accuracy"
 	field in time structures (defaults to zero).
 
-* `libep.thr.pool.min_workers` --- the default minimum number of
+* `libep.thr.pool.min_workers` &mdash; the default minimum number of
 	worker threads in the thread pool.  If not specified
 	the default is 1.  It can be overridden by the calling
 	application.
 
-* `libep.thr.pool.max_workers` --- the default maximum number of
+* `libep.thr.pool.max_workers` &mdash; the default maximum number of
 	worker threads in the thread pool.  If not specified
 	the default is two times the number of available
 	cores.  It can be overridden by the calling application.

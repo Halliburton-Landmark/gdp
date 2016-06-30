@@ -52,22 +52,20 @@ parameter of interest is:
 `swarm.gdp.routers`         (file: `gdp`)
 
 > A semicolon-separated list of host names or IP
-> addresses to search to find a running routing node.
-> This defaults to 127.0.0.1.  If you have a local
-> routing node you should name it first, followed
-> by "gdp-01.eecs.berkeley.edu; gdp-02.eecs.berkeley.edu"
-> (these are run by us for your convenience).  This
-> parameter is only consulted if Zeroconf fails.
+addresses to search to find a running routing node.
+This defaults to 127.0.0.1.  If you have a local
+routing node you should name it first, followed
+by "gdp-01.eecs.berkeley.edu; gdp-02.eecs.berkeley.edu"
+(these are run by us for your convenience).  This
+parameter is only consulted if Zeroconf fails.
 
 #### Example
 
 In file `/usr/local/etc/ep_adm_params/gdp`:
 
-        swarm.gdp.routers=mygdp.example.com; gdp-01.eecs.berkeley.edu; \
-	            gdp-02.eecs.berkeley.edu
+	swarm.gdp.routers=mygdp.example.com; gdp-01.eecs.berkeley.edu; gdp-02.eecs.berkeley.edu
 
-[This example is line wrapped to fit; when you create
-the file it must be on one line.] This tells application programs
+This tells application programs
 where to look for routers if Zeroconf fails.
 
 ### Supplied Applications
@@ -79,7 +77,7 @@ associated man pages for details.
 The gdp-writer program reads records from the standard input
 and writes to the target log.  It is invoked as:
 
-        gdp-writer gcl-name
+	gdp-writer gcl-name
 
 The _gcl-name_ is the name of the GCL to be appended to.  Lines are
 read from the input and written to the log, where each input
@@ -89,7 +87,7 @@ for more details.
 The gdp-reader program reads records from the log and writes
 them to the standard output.  It is invoked as:
 
-        gdp-reader [-f firstrec] [-n nrecs] [-s] [-t] [-v] gcl-name
+	gdp-reader [-f firstrec] [-n nrecs] [-s] [-t] [-v] gcl-name
 
 The `-f` and `-n` flags specify the first record number (starting
 from 1) and the maximum number of records to read.  By default

@@ -14,8 +14,8 @@ Debian package.  Since you are reading this, you presumably already
 have the source code.  If not, you can get the GDP source distribution
 using one of the following commands:
 
-		git clone https://repo.eecs.berkeley.edu/git/projects/swarmlab/gdp.git
-		git clone repoman@repo.eecs.berkeley.edu:projects/swarmlab/gdp.git
+	git clone https://repo.eecs.berkeley.edu/git/projects/swarmlab/gdp.git
+	git clone repoman@repo.eecs.berkeley.edu:projects/swarmlab/gdp.git
 
 The second is only available if you have registered your public
 ssh key with `repo.eecs.berkeley.edu`.  For the moment that repository
@@ -49,7 +49,7 @@ system tree using `make install`.  If you prefer installing into
 something other than the main tree, set the `LOCALROOT` variable
 on the `make` command line.  For example:
 
-		make clean install LOCALROOT=/usr/local
+	make clean install LOCALROOT=/usr/local
 
 It is not necessary to install the code for testing and debugging.
 
@@ -98,43 +98,43 @@ Directory Structure
 The following is a brief explanation of the subdirectories
 contained in this source tree.
 
-* ep --- A library of C utility functions.  This is a stripped
+* ep &mdash; A library of C utility functions.  This is a stripped
 	down version of a library I wrote several years ago.
 	If you look at the code you'll see vestiges of some
 	of the stripped out functions.  I plan on cleaning
 	this version up and releasing it again.
 
-* gdp --- A library for GDP manipulation.  This is the library
+* gdp &mdash; A library for GDP manipulation.  This is the library
 	that applications must link to access the GDP.
 
-* gdplogd --- The GDP log daemon.  This implements physical
+* gdplogd &mdash; The GDP log daemon.  This implements physical
 	(on disk) logs for the GDP.  The implementation is
 	still fairly simplistic.  It depends on a routing
 	layer (currently gdp_router, in a separate repository).
 
-* scgilib --- An updated version of the SCGI code from
+* scgilib &mdash; An updated version of the SCGI code from
 	[`http://www.xamuel.com/scgilib/`](http://www.xameul.com/scgilib/).
 	SCGI permits a web server to access outside programs by opening
 	a socket in a manner much more efficient than basic
 	CGI fork/exec.  This is only used for the REST interface.
 
-* apps --- Application programs, including tests.
+* apps &mdash; Application programs, including tests.
 
-* doc --- Some documentation, woefully incomplete.
+* doc &mdash; Some documentation, woefully incomplete.
 
-* examples --- Some example programs, intended be usable as
+* examples &mdash; Some example programs, intended be usable as
 	tutorials.
 
-* lang --- sub-directories with language-specific application
+* lang &mdash; sub-directories with language-specific application
 	programs and supporting code.
 
-* lang/java --- Java-specific apps and libraries.
+* lang/java &mdash; Java-specific apps and libraries.
 
-* lang/js --- JavaScript-specific apps and libraries.  Also contains
+* lang/js &mdash; JavaScript-specific apps and libraries.  Also contains
 	the Node.js/JS GDP RESTful interface code.  See associated
 	README files for details.
 
-* lang/python --- Python-specific apps and libraries.  See the
+* lang/python &mdash; Python-specific apps and libraries.  See the
 	associated README file for details.
 
 <!-- vim: set ai sw=4 sts=4 ts=4 : -->
