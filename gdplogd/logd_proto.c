@@ -391,7 +391,6 @@ cmd_read(gdp_req_t *req)
 		}
 	}
 
-	gdp_buf_reset(req->pdu->datum->dbuf);
 	estat = req->gcl->x->physimpl->read(req->gcl, req->pdu->datum);
 
 	// deliver "record expired" as "not found"

@@ -1155,6 +1155,8 @@ disk_read(gdp_gcl_t *gcl,
 	index_entry_t *xent;
 
 	EP_ASSERT_POINTER_VALID(gcl);
+	gdp_buf_reset(datum->dbuf);
+	gdp_buf_reset(datum->sig);
 
 	ep_dbg_cprintf(Dbg, 14, "disk_read(%" PRIgdp_recno "): ", datum->recno);
 
