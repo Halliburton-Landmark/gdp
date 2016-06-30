@@ -32,8 +32,6 @@ LOCALROOT=	/usr
 INSTALLROOT=	${DESTDIR}${LOCALROOT}
 DOCDIR=		${INSTALLROOT}/share/doc/gdp
 
-CTAGS=		ctags
-
 all:
 	(cd ep;		 make all)
 	(cd gdp;	 make all)
@@ -49,7 +47,7 @@ clean:
 	(cd gdplogd;	 make clean)
 	(cd apps;	 make clean)
 	(cd examples;	 make clean)
-	rm -f gdp-client*.deb gdp-server*.deb python-gdp*.deb
+	rm -f gdp-client*.deb gdp-server*.deb python-gdp*.deb README*.html
 
 install:
 	(cd ep;		make install DESTDIR=${DESTDIR} INSTALLROOT=${INSTALLROOT})
@@ -82,6 +80,8 @@ CSRCS=		ep/*.[ch] \
 		gdplogd/*.[ch] \
 		scgilib/scgilib.[ch] \
 		apps/*.[ch] \
+
+CTAGS=		ctags
 
 tags: .FORCE
 	${CTAGS} ${CSRCS}
@@ -129,9 +129,20 @@ update-license:
 	(cd apps;	 make update-license)
 
 # Not made by default
+READMES_HTML= \
+	README.html \
+	README-admin.html \
+	README-CAAPI.html \
+	README-compiling.html \
+	README-deb.html \
+	README-developers.html \
+
 PANDOC=		pandoc
 PANFLAGS=	-sS
 
-README.html: README.md
+.SUFFIXES: .md .html
+
+.md.html:
 	${PANDOC} ${PANFLAGS} -o $@ $<
 
+README_html: ${READMES_HTML}
