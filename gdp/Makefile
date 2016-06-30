@@ -158,12 +158,15 @@ INSTALL=	install
 
 all: ${ALL}
 
-libgdp.a: ${OBJS}
+${LIBNAME}.a: ${OBJS}
 	${AR} -r $@ ${OBJS}
 	${RANLIB} $@
+	${RM} -f ${LOCALLIBSDIR}/$@
+	${CP} $@ ${LOCALLIBSDIR}
 
-libgdp.so.${GDPLIBVER}: ${OBJS}
+${LIBNAME}.so.${GDPLIBVER}: ${OBJS}
 	${CC} ${SHARED} -o $@ ${OBJS} ${LDFLAGS}
+	(cd ${LOCALLIBSDIR} && sh makelinks.sh gdp ${GDPLIBMAJVER} ${GDPLIBMINVER})
 
 ${OBJS}: ${HFILES}
 

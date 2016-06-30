@@ -221,9 +221,12 @@ all: ${ALL}
 ${LIBNAME}.a: ${OBJS}
 	${AR} -r $@ ${OBJS}
 	${RANLIB} $@
+	${RM} -f ${LOCALLIBSDIR}/$@
+	${CP} $@ ${LOCALLIBSDIR}
 
 ${LIBNAME}.so.${EPLIBVER}: ${OBJS}
 	${CC} ${SHARED} -o $@ ${OBJS} ${LIBS}
+	(cd ${LOCALLIBSDIR} && sh makelinks.sh ep ${EPLIBMAJVER} ${EPLIBMINVER})
 
 ${OBJS}: ${HFILES}
 
