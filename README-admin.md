@@ -248,30 +248,30 @@ Following is a list of all the administrative parameters relevant
 to the GDP.  With a few exceptions mentioned elsewhere you shouldn't
 have to change any of these.
 
-* `swarm.gdp.routers` --- the address(es) of the gdp routing layer
+* `swarm.gdp.routers` &mdash; the address(es) of the gdp routing layer
 	(used by clients).  Multiple addresses can be included,
 	separated by semicolons.  If no port is included, it
 	defaults to 8007.  This will eventually be replaced by
 	service discovery.  Defaults to 127.0.0.1:8007.
 
-* `swarm.gdp.event.loopdelay` --- if the event loop exits for some
+* `swarm.gdp.event.loopdelay` &mdash; if the event loop exits for some
 	reason, this is the number of microseconds to delay
 	before restarting the loop.  Defaults to 100000 (100msec).
 
-* `swarm.gdp.event.looptimeout` --- the timeout for the event loop;
+* `swarm.gdp.event.looptimeout` &mdash; the timeout for the event loop;
 	this is mostly just to make sure things don't "hang up"
 	forever.  Defaults to 30 (seconds).
 
-* `swarm.gdp.connect.timeout` --- how long to wait for a connection
+* `swarm.gdp.connect.timeout` &mdash; how long to wait for a connection
 	to the GDP routing layer before giving up and trying
 	another entry point (in milliseconds).  Defaults to
 	10000 (ten seconds).
 
-* `swarm.gdp.reconnect.delay` --- the number of milliseconds to wait
+* `swarm.gdp.reconnect.delay` &mdash; the number of milliseconds to wait
 	before attempting to reconnect if the routing layer is
 	disconnected.  Defaults to 100 milliseconds.
 
-* `swarm.gdp.invoke.timeout` --- the number of milliseconds to wait
+* `swarm.gdp.invoke.timeout` &mdash; the number of milliseconds to wait
 	for a response before timing out a GDP request.  Defaults
 	to 10000 (ten seconds).
 
@@ -351,7 +351,7 @@ have to change any of these.
 	Generally speaking, you will want to set this parameter;
 	I recommend reverse-dns addresses, e.g.,
 
-	swarm.gdplogd.gdpname=edu.berkeley.eecs.gdp-01.gdplogd.
+	`swarm.gdplogd.gdpname=edu.berkeley.eecs.gdp-01.gdplogd`
 
 * `swarm.gdplogd.runasuser` &mdash; the name of the UNIX account to
 	switch to if gdplogd is started as root.  Generally
@@ -375,7 +375,7 @@ have to change any of these.
 
 
 * `swarm.rest.kv.gclname` &mdash; the name of the GCL to use for the
-	key-value store.  Defaults to "swarm.rest.kv.gcl".
+	key-value store.  Defaults to "`swarm.rest.kv.gcl`".
 
 * `swarm.rest.prefix` &mdash; the REST prefix (e.g., `/gdp/v1/`).
 
@@ -389,7 +389,7 @@ have to change any of these.
 
 
 * `libep.crypto.dev` &mdash; whether or not to try to use `/dev/crypto`
-	for hardware acceleration.  Defaults to true.
+	for hardware acceleration.  Defaults to `true`.
 
 * `libep.time.accuracy` &mdash; the value filled in for the "accuracy"
 	field in time structures (defaults to zero).

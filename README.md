@@ -41,8 +41,8 @@ specifying the address of the routing node(s) for clients to use
 to contact the GDP.
 
 Configuration files are simple "name=value" pairs, one per line.
-There is a built-in search path "`.ep_adm_params:~/.ep_adm_params:\
-/usr/local/etc/ep_adm_params:/etc/ep_adm_params`"
+There is a built-in search path
+"`.ep_adm_params:~/.ep_adm_params:/usr/local/etc/ep_adm_params:/etc/ep_adm_params`"
 that can be overridden the `EP_PARAM_PATH` environment variable.
 (Note: if a program is running setuid then only the two
 system paths are searched, and `EP_PARAM_PATH` is ignored.)
@@ -54,10 +54,11 @@ parameter of interest is:
 > A semicolon-separated list of host names or IP
 addresses to search to find a running routing node.
 This defaults to 127.0.0.1.  If you have a local
-routing node you should name it first, followed
-by "gdp-01.eecs.berkeley.edu; gdp-02.eecs.berkeley.edu"
-(these are run by us for your convenience).  This
-parameter is only consulted if Zeroconf fails.
+routing node you should name it first, followed by
+"`gdp-01.eecs.berkeley.edu; gdp-02.eecs.berkeley.edu; gdp-03.eecs.berkeley.edu`"
+(in random order, please &mdash; these are run by us for your
+convenience).  This parameter is only consulted if
+Zeroconf fails.
 
 #### Example
 
