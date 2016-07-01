@@ -4,12 +4,12 @@
 #
 
 # files that should be made public (installed in /usr/local/share/doc)
+#   should include gdplogd-vizstats.html once pandoc is installed
 PUBALL= \
 		gdp-gcl-metadata.html \
 		gdp-programmatic-api.html \
 		gdp-protocol.html \
 		gdp-rest-interface.html \
-		gdplogd-vizstats.html \
 		Libep.dbk \
 		Libep.pdf \
 
