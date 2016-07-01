@@ -54,6 +54,10 @@
 
 static FILE			*AdminStatsFp;
 static uint32_t		AdminRunMask = 0xffffffff;
+static char			*AdminPrefix = "";
+
+// a prefix to indicate that this is an admin message (stdout & stderr only)
+#define INDICATOR		">#<"
 
 
 /*
@@ -87,10 +91,12 @@ admin_init(void)
 	else if (strcmp(logdest, "stdout") == 0)
 	{
 		AdminStatsFp = stdout;
+		AdminPrefix = INDICATOR;
 	}
 	else if (strcmp(logdest, "stderr") == 0)
 	{
 		AdminStatsFp = stderr;
+		AdminPrefix = INDICATOR;
 	}
 	else if (strcmp(logdest, "syslog") == 0)
 	{
@@ -166,6 +172,9 @@ admin_post_statsv(
 	fp = AdminStatsFp;
 	if (forbidchars == NULL)
 		forbidchars = ep_adm_getstrparam("gdplogd.admin.forbidchars", "=;");
+
+	// output an initial indicator to make this easy to find
+	fprintf(fp, "%s", AdminPrefix);
 
 	// add a timestamp and the message id
 	{

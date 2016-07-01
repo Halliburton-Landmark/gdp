@@ -33,6 +33,7 @@ INSTALLROOT=	${DESTDIR}${LOCALROOT}
 DOCDIR=		${INSTALLROOT}/share/doc/gdp
 
 all:
+	(cd doc;	make all)
 	(cd ep;		 make all)
 	(cd gdp;	 make all)
 	(cd scgilib;	 make all)
@@ -41,6 +42,7 @@ all:
 	(cd examples;	 make all)
 
 clean:
+	(cd doc;	make clean)
 	(cd ep;		 make clean)
 	(cd gdp;	 make clean)
 	(cd scgilib;	 make clean)
