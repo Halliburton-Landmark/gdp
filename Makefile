@@ -33,7 +33,7 @@ INSTALLROOT=	${DESTDIR}${LOCALROOT}
 DOCDIR=		${INSTALLROOT}/share/doc/gdp
 
 all:
-	(cd doc;	make all)
+	#(cd doc;	make all)	# needs pandoc
 	(cd ep;		make all)
 	(cd gdp;	make all)
 	(cd scgilib;	make all)
