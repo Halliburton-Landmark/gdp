@@ -34,21 +34,21 @@ DOCDIR=		${INSTALLROOT}/share/doc/gdp
 
 all:
 	(cd doc;	make all)
-	(cd ep;		 make all)
-	(cd gdp;	 make all)
-	(cd scgilib;	 make all)
-	(cd gdplogd;	 make all)
-	(cd apps;	 make all)
-	(cd examples;	 make all)
+	(cd ep;		make all)
+	(cd gdp;	make all)
+	(cd scgilib;	make all)
+	(cd gdplogd;	make all)
+	(cd apps;	make all)
+	(cd examples;	make all)
 
 clean:
 	(cd doc;	make clean)
-	(cd ep;		 make clean)
-	(cd gdp;	 make clean)
-	(cd scgilib;	 make clean)
-	(cd gdplogd;	 make clean)
-	(cd apps;	 make clean)
-	(cd examples;	 make clean)
+	(cd ep;		make clean)
+	(cd gdp;	make clean)
+	(cd scgilib;	make clean)
+	(cd gdplogd;	make clean)
+	(cd apps;	make clean)
+	(cd examples;	make clean)
 	rm -f gdp-client*.deb gdp-server*.deb python-gdp*.deb README*.html
 
 install:
