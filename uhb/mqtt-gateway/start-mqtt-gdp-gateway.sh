@@ -28,7 +28,7 @@ info "Running $0 in $root with GDP_ROOT=$GDP_ROOT"
 info "Using MQTT server at $mqtt_host"
 info "Using log names $groot.*"
 
-args="-s -M $mqtt_host -d"
+args="-D *=2 -s -M $mqtt_host -d"
 gw_prog="mqtt-gdp-gateway"
 
 for i
