@@ -22,6 +22,7 @@ deviceData = {
             { "logname": "edu.berkeley.eecs.bwrc.device.c098e5300054", "type": "BLEES", "humanName": 'bwrc BLEE: hot aisle'},
             { "logname": "edu.berkeley.eecs.bwrc.device.c098e530005d", "type": "BLEES", "humanName": 'bwrc BLEE: mid wall'},
             { "logname": "edu.berkeley.eecs.bwrc.device.c098e570008f", "type": "PowerBlade", "humanName": 'bwrc PowerBlade: utility power to sump pump'},
+            { "logname": "edu.berkeley.eecs.bwrc.device.c098e5700090", "type": "PowerBlade", "humanName": 'bwrc PowerBlade: power to air compressor'},
             { "logname": "edu.berkeley.eecs.bwrc.device.c098e590001e", "type": "Blink", "humanName": 'bwrc Blink'}],
     };
 
