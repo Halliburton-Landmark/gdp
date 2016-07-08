@@ -29,15 +29,15 @@
 // EP_STAT_INT_EQUIV is needed for some casts below.
 // We determine this by examning EP_STAT in ep/ep_stat.h .
 // We assume these BIT counts exhaust EP_STAT.
-#define EP_STAT_NBITS  ( _EP_STAT_SEVBITS + _EP_STAT_REGBITS + \
-                         _EP_STAT_MODBITS + _EP_STAT_DETBITS )
+#define EP_STAT_NBITS  ( _EP_STAT_SEVBITS + _EP_STAT_REGBITS +  \
+            _EP_STAT_MODBITS + _EP_STAT_DETBITS )
 
 #if   (EP_STAT_NBITS ==  32)
-	#define EP_STAT_INT_EQUIV  uint32_t
+#define EP_STAT_INT_EQUIV  uint32_t
 #elif (EP_STAT_NBITS ==  64)
-	#define EP_STAT_INT_EQUIV  uint64_t
+#define EP_STAT_INT_EQUIV  uint64_t
 #else
-	#error "The type EP_STAT (in ep/ep_stat.h) must be 32 or 64 bits long"
+#error "The type EP_STAT (in ep/ep_stat.h) must be 32 or 64 bits long"
 #endif
 
 // EP_STAT_32_64 is needed for some casts below
@@ -45,9 +45,9 @@
 // cpp macro.  Yes, we may be making some assumptions here about padding, etc.
 // but we only use this type for casts, and don't access internal structure.
 typedef union
-		{ EP_STAT            as_EP_STAT;
-	      EP_STAT_INT_EQUIV  as_32_64_t;
-        } EP_STAT_32_64;
+{ EP_STAT            as_EP_STAT;
+    EP_STAT_INT_EQUIV  as_32_64_t;
+} EP_STAT_32_64;
 
 
 
@@ -72,11 +72,11 @@ sizeof_EP_STAT_in_bytes()
 {
 #if DEBUG
     fprintf( stderr,
-	         "sizeof_EP_STAT_in_bytes: sizeof(EP_STAT) = %lu (decimal-%%lu)\n",
-	         sizeof(EP_STAT)
-		   );
+            "sizeof_EP_STAT_in_bytes: sizeof(EP_STAT) = %lu (decimal-%%lu)\n",
+            sizeof(EP_STAT)
+             );
 #endif
-	return (sizeof(EP_STAT));
+    return (sizeof(EP_STAT));
 }
 
 
@@ -99,10 +99,10 @@ sizeof_EP_STAT_in_bytes()
 //
 void
 gdp_gcl_print_stdout(
-    const gdp_gcl_t *gclh,  // GCL handle to print
-    int detail,             // not used at this time
-    int indent              // not used at this time
-)
+        const gdp_gcl_t *gclh,  // GCL handle to print
+        int detail,             // not used at this time
+        int indent              // not used at this time
+                     )
 {
     gdp_gcl_print( gclh, stdout);
 }
@@ -119,8 +119,8 @@ gdp_gcl_print_stdout(
 //
 void
 gdp_datum_print_stdout(
-    const gdp_datum_t *datum // message to print
-)
+        const gdp_datum_t *datum // message to print
+                       )
 {
     gdp_datum_print( datum, stdout, 0 );
 }
@@ -136,7 +136,7 @@ gdp_datum_print_stdout(
 char *
 gdp_get_pname_from_gclh( const gdp_gcl_t *gclh )
 {
-	return (char *) (gclh->pname);
+    return (char *) (gclh->pname);
 }
 //
 // TBD: this routine doesn't work yet -- fix it or delete it.
@@ -156,28 +156,28 @@ gdp_get_pname_from_gclh( const gdp_gcl_t *gclh )
 char *
 gdp_get_printable_name_from_gclh( const gdp_gcl_t *gclh )
 {
-	char               *rv = NULL;
-	// handstands to get types correct for the two calls below
+    char               *rv = NULL;
+    // handstands to get types correct for the two calls below
     const gdp_name_t    int_gcl_name;
     const gdp_name_t   *int_gcl_name_p = &int_gcl_name;
     static gdp_pname_t  ext_gcl_name;
 
-	// gcp_gcl_getname() has no check on gclh
+    // gcp_gcl_getname() has no check on gclh
     int_gcl_name_p = gdp_gcl_getname( gclh );
-	// gcp_gcl_printable_name() has no check on either argument
-	// assumes caller allocates ext_gcl_name. rv will point to ext_gcl_name.
-	rv = gdp_printable_name( int_gcl_name, ext_gcl_name );
+    // gcp_gcl_printable_name() has no check on either argument
+    // assumes caller allocates ext_gcl_name. rv will point to ext_gcl_name.
+    rv = gdp_printable_name( int_gcl_name, ext_gcl_name );
 
 #if DEBUG
-	// Yes, atrocious debug output == TBD
-	// fprintf( stderr, "gdp_get_printable_name_from_gclh: int_gcl_name_p = \'%s\'\n", int_gcl_name_p );
-	fprintf( stderr, "gdp_get_printable_name_from_gclh: int_gcl_name = \'%s\'\n", int_gcl_name );
-	fprintf( stderr, "gdp_get_printable_name_from_gclh: ext_gcl_name = \'%s\'\n", ext_gcl_name );
-	fprintf( stderr, "gdp_get_printable_name_from_gclh: rv = \'%s\'\n", rv );
+    // Yes, atrocious debug output == TBD
+    // fprintf( stderr, "gdp_get_printable_name_from_gclh: int_gcl_name_p = \'%s\'\n", int_gcl_name_p );
+    fprintf( stderr, "gdp_get_printable_name_from_gclh: int_gcl_name = \'%s\'\n", int_gcl_name );
+    fprintf( stderr, "gdp_get_printable_name_from_gclh: ext_gcl_name = \'%s\'\n", ext_gcl_name );
+    fprintf( stderr, "gdp_get_printable_name_from_gclh: rv = \'%s\'\n", rv );
     fflush(stderr);
 #endif
 
-	return rv;
+    return rv;
 }
 
 
@@ -197,12 +197,12 @@ gdp_get_printable_name_from_gclh( const gdp_gcl_t *gclh )
 char *
 ep_time_as_string( const EP_TIME_SPEC *tv, bool human )
 {
-	// TBD: watch out, we're using a static to hold our return string contents
-	static char tbuf[100]; // TBD: need a safely defined constant/macro for 100
-	                       // Maybe even a separate gdp.h type.
+    // TBD: watch out, we're using a static to hold our return string contents
+    static char tbuf[100]; // TBD: need a safely defined constant/macro for 100
+    // Maybe even a separate gdp.h type.
 
-	ep_time_format(tv, tbuf, sizeof tbuf, human);
-	return tbuf;
+    ep_time_format(tv, tbuf, sizeof tbuf, human);
+    return tbuf;
 }
 
 
@@ -221,16 +221,16 @@ ep_time_as_string( const EP_TIME_SPEC *tv, bool human )
 char *
 gdp_datum_getts_as_string( const gdp_datum_t *datum, bool human )
 {
-	char               *rv = NULL;
+    char               *rv = NULL;
 
-	// TBD: watch out, ep_time_as_string is using static to hold its
-	//      return string contents
-	rv = ep_time_as_string( &datum->ts, human );
+    // TBD: watch out, ep_time_as_string is using static to hold its
+    //      return string contents
+    rv = ep_time_as_string( &datum->ts, human );
 #if DEBUG
-	fprintf( stderr, "gdp_datum_getts_as_string: rv = \'%s\'\n", rv );
+    fprintf( stderr, "gdp_datum_getts_as_string: rv = \'%s\'\n", rv );
     fflush(stderr);
 #endif
-	return rv;
+    return rv;
 }
 
 
@@ -245,11 +245,11 @@ gdp_datum_getts_as_string( const gdp_datum_t *datum, bool human )
 EP_STAT
 gdp_stat_nak_notfound()
 {
-	EP_STAT_32_64 rv;
+    EP_STAT_32_64 rv;
     rv.as_EP_STAT  = (GDP_STAT_NEW(ERROR, _GDP_CCODE_NOTFOUND));
 #if DEBUG
     fprintf( stderr, "gdp_stat_nak_notfound:"
-                     "  Returning GDP_STAT_NAK_NOTFOUND = %x\n", rv.as_32_64_t);
+            "  Returning GDP_STAT_NAK_NOTFOUND = %x\n", rv.as_32_64_t);
     fflush(stderr);
 #endif
     return (rv.as_EP_STAT);
@@ -268,7 +268,7 @@ gdp_stat_nak_notfound()
 EP_STAT
 ep_stat_ok()
 {
-	EP_STAT_32_64 rv;
+    EP_STAT_32_64 rv;
     rv.as_EP_STAT = (EP_STAT_NEW(EP_STAT_SEV_OK, 0, 0, 0));
 #if DEBUG
     fprintf( stderr, "ep_stat_ok:  Returning EP_STAT_OK = %x\n", rv.as_32_64_t );
@@ -287,11 +287,11 @@ ep_stat_ok()
 EP_STAT
 ep_stat_end_of_file()
 {
-	EP_STAT_32_64 rv;
+    EP_STAT_32_64 rv;
     rv.as_EP_STAT = ( _EP_STAT_INTERNAL(WARN, EP_STAT_MOD_GENERIC, 3) );
 #if DEBUG
     fprintf( stderr, "ep_stat_end_of_file:"
-                     "  Returning EP_STAT_END_OF_FILE = %x\n", rv.as_32_64_t );
+            "  Returning EP_STAT_END_OF_FILE = %x\n", rv.as_32_64_t );
     fflush(stderr);
 #endif
     return (rv.as_EP_STAT);
@@ -310,7 +310,7 @@ ep_stat_isok(EP_STAT ep_stat) {
     int rv = EP_STAT_ISOK(ep_stat);
 #if DEBUG
     fprintf( stderr, "ep_stat_isok: ep_stat = %x,",
-	         ((EP_STAT_32_64) ep_stat).as_32_64_t );
+            ((EP_STAT_32_64) ep_stat).as_32_64_t );
     fprintf( stderr, "  Returning EP_STAT_ISOK() = %x\n", rv );
     fflush(stderr);
 #endif
@@ -329,9 +329,9 @@ ep_stat_is_same(EP_STAT a, EP_STAT b) {
     int rv = EP_STAT_IS_SAME(a, b);
 #if DEBUG
     fprintf( stderr, "ep_stat_is_same: a = %x, b = %x",
-	         (((EP_STAT_32_64) a).as_32_64_t ),
-	         (((EP_STAT_32_64) b).as_32_64_t )
-		   );
+            (((EP_STAT_32_64) a).as_32_64_t ),
+            (((EP_STAT_32_64) b).as_32_64_t )
+             );
     fprintf( stderr, "  Returning EP_STAT_IS_SAME() = %x\n", rv );
     fflush(stderr);
 #endif
