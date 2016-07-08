@@ -13,6 +13,7 @@ then
 		echo "I will create the user for you"
 		sudo adduser --system --group gdp
 	fi
+	test `whoami` = "root" && exec $0 "$@"
 	echo "Please try again"
 	exit 1
 fi
