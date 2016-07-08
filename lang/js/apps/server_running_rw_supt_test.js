@@ -22,14 +22,14 @@
 var http = require("http");
 
 http.createServer(function(request, response) {
-	response.writeHead(200, {"Content-Type": "text/plain"});
-	response.write(
-    "Ran the test program rw_supt_test.js;"
-	);
-	console.log( "Calling run_rw_supt_test()" );
-	run_rw_supt_test();
-	response.end();
-}).listen(8888);
+            response.writeHead(200, {"Content-Type": "text/plain"});
+            response.write(
+                    "Ran the test program rw_supt_test.js;"
+                           );
+            console.log( "Calling run_rw_supt_test()" );
+            run_rw_supt_test();
+            response.end();
+        }).listen(8888);
 
 
 
@@ -66,55 +66,55 @@ eval( fs.readFileSync( LIBGDP_H_DIR + 'rw_supt.js').toString() );
 function run_rw_supt_test()
 {
 
-	var brk = "==============================================================";
-	brk = "\n" + brk + "\n";
+    var brk = "==============================================================";
+    brk = "\n" + brk + "\n";
 
-	// =======================================================================
-	// Set up calls to write_gcl_records()
+    // =======================================================================
+    // Set up calls to write_gcl_records()
 
-	// Common hard-wired arguments
-	gdpd_addr  = null;    // default "127.0.0.1:2468"
-	gcl_name   = null;    // default; create a new gcl
-	gcl_append = false;
-	// gcl_append = true;   // TBD: use an existing gcl
+    // Common hard-wired arguments
+    gdpd_addr  = null;    // default "127.0.0.1:2468"
+    gcl_name   = null;    // default; create a new gcl
+    gcl_append = false;
+    // gcl_append = true;   // TBD: use an existing gcl
 
-	// Test calls to write_gcl_records()
-	console.log( brk );
+    // Test calls to write_gcl_records()
+    console.log( brk );
 
-	// A: write to gcl from stdin
-	// recsrc = -1;  // read the gcl records to be written from stdin with
-	//               // prompts to and echoing for the user on stdout
-	// recarray = [ ];
-	recsrc   = -1;   // read the gcl records to be written from stdin...
-	recarray = [ ];  // not used for recsrc = -1
-	write_gcl_records( gdpd_addr, gcl_name, gcl_append, recsrc, recarray );
-	console.log( brk );
+    // A: write to gcl from stdin
+    // recsrc = -1;  // read the gcl records to be written from stdin with
+    //               // prompts to and echoing for the user on stdout
+    // recarray = [ ];
+    recsrc   = -1;   // read the gcl records to be written from stdin...
+    recarray = [ ];  // not used for recsrc = -1
+    write_gcl_records( gdpd_addr, gcl_name, gcl_append, recsrc, recarray );
+    console.log( brk );
 
-	// B: write to gcl from JS Array
-	// recsrc =  0;  // read the gcl records from the Array recarray
-	// recarray = [ "Item 01 - from recarray", "Item 02", "Item 03" ];
-	recsrc =  0;  // read the gcl records from the Array recarray
-	recarray = [ "Item 01 - from recarray", "Item 02", "Item 03" ];
-	write_gcl_records( gdpd_addr, gcl_name, gcl_append, recsrc, recarray );
-	console.log( brk );
-
-
-	// C: write to gcl N records with integers as contents
-	// recsrc >  0;  // write recsrc records with automatically generated
-	//               // content: the integers starting at 1 and going up to
-	//               // recsrc, inclusive.
-	// recsrc   =  7;
-	// recarray = [ ];
-	recsrc   =  7;
-	recarray = [ ];
-	write_gcl_records( gdpd_addr, gcl_name, gcl_append, recsrc, recarray );
-	console.log( brk );
+    // B: write to gcl from JS Array
+    // recsrc =  0;  // read the gcl records from the Array recarray
+    // recarray = [ "Item 01 - from recarray", "Item 02", "Item 03" ];
+    recsrc =  0;  // read the gcl records from the Array recarray
+    recarray = [ "Item 01 - from recarray", "Item 02", "Item 03" ];
+    write_gcl_records( gdpd_addr, gcl_name, gcl_append, recsrc, recarray );
+    console.log( brk );
 
 
-	// =======================================================================
-	// Set up calls to read_gcl_records()
+    // C: write to gcl N records with integers as contents
+    // recsrc >  0;  // write recsrc records with automatically generated
+    //               // content: the integers starting at 1 and going up to
+    //               // recsrc, inclusive.
+    // recsrc   =  7;
+    // recarray = [ ];
+    recsrc   =  7;
+    recarray = [ ];
+    write_gcl_records( gdpd_addr, gcl_name, gcl_append, recsrc, recarray );
+    console.log( brk );
 
-	// TBD
+
+    // =======================================================================
+    // Set up calls to read_gcl_records()
+
+    // TBD
 
 } /* end function run_rw_supt_test() */
 

@@ -3,22 +3,22 @@
 /* vim: set ai sw=4 sts=4 ts=4 : */
 
 var ffi        = require('ffi')
-var ref        = require('ref')
-var ref_array  = require('ref-array')
+    var ref        = require('ref')
+    var ref_array  = require('ref-array')
 
-var char_t = ref.types.char;
+    var char_t = ref.types.char;
 var buf_t = ref_array(char_t);
 
 // From ep/ep_dbg.h
 var libep = ffi.Library('../../../libs/libep-3.0', {
-    'ep_dbg_init': [ 'void', [ ] ],
-    'ep_dbg_set':  [ 'void', [ 'string' ] ],
-    'ep_stat_tostr':  [ 'string', [ ref.types.uint32, buf_t, 'size_t' ] ],
-    'ep_time_nanosleep': [ 'void', [ 'int64' ]],
-})
+            'ep_dbg_init': [ 'void', [ ] ],
+            'ep_dbg_set':  [ 'void', [ 'string' ] ],
+            'ep_stat_tostr':  [ 'string', [ ref.types.uint32, buf_t, 'size_t' ] ],
+            'ep_time_nanosleep': [ 'void', [ 'int64' ]],
+        })
 
-// From gdp/gdp.h => <inttypes.h> ==> <stdint.h> ==> <sys/_types/_int32_t.h>
-var int32_t = ref.types.int32;
+    // From gdp/gdp.h => <inttypes.h> ==> <stdint.h> ==> <sys/_types/_int32_t.h>
+    var int32_t = ref.types.int32;
 
 // From gdp/gdp.h => <stdbool.h>
 var bool_t = ref.types.int;
@@ -74,110 +74,110 @@ var voidPtrType =  ref.refType(ref.types.void);
 
 var libgdp = ffi.Library('../../../libs/libgdp-0.5', {
 
-    // From gdp/gdp.h
-    //CJS // free an event (required after gdp_event_next)
-    //CJS extern EP_STAT                  gdp_event_free(gdp_event_t *gev);
-    'gdp_event_free': [ 'ulong', [ gdp_event_tPtr ] ],
+            // From gdp/gdp.h
+            //CJS // free an event (required after gdp_event_next)
+            //CJS extern EP_STAT                  gdp_event_free(gdp_event_t *gev);
+            'gdp_event_free': [ 'ulong', [ gdp_event_tPtr ] ],
 
-    //CJS // get next event (fills in gev structure)
-    //CJS extern gdp_event_t              *gdp_event_next(bool wait);
-    'gdp_event_next': [ gdp_event_tPtr, [ bool_t ] ],
+            //CJS // get next event (fills in gev structure)
+            //CJS extern gdp_event_t              *gdp_event_next(bool wait);
+            'gdp_event_next': [ gdp_event_tPtr, [ bool_t ] ],
 
-    //CJS // get the type of an event
-    //CJS extern int                       gdp_event_gettype(gdp_event_t *gev);
-    'gdp_event_gettype': [ 'int', [ gdp_event_tPtr ] ],
+            //CJS // get the type of an event
+            //CJS extern int                       gdp_event_gettype(gdp_event_t *gev);
+            'gdp_event_gettype': [ 'int', [ gdp_event_tPtr ] ],
 
-    //CJS // get the GCL handle
-    //CJS extern gdp_gcl_t                *gdp_event_getgcl(gdp_event_t *gev);
-    'gdp_event_getgcl': [ gdp_gcl_tPtr, [ gdp_event_tPtr ] ],
+            //CJS // get the GCL handle
+            //CJS extern gdp_gcl_t                *gdp_event_getgcl(gdp_event_t *gev);
+            'gdp_event_getgcl': [ gdp_gcl_tPtr, [ gdp_event_tPtr ] ],
 
-    //CJS // get the datum
-    //CJS extern gdp_datum_t              *gdp_event_getdatum(gdp_event_t *gev);
-    'gdp_event_getdatum': [ gdp_datum_tPtr, [ gdp_event_tPtr ] ],
+            //CJS // get the datum
+            //CJS extern gdp_datum_t              *gdp_event_getdatum(gdp_event_t *gev);
+            'gdp_event_getdatum': [ gdp_datum_tPtr, [ gdp_event_tPtr ] ],
 
-    //CJS // initialize the library
-    //CJS EP_STAT gdp_init( const char *gdpd_addr );          // address of gdpd
-    'gdp_init': [ 'ulong', [ 'string' ] ],
+            //CJS // initialize the library
+            //CJS EP_STAT gdp_init( const char *gdpd_addr );          // address of gdpd
+            'gdp_init': [ 'ulong', [ 'string' ] ],
 
-    //CJS // create a new GCL
-    //CJS EP_STAT gdp_gcl_create( gcl_name_t, gdp_gcl_t ** ); // pointer to result GCL handle
-    'gdp_gcl_create': [ 'ulong', [ gcl_name_t, gdp_gcl_tPtrPtr ] ],
+            //CJS // create a new GCL
+            //CJS EP_STAT gdp_gcl_create( gcl_name_t, gdp_gcl_t ** ); // pointer to result GCL handle
+            'gdp_gcl_create': [ 'ulong', [ gcl_name_t, gdp_gcl_tPtrPtr ] ],
 
-    //CJS // open an existing GCL
-    //CJS extern EP_STAT  gdp_gcl_open( gcl_name_t name, gdp_iomode_t rw, gdp_gcl_t **gclh);              // pointer to result GCL handle
-    'gdp_gcl_open': [ 'ulong', [ gcl_name_t, gdp_iomode_t, voidPtrType, gdp_gcl_tPtrPtr ] ],
+            //CJS // open an existing GCL
+            //CJS extern EP_STAT  gdp_gcl_open( gcl_name_t name, gdp_iomode_t rw, gdp_gcl_t **gclh);              // pointer to result GCL handle
+            'gdp_gcl_open': [ 'ulong', [ gcl_name_t, gdp_iomode_t, voidPtrType, gdp_gcl_tPtrPtr ] ],
 
-    //CJS // close an open GCL
-    //CJS EP_STAT  gdp_gcl_close( gdp_gcl_t *gclh);           // GCL handle to close
-    'gdp_gcl_close': [ 'ulong', [ gdp_gcl_tPtr ] ],
+            //CJS // close an open GCL
+            //CJS EP_STAT  gdp_gcl_close( gdp_gcl_t *gclh);           // GCL handle to close
+            'gdp_gcl_close': [ 'ulong', [ gdp_gcl_tPtr ] ],
 
-    //CJS // parse a (possibly human-friendly) GCL name
-    //CJS EP_STAT gdp_parse_name( const char *ext, gcl_name_t internal );
-    'gdp_parse_name': [ 'ulong', [ 'string', gcl_name_t ] ],
+            //CJS // parse a (possibly human-friendly) GCL name
+            //CJS EP_STAT gdp_parse_name( const char *ext, gcl_name_t internal );
+            'gdp_parse_name': [ 'ulong', [ 'string', gcl_name_t ] ],
 
-    //CJS // allocate a new message
-    //CJS gdp_datum_t             *gdp_datum_new(void);
-    'gdp_datum_new': [ gdp_datum_tPtr, [ ] ],
+            //CJS // allocate a new message
+            //CJS gdp_datum_t             *gdp_datum_new(void);
+            'gdp_datum_new': [ gdp_datum_tPtr, [ ] ],
 
-    //CJS // free a message
-    //CJS void                    gdp_datum_free(gdp_datum_t *);
-    'gdp_datum_free': [ 'void', [ gdp_datum_tPtr ] ],
+            //CJS // free a message
+            //CJS void                    gdp_datum_free(gdp_datum_t *);
+            'gdp_datum_free': [ 'void', [ gdp_datum_tPtr ] ],
 
-    // From gdp/gdp.h
-    //CJS // get the data buffer from a datum
-    //CJS extern gdp_buf_t *gdp_datum_getbuf( const gdp_datum_t *datum );
-    'gdp_datum_getbuf': [ gdp_buf_tPtr , [ gdp_datum_tPtr ] ],
+            // From gdp/gdp.h
+            //CJS // get the data buffer from a datum
+            //CJS extern gdp_buf_t *gdp_datum_getbuf( const gdp_datum_t *datum );
+            'gdp_datum_getbuf': [ gdp_buf_tPtr , [ gdp_datum_tPtr ] ],
 
-    // From gdp/gdp_buf.h
-    //CJS extern int gdp_buf_write( gdp_buf_t *buf, void *in, size_t sz );
-    //'gdp_buf_write': [ 'int', [ gdp_buf_tPtr, 'pointer', 'size_t' ] ],
-    //'gdp_buf_write': [ 'int', [ gdp_buf_tPtr, 'pointer', 'int' ] ],
-    'gdp_buf_write': [ 'int', [ gdp_buf_tPtr, buf_t, 'size_t' ] ],
+            // From gdp/gdp_buf.h
+            //CJS extern int gdp_buf_write( gdp_buf_t *buf, void *in, size_t sz );
+            //'gdp_buf_write': [ 'int', [ gdp_buf_tPtr, 'pointer', 'size_t' ] ],
+            //'gdp_buf_write': [ 'int', [ gdp_buf_tPtr, 'pointer', 'int' ] ],
+            'gdp_buf_write': [ 'int', [ gdp_buf_tPtr, buf_t, 'size_t' ] ],
 
-    // From gdp/gdp_buf.h
-    //CJS extern size_t           gdp_buf_read( gdp_buf_t *buf, void *out, size_t sz);
-    'gdp_buf_read': [ 'size_t', [ gdp_buf_tPtr, buf_t, 'size_t' ] ],
+            // From gdp/gdp_buf.h
+            //CJS extern size_t           gdp_buf_read( gdp_buf_t *buf, void *out, size_t sz);
+            'gdp_buf_read': [ 'size_t', [ gdp_buf_tPtr, buf_t, 'size_t' ] ],
 
-    'gdp_gcl_print': ['void', [ gdp_gcl_tPtr, 'void' ] ],
+            'gdp_gcl_print': ['void', [ gdp_gcl_tPtr, 'void' ] ],
 
-    // From gdp/gdp.h
-    //CJS // append to a writable GCL
-    //CJS extern EP_STAT  gdp_gcl_publish( gdp_gcl_t *gclh, gdp_datum_t *);
-    //'gdp_gcl_publish': [ 'ulong', [ gdp_gcl_tPtr, gdp_datum_tPtr ] ],
+            // From gdp/gdp.h
+            //CJS // append to a writable GCL
+            //CJS extern EP_STAT  gdp_gcl_publish( gdp_gcl_t *gclh, gdp_datum_t *);
+            //'gdp_gcl_publish': [ 'ulong', [ gdp_gcl_tPtr, gdp_datum_tPtr ] ],
 
-    //CJS extern EP_STAT  gdp_gcl_subscribe(
-    //CJS                                         gdp_gcl_t *gclh,                // readable GCL handle
-    //CJS                                         gdp_recno_t start,              // first record to retrieve
-    //CJS                                         int32_t numrecs,                // number of records to retrieve
-    //CJS                                         EP_TIME_SPEC *timeout,  // timeout
-    //CJS                                         gdp_gcl_sub_cbfunc_t cbfunc,
-    //CJS
-    //CJS         // callback function for next datum
-    //CJS                                         void *cbarg);                   // argument passed to callback
-    // Note, in our call to this function in do_multiread() below we do not
-    //       use the last 3 (pointer) arguments.
-    'gdp_gcl_subscribe': [ 'ulong', [ gdp_gcl_tPtr, gdp_recno_t, int32_t, 'pointer', 'pointer', 'pointer' ] ],
+            //CJS extern EP_STAT  gdp_gcl_subscribe(
+            //CJS                                         gdp_gcl_t *gclh,                // readable GCL handle
+            //CJS                                         gdp_recno_t start,              // first record to retrieve
+            //CJS                                         int32_t numrecs,                // number of records to retrieve
+            //CJS                                         EP_TIME_SPEC *timeout,  // timeout
+            //CJS                                         gdp_gcl_sub_cbfunc_t cbfunc,
+            //CJS
+            //CJS         // callback function for next datum
+            //CJS                                         void *cbarg);                   // argument passed to callback
+            // Note, in our call to this function in do_multiread() below we do not
+            //       use the last 3 (pointer) arguments.
+            'gdp_gcl_subscribe': [ 'ulong', [ gdp_gcl_tPtr, gdp_recno_t, int32_t, 'pointer', 'pointer', 'pointer' ] ],
 
-    //CJS // read from a readable GCL
-    //CJS extern EP_STAT  gdp_gcl_read( gdp_gcl_t *gclh, gdp_recno_t recno, gdp_datum_t *datum);    // pointer to result message
-    'gdp_gcl_read': [ 'ulong', [ gdp_gcl_tPtr, gdp_recno_t, gdp_datum_tPtr ] ],
+            //CJS // read from a readable GCL
+            //CJS extern EP_STAT  gdp_gcl_read( gdp_gcl_t *gclh, gdp_recno_t recno, gdp_datum_t *datum);    // pointer to result message
+            'gdp_gcl_read': [ 'ulong', [ gdp_gcl_tPtr, gdp_recno_t, gdp_datum_tPtr ] ],
 
-    // From gdp/gdp.h
-    //CJS // get the data length from a datum
-    //CJS extern size_t   gdp_datum_getdlen( const gdp_datum_t *datum);
-    'gdp_datum_getdlen': [ 'size_t', [ gdp_datum_tPtr ] ],
+            // From gdp/gdp.h
+            //CJS // get the data length from a datum
+            //CJS extern size_t   gdp_datum_getdlen( const gdp_datum_t *datum);
+            'gdp_datum_getdlen': [ 'size_t', [ gdp_datum_tPtr ] ],
 
-})
+        })
 
 
 
-var gclname_arg = "6zvLBmrn5VUiPweLV9PYqPL_h-SFQZoV_Ht5XtZ9x-Y"
-// var gclname_arg = process.argv[ 3 ];
-var firstrec = 1  // first item entered in the gcl
+    var gclname_arg = "6zvLBmrn5VUiPweLV9PYqPL_h-SFQZoV_Ht5XtZ9x-Y"
+    // var gclname_arg = process.argv[ 3 ];
+    var firstrec = 1  // first item entered in the gcl
     //    var firstrec = 0  // most recently entered item in the gcl
 
-//C  gcl_name_t gclname;
-var gclname = ref.alloc(gcl_name_t);
+    //C  gcl_name_t gclname;
+    var gclname = ref.alloc(gcl_name_t);
 
 libep.ep_dbg_set("*=10");
 
@@ -294,9 +294,9 @@ var buf = new buf_t(1000); // hack size??
 var temp_gdp_buf_size = libgdp.gdp_buf_read( temp_gdp_buf, buf, buf.length );
 var aJSString = '';
 for ( var i = 0; i < temp_gdp_buf_size; i++ )
-{
-    aJSString = aJSString + String.fromCharCode( buf[i] );
-}
+    {
+        aJSString = aJSString + String.fromCharCode( buf[i] );
+    }
 console.log("read: '" + aJSString + "'" );
 
 //C gdp_gcl_close(gclh);
