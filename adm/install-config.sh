@@ -16,9 +16,10 @@ adm=adm
 
 . $adm/common-support.sh
 
-info "Installing gdplogd wrapper"
+info "Installing gdplogd wrapper and actual binary"
 umask 022
 sudo cp $adm/gdplogd-wrapper.sh $GDP_ROOT/sbin/gdplogd-wrapper.sh
+sudo cp gdplogd/gdplogd $GDP_ROOT/sbin/gdplogd
 
 info "Installing rsyslog configuration"
 umask 0222
