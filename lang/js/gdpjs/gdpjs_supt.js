@@ -106,7 +106,7 @@ function gdp_gcl_open_js( /* gcl_name_t */   gcliname,
 {
 	var gcl_Ptr;                                  // gclHandle_t 
 	var gclPtrPtr = ref.alloc( gdp_gcl_tPtrPtr ); // gclHandle_t *
-	var estat = libgdp.gdp_gcl_open(gcliname, mode, gclPtrPtr);
+	var estat = libgdp.gdp_gcl_open(gcliname, mode, ref.NULL, gclPtrPtr);
 	gcl_Ptr = gclPtrPtr.deref();
 	return { error_code: estat, gclH: gcl_Ptr };
 }

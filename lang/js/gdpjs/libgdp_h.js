@@ -123,6 +123,8 @@ var sleep      = require( NODE_MODULES_DIR + 'sleep' );
 
 
 
+var gdp_gcl_open_info_tPtr =  ref.refType(ref.types.void);
+
 // { GRRRRRR... trying to get stdout up to the JS level using libc.fcntl()
 // here JUST DOESN'T WORK.  Get a Segmentation fault: 11 on call to
 // libgdp.gdp_datum_print().
@@ -231,7 +233,7 @@ var EP_TIME_SPEC_struct_Ptr    = ref.refType(EP_TIME_SPEC_struct);
 var EP_TIME_SPEC_struct_PtrPtr = ref.refType(EP_TIME_SPEC_struct_Ptr);
 
 
-var libep = ffi.Library( GDP_DIR + '/libs/libep', {
+var libep = ffi.Library( GDP_DIR + '/libs/libep-3.0', {
 
 // From ep/ep_dbg.h
 //CJS // initialization
@@ -398,7 +400,7 @@ var GDP_EVENT_DATA = 1       // returned data
 var GDP_EVENT_EOS  = 2       // end of subscription
 
 
-var libgdp = ffi.Library( GDP_DIR + '/libs/libgdp', {
+var libgdp = ffi.Library( GDP_DIR + '/libs/libgdp-0.5', {
 
 // From gdp/gdp.h
 //CJS // free an event (required after gdp_event_next)
@@ -448,12 +450,14 @@ var libgdp = ffi.Library( GDP_DIR + '/libs/libgdp', {
 // From gdp/gdp.h
 //CJS // open an existing GCL
 //CJS extern EP_STAT  gdp_gcl_open( gcl_name_t name, gdp_iomode_t rw, gdp_gcl_t **gclh);
-  'gdp_gcl_open': [ EP_STAT, [ gcl_name_t, gdp_iomode_t, gdp_gcl_tPtrPtr ] ],
+   'gdp_gcl_open': [ EP_STAT, [ gcl_name_t, gdp_iomode_t, gdp_gcl_open_info_tPtr, gdp_gcl_tPtrPtr ] ],
 
 // From gdp/gdp.h
 //CJS // close an open GCL
 //CJS EP_STAT  gdp_gcl_close( gdp_gcl_t *gclh);           // GCL handle to close
   'gdp_gcl_close': [ EP_STAT, [ gdp_gcl_tPtr ] ],
+
+   'gdp_gcl_print': ['void', [ gdp_gcl_tPtr, 'void' ] ],
 
 // From gdp/gdp.h
 //CJS // make a printable GCL name from a binary version

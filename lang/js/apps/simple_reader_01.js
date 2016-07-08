@@ -6,10 +6,14 @@ var ffi        = require('ffi')
 var ref        = require('ref')
 var ref_array  = require('ref-array')
 
+var char_t = ref.types.char;
+var buf_t = ref_array(char_t);
+
 // From ep/ep_dbg.h
-var libep = ffi.Library('../../../libs/libep', {
+var libep = ffi.Library('../../../libs/libep-3.0', {
     'ep_dbg_init': [ 'void', [ ] ],
     'ep_dbg_set':  [ 'void', [ 'string' ] ],
+    'ep_stat_tostr':  [ 'string', [ ref.types.uint32, buf_t, 'size_t' ] ],
     'ep_time_nanosleep': [ 'void', [ 'int64' ]],
 })
 
@@ -42,8 +46,6 @@ var GDP_MODE_RO  = 1;
 var GDP_MODE_AO  = 2;
 var gdp_iomode_t = ref.types.int;  //?? check this - enum === int ?
 
-var char_t = ref.types.char;
-var buf_t = ref_array(char_t);
 
 //CJS // an open handle on a GCL (opaque)
 //CJS typedef struct gdp_gcl          gdp_gcl_t;
@@ -68,7 +70,9 @@ var gdp_buf_tPtr    = ref.refType(gdp_buf_t);
 var gdp_buf_tPtrPtr = ref.refType(gdp_buf_tPtr);  //?? not used yet??
 
 
-var libgdp = ffi.Library('../../../libs/libgdp', {
+var voidPtrType =  ref.refType(ref.types.void);
+
+var libgdp = ffi.Library('../../../libs/libgdp-0.5', {
 
     // From gdp/gdp.h
     //CJS // free an event (required after gdp_event_next)
@@ -101,7 +105,7 @@ var libgdp = ffi.Library('../../../libs/libgdp', {
 
     //CJS // open an existing GCL
     //CJS extern EP_STAT  gdp_gcl_open( gcl_name_t name, gdp_iomode_t rw, gdp_gcl_t **gclh);              // pointer to result GCL handle
-    'gdp_gcl_open': [ 'ulong', [ gcl_name_t, gdp_iomode_t, gdp_gcl_tPtrPtr ] ],
+    'gdp_gcl_open': [ 'ulong', [ gcl_name_t, gdp_iomode_t, voidPtrType, gdp_gcl_tPtrPtr ] ],
 
     //CJS // close an open GCL
     //CJS EP_STAT  gdp_gcl_close( gdp_gcl_t *gclh);           // GCL handle to close
@@ -134,6 +138,8 @@ var libgdp = ffi.Library('../../../libs/libgdp', {
     //CJS extern size_t           gdp_buf_read( gdp_buf_t *buf, void *out, size_t sz);
     'gdp_buf_read': [ 'size_t', [ gdp_buf_tPtr, buf_t, 'size_t' ] ],
 
+    'gdp_gcl_print': ['void', [ gdp_gcl_tPtr, 'void' ] ],
+
     // From gdp/gdp.h
     //CJS // append to a writable GCL
     //CJS extern EP_STAT  gdp_gcl_publish( gdp_gcl_t *gclh, gdp_datum_t *);
@@ -165,15 +171,15 @@ var libgdp = ffi.Library('../../../libs/libgdp', {
 
 
 
-var gclname_arg = "cHL47Jlv6t9sc74PjV1Gist_PcTT1HnibulAXA8OocI"
+var gclname_arg = "6zvLBmrn5VUiPweLV9PYqPL_h-SFQZoV_Ht5XtZ9x-Y"
 // var gclname_arg = process.argv[ 3 ];
-// var firstrec = 1  // first item entered in the gcl
-var firstrec = 0  // most recently entered item in the gcl
+var firstrec = 1  // first item entered in the gcl
+    //    var firstrec = 0  // most recently entered item in the gcl
 
 //C  gcl_name_t gclname;
 var gclname = ref.alloc(gcl_name_t);
 
-libep.ep_dbg_set("*=40");
+libep.ep_dbg_set("*=10");
 
 //C  char *gdpd_addr = NULL;
 //var gdpd_addr = "127.0.0.1:2468";  // default port for a local gdpd
@@ -194,10 +200,66 @@ estat = libgdp.gdp_parse_name(gclname_arg, gclname);
 
 //C  // open the GCL; arguably this shouldn't be necessary
 //C  estat = gdp_gcl_open(gclname, GDP_MODE_RO, &gclh);
+var gcl = ref.alloc( gdp_gcl_t );
+console.log( "simple: gcl: " + gcl);
+console.log(gcl);
+
+var gclPtr = ref.alloc( gdp_gcl_tPtr);
+
+console.log( "simple: gclPtr: " + gclPtr);
+console.log(gclPtr);
+
+console.log( "simple: writePointer()");
+ref.writePointer(gclPtr, 0, gcl);
+
+console.log( "simple: gcl:" + gcl)
+console.log(gcl);
+console.log( "simple: gclPtr:" + gclPtr)
+console.log(gclPtr);
+
+
 var gclPtrPtr = ref.alloc( gdp_gcl_tPtrPtr );
-estat = libgdp.gdp_gcl_open(gclname, GDP_MODE_RO, gclPtrPtr);
-console.log( "after gdp_gcl_open()");
+
+//ref.writePointer(gclPtrPtr, 0, gclPtr);
+console.log( "simple: gclPtrPtr: " + gclPtrPtr);
+console.log(gclPtrPtr);
+
+console.log( "simple: about to print the gcl before open, it should be NULL or garbage");
+var gcl_Ptr = gclPtrPtr.deref();
+libgdp.gdp_gcl_print(gcl_Ptr, 0);
+
+estat = libgdp.gdp_gcl_open(gclname, GDP_MODE_RO, ref.NULL, gclPtrPtr);
+console.log( "simple: after gdp_gcl_open()");
+console.log( "simple: gclPtrPtr:" + gclPtrPtr + " " + gclPtrPtr.address().toString(16));
+console.log(gclPtrPtr);
+
 gcl_Ptr = gclPtrPtr.deref();
+console.log( "simple: gcl_Ptr:" + gcl_Ptr + " " + gcl_Ptr.address().toString(16));
+console.log(gcl_Ptr);
+var gcl_1 = gcl_Ptr.deref();
+console.log( "simple: gcl_1:");
+console.log(gcl_1);
+
+
+console.log( "simple: about to print the gcl after open");
+libgdp.gdp_gcl_print(gcl_Ptr, 0);
+console.log( "simple: after gdp_gcl_print()");
+
+var ebuf = ref.allocCString('123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890');
+
+console.log("About to create ebuf");
+//var ebuf = new buf_t(400);
+
+//var ebuf = ref.alloc(ref.types.CString);
+console.log( "simple: after setting ebuf");
+console.log( "simple: ebuf: " + ebuf);
+//console.log( "simple: ebuf.address(): " + ref.address(ebuf));
+//var ebuf = new Array( 200 + 1 ).join( " " );  // long enough??
+var ebuf2 = libep.ep_stat_tostr(estat, ebuf, ebuf.length);
+console.log( "simple: after ep_stat_tostr()");
+console.log("after open, estat: " + ebuf2);
+
+
 
 
 // From estat = do_simpleread(gcl_Ptr, firstrec, numrecs);
@@ -209,16 +271,22 @@ recno = firstrec;
 //C  while (numrecs < 0 || --numrecs >= 0)
 //C  gdp_datum_t *datum = gdp_datum_new();
 var datum;
+console.log( "simple: about to call gdp_datum_new()");
 datum = libgdp.gdp_datum_new();
+console.log( "simple: after calling gdp_datum_new()");
 // In this test program we do not free this datum
 
-console.log( "About to read record #" + recno + " from GCL '%s'", gclname_arg );
-
+console.log( "simple: About to read record #" + recno + " from GCL '%s'", gclname_arg );
+console.log( "simple: gcl_PtrPtr: " + gclPtrPtr);
+console.log( "simple: gclPtrPtr.address(): " + ref.address(gclPtrPtr));
+console.log( "simple: gcl_Ptr: " + gcl_Ptr);
 //C // ask the GDP to give us a record
 //C estat = gdp_gcl_read(gclh, recno, datum);
 estat = libgdp.gdp_gcl_read(gcl_Ptr, recno, datum);
+var ebuf2 = libep.ep_stat_tostr(estat, ebuf, ebuf.length);
+console.log("after read, estat: " + ebuf2);
 
-console.log( "Done eading record #" + recno + " from GCL '%s'", gclname_arg );
+console.log( "simple: Done reading record #" + recno + " from GCL '%s'", gclname_arg );
 // Print out the contents of the datum's buffer we read
 var datum_dlen = libgdp.gdp_datum_getdlen( datum );
 var temp_gdp_buf = libgdp.gdp_datum_getbuf( datum );
