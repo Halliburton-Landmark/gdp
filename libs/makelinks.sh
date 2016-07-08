@@ -6,7 +6,12 @@ minor=$3
 
 rm -f lib$lib.so.$major.$minor
 cp ../$lib/lib$lib.so.$major.$minor .
-. ../adm/common-support.sh
+if [ -f ../adm/common-support.sh ]; then 
+    . ../adm/common-support.sh
+else
+    # If we run this script in lang/js/gdpjs, then we need to look further up the tree.
+    . ../../../adm/common-support.sh
+fi
 
 platform OS
 case "$OS" in
