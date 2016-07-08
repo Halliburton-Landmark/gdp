@@ -21,15 +21,17 @@
 
 var http = require("http");
 
-http.createServer(function(request, response) {
-            response.writeHead(200, {"Content-Type": "text/plain"});
-            response.write(
-                    "Ran the test program rw_supt_test.js;"
-                           );
-            console.log( "Calling run_rw_supt_test()" );
-            run_rw_supt_test();
-            response.end();
-        }).listen(8888);
+http.createServer(function (request, response) {
+    response.writeHead(200, {
+        "Content-Type": "text/plain"
+    });
+    response.write(
+        "Ran the test program rw_supt_test.js;"
+    );
+    console.log("Calling run_rw_supt_test()");
+    run_rw_supt_test();
+    response.end();
+}).listen(8888);
 
 
 
@@ -49,22 +51,21 @@ http.createServer(function(request, response) {
 // Parameters needed for libgdp_h.js and gdpjs_supt.js
 // They MUST be adapted to the directory where this program will be run.
 // See libgdp_h.js for details.
-var GDP_DIR           = "../../../";
-var GDPJS_DIR         = GDP_DIR + "./lang/js/gdpjs/";
-var NODE_MODULES_DIR  = "";
+var GDP_DIR = "../../../";
+var GDPJS_DIR = GDP_DIR + "./lang/js/gdpjs/";
+var NODE_MODULES_DIR = "";
 //
 var LIBGDP_H_DIR = GDPJS_DIR;
 // Here we include and evaluate our shared GDP Javascript "header file",
 // 'libgdp_h.js', within the global scope/environment.
-var fs = require('fs');   // Node.js's built-in File System module
-eval( fs.readFileSync( LIBGDP_H_DIR + 'libgdp_h.js').toString() );
+var fs = require('fs'); // Node.js's built-in File System module
+eval(fs.readFileSync(LIBGDP_H_DIR + 'libgdp_h.js').toString());
 // We similarly include & evaluate some JS support functions.
-eval( fs.readFileSync( LIBGDP_H_DIR + 'gdpjs_supt.js').toString() );
-eval( fs.readFileSync( LIBGDP_H_DIR + 'rw_supt.js').toString() );
+eval(fs.readFileSync(LIBGDP_H_DIR + 'gdpjs_supt.js').toString());
+eval(fs.readFileSync(LIBGDP_H_DIR + 'rw_supt.js').toString());
 
 
-function run_rw_supt_test()
-{
+function run_rw_supt_test() {
 
     var brk = "==============================================================";
     brk = "\n" + brk + "\n";
@@ -73,30 +74,30 @@ function run_rw_supt_test()
     // Set up calls to write_gcl_records()
 
     // Common hard-wired arguments
-    gdpd_addr  = null;    // default "127.0.0.1:2468"
-    gcl_name   = null;    // default; create a new gcl
+    gdpd_addr = null; // default "127.0.0.1:2468"
+    gcl_name = null; // default; create a new gcl
     gcl_append = false;
     // gcl_append = true;   // TBD: use an existing gcl
 
     // Test calls to write_gcl_records()
-    console.log( brk );
+    console.log(brk);
 
     // A: write to gcl from stdin
     // recsrc = -1;  // read the gcl records to be written from stdin with
     //               // prompts to and echoing for the user on stdout
     // recarray = [ ];
-    recsrc   = -1;   // read the gcl records to be written from stdin...
-    recarray = [ ];  // not used for recsrc = -1
-    write_gcl_records( gdpd_addr, gcl_name, gcl_append, recsrc, recarray );
-    console.log( brk );
+    recsrc = -1; // read the gcl records to be written from stdin...
+    recarray = []; // not used for recsrc = -1
+    write_gcl_records(gdpd_addr, gcl_name, gcl_append, recsrc, recarray);
+    console.log(brk);
 
     // B: write to gcl from JS Array
     // recsrc =  0;  // read the gcl records from the Array recarray
     // recarray = [ "Item 01 - from recarray", "Item 02", "Item 03" ];
-    recsrc =  0;  // read the gcl records from the Array recarray
-    recarray = [ "Item 01 - from recarray", "Item 02", "Item 03" ];
-    write_gcl_records( gdpd_addr, gcl_name, gcl_append, recsrc, recarray );
-    console.log( brk );
+    recsrc = 0; // read the gcl records from the Array recarray
+    recarray = ["Item 01 - from recarray", "Item 02", "Item 03"];
+    write_gcl_records(gdpd_addr, gcl_name, gcl_append, recsrc, recarray);
+    console.log(brk);
 
 
     // C: write to gcl N records with integers as contents
@@ -105,10 +106,10 @@ function run_rw_supt_test()
     //               // recsrc, inclusive.
     // recsrc   =  7;
     // recarray = [ ];
-    recsrc   =  7;
-    recarray = [ ];
-    write_gcl_records( gdpd_addr, gcl_name, gcl_append, recsrc, recarray );
-    console.log( brk );
+    recsrc = 7;
+    recarray = [];
+    write_gcl_records(gdpd_addr, gcl_name, gcl_append, recsrc, recarray);
+    console.log(brk);
 
 
     // =======================================================================
@@ -121,5 +122,3 @@ function run_rw_supt_test()
 
 // Invoke the test
 // run_rw_supt_test();
-
-
