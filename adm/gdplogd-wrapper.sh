@@ -7,8 +7,6 @@
 : ${GDPLOGD_LOG:=/var/log/gdp/gdplogd.log}
 
 {
-	echo "Sleeping for 5s"
-	sleep 5
 	echo `date +"%F %T %z"` Running $GDPLOGD_BIN $GDPLOGD_ARGS
 	exec $GDPLOGD_BIN $GDPLOGD_ARGS
 } >> $GDPLOGD_LOG 2>& 1

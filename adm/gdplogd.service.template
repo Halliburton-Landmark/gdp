@@ -9,7 +9,7 @@ Environment=GDP_ROOT=@GDP_ROOT@
 User=@GDP_USER@
 
 # give router time to start up
-ExecStartPre=/bin/sleep 1
+ExecStartPre=/bin/sleep 5
 ExecStart=/bin/sh @GDP_ROOT@/sbin/gdplogd-wrapper.sh
 Restart=always
 
