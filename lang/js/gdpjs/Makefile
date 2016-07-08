@@ -88,10 +88,7 @@ libgdpjs.a: ${OBJS}
 
 libgdpjs.so.${GDPJS_LIBVER}: ${OBJS}
 	${CC} ${SHARED} -o $@ ${OBJS} ${LDFLAGS}
-	${MV} $@ ${LIBDIR}
-	(cd ${LIBDIR}; rm -f libgdpjs.so.${GDPJS_LIBMAJVER}; ln -s libgdpjs.so.${GDPJS_LIBVER} libgdpjs.so.${GDPJS_LIBMAJVER})
-	(cd ${LIBDIR}; rm -f libgdpjs.so; ln -s libgdpjs.so.${GDPJS_LIBMAJVER} libgdpjs.so; ln -s libgdpjs.so.${GDPJS_LIBVER} libgdpjs.${GDPJS_LIBVER}.so)
-	(cd ${LIBDIR}; rm -f libgdpjs.${GDPJS_LIBVER}.dylib; ln -s libgdpjs.so.${GDPJS_LIBVER} libgdpjs.${GDPJS_LIBVER}.dylib)
+	(cd ${LIBDIR} && sh ${GDPROOT}/libs/makelinks.sh gdpjs ${GDPJS_LIBMAJVER} ${GDPJS_LIBMINVER})
 
 gdpjs_version.o: gdpjs_version.c FORCE
 	${CC} ${CFLAGS} -D_CURRENT_DATE_=\"`date +'%Y-%m-%d_%H:%M'`\" -c gdpjs_version.c
