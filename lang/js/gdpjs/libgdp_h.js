@@ -570,7 +570,7 @@ var libgdp = ffi.Library( GDP_DIR + '/libs/libgdp-0.5', {
 
 // JS-to-GDP onion skin layer on selected GDP functions and macros.
 //
-var libgdpjs = ffi.Library( GDPJS_DIR + '../libs/libgdpjs.1.0', {
+var libgdpjs = ffi.Library( GDPJS_DIR + '../libs/libgdpjs-1.0', {
 
 // Some general libc-related functions
 
