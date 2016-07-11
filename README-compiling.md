@@ -96,6 +96,10 @@ Unfortunately there are some reports that neither of them has
 all the modules you may need if you are compiling everything,
 so you may have to download other packages from source code.
 
+It's been reported that brew doesn't include Avahi at all, so
+if you are using that package manager you'll probably have to
+compile Avahi for yourself.
+
 ### Red Hat
 
 Red Hat is not well supported, although some people have been
