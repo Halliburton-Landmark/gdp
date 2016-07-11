@@ -33,7 +33,8 @@ GDPLIBMINVER=	5
 # These are generally changed on make command line
 DESTDIR=
 LOCALROOT=	/usr
-CRYPTOROOT=	/opt/local
+LOCAL1=		/usr/local
+LOCAL2=		/opt/local
 
 # These generally do not need to be changed
 INSTALLROOT=	${DESTDIR}${LOCALROOT}
@@ -121,18 +122,18 @@ ALL=		${CLEANALL} ${PUBALL}
 LOCAL1=		/usr/local
 LOCAL2=		/opt/local
 INCROOT=	..
-INCSEARCH=	-I${LOCAL1}/include -I${LOCAL2}/include
+INCSEARCH=	${INCLOCAL} \
+		-I${INCROOT} \
+		-I${LOCAL1}/include \
+		-I${LOCAL2}/include
 LIBROOT=	${INCROOT}
-INCCRYPTO=	-I${CRYPTOROOT}/include
 LIBCRYPTO=	-lcrypto
-INCEVENT2=
 LIBEVENT2=	-levent -levent_pthreads
-INCAVAHI=
 LIBAVAHI=	-lavahi-client -lavahi-common
 INCEP=		-I${INCROOT}
 LIBEP=		-lep
-INCS=		${INCSEARCH} ${INCEP} ${INCEVENT2} ${INCCRYPTO} ${INCAVAHI}
-LIBSEARCH=	-L${CRYPTOROOT}/lib \
+INCS=		${INCSEARCH} ${INCEP} ${INCEVENT2} ${INCAVAHI}
+LIBSEARCH=	${LIBLOCAL} \
 		-L${LIBROOT}/ep \
 		-L${LOCAL1}/lib \
 		-L${LOCAL2}/lib

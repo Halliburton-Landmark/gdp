@@ -55,7 +55,6 @@ ALL=		${CLEANALL} ${PUBALL}
 DESTDIR=
 LOCALROOT=	/usr
 INSTALLROOT=	${DESTDIR}${LOCALROOT}
-CRYPTOROOT=	/opt/local
 BINDIR=		${INSTALLROOT}/bin
 SBINDIR=	${INSTALLROOT}/sbin
 MANDIR=		${INSTALLROOT}/share/man
@@ -72,24 +71,21 @@ INSTALL=	install
 LOCAL1=		/usr/local
 LOCAL2=		/opt/local
 INCROOT=	../..
-INCSEARCH=	-I${LOCAL1}/include -I${LOCAL2}/include
+INCSEARCH=	-I${INCROOT} -I${LOCAL1}/include -I${LOCAL2}/include
 LIBROOT=	${INCROOT}
-LIBSEARCH=	-L${CRYPTOROOT}/lib \
+LIBSEARCH=	-L${LIBROOT}/gdp \
 		-L${LIBROOT}/ep \
-		-L${LIBROOT}/gdp
+		-L${LOCAL1}/lib \
+		-L${LOCAL2}/lib
 INCGDP=		-I${INCROOT}
 LIBGDP=		-lgdp
 INCEP=
 LIBEP=		-lep
-INCJANSSON=
 LIBJANSSON=	-L${LOCAL1}/lib -L${LOCAL2}/lib -ljansson
-INCEVENT2=
 LIBEVENT2=	-levent -levent_pthreads -pthread
 INCCRYPTO=	-I${CRYPTOROOT}/include
 LIBCRYPTO=	-lcrypto
-INCAVAHI=
 LIBAVAHI=	-lavahi-client -lavahi-common
-INCMOSQ=
 LIBMOSQ=	-lmosquitto
 INCS=		${INCSEARCH} ${INCGDP} ${INCEP} \
 		${INCJANSSON} ${INCEVENT2} ${INCCRYPTO} ${INCAVAHI} \

@@ -35,7 +35,8 @@ EPLIBMINVER=	0
 # These are generally changed on make command line
 DESTDIR=
 LOCALROOT=	/usr
-CRYPTOROOT=	/opt/local
+LOCAL1=		/usr/local
+LOCAL2=		/opt/local
 
 # These generally do not need to be changed
 INSTALLROOT=	${DESTDIR}${LOCALROOT}
@@ -187,13 +188,18 @@ G=		-g
 O=		-O
 STD=
 COPTS=		${PG} ${WALL} $G $O ${STD}
-CRYPTOCFLAGS=	-I${CRYPTOROOT}/include
-CRYPTOLFLAGS=	-L${CRYPTOROOT}/lib
-INCLS=		${CRYPTOCFLAGS}
-CFLAGS=		${COPTS} ${INCLS} -I${CURDIR} -I.. -fPIC
+INCSEARCH=	${INCLOCAL} \
+		-I${INCROOT} \
+		-I${LOCAL1}/include \
+		-I${LOCAL2}/include
+LIBSEARCH=	${LIBLOCAL} \
+		-I${LOCAL1}/lib \
+		-I${LOCAL2}/lib
+INCS=		${INCSEARCH}
+CFLAGS=		${COPTS} ${INCS} -I${CURDIR} -I.. -fPIC
 RM=		rm
 LD=		ld
-LDFLAGS=	-L. ${CRYPTOLFLAGS}
+LDFLAGS=	-L. ${LIBSEARCH}
 LDLIBS=		${LIBNAME}.a -pthread
 LIBS=		-lcrypto
 LN=		ln
