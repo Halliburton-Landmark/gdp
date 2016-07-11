@@ -24,7 +24,8 @@ is not open; contact Eric Allman <eric@cs.berkeley.edu> to get access.
 At the moment, compiles work on many platforms, including Debian,
 RedHat, MacOS, and FreeBSD.  However, some other GDP-related packages
 work on Debian only (which includes Ubuntu), so you may have
-difficulties outside the main source tree.
+difficulties outside the main source tree.  See the section on
+Operating System Quirks below for some hints.
 
 Installing Requisite Packages
 -----------------------------
@@ -36,8 +37,7 @@ The easiest way to do this is to run the `adm/gdp-setup.sh`
 script.
 
 Note that on some systems you may need to install the compile suite
-as well.  For example, on MacOS you must install XCode in order to
-get the compilers, libraries, and build tools you will need.
+as well.
 
 Compilation
 -----------
@@ -79,6 +79,35 @@ catches things that gcc does not.)
 In addition to C, there is support for Python, Java, and
 Javascript.  These bindings are all in the `lang` subtree.
 See the instructions in those directories for compiling.
+
+Operating System Quirks
+-----------------------
+
+### MacOS
+
+If you are trying to compile on MacOS you'll need to install
+Xcode from the App Store to get the compilers, libraries, and
+build tools you will need.
+
+Other packages are installed by `adm/gdp-setup.sh`.  Note that
+this script will try to determine if you are using `brew` or
+`macports`.  Of the two, `macports` is better understood.
+Unfortunately there are some reports that neither of them has
+all the modules you may need if you are compiling everything,
+so you may have to download other packages from source code.
+
+### Red Hat
+
+Red Hat is not well supported, although some people have been
+able to make it work.  Christopher Brooks is the best contact for
+this platform.
+
+### FreeBSD
+
+We do attempt to compile on FreeBSD occasionally in an attempt
+to promote portability, but some of the other optional packages
+do not compile or run on FreeBSD.  However, the base code
+should compile.
 
 Next Steps
 ----------
