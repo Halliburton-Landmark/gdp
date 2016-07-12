@@ -17,15 +17,15 @@ Cya='[0;36m';     BCya='[1;36m';    UCya='[4;36m';    ICya='[0;96m';    BICy
 Whi='[0;37m';     BWhi='[1;37m';    UWhi='[4;37m';    IWhi='[0;97m';    BIWhi='[1;97m';   On_Whi='[47m';    On_IWhi='[0;107m';
 
 info() {
-	echo "${Gre}${On_Bla}[+] $1${Reset}"
+	echo "${Gre}${On_Bla}[INFO] $1${Reset}"
 }
 
 warn() {
-	echo "${Yel}${On_Bla}[*] $1${Reset}"
+	echo "${Yel}${On_Bla}[WARN] $1${Reset}"
 }
 
 fatal() {
-	echo "${Whi}${On_Red}[!] $1${Reset}"
+	echo "${Whi}${On_Red}[FATAL] $1${Reset}"
 	exit 1
 }
 

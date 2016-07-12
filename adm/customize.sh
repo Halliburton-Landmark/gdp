@@ -25,6 +25,7 @@ source_file="$source_dir/$source_root.template"
 : ${GDP_SYSLOG_LEVEL:=notice}
 : ${GDP_USER:=gdp}
 : ${GDPLOGD_ARGS:=}
+: ${GDPLOGD_DATADIR:=}
 
 (
 	echo "# Generated" `date +"%F %T %z"` from $source_file
@@ -36,6 +37,7 @@ source_file="$source_dir/$source_root.template"
 		-e "s;@GDP_SYSLOG_LEVEL@;$GDP_SYSLOG_LEVEL;g" \
 		-e "s;@GDP_USER@;$GDP_USER;g" \
 		-e "s;@GDPLOGD_ARGS@;$GDPLOGD_ARGS;g" \
+		-e "s;@GDPLOGD_DATADIR@;$GDPLOGD_DATADIR;g" \
 
 	echo "# End of generated" $1
 ) < $source_file > $target_dir/$source_root
