@@ -28,6 +28,11 @@
 **  ----- END LICENSE BLOCK -----
 */
 
+#ifndef GDP_OSCF_USE_ZEROCONF
+# define GDP_OSCF_USE_ZEROCONF		1	// default to zeroconf on
+#endif
+
+#if GDP_OSCF_USE_ZEROCONF
 #include <avahi-common/simple-watch.h>
 #include <avahi-common/error.h>
 #include <avahi-common/malloc.h>
@@ -47,5 +52,7 @@ int gdp_zc_scan();
 zcinfo_t **gdp_zc_get_infolist();
 char *gdp_zc_addr_str(zcinfo_t **list);
 int gdp_zc_free_infolist(zcinfo_t **list);
+
+#endif // GDP_OSCF_USE_ZEROCONF
 
 /* vim: set noexpandtab : */

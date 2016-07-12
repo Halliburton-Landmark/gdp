@@ -1,4 +1,6 @@
-<!-- Use "pandoc -sS -o README-compiling.html README-compiling.md" to process this to HTML -->
+<!-- Use
+	pandoc -sS -o README-compiling.html README-compiling.md
+to process this to HTML -->
 
 COMPILING THE GLOBAL DATAPLANE SOFTWARE
 =======================================
@@ -98,7 +100,16 @@ so you may have to download other packages from source code.
 
 It's been reported that brew doesn't include Avahi at all, so
 if you are using that package manager you'll probably have to
-compile Avahi for yourself.
+compile Avahi for yourself.  As an alternative, you can
+remove Zeroconf from the compilation entirely using
+`-DGDP_OSCF_USE_ZEROCONF=0`.  The easiest way to do this is
+to build using:
+
+    make STD='-DGDP_OSCF_USER_ZEROCONF=0'
+
+(Using the STD variable is a hack, but it should work.)
+You'll also have to remove references to `gdp_zc_*` from
+`gdp/Makefile`, and `gdp-zc*` from `apps/Makefile`.
 
 ### Red Hat
 

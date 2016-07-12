@@ -228,6 +228,7 @@ _gdp_chan_open(const char *gdp_addr,
 	}
 	else
 	{
+#if GDP_OSCF_USE_ZEROCONF
 		if (ep_adm_getboolparam("swarm.gdp.zeroconf.enable", true))
 		{
 			// zeroconf
@@ -257,6 +258,7 @@ _gdp_chan_open(const char *gdp_addr,
 				}
 			}
 		}
+#endif // GDP_OSCF_USE_ZEROCONF
 		strlcat(abuf,
 				ep_adm_getstrparam("swarm.gdp.routers", "127.0.0.1"),
 				sizeof abuf);
