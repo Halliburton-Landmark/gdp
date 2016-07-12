@@ -1,4 +1,6 @@
-<!-- Use "pandoc -sS -o README-admin.html README-admin.md" to process this to HTML -->
+<!-- Use
+	pandoc -sS -o gdp-server-admin.html gdp-server-admin.md
+to process this to HTML -->
 
 ADMINISTERING GLOBAL DATAPLANE SERVERS
 ======================================
