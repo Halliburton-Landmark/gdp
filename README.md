@@ -17,7 +17,7 @@ compiling from source, see `README-compiling.md`.
 In most cases you will only need the client libraries and
 applications.  Specifically, you do not need to run your own
 routers and log servers.  If you do want to administer your own
-servers, see `README-admin.md`.
+servers, see `doc/gdp-server-admin.md`.
 
 If you are actually doing development on the GDP itself, please
 see `README-developers.md` for more information.
