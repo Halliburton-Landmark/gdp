@@ -87,6 +87,7 @@ case "$OS" in
 	package avahi-daemon
 	package libmosquitto-dev
 	package mosquitto-clients
+	package pandoc
 	;;
 
     "darwin")
@@ -111,12 +112,14 @@ case "$OS" in
 	package openssl
 	package lighttpd
 	package jansson
-	package avahi
+	package pandoc
 	if [ "$pkgmgr" = "brew" ]
 	then
 		package mosquitto
+		warn "Homebrew doesn't support Avahi: install by hand"
 	else
-		warn "Warning: you must install mosquitto by hand"
+		package avahi
+		warn "Macports doesn't support Mosquitto: install by hand"
 	fi
 	;;
 
@@ -127,6 +130,7 @@ case "$OS" in
 	package jansson
 	package avahi
 	package mosquitto
+	package hs-pandoc
 	;;
 
     "gentoo" | "redhat")
@@ -136,6 +140,7 @@ case "$OS" in
 	package jansson-devel
 	package avahi-devel
 	package mosquitto
+	warn "Yum doesn't support Pandoc: install by hand"
 	;;
 
     "centos")
@@ -146,6 +151,7 @@ case "$OS" in
 	package jansson-devel
 	package avahi-devel
 	package mosquitto
+	package pandoc
 	;;
 
     *)
