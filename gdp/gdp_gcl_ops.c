@@ -699,11 +699,11 @@ fail0:
 
 
 /*
-**  _GDP_GCL_NEWEXTENT --- create a new physical extent for a log
+**  _GDP_GCL_NEWSEGMENT --- create a new physical segment for a log
 */
 
 EP_STAT
-_gdp_gcl_newextent(gdp_gcl_t *gcl,
+_gdp_gcl_newsegment(gdp_gcl_t *gcl,
 		gdp_chan_t *chan,
 		uint32_t reqflags)
 {
@@ -711,7 +711,7 @@ _gdp_gcl_newextent(gdp_gcl_t *gcl,
 	gdp_req_t *req;
 
 	GDP_ASSERT_GOOD_GCL(gcl);
-	estat = _gdp_req_new(GDP_CMD_NEWEXTENT, gcl, chan, NULL, reqflags, &req);
+	estat = _gdp_req_new(GDP_CMD_NEWSEGMENT, gcl, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	estat = _gdp_invoke(req);

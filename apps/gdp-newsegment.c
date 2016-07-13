@@ -1,7 +1,7 @@
 /* vim: set ai sw=4 sts=4 ts=4 : */
 
 /*
-**  GDP-NEWEXTENT --- create a new extent in an existing GCL
+**  GDP-NEWSEGMENT --- create a new segment in an existing GCL
 **
 **	----- BEGIN LICENSE BLOCK -----
 **	Applications for the Global Data Plane
@@ -103,9 +103,9 @@ main(int argc, char **argv)
 	estat = gdp_gcl_open(gcliname, GDP_MODE_AO, NULL, &gcl);
 	EP_STAT_CHECK(estat, goto fail1);
 
-	// create new extent
-	phase = "create new extent for";
-	estat = gdp_gcl_newextent(gcl);
+	// create new segment
+	phase = "create new segment for";
+	estat = gdp_gcl_newsegment(gcl);
 	EP_STAT_CHECK(estat, goto fail1);
 
 	// close GCLs / release resources

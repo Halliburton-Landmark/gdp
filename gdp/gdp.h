@@ -251,8 +251,8 @@ extern EP_STAT	gdp_gcl_getmetadata(
 					gdp_gcl_t *gcl,			// GCL handle
 					gdp_gclmd_t **gmdp);	// out-param for metadata
 
-// create new extent
-extern EP_STAT	gdp_gcl_newextent(
+// create new log segment
+extern EP_STAT	gdp_gcl_newsegment(
 					gdp_gcl_t *gcl);		// GCL handle
 
 // set append filter

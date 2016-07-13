@@ -207,7 +207,7 @@ EP_PRFLAGS_DESC	RecordFlags[] =
 
 
 int
-show_record(extent_record_t *rec, FILE *dfp, size_t *foffp, int plev)
+show_record(segment_record_t *rec, FILE *dfp, size_t *foffp, int plev)
 {
 	rec->recno = ep_net_ntoh64(rec->recno);
 	ep_net_ntoh_timespec(&rec->timestamp);
@@ -326,16 +326,16 @@ open_index(const char *index_filename, struct stat *st, index_header_t *phdr)
 gdp_recno_t
 show_index_header(const char *index_filename,
 		int plev,
-		int *min_extent,
-		int *max_extent)
+		int *min_segment,
+		int *max_segment)
 {
 	struct stat st;
 	index_entry_t xent;
 	index_header_t index_header;
 	FILE *index_fp = open_index(index_filename, &st, &index_header);
 
-	*min_extent = 0;
-	*max_extent = 0;
+	*min_segment = 0;
+	*max_segment = 0;
 
 	if (index_fp == NULL)
 		return -1;
@@ -365,11 +365,11 @@ show_index_header(const char *index_filename,
 	}
 	else
 	{
-		*min_extent = ep_net_ntoh32(xent.extent);
+		*min_segment = ep_net_ntoh32(xent.segment);
 	}
 
 	// get info from the last record
-	*max_extent = *min_extent;
+	*max_segment = *min_segment;
 	if (fseek(index_fp, st.st_size - SIZEOF_INDEX_RECORD, SEEK_SET) < 0)
 	{
 		printf("show_index_header: cannot seek (2)\n");
@@ -380,7 +380,7 @@ show_index_header(const char *index_filename,
 	}
 	else
 	{
-		*max_extent = ep_net_ntoh32(xent.extent);
+		*max_segment = ep_net_ntoh32(xent.segment);
 	}
 
 	if (plev > 1)
@@ -390,12 +390,12 @@ show_index_header(const char *index_filename,
 				index_header.magic, index_header.version,
 				index_header.header_size, index_header.min_recno);
 
-		printf("\tfirst extent %d, last recno %" PRIgdp_recno
-				" offset %jd extent %d reserved %x\n",
-				*min_extent,
+		printf("\tfirst segment %d, last recno %" PRIgdp_recno
+				" offset %jd segment %d reserved %x\n",
+				*min_segment,
 				ep_net_ntoh64(xent.recno),
 				(intmax_t) ep_net_ntoh64(xent.offset),
-				ep_net_ntoh32(xent.extent),
+				ep_net_ntoh32(xent.segment),
 				ep_net_ntoh32(xent.reserved));
 	}
 done:
@@ -447,12 +447,12 @@ show_index_contents(const char *gcl_dir_name, gdp_name_t gcl_name, int plev)
 			break;
 		index_entry.recno = ep_net_ntoh64(index_entry.recno);
 		index_entry.offset = ep_net_ntoh64(index_entry.offset);
-		index_entry.extent = ep_net_ntoh32(index_entry.extent);
+		index_entry.segment = ep_net_ntoh32(index_entry.segment);
 		index_entry.reserved = ep_net_ntoh32(index_entry.reserved);
 
-		printf("\trecno %" PRIgdp_recno ", extent %" PRIu32
+		printf("\trecno %" PRIgdp_recno ", segment %" PRIu32
 				", offset %" PRIu64 ", reserved %" PRIu32 "\n",
-				index_entry.recno, index_entry.extent,
+				index_entry.recno, index_entry.segment,
 				index_entry.offset, index_entry.reserved);
 	}
 	fclose(index_fp);
@@ -461,7 +461,7 @@ show_index_contents(const char *gcl_dir_name, gdp_name_t gcl_name, int plev)
 
 
 int
-show_extent(const char *gcl_dir_name,
+show_segment(const char *gcl_dir_name,
 		gdp_name_t gcl_name,
 		int extno,
 		bool shadow,
@@ -469,25 +469,25 @@ show_extent(const char *gcl_dir_name,
 {
 	gdp_pname_t gcl_pname;
 	int istat = 0;
-	char extent_str[20];
+	char segment_str[20];
 
 	(void) gdp_printable_name(gcl_name, gcl_pname);
-	snprintf(extent_str, sizeof extent_str, "-%06d", extno);
+	snprintf(segment_str, sizeof segment_str, "-%06d", extno);
 
 	// Add 5 in the middle for '/_xx/'
 	int filename_size = strlen(gcl_dir_name) + 5 + strlen(gcl_pname) +
-			strlen(extent_str) + strlen(GCL_LDF_SUFFIX) + 1;
+			strlen(segment_str) + strlen(GCL_LDF_SUFFIX) + 1;
 	char *filename = alloca(filename_size);
 
 	snprintf(filename, filename_size,
 			"%s/_%02x/%s%s%s",
-			gcl_dir_name, gcl_name[0], gcl_pname, extent_str, GCL_LDF_SUFFIX);
+			gcl_dir_name, gcl_name[0], gcl_pname, segment_str, GCL_LDF_SUFFIX);
 	ep_dbg_cprintf(Dbg, 6, "Reading %s\n\n", filename);
 
 	FILE *data_fp = fopen(filename, "r");
 	if (data_fp == NULL && extno == 0)
 	{
-		// try again without extent
+		// try again without segment
 		snprintf(filename, filename_size,
 				"%s/_%02x/%s%s",
 				gcl_dir_name, gcl_name[0], gcl_pname, GCL_LDF_SUFFIX);
@@ -503,8 +503,8 @@ show_extent(const char *gcl_dir_name,
 	}
 
 	size_t file_offset = 0;
-	extent_header_t log_header;
-	extent_record_t record;
+	segment_header_t log_header;
+	segment_record_t record;
 	if (fread(&log_header, sizeof log_header, 1, data_fp) != 1)
 	{
 		fprintf(stderr, "fread() failed while reading log_header, ferror = %d\n",
@@ -518,7 +518,7 @@ show_extent(const char *gcl_dir_name,
 	log_header.reserved1 = ep_net_ntoh32(log_header.reserved1);
 	log_header.n_md_entries = ep_net_ntoh16(log_header.n_md_entries);
 	log_header.log_type = ep_net_ntoh16(log_header.log_type);
-	log_header.extent = ep_net_ntoh32(log_header.extent);
+	log_header.segment = ep_net_ntoh32(log_header.segment);
 	log_header.reserved2 = ep_net_ntoh64(log_header.reserved2);
 	log_header.recno_offset = ep_net_ntoh64(log_header.recno_offset);
 
@@ -526,11 +526,11 @@ show_extent(const char *gcl_dir_name,
 	{
 		gdp_pname_t pname;
 
-		printf("\n    =============== Extent %d ===============\n", extno);
-		printf("\textent %d magic 0x%08" PRIx32
+		printf("\n    =============== Segment %d ===============\n", extno);
+		printf("\tsegment %d magic 0x%08" PRIx32
 				", version %" PRIi32
 				", type %" PRIi16 "\n",
-				log_header.extent, log_header.magic,
+				log_header.segment, log_header.magic,
 				log_header.version, log_header.log_type);
 		printf("\tname %s\n",
 				gdp_printable_name(log_header.gname, pname));
@@ -583,9 +583,9 @@ show_gcl(const char *gcl_dir_name, gdp_name_t gcl_name, int plev)
 {
 	gdp_pname_t gcl_pname;
 	gdp_recno_t max_recno;
-	int extent;
-	int min_extent;
-	int max_extent;
+	int segment;
+	int min_segment;
+	int max_segment;
 	int istat = 0;
 
 	(void) gdp_printable_name(gcl_name, gcl_pname);
@@ -605,24 +605,24 @@ show_gcl(const char *gcl_dir_name, gdp_name_t gcl_name, int plev)
 			"%s/_%02x/%s%s",
 			gcl_dir_name, gcl_name[0], gcl_pname, GCL_LXF_SUFFIX);
 	max_recno = show_index_header(filename, 0,
-						&min_extent, &max_extent);
+						&min_segment, &max_segment);
 	printf("\t%" PRIgdp_recno " recs\n", max_recno - 1);
 
 	if (plev <= 1)
 	{
 		plev = 0;			// arrange to get external ID only
-		for (extent = min_extent; extent <= max_extent; extent++)
+		for (segment = min_segment; segment <= max_segment; segment++)
 		{
-			istat = show_extent(gcl_dir_name, gcl_name, extent, true, plev);
+			istat = show_segment(gcl_dir_name, gcl_name, segment, true, plev);
 			if (istat != EX_NOINPUT)
 				break;
 		}
 		return 0;
 	}
 
-	for (extent = min_extent; extent <= max_extent; extent++)
-		istat = show_extent(gcl_dir_name, gcl_name, extent, false, plev);
-	(void) show_extent(gcl_dir_name, gcl_name, extent, true, plev);
+	for (segment = min_segment; segment <= max_segment; segment++)
+		istat = show_segment(gcl_dir_name, gcl_name, segment, false, plev);
+	(void) show_segment(gcl_dir_name, gcl_name, segment, true, plev);
 
 	if (plev >= 5)
 	{
@@ -683,7 +683,7 @@ list_gcls(const char *gcl_dir_name, int plev)
 			// strip off the ".data"
 			*p = '\0';
 
-			// strip off extent number if it exists
+			// strip off segment number if it exists
 			if (strlen(dent->d_name) > GDP_GCL_PNAME_LEN &&
 					dent->d_name[GDP_GCL_PNAME_LEN] == '-')
 				dent->d_name[GDP_GCL_PNAME_LEN] = '\0';

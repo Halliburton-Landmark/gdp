@@ -506,16 +506,16 @@ gdp_gcl_getmetadata(gdp_gcl_t *gcl,
 
 
 /*
-**  GDP_GCL_NEWEXTENT --- create new extent for GCL
+**  GDP_GCL_NEWSEGMENT --- create new segment for GCL
 **
 **		This should only be invoked by a service and with appropriate
 **		authorization.
 */
 
 EP_STAT
-gdp_gcl_newextent(gdp_gcl_t *gcl)
+gdp_gcl_newsegment(gdp_gcl_t *gcl)
 {
-	return _gdp_gcl_newextent(gcl, _GdpChannel, 0);
+	return _gdp_gcl_newsegment(gcl, _GdpChannel, 0);
 }
 
 

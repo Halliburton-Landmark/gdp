@@ -1,6 +1,6 @@
 gcl-create
 gdp-name-xlate
-gdp-newextent
+gdp-newsegment
 gdp-rest
 gdp-reader
 gdp-writer

@@ -37,7 +37,7 @@ BINALL=		gcl-create \
 SBINALL=	gdp-rest \
 		log-view \
 		gdp-name-xlate \
-		gdp-newextent \
+		gdp-newsegment \
 		gdp-zcpublish \
 
 MAN1ALL=	gdp-reader.1 \
@@ -133,8 +133,8 @@ log-view:	log-view.o
 gdp-name-xlate:	gdp-name-xlate.o
 	$(CC) -o $@ gdp-name-xlate.o $(LDFLAGS)
 
-gdp-newextent:	gdp-newextent.o
-	$(CC) -o $@ gdp-newextent.o $(LDFLAGS)
+gdp-newsegment:	gdp-newsegment.o
+	$(CC) -o $@ gdp-newsegment.o $(LDFLAGS)
 
 gdp-zcpublish:	gdp-zcpublish.o
 	$(CC) -o $@ gdp-zcpublish.o $(LDFLAGS)

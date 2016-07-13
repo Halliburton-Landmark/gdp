@@ -56,9 +56,8 @@
 #include <sys/file.h>
 #include <stdint.h>
 
-/* On-disk extents work, but we choose not to use them at this time */
-#define EXTENT_SUPPORT				0	// allow multiple extents
-#define PRE_EXTENT_BACK_COMPAT		1	// handle pre-extent on disk format
+#define SEGMENT_SUPPORT				1	// allow multiple segments
+#define PRE_SEGMENT_BACK_COMPAT		1	// handle pre-segment on disk format
 
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.physlog", "GDP Log Daemon Physical Log");
@@ -135,7 +134,7 @@ disk_init()
 
 static EP_STAT
 get_gcl_path(gdp_gcl_t *gcl,
-		int extent,
+		int segment,
 		const char *sfx,
 		char *pbuf,
 		int pbufsiz)
@@ -144,23 +143,23 @@ get_gcl_path(gdp_gcl_t *gcl,
 	gdp_pname_t pname;
 	int i;
 	struct stat st;
-	char extent_str[20] = "";
+	char segment_str[20] = "";
 
 	EP_ASSERT_POINTER_VALID(gcl);
 
 	errno = 0;
 	gdp_printable_name(gcl->name, pname);
 
-#if EXTENT_SUPPORT
-	if (extent >= 0)
+#if SEGMENT_SUPPORT
+	if (segment >= 0)
 	{
-		snprintf(extent_str, sizeof extent_str, "-%06d", extent);
+		snprintf(segment_str, sizeof segment_str, "-%06d", segment);
 	}
 
-#if PRE_EXTENT_BACK_COMPAT
-	if (extent == 0)
+#if PRE_SEGMENT_BACK_COMPAT
+	if (segment == 0)
 	{
-		// try file without extent number
+		// try file without segment number
 		i = snprintf(pbuf, pbufsiz, "%s/_%02x/%s%s",
 				GCLDir, gcl->name[0], pname, sfx);
 		if (i >= pbufsiz)
@@ -168,12 +167,12 @@ get_gcl_path(gdp_gcl_t *gcl,
 		if (stat(pbuf, &st) >= 0)
 		{
 			// OK, old style name exists
-			extent = -1;
-			strlcpy(extent_str, "", sizeof extent_str);
+			segment = -1;
+			strlcpy(segment_str, "", sizeof segment_str);
 		}
 	}
-#endif // PRE_EXTENT_BACK_COMPAT
-#endif // EXTENT_SUPPORT
+#endif // PRE_SEGMENT_BACK_COMPAT
+#endif // SEGMENT_SUPPORT
 
 	// find the subdirectory based on the first part of the name
 	i = snprintf(pbuf, pbufsiz, "%s/_%02x", GCLDir, gcl->name[0]);
@@ -195,7 +194,7 @@ get_gcl_path(gdp_gcl_t *gcl,
 
 	// now return the final complete name
 	i = snprintf(pbuf, pbufsiz, "%s/_%02x/%s%s%s",
-				GCLDir, gcl->name[0], pname, extent_str, sfx);
+				GCLDir, gcl->name[0], pname, segment_str, sfx);
 	if (i < pbufsiz)
 		return EP_STAT_OK;
 
@@ -222,159 +221,159 @@ fail0:
 
 
 /*
-**  Allocate and free a new in-memory extent.  Does not touch disk.
+**  Allocate and free a new in-memory segment.  Does not touch disk.
 */
 
-static extent_t *
-extent_alloc(uint32_t extno)
+static segment_t *
+segment_alloc(uint32_t segno)
 {
-	extent_t *ext = ep_mem_zalloc(sizeof *ext);
+	segment_t *seg = ep_mem_zalloc(sizeof *seg);
 
-	ext->extno = extno;
+	seg->segno = segno;
 
-	return ext;
+	return seg;
 }
 
 static void
-extent_free(extent_t *ext)
+segment_free(segment_t *seg)
 {
-	if (ext == NULL)
+	if (seg == NULL)
 		return;
-	ep_dbg_cprintf(Dbg, 41, "extent_free: closing fp @ %p (extent %d)\n",
-			ext->fp, ext->extno);
-	if (ext->fp != NULL && fclose(ext->fp) < 0)
-		(void) posix_error(errno, "extent_free: fclose (extent %d)",
-						ext->extno);
-	ext->fp = NULL;
-	ep_mem_free(ext);
+	ep_dbg_cprintf(Dbg, 41, "segment_free: closing fp @ %p (segment %d)\n",
+			seg->fp, seg->segno);
+	if (seg->fp != NULL && fclose(seg->fp) < 0)
+		(void) posix_error(errno, "segment_free: fclose (segment %d)",
+						seg->segno);
+	seg->fp = NULL;
+	ep_mem_free(seg);
 }
 
 
 /*
-**  Print an extent for debugging.
+**  Print a segment for debugging.
 */
 
 static void
-extent_dump(extent_t *ext, FILE *fp)
+segment_dump(segment_t *seg, FILE *fp)
 {
-	fprintf(fp, "Extent %d @ %p:\n", ext->extno, ext);
+	fprintf(fp, "Segment %d @ %p:\n", seg->segno, seg);
 	fprintf(fp, "\tfp %p, ver %d, hsize %zd\n",
-			ext->fp, ext->ver, ext->header_size);
+			seg->fp, seg->ver, seg->header_size);
 	fprintf(fp, "\trecno_offset %" PRIgdp_recno ", max_offset %jd\n",
-			ext->recno_offset, (intmax_t) ext->max_offset);
+			seg->recno_offset, (intmax_t) seg->max_offset);
 }
 
 
 /*
-**  EXTENT_OPEN --- physically open an extent
+**  SEGMENT_OPEN --- physically open a segment
 **
-**		The caller allocates and passes in the new extent.
+**		The caller allocates and passes in the new segment.
 */
 
 static EP_STAT
-extent_open(gdp_gcl_t *gcl, extent_t *ext)
+segment_open(gdp_gcl_t *gcl, segment_t *seg)
 {
 	EP_STAT estat;
 	FILE *data_fp;
 	char data_pbuf[GCL_PATH_MAX];
 
-	ep_dbg_cprintf(Dbg, 20, "extent_open(ext %d, fp %p)\n",
-			ext->extno, ext->fp);
+	ep_dbg_cprintf(Dbg, 20, "segment_open(seg %d, fp %p)\n",
+			seg->segno, seg->fp);
 
 	// if already open, this is a no-op
-	if (ext->fp != NULL)
+	if (seg->fp != NULL)
 		return EP_STAT_OK;
 
-	// figure out where the extent lives on disk
+	// figure out where the segment lives on disk
 	//XXX for the moment assume that it's on our local disk
-	estat = get_gcl_path(gcl, ext->extno, GCL_LDF_SUFFIX,
+	estat = get_gcl_path(gcl, seg->segno, GCL_LDF_SUFFIX,
 					data_pbuf, sizeof data_pbuf);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// do the physical open
 	{
-		//XXX should open read only if this extent is now frozen
+		//XXX should open read only if this segment is now frozen
 		int fd = open(data_pbuf, O_RDWR | O_APPEND);
 
 		if (fd < 0 || flock(fd, LOCK_SH) < 0 ||
 				(data_fp = fdopen(fd, "a+")) == NULL)
 		{
 			estat = ep_stat_from_errno(errno);
-			ep_dbg_cprintf(Dbg, 6, "extent_open(%s): %s\n",
+			ep_dbg_cprintf(Dbg, 6, "segment_open(%s): %s\n",
 					data_pbuf, strerror(errno));
 			if (fd >= 0)
 				close(fd);
 			goto fail0;
 		}
-		ep_dbg_cprintf(Dbg, 20, "extent_open(%s) OK\n", data_pbuf);
+		ep_dbg_cprintf(Dbg, 20, "segment_open(%s) OK\n", data_pbuf);
 	}
 
-	// read in the extent header
-	extent_header_t ext_hdr;
+	// read in the segment header
+	segment_header_t seg_hdr;
 	rewind(data_fp);
-	if (fread(&ext_hdr, sizeof ext_hdr, 1, data_fp) < 1)
+	if (fread(&seg_hdr, sizeof seg_hdr, 1, data_fp) < 1)
 	{
 		estat = ep_stat_from_errno(errno);
-		ep_log(estat, "extent_open(%s): header read failure", data_pbuf);
+		ep_log(estat, "segment_open(%s): header read failure", data_pbuf);
 		goto fail1;
 	}
 
 	// convert on-disk format from network to host byte order
-	ext_hdr.magic = ep_net_ntoh32(ext_hdr.magic);
-	ext_hdr.version = ep_net_ntoh32(ext_hdr.version);
-	ext_hdr.header_size = ep_net_ntoh32(ext_hdr.header_size);
-	ext_hdr.n_md_entries = ep_net_ntoh16(ext_hdr.n_md_entries);
-	ext_hdr.log_type = ep_net_ntoh16(ext_hdr.log_type);
-	ext_hdr.recno_offset = ep_net_ntoh64(ext_hdr.recno_offset);
+	seg_hdr.magic = ep_net_ntoh32(seg_hdr.magic);
+	seg_hdr.version = ep_net_ntoh32(seg_hdr.version);
+	seg_hdr.header_size = ep_net_ntoh32(seg_hdr.header_size);
+	seg_hdr.n_md_entries = ep_net_ntoh16(seg_hdr.n_md_entries);
+	seg_hdr.log_type = ep_net_ntoh16(seg_hdr.log_type);
+	seg_hdr.recno_offset = ep_net_ntoh64(seg_hdr.recno_offset);
 
-	// validate the extent header
-	if (ext_hdr.magic != GCL_LDF_MAGIC)
+	// validate the segment header
+	if (seg_hdr.magic != GCL_LDF_MAGIC)
 	{
 		estat = GDP_STAT_CORRUPT_GCL;
-		ep_log(estat, "extent_open(%s): bad magic: found: 0x%" PRIx32
+		ep_log(estat, "segment_open(%s): bad magic: found: 0x%" PRIx32
 				", expected: 0x%" PRIx32 "\n",
 				data_pbuf,
-				ext_hdr.magic, GCL_LDF_MAGIC);
+				seg_hdr.magic, GCL_LDF_MAGIC);
 		goto fail1;
 	}
 
-	if (ext_hdr.version < GCL_LDF_MINVERS ||
-			ext_hdr.version > GCL_LDF_MAXVERS)
+	if (seg_hdr.version < GCL_LDF_MINVERS ||
+			seg_hdr.version > GCL_LDF_MAXVERS)
 	{
 		estat = GDP_STAT_GCL_VERSION_MISMATCH;
-		ep_log(estat, "extent_open(%s): bad version: found: %" PRId32
+		ep_log(estat, "segment_open(%s): bad version: found: %" PRId32
 				", expected: %" PRIx32 "-%" PRId32 "\n",
 				data_pbuf,
-				ext_hdr.version, GCL_LDF_MINVERS, GCL_LDF_MAXVERS);
+				seg_hdr.version, GCL_LDF_MINVERS, GCL_LDF_MAXVERS);
 		goto fail1;
 	}
 
-	// now we can interpret the data (for the extent)
-	ext->header_size = ext_hdr.header_size;
-	ext->recno_offset = ext_hdr.recno_offset;
-	ext->fp = data_fp;
-	ext->ver = ext_hdr.version;
-	ext->max_offset = fsizeof(data_fp);
+	// now we can interpret the data (for the segment)
+	seg->header_size = seg_hdr.header_size;
+	seg->recno_offset = seg_hdr.recno_offset;
+	seg->fp = data_fp;
+	seg->ver = seg_hdr.version;
+	seg->max_offset = fsizeof(data_fp);
 
 	// interpret data (for the entire log)
-	gcl->x->log_type = ext_hdr.log_type;
+	gcl->x->log_type = seg_hdr.log_type;
 	if (gcl->gclmd != NULL)
 	{
 		// we've already read the metadata; no need to do it again
 		goto success;
 	}
 
-	gcl->x->n_md_entries = ext_hdr.n_md_entries;
+	gcl->x->n_md_entries = seg_hdr.n_md_entries;
 
 	// read metadata entries
-	if (ext_hdr.n_md_entries > 0)
+	if (seg_hdr.n_md_entries > 0)
 	{
 		int mdtotal = 0;
 		void *md_data;
 		int i;
 
-		gcl->gclmd = gdp_gclmd_new(ext_hdr.n_md_entries);
-		for (i = 0; i < ext_hdr.n_md_entries; i++)
+		gcl->gclmd = gdp_gclmd_new(seg_hdr.n_md_entries);
+		for (i = 0; i < seg_hdr.n_md_entries; i++)
 		{
 			uint32_t md_id;
 			uint32_t md_len;
@@ -404,13 +403,13 @@ extent_open(gdp_gcl_t *gcl, extent_t *ext)
 success:
 	if (ep_dbg_test(Dbg, 20))
 	{
-		ep_dbg_printf("extent_open: ");
-		extent_dump(ext, ep_dbg_getfile());
+		ep_dbg_printf("segment_open: ");
+		segment_dump(seg, ep_dbg_getfile());
 	}
 	return estat;
 
 fail1:
-	ep_dbg_cprintf(Dbg, 10, "extent_open: closing fp %p (error)\n", data_fp);
+	ep_dbg_cprintf(Dbg, 10, "segment_open: closing fp %p (error)\n", data_fp);
 	fclose(data_fp);
 fail0:
 	EP_ASSERT_ENSURE(!EP_STAT_ISOK(estat));
@@ -419,116 +418,116 @@ fail0:
 
 
 void
-extent_close(gdp_gcl_t *gcl, uint32_t extno)
+segment_close(gdp_gcl_t *gcl, uint32_t segno)
 {
 	gcl_physinfo_t *phys = GETPHYS(gcl);
-	extent_t *ext;
+	segment_t *seg;
 
-	if (phys->extents == NULL ||
-			phys->nextents < extno ||
-			(ext = phys->extents[extno]) == NULL)
+	if (phys->segments == NULL ||
+			phys->nsegments < segno ||
+			(seg = phys->segments[segno]) == NULL)
 	{
 		// nothing to do
 		return;
 	}
-	if (ext->fp != NULL)
+	if (seg->fp != NULL)
 	{
-		ep_dbg_cprintf(Dbg, 39, "extent_close: closing extent fp %p\n",
-				ext->fp);
-		if (fclose(ext->fp) != 0)
-			(void) posix_error(errno, "extent_close: cannot fclose");
-		ext->fp = NULL;
+		ep_dbg_cprintf(Dbg, 39, "segment_close: closing segment fp %p\n",
+				seg->fp);
+		if (fclose(seg->fp) != 0)
+			(void) posix_error(errno, "segment_close: cannot fclose");
+		seg->fp = NULL;
 	}
-	ep_mem_free(ext);
-	phys->extents[extno] = NULL;
+	ep_mem_free(seg);
+	phys->segments[segno] = NULL;
 }
 
 
 /*
-**  Get the in-memory representation of a numbered extent.
+**  Get the in-memory representation of a numbered segment.
 **
 **		This does not open it if it's new, but it does allocate the
 **		memory and makes sure that the physinfo is allocated.
 **
-**		If extno is negative, get any extent (we just need the
+**		If segno is negative, get any segment (we just need the
 **		header information and/or metadata).
 */
 
-static extent_t *
-extent_get(gdp_gcl_t *gcl, int extno)
+static segment_t *
+segment_get(gdp_gcl_t *gcl, int segno)
 {
-	extent_t *ext;
+	segment_t *seg;
 	gcl_physinfo_t *phys = GETPHYS(gcl);
 
-	if (extno < 0)
+	if (segno < 0)
 	{
 		int i;
 
-		for (i = 0; i < phys->nextents; i++)
+		for (i = 0; i < phys->nsegments; i++)
 		{
-			if (phys->extents[i] != NULL)
-				return phys->extents[i];
+			if (phys->segments[i] != NULL)
+				return phys->segments[i];
 		}
 
-		// nothing in memory yet?  OK, go for extent zero
+		// nothing in memory yet?  OK, go for segment zero
 		//XXX really we should do a wildcard to find anything we have
-		extno = 0;
+		segno = 0;
 	}
 
-	// see if we need to expand extent list
-	if (phys->extents == NULL || extno >= phys->nextents)
+	// see if we need to expand segment list
+	if (phys->segments == NULL || segno >= phys->nsegments)
 	{
-		// not enough space for extent pointers allocated
-		EP_ASSERT(phys->extents != NULL || phys->nextents == 0);
-		phys->extents = ep_mem_realloc(phys->extents, 
-							(extno + 1) * sizeof phys->extents[0]);
-		memset(&phys->extents[phys->nextents], 0,
-				(extno + 1 - phys->nextents) * sizeof phys->extents[0]);
-		phys->nextents = extno + 1;
+		// not enough space for segment pointers allocated
+		EP_ASSERT(phys->segments != NULL || phys->nsegments == 0);
+		phys->segments = ep_mem_realloc(phys->segments, 
+							(segno + 1) * sizeof phys->segments[0]);
+		memset(&phys->segments[phys->nsegments], 0,
+				(segno + 1 - phys->nsegments) * sizeof phys->segments[0]);
+		phys->nsegments = segno + 1;
 	}
 
-	ext = phys->extents[extno];
-	if (ext == NULL)
+	seg = phys->segments[segno];
+	if (seg == NULL)
 	{
-		// allocate space for new extent
-		phys->extents[extno] = ext = extent_alloc(extno);
+		// allocate space for new segment
+		phys->segments[segno] = seg = segment_alloc(segno);
 	}
 
-	EP_ASSERT_ENSURE(ext != NULL);
-	return ext;
+	EP_ASSERT_ENSURE(seg != NULL);
+	return seg;
 }
 
 
 /*
-**  EXTENT_CREATE --- create a new extent on disk
+**  SEGMENT_CREATE --- create a new segment on disk
 */
 
 static EP_STAT
-extent_create(gdp_gcl_t *gcl,
+segment_create(gdp_gcl_t *gcl,
 		gdp_gclmd_t *gmd,
-		uint32_t extno,
+		uint32_t segno,
 		gdp_recno_t recno_offset)
 {
 	EP_STAT estat = EP_STAT_OK;
 	FILE *data_fp = NULL;
-	extent_t *ext;
+	segment_t *seg;
 
-	ep_dbg_cprintf(Dbg, 10, "extent_create(%s, %d)\n",
-			gcl->pname, extno);
+	ep_dbg_cprintf(Dbg, 10, "segment_create(%s, %d)\n",
+			gcl->pname, segno);
 
 	// this will allocate memory, but leave the disk untouched
-	ext = extent_get(gcl, extno);
+	seg = segment_get(gcl, segno);
 
 	// create a file node representing the gcl
 	{
 		int data_fd;
 		char data_pbuf[GCL_PATH_MAX];
 
-		estat = get_gcl_path(gcl, extno, GCL_LDF_SUFFIX,
+		estat = get_gcl_path(gcl, segno, GCL_LDF_SUFFIX,
 						data_pbuf, sizeof data_pbuf);
 		EP_STAT_CHECK(estat, goto fail1);
 
-		ep_dbg_cprintf(Dbg, 20, "extent_create: creating %s\n", data_pbuf);
+		ep_dbg_cprintf(Dbg, 20, "segment_create: creating %s\n", data_pbuf);
 		data_fd = open(data_pbuf, O_RDWR | O_CREAT | O_APPEND | O_EXCL, 0644);
 		if (data_fd < 0 || (flock(data_fd, LOCK_EX) < 0))
 		{
@@ -536,7 +535,7 @@ extent_create(gdp_gcl_t *gcl,
 
 			estat = ep_stat_from_errno(errno);
 			strerror_r(errno, nbuf, sizeof nbuf);
-			ep_log(estat, "extent_create: cannot create %s: %s",
+			ep_log(estat, "segment_create: cannot create %s: %s",
 					data_pbuf, nbuf);
 			if (data_fd >= 0)
 				close(data_fd);
@@ -549,28 +548,28 @@ extent_create(gdp_gcl_t *gcl,
 
 			estat = ep_stat_from_errno(errno);
 			strerror_r(errno, nbuf, sizeof nbuf);
-			ep_log(estat, "extent_create: cannot fdopen %s: %s",
+			ep_log(estat, "segment_create: cannot fdopen %s: %s",
 					data_pbuf, nbuf);
 			(void) close(data_fd);
 			goto fail1;
 		}
 	}
 
-	// write the extent header
+	// write the segment header
 	{
-		extent_header_t ext_hdr;
+		segment_header_t seg_hdr;
 		size_t metadata_size = 0;
 
 		if (gmd == NULL)
 		{
-			ext_hdr.n_md_entries = 0;
+			seg_hdr.n_md_entries = 0;
 		}
 		else
 		{
 			// allow space for id and length fields
 			metadata_size = gmd->nused * 2 * sizeof (uint32_t);
 			gcl->x->n_md_entries = gmd->nused;
-			ext_hdr.n_md_entries = ep_net_hton16(gmd->nused);
+			seg_hdr.n_md_entries = ep_net_hton16(gmd->nused);
 
 			// compute the space needed for the data fields
 			int i;
@@ -578,24 +577,24 @@ extent_create(gdp_gcl_t *gcl,
 				metadata_size += gmd->mds[i].md_len;
 		}
 
-		EP_ASSERT_POINTER_VALID(ext);
+		EP_ASSERT_POINTER_VALID(seg);
 
-		ext->ver = GCL_LDF_VERSION;
-		ext->extno = extno;
-		ext->header_size = ext->max_offset = sizeof ext_hdr + metadata_size;
-		ext->recno_offset = 0;
+		seg->ver = GCL_LDF_VERSION;
+		seg->segno = segno;
+		seg->header_size = seg->max_offset = sizeof seg_hdr + metadata_size;
+		seg->recno_offset = 0;
 
-		ext_hdr.magic = ep_net_hton32(GCL_LDF_MAGIC);
-		ext_hdr.version = ep_net_hton32(GCL_LDF_VERSION);
-		ext_hdr.header_size = ep_net_ntoh32(ext->max_offset);
-		ext_hdr.reserved1 = 0;
-		ext_hdr.log_type = ep_net_hton16(0);		// unused for now
-		ext_hdr.extent = ep_net_hton32(extno);
-		ext_hdr.reserved2 = 0;
-		memcpy(ext_hdr.gname, gcl->name, sizeof ext_hdr.gname);
-		ext_hdr.recno_offset = ep_net_hton64(recno_offset);
+		seg_hdr.magic = ep_net_hton32(GCL_LDF_MAGIC);
+		seg_hdr.version = ep_net_hton32(GCL_LDF_VERSION);
+		seg_hdr.header_size = ep_net_ntoh32(seg->max_offset);
+		seg_hdr.reserved1 = 0;
+		seg_hdr.log_type = ep_net_hton16(0);		// unused for now
+		seg_hdr.segment = ep_net_hton32(segno);
+		seg_hdr.reserved2 = 0;
+		memcpy(seg_hdr.gname, gcl->name, sizeof seg_hdr.gname);
+		seg_hdr.recno_offset = ep_net_hton64(recno_offset);
 
-		fwrite(&ext_hdr, sizeof ext_hdr, 1, data_fp);
+		fwrite(&seg_hdr, sizeof seg_hdr, 1, data_fp);
 	}
 
 	// write metadata
@@ -628,17 +627,17 @@ extent_create(gdp_gcl_t *gcl,
 
 	// success!
 	fflush(data_fp);
-	ext->fp = data_fp;
+	seg->fp = data_fp;
 	flock(fileno(data_fp), LOCK_UN);
-	ep_dbg_cprintf(Dbg, 10, "Created GCL Extent %s-%06d\n",
-			gcl->pname, extno);
+	ep_dbg_cprintf(Dbg, 10, "Created GCL Segment %s-%06d\n",
+			gcl->pname, segno);
 	return estat;
 
 fail2:
 	estat = ep_stat_from_errno(errno);
 	if (data_fp != NULL)
 	{
-		ep_dbg_cprintf(Dbg, 20, "extent_create: closing data_fp @ %p\n",
+		ep_dbg_cprintf(Dbg, 20, "segment_create: closing data_fp @ %p\n",
 				data_fp);
 		fclose(data_fp);
 	}
@@ -666,7 +665,7 @@ fail1:
 **  Allocate/Free the in-memory version of the physical representation
 **		of a GCL.
 **
-**		XXX Currently allocates space for the first extent.
+**		XXX Currently allocates space for the first segment.
 **		XXX That should probably be deferred until it is actually
 **			read off of disk.
 */
@@ -679,9 +678,9 @@ physinfo_alloc(gdp_gcl_t *gcl)
 	if (ep_thr_rwlock_init(&phys->lock) != 0)
 		goto fail1;
 
-	//XXX Need to figure out how many extents exist
+	//XXX Need to figure out how many segments exist
 	//XXX This is just for transition.
-	phys->nextents = 0;
+	phys->nsegments = 0;
 
 	return phys;
 
@@ -694,7 +693,7 @@ fail1:
 static void
 physinfo_free(gcl_physinfo_t *phys)
 {
-	uint32_t extno;
+	uint32_t segno;
 
 	if (phys == NULL)
 		return;
@@ -708,14 +707,14 @@ physinfo_free(gcl_physinfo_t *phys)
 		phys->index.fp = NULL;
 	}
 
-	for (extno = 0; extno < phys->nextents; extno++)
+	for (segno = 0; segno < phys->nsegments; segno++)
 	{
-		if (phys->extents[extno] != NULL)
-			extent_free(phys->extents[extno]);
-		phys->extents[extno] = NULL;
+		if (phys->segments[segno] != NULL)
+			segment_free(phys->segments[segno]);
+		phys->segments[segno] = NULL;
 	}
-	ep_mem_free(phys->extents);
-	phys->extents = NULL;
+	ep_mem_free(phys->segments);
+	phys->segments = NULL;
 
 	if (ep_thr_rwlock_destroy(&phys->lock) != 0)
 		(void) posix_error(errno, "physinfo_free: cannot destroy rwlock");
@@ -728,27 +727,27 @@ physinfo_free(gcl_physinfo_t *phys)
 static void
 physinfo_dump(gcl_physinfo_t *phys, FILE *fp)
 {
-	int extno;
+	int segno;
 
 	fprintf(fp, "physinfo @ %p: min_recno %" PRIgdp_recno
 			", max_recno %" PRIgdp_recno "\n",
 			phys, phys->min_recno, phys->max_recno);
-	fprintf(fp, "\tnextents %d, last_extent %d\n",
-			phys->nextents, phys->last_extent);
+	fprintf(fp, "\tnsegments %d, last_segment %d\n",
+			phys->nsegments, phys->last_segment);
 	fprintf(fp, "\tindex: fp %p, min_recno %" PRIgdp_recno
 			", max_offset %jd, header_size %zd\n",
 			phys->index.fp, phys->index.min_recno,
 			(intmax_t) phys->index.max_offset,
 			phys->index.header_size);
 
-	for (extno = 0; extno < phys->nextents; extno++)
+	for (segno = 0; segno < phys->nsegments; segno++)
 	{
-		extent_t *ext = phys->extents[extno];
+		segment_t *seg = phys->segments[segno];
 		fprintf(fp, "    ");
-		if (ext == NULL)
-			fprintf(fp, "Extent %d: NULL\n", extno);
+		if (seg == NULL)
+			fprintf(fp, "Segment %d: NULL\n", segno);
 		else
-			extent_dump(ext, fp);
+			segment_dump(seg, fp);
 	}
 }
 
@@ -796,7 +795,7 @@ disk_create(gdp_gcl_t *gcl, gdp_gclmd_t *gmd)
 	phys = physinfo_alloc(gcl);
 	if (phys == NULL)
 		goto fail1;
-	phys->last_extent = 0;
+	phys->last_segment = 0;
 	gcl->x->physinfo = phys;
 
 	// allocate a name
@@ -805,8 +804,8 @@ disk_create(gdp_gcl_t *gcl, gdp_gclmd_t *gmd)
 		_gdp_gcl_newname(gcl);
 	}
 
-	// create an initial extent for the GCL
-	estat = extent_create(gcl, gmd, 0, 0);
+	// create an initial segment for the GCL
+	estat = segment_create(gcl, gmd, 0, 0);
 
 	// create an offset index for that gcl
 	{
@@ -905,8 +904,8 @@ fail1:
 **			access.
 **		(b) Anything new that comes into the log after it is opened.
 **			To do this we need to read the existing index to find the end.
-**		There is a possibility that there exists a new extent that is
-**		one greater than the last extent mentioned in the index.  We
+**		There is a possibility that there exists a new segment that is
+**		one greater than the last segment mentioned in the index.  We
 **		have to check for that file to be sure.
 */
 
@@ -1013,13 +1012,13 @@ disk_open(gdp_gcl_t *gcl)
 
 	/*
 	**  Index header has been read.
-	**  Find the last extent mentioned in that index.
+	**  Find the last segment mentioned in that index.
 	*/
 
 	phase = "initial index read";
 	if (phys->index.max_offset == 0)
 	{
-		phys->last_extent = 0;
+		phys->last_segment = 0;
 	}
 	else
 	{
@@ -1030,12 +1029,12 @@ disk_open(gdp_gcl_t *gcl)
 		{
 			goto fail0;
 		}
-		phys->last_extent = ep_net_ntoh32(xent.extent);
+		phys->last_segment = ep_net_ntoh32(xent.segment);
 	}
 
-#if EXTENT_SUPPORT
+#if SEGMENT_SUPPORT
 	/*
-	**  Now we have to see if there is another (empty) extent
+	**  Now we have to see if there is another (empty) segment
 	*/
 
 	{
@@ -1043,25 +1042,25 @@ disk_open(gdp_gcl_t *gcl)
 		struct stat stbuf;
 
 		phase = "get_gcl_path(data)";
-		estat = get_gcl_path(gcl, phys->last_extent + 1, GCL_LDF_SUFFIX,
+		estat = get_gcl_path(gcl, phys->last_segment + 1, GCL_LDF_SUFFIX,
 						data_pbuf, sizeof data_pbuf);
 		EP_STAT_CHECK(estat, goto fail0);
 		if (stat(data_pbuf, &stbuf) >= 0)
-			phys->last_extent++;
+			phys->last_segment++;
 	}
-#endif // EXTENT_SUPPORT
+#endif // SEGMENT_SUPPORT
 
 	/*
-	**  We need to physically read at least one extent if only
+	**  We need to physically read at least one segment if only
 	**  to initialize the metadata.
-	**  We choose the last extent on the assumption that new data
+	**  We choose the last segment on the assumption that new data
 	**  is "hotter" than old data.
 	*/
 
-	phase = "extent_get";
+	phase = "segment_get";
 	{
-		extent_t *ext = extent_get(gcl, phys->last_extent);
-		estat = extent_open(gcl, ext);
+		segment_t *seg = segment_get(gcl, phys->last_segment);
+		estat = segment_open(gcl, seg);
 		EP_STAT_CHECK(estat, goto fail0);
 	}
 
@@ -1201,13 +1200,13 @@ disk_read(gdp_gcl_t *gcl,
 		}
 		xent->recno = ep_net_ntoh64(xent->recno);
 		xent->offset = ep_net_ntoh64(xent->offset);
-		xent->extent = ep_net_ntoh32(xent->extent);
+		xent->segment = ep_net_ntoh32(xent->segment);
 		xent->reserved = ep_net_ntoh32(xent->reserved);
 
 		ep_dbg_cprintf(Dbg, 14,
-				"got index entry: recno %" PRIgdp_recno ", extent %" PRIu32
+				"got index entry: recno %" PRIgdp_recno ", segment %" PRIu32
 				", offset=%jd, rsvd=%" PRIu32 "\n",
-				xent->recno, xent->extent,
+				xent->recno, xent->segment,
 				(intmax_t) xent->offset, xent->reserved); 
 
 		if (xent->offset == 0)
@@ -1224,9 +1223,9 @@ fail3:
 
 	// xent now points to the index entry for this record
 
-	// get the open extent
-	extent_t *ext = extent_get(gcl, xent->extent);
-	estat = extent_open(gcl, ext);
+	// get the open segment
+	segment_t *seg = segment_get(gcl, xent->segment);
+	estat = segment_open(gcl, seg);
 	if (!EP_STAT_ISOK(estat))
 	{
 		// if this an ENOENT, it might be because the data is expired
@@ -1237,10 +1236,10 @@ fail3:
 	}
 
 	// read record header
-	extent_record_t log_record;
-	flockfile(ext->fp);
-	if (fseek(ext->fp, xent->offset, SEEK_SET) < 0 ||
-			fread(&log_record, sizeof log_record, 1, ext->fp) < 1)
+	segment_record_t log_record;
+	flockfile(seg->fp);
+	if (fseek(seg->fp, xent->offset, SEEK_SET) < 0 ||
+			fread(&log_record, sizeof log_record, 1, seg->fp) < 1)
 	{
 		ep_dbg_cprintf(Dbg, 1, "gcl_diskread: header fread failed: %s\n",
 				strerror(errno));
@@ -1277,14 +1276,14 @@ fail3:
 	char *phase = "data";
 	while (data_length >= sizeof read_buffer)
 	{
-		if (fread(read_buffer, sizeof read_buffer, 1, ext->fp) < 1)
+		if (fread(read_buffer, sizeof read_buffer, 1, seg->fp) < 1)
 			goto fail2;
 		gdp_buf_write(datum->dbuf, read_buffer, sizeof read_buffer);
 		data_length -= sizeof read_buffer;
 	}
 	if (data_length > 0)
 	{
-		if (fread(read_buffer, data_length, 1, ext->fp) < 1)
+		if (fread(read_buffer, data_length, 1, seg->fp) < 1)
 			goto fail2;
 		gdp_buf_write(datum->dbuf, read_buffer, data_length);
 	}
@@ -1303,7 +1302,7 @@ fail3:
 			datum->sig = gdp_buf_new();
 		else
 			gdp_buf_reset(datum->sig);
-		if (fread(read_buffer, datum->siglen, 1, ext->fp) < 1)
+		if (fread(read_buffer, datum->siglen, 1, seg->fp) < 1)
 			goto fail2;
 		gdp_buf_write(datum->sig, read_buffer, datum->siglen);
 	}
@@ -1318,7 +1317,7 @@ fail2:
 		estat = ep_stat_from_errno(errno);
 	}
 fail1:
-	funlockfile(ext->fp);
+	funlockfile(seg->fp);
 fail0:
 	ep_thr_rwlock_unlock(&phys->lock);
 
@@ -1333,12 +1332,12 @@ static EP_STAT
 disk_append(gdp_gcl_t *gcl,
 			gdp_datum_t *datum)
 {
-	extent_record_t log_record;
+	segment_record_t log_record;
 	int64_t record_size = sizeof log_record;
 	index_entry_t index_entry;
 	size_t dlen;
 	gcl_physinfo_t *phys;
-	extent_t *ext;
+	segment_t *seg;
 	EP_STAT estat = EP_STAT_OK;
 
 	if (ep_dbg_test(Dbg, 14))
@@ -1354,8 +1353,8 @@ disk_append(gdp_gcl_t *gcl,
 
 	ep_thr_rwlock_wrlock(&phys->lock);
 
-	ext = extent_get(gcl, phys->last_extent);
-	estat = extent_open(gcl, ext);
+	seg = segment_get(gcl, phys->last_segment);
+	estat = segment_open(gcl, seg);
 	EP_STAT_CHECK(estat, return estat);
 
 	memset(&log_record, 0, sizeof log_record);
@@ -1369,14 +1368,14 @@ disk_append(gdp_gcl_t *gcl,
 	log_record.flags = ep_net_hton16(log_record.flags);
 
 	// write log record header
-	fwrite(&log_record, sizeof log_record, 1, ext->fp);
+	fwrite(&log_record, sizeof log_record, 1, seg->fp);
 
 	// write log record data
 	if (dlen > 0)
 	{
 		unsigned char *p = evbuffer_pullup(datum->dbuf, dlen);
 		if (p != NULL)
-			fwrite(p, dlen, 1, ext->fp);
+			fwrite(p, dlen, 1, seg->fp);
 		record_size += dlen;
 	}
 
@@ -1395,7 +1394,7 @@ disk_append(gdp_gcl_t *gcl,
 		}
 		EP_ASSERT_INSIST(datum->siglen == slen);
 		if (slen > 0 && p != NULL)
-			fwrite(p, slen, 1, ext->fp);
+			fwrite(p, slen, 1, seg->fp);
 		record_size += slen;
 	}
 	else if (datum->siglen > 0)
@@ -1406,8 +1405,8 @@ disk_append(gdp_gcl_t *gcl,
 	}
 
 	index_entry.recno = log_record.recno;	// already in net byte order
-	index_entry.offset = ep_net_hton64(ext->max_offset);
-	index_entry.extent = ep_net_hton32(phys->last_extent);
+	index_entry.offset = ep_net_hton64(seg->max_offset);
+	index_entry.segment = ep_net_hton32(phys->last_segment);
 	index_entry.reserved = 0;
 
 	// write index record
@@ -1416,16 +1415,16 @@ disk_append(gdp_gcl_t *gcl,
 	fwrite(&index_entry, sizeof index_entry, 1, phys->index.fp);
 
 	// commit
-	if (fflush(ext->fp) < 0 || ferror(ext->fp))
+	if (fflush(seg->fp) < 0 || ferror(seg->fp))
 		estat = posix_error(errno, "disk_append: cannot flush data");
-	else if (fflush(phys->index.fp) < 0 || ferror(ext->fp))
+	else if (fflush(phys->index.fp) < 0 || ferror(seg->fp))
 		estat = posix_error(errno, "disk_append: cannot flush index");
 	else
 	{
 		xcache_put(phys, index_entry.recno, index_entry.offset);
 		++phys->max_recno;
 		phys->index.max_offset += sizeof index_entry;
-		ext->max_offset += record_size;
+		seg->max_offset += record_size;
 	}
 
 fail0:
@@ -1463,7 +1462,7 @@ disk_getmetadata(gdp_gcl_t *gcl,
 	int i;
 	size_t tlen;
 	gcl_physinfo_t *phys = GETPHYS(gcl);
-	extent_t *ext = extent_get(gcl, -1);
+	segment_t *seg = segment_get(gcl, -1);
 	EP_STAT estat = EP_STAT_OK;
 
 	ep_dbg_cprintf(Dbg, 29, "gcl_physgetmetadata: n_md_entries %d\n",
@@ -1480,7 +1479,7 @@ disk_getmetadata(gdp_gcl_t *gcl,
 
 	// seek to the metadata area
 	STDIOCHECK("gcl_physgetmetadata: fseek#0", 0,
-			fseek(ext->fp, sizeof (extent_header_t), SEEK_SET));
+			fseek(seg->fp, sizeof (segment_header_t), SEEK_SET));
 
 	// read in the individual metadata headers
 	tlen = 0;
@@ -1489,10 +1488,10 @@ disk_getmetadata(gdp_gcl_t *gcl,
 		uint32_t t32;
 
 		STDIOCHECK("gcl_physgetmetadata: fread#0", 1,
-				fread(&t32, sizeof t32, 1, ext->fp));
+				fread(&t32, sizeof t32, 1, seg->fp));
 		gmd->mds[i].md_id = ep_net_ntoh32(t32);
 		STDIOCHECK("gcl_physgetmetadata: fread#1", 1,
-				fread(&t32, sizeof t32, 1, ext->fp));
+				fread(&t32, sizeof t32, 1, seg->fp));
 		gmd->mds[i].md_len = ep_net_ntoh32(t32);
 		tlen += ep_net_ntoh32(t32);
 		ep_dbg_cprintf(Dbg, 34, "\tid = %08x, len = %zd\n",
@@ -1505,7 +1504,7 @@ disk_getmetadata(gdp_gcl_t *gcl,
 	// now the data
 	gmd->databuf = ep_mem_malloc(tlen);
 	STDIOCHECK("gcl_physgetmetadata: fread#2", 1,
-			fread(gmd->databuf, tlen, 1, ext->fp));
+			fread(gmd->databuf, tlen, 1, seg->fp));
 
 	// now map the pointers to the data
 	void *dbuf = gmd->databuf;
@@ -1534,16 +1533,16 @@ fail_stdio:
 
 
 /*
-**  Create a new extent.
+**  Create a new segment.
 */
 
-#if EXTENT_SUPPORT
+#if SEGMENT_SUPPORT
 static EP_STAT
-disk_newextent(gdp_gcl_t *gcl)
+disk_newsegment(gdp_gcl_t *gcl)
 {
 	EP_STAT estat;
 	gcl_physinfo_t *phys = GETPHYS(gcl);
-	int newextno = phys->last_extent + 1;
+	int newsegno = phys->last_segment + 1;
 	gdp_gclmd_t *gmd;
 
 	// get the metadata
@@ -1551,14 +1550,14 @@ disk_newextent(gdp_gcl_t *gcl)
 	EP_STAT_CHECK(estat, return estat);
 
 	ep_thr_rwlock_wrlock(&phys->lock);
-	estat = extent_create(gcl, gmd, newextno, phys->max_recno);
+	estat = segment_create(gcl, gmd, newsegno, phys->max_recno);
 	if (EP_STAT_ISOK(estat))
-		phys->last_extent = newextno;
+		phys->last_segment = newsegno;
 	ep_thr_rwlock_unlock(&phys->lock);
 
 	return estat;
 }
-#endif // EXTENT_SUPPORT
+#endif // SEGMENT_SUPPORT
 
 
 /*
@@ -1626,16 +1625,16 @@ disk_getstats(
 		gdp_gcl_t *gcl,
 		struct gcl_phys_stats *st)
 {
-	int exno;
+	int segno;
 	gcl_physinfo_t *phys = gcl->x->physinfo;
 
 	st->nrecs = gcl->nrecs;
 	st->size = 0;
-	for (exno = 0; exno < phys->last_extent; exno++)
+	for (segno = 0; segno < phys->last_segment; segno++)
 	{
-		extent_t *ext = phys->extents[exno];
-		if (ext != NULL && ext->fp != NULL)
-			st->size += fsizeof(ext->fp);
+		segment_t *seg = phys->segments[segno];
+		if (seg != NULL && seg->fp != NULL)
+			st->size += fsizeof(seg->fp);
 	}
 }
 
@@ -1649,8 +1648,8 @@ struct gcl_phys_impl	GdpDiskImpl =
 	.close =		disk_close,
 	.append =		disk_append,
 	.getmetadata =	disk_getmetadata,
-#if EXTENT_SUPPORT
-	.newextent =	disk_newextent,
+#if SEGMENT_SUPPORT
+	.newsegment =	disk_newsegment,
 #endif
 	.foreach =		disk_foreach,
 	.getstats =		disk_getstats,

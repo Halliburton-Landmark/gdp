@@ -986,28 +986,28 @@ fail0:
 
 
 EP_STAT
-cmd_newextent(gdp_req_t *req)
+cmd_newsegment(gdp_req_t *req)
 {
 	EP_STAT estat;
 
 	req->pdu->cmd = GDP_ACK_CREATED;
 
 	// should have no input data; ignore anything there
-	flush_input_data(req, "cmd_newextent");
+	flush_input_data(req, "cmd_newsegment");
 
 	estat = get_open_handle(req, GDP_MODE_AO);
 	EP_STAT_CHECK(estat, goto fail0);
 
-	if (req->gcl->x->physimpl->newextent == NULL)
+	if (req->gcl->x->physimpl->newsegment == NULL)
 		return gdpd_gcl_error(req->pdu->dst,
-				"cmd_newextent: extents not defined for this type",
+				"cmd_newsegment: segments not defined for this type",
 				GDP_STAT_NAK_METHNOTALLOWED, GDP_STAT_NAK_METHNOTALLOWED);
-	estat = req->gcl->x->physimpl->newextent(req->gcl);
+	estat = req->gcl->x->physimpl->newsegment(req->gcl);
 	return estat;
 
 fail0:
 	return gdpd_gcl_error(req->pdu->dst,
-			"cmd_newextent: cannot create new extent for",
+			"cmd_newsegment: cannot create new segment for",
 			estat, GDP_STAT_NAK_INTERNAL);
 }
 
@@ -1159,7 +1159,7 @@ static struct cmdfuncs	CmdFuncs[] =
 	{ GDP_CMD_MULTIREAD,	cmd_multiread	},
 	{ GDP_CMD_GETMETADATA,	cmd_getmetadata	},
 	{ GDP_CMD_OPEN_RA,		cmd_open		},
-	{ GDP_CMD_NEWEXTENT,	cmd_newextent	},
+	{ GDP_CMD_NEWSEGMENT,	cmd_newsegment	},
 	{ GDP_CMD_FWD_APPEND,	cmd_fwd_append	},
 	{ 0,					NULL			}
 };

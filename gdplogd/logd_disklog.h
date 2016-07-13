@@ -63,12 +63,12 @@
 /*
 **  On-disk data format
 **
-**		Data in logs are stored in individual extent files, each of which
+**		Data in logs are stored in individual segment files, each of which
 **		stores a contiguous series of records.  These definitions really
-**		apply to individual extents, not the log as a whole.
+**		apply to individual segments, not the log as a whole.
 **
-**		TODO:	Is the metadata copied in each extent, or is it just in
-**		TODO:	extent 0?  Should there be a single file representing
+**		TODO:	Is the metadata copied in each segment, or is it just in
+**		TODO:	segment 0?  Should there be a single file representing
 **		TODO:	the log as a whole, but contains no data, only metadata,
 **		TODO:	kind of like a superblock?
 **
@@ -77,7 +77,7 @@
 **		TODO:	Since this file is written a lot, it is important that it
 **		TODO:	can be reconstructed.
 **
-**		Each extent has a fixed length extent header (called here a log
+**		Each segment has a fixed length segment header (called here a log
 **		header), followed by the log metadata, followed by a series of
 **		data records.  Each record has a header followed by data.
 **
@@ -109,7 +109,7 @@
 **		so this ensures that the disk layout won't change.
 */
 
-// a data extent file header
+// a data segment file header
 typedef struct
 {
 	uint32_t	magic;			// GCL_LDF_MAGIC
@@ -119,13 +119,13 @@ typedef struct
 	uint32_t	reserved1;		// reserved for future use
 	uint16_t	n_md_entries;	// number of metadata entries
 	uint16_t	log_type;		// directory, indirect, data, etc. (unused)
-	uint32_t	extent;			// extent number
+	uint32_t	segment;		// segment number
 	uint64_t	reserved2;		// reserved for future use
 	gdp_name_t	gname;			// the name of this log
-	gdp_recno_t	recno_offset;	// first recno stored in this extent - 1
-} extent_header_t;
+	gdp_recno_t	recno_offset;	// first recno stored in this segment - 1
+} segment_header_t;
 
-// an individual record header in an extent
+// an individual record header in a segment
 typedef struct
 {
 	gdp_recno_t		recno;
@@ -137,33 +137,33 @@ typedef struct
 	int16_t			reserved2;			// reserved for future use
 	int32_t			reserved3;			// reserved for future use
 	int32_t			data_length;		// in bytes
-} extent_record_t;
+} segment_record_t;
 
 // flag bits in record headers
 #define REC_HAS_SIGNATURE		0x0001	// signature is stored on disk
 
 
 /*
-**  In-Memory representation of Per-Extent info
+**  In-Memory representation of per-segment info
 **
 **		This only includes the information that may (or does) vary
-**		on a per-extent basis.  For example, different extents might
+**		on a per-segment basis.  For example, different segments might
 **		have different versions or header sizes, but not different
 **		metadata, which must be fixed per log (even though on disk
-**		that information is actually replicated in each extent.
+**		that information is actually replicated in each segment.
 */
 
 typedef struct
 {
-	FILE				*fp;				// file pointer to extent
+	FILE				*fp;				// file pointer to segment
 	uint32_t			ver;				// on-disk file version
-	uint32_t			extno;				// extent number
-	size_t				header_size;		// size of extent file hdr
-	gdp_recno_t			recno_offset;		// first recno in extent - 1
-	off_t				max_offset;			// size of extent file
+	uint32_t			segno;				// segment number
+	size_t				header_size;		// size of segment file hdr
+	gdp_recno_t			recno_offset;		// first recno in segment - 1
+	off_t				max_offset;			// size of segment file
 	EP_TIME_SPEC		retain_until;		// retain at least until this date
 	EP_TIME_SPEC		remove_by;			// must be gone by this date
-} extent_t;
+} segment_t;
 
 
 /*
@@ -174,26 +174,26 @@ typedef struct
 **		the lowest record number that can be accessed).
 **
 **		The index covers the entirety of the log (i.e., not just one
-**		extent), so any records numbered below that first record number
+**		segment), so any records numbered below that first record number
 **		are inaccessible at any location.  Each index entry contains the
-**		extent number in which the record occurs and the offset into that
-**		extent file.  In theory records could be interleaved between
-**		extents, but that's not how things work now.
+**		segment number in which the record occurs and the offset into that
+**		segment file.  In theory records could be interleaved between
+**		segments, but that's not how things work now.
 **
 **		At some point it may be that the local server doesn't have all
-**		the extents for a given log.  Figuring out the physical location
-**		of an extent from the index is not addressed here.
-**		(The current implementation assumes that all extents are local.)
+**		the segments for a given log.  Figuring out the physical location
+**		of a segment from the index is not addressed here.
+**		(The current implementation assumes that all segments are local.)
 **
 **		The index is not intended to have unique information.  Given the
-**		set of extent files, it should be possible to rebuild the index.
+**		set of segment files, it should be possible to rebuild the index.
 */
 
 typedef struct index_entry
 {
 	gdp_recno_t	recno;			// record number
-	int64_t		offset;			// offset into extent file
-	uint32_t	extent;			// id of extent (for segmented logs)
+	int64_t		offset;			// offset into segment file
+	uint32_t	segment;		// id of segment (for segmented logs)
 	uint32_t	reserved;		// make padding explicit
 } index_entry_t;
 
@@ -235,7 +235,7 @@ typedef struct index_header
 **  The in-memory representation of the on-disk log index.
 **
 **		Note that index.min_recno need not be the same as phys->min_recno
-**		because the index may include entries for extents that have been
+**		because the index may include entries for segments that have been
 **		expired.
 */
 
@@ -257,7 +257,7 @@ struct phys_index
 **
 **		There is no single instantiation of a log, so this is really
 **		a representation of an abstraction.  It includes information
-**		about all extents and the index.
+**		about all segments and the index.
 */
 
 struct physinfo
@@ -265,14 +265,14 @@ struct physinfo
 	// reading and writing to the log requires holding this lock
 	EP_THR_RWLOCK		lock;
 
-	// info regarding the entire log (not extent)
+	// info regarding the entire log (not segment)
 	gdp_recno_t			min_recno;				// first recno in log
 	gdp_recno_t			max_recno;				// last recno in log (dynamic)
 
-	// info regarding the extent files
-	uint32_t			nextents;				// number of extents
-	uint32_t			last_extent;			// extent being written
-	extent_t			**extents;				// list of extent pointers
+	// info regarding the segment files
+	uint32_t			nsegments;				// number of segments
+	uint32_t			last_segment;			// segment being written
+	segment_t			**segments;				// list of segment pointers
 												// can be dynamically expanded
 
 	// info regarding the index file

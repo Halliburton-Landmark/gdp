@@ -163,7 +163,7 @@ struct gcl_phys_impl
 	EP_STAT		(*getmetadata)(
 						gdp_gcl_t *gcl,
 						gdp_gclmd_t **gmdp);
-	EP_STAT		(*newextent)(
+	EP_STAT		(*newsegment)(
 						gdp_gcl_t *gcl);
 	void		(*foreach)(
 						void (*func)(
