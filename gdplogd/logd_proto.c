@@ -989,6 +989,7 @@ EP_STAT
 cmd_newsegment(gdp_req_t *req)
 {
 	EP_STAT estat;
+	char ebuf[60];
 
 	req->pdu->cmd = GDP_ACK_CREATED;
 
@@ -1003,6 +1004,10 @@ cmd_newsegment(gdp_req_t *req)
 				"cmd_newsegment: segments not defined for this type",
 				GDP_STAT_NAK_METHNOTALLOWED, GDP_STAT_NAK_METHNOTALLOWED);
 	estat = req->gcl->x->physimpl->newsegment(req->gcl);
+	admin_post_stats(ADMIN_LOG_EXIST, "newsegment",
+			"log-name", req->gcl->pname,
+			"status", ep_stat_tostr(estat, ebuf, sizeof ebuf),
+			NULL, NULL);
 	return estat;
 
 fail0:
