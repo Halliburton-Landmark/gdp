@@ -29,19 +29,60 @@
 import sys
 sys.path.append("../")
 import gdp
+import time
 
 class GDPcache:
-    """ A caching + query-by-time layer for GDP. We don't need a lock here,
-        since all our opreations are atomic (at least for now)"""
+    """
+    A caching + query-by-time layer for GDP. We don't need a lock here,
+        since all our opreations are atomic (at least for now)
+    limit is the number of records to keep in the cache. This is a soft
+        limit, which means that we will go over the limit on various
+        occasions, but we will try to be within a certain factor of the
+        specified limit (by default, 2). This enables us to minimize the
+        cleanup overhead.
+    """
 
-    def __init__(self, logname, limit=1000):
+    def __init__(self, logname, limit=10000):
+        """ Initialize with just the log name, and optionally cache size """
 
+        gdp.gdp_init()      # No side-effects of calling this multiple times
         self.logname = logname
         self.lh = gdp.GDP_GCL(gdp.GDP_NAME(logname), gdp.GDP_MODE_RO)
-        self.cache = {}     # a recno => record cache   (limited size)
+        self.limit = limit
+        self.cache = {}     # recno => record cache   (limited size)
+        self.atime = {}     # recno => time of access (same size as cache)
 
         self.__read(1)
         self.__read(-1)
+
+    def __cleanup(self):
+        """
+        Make sure that we adhere to the size limit on cache. However, as
+            an optimization, we never delete the smallest and the largest
+            record number we know of. In addition, the limit is a *soft*
+            limit, meaning that we avoid doing cleanup as soon as we are
+            just one above the limit, for example.
+        """
+
+        # A quick return for the case we don't need cleanup for
+        if len(self.cache)<=2*self.limit: return
+
+        print "Length before cleanup", len(self.cache)
+        min_recno = min(self.cache.keys())
+        max_recno = max(self.cache.keys())
+
+        # get an ordered list of keys based on inverse LRU
+        iLRUorder = sorted(self.cache.keys(), key=lambda x:self.atime[x],
+                                             reverse=True )
+        if min_recno in iLRUorder: iLRUorder.remove(min_recno)
+        if max_recno in iLRUorder: iLRUorder.remove(max_recno)
+
+        while len(self.cache)>self.limit:
+            # the last item in the reverse sorted list (least recently used)
+            lru = iLRUorder.pop()
+            self.cache.pop(lru)
+            self.atime.pop(lru)
+        print "Length after cleanup", len(self.cache)
 
     
     def __time(self, recno):        # cache for tMap
@@ -51,13 +92,16 @@ class GDPcache:
         return datum['ts']['tv_sec'] + (datum['ts']['tv_nsec']*1.0/10**9)
 
 
-    def __read(self, recno):        # cache for, of course, cache
+    def __read(self, recno):        # cache for, of course, records
         """ read a single record by recno, but add to cache """
         if recno in self.cache.keys():
+            self.atime[recno] = time.time()
             return self.cache[recno]
         datum = self.lh.read(recno)
         pos_recno = datum['recno']
         self.cache[pos_recno] = datum
+        self.atime[pos_recno] = time.time()
+        self.__cleanup()
         return datum
 
 
@@ -72,11 +116,13 @@ class GDPcache:
             datum = event['datum']
             recno = datum['recno']
             self.cache[recno] = datum
+            self.atime[recno] = time.time()
             ret.append(datum)
+        self.__cleanup()
         return ret
 
 
-    def __findRecNo(self, t):
+    def __findRec(self, t):
         """ find the most recent record num before t, i.e. a binary search"""
 
         self.__read(-1)     # just to refresh the cache
@@ -94,11 +140,16 @@ class GDPcache:
 
         return _startR
 
+    def get(self, t):
+        """ Get the record just before time t (using a binary search)"""
+        recno = self.__findRec(t)
+        return self.__read(recno)
 
-    def get(self, tStart, tEnd, numPoints=1000):
-        """ return a list of records, *roughly* numPoints long """
-        _startR = self.__findRecNo(tStart)+1
-        _endR = self.__findRecNo(tEnd)
+
+    def getRange(self, tStart, tEnd, numPoints=1000):
+        """ return a sampled list of records, *roughly* numPoints long """
+        _startR = self __findRec(tStart)+1
+        _endR = self __findRec(tEnd)
 
         # can we use multiread?
         if _endR+1-_startR<4*numPoints:
