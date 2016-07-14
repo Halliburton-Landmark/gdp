@@ -35,15 +35,37 @@ class GDPcache:
     """
     A caching + query-by-time layer for GDP. We don't need a lock here,
         since all our opreations are atomic (at least for now)
-    limit is the number of records to keep in the cache. This is a soft
+
+	Example Usage (just for reference):
+
+    ```
+        from GDPcache import GDPcache
+        import time
+
+        logname = "edu.berkeley.eecs.swarmlab.device.c098e5300003"
+        c = GDPcache(logname)
+        cur_time = time.time()      # to get a time reference
+
+        # A single record that's one day old
+        singleRecord = c.get(cur_time-86400.0)
+
+        # Records from a *sampled* time range
+        rangeRecord = c.getRange(cur_time-86400.0, cur_time-86400.0+60.0)
+
+        print singleRecord, rangeRecord
+    ```
+    """
+
+    def __init__(self, logname, limit=10000):
+        """
+        Initialize with just the log name, and optionally cache size
+        
+        limit is the number of records to keep in the cache. This is a soft
         limit, which means that we will go over the limit on various
         occasions, but we will try to be within a certain factor of the
         specified limit (by default, 2). This enables us to minimize the
         cleanup overhead.
-    """
-
-    def __init__(self, logname, limit=10000):
-        """ Initialize with just the log name, and optionally cache size """
+        """
 
         gdp.gdp_init()      # No side-effects of calling this multiple times
         self.logname = logname
