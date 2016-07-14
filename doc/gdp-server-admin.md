@@ -7,48 +7,22 @@ ADMINISTERING GLOBAL DATAPLANE SERVERS
 
 These instructions are relevant *only* if you are running a GDP router
 and/or log daemon.  In most cases you should be able to use the
-servers at Berkeley.  It assumes that the software is already compiled
-and installed, but has not been configured.
+servers at Berkeley.
 
-Initializing A Server
----------------------
-
-The script `adm/init-gdp.sh` should do all the steps necessary for
-initializing a server.  This:
-
-  * Creates a user and group named `gdp:gdp` if it doesn't exist.
-  * Creates directories needed by the GDP.  See below for details.
-  * Creates initial parameter files.
-
-Before running `adm/init-gdp.sh` you can optionally create a
-file called `/usr/local/etc/gdp.conf.sh` or `/etc/gdp.conf.sh`
-that defines some variables.  The most important is `GDP_ROOT`,
-which is the root of the installed tree.  If you want to change
-this, you should do so before doing anything with the GDP,
-including compiling.
-
-There are three cases for `GDP_ROOT`:
-
-  * `GDP_ROOT` = `/usr` means that everything will be installed
-    in the "normal" system directories: /usr/bin, /usr/sbin,
-	/var/log, and /etc.
-  * `GDP_ROOT` = ~gdp (that is, the home directory for user
-    `gdp`) means that everything will be installed in that
-	directory: ~gdp/bin, ~gdp/sbin, ~gdp/log, and ~gdp/etc.
-	Administrative paramters will be stored in ~gdp/.ep_adm_params
-	(and hence will be available only to user `gdp`).
-  * Otherwise everything is installed in subdirectories of
-    the indicated directory.
+This assumes that the server code is already installed and ready to
+run.  If you have not used a package, see `README-server-install.md`
+in the root of the source tree for instructions on installing from
+source.
 
 Considerations for the GDP Data
 -------------------------------
 
 For obvious reasons GDP data files should be on a filesystem
 that has a reasonable amount of free space.  The default is
-`/var/swarm/gdp/gcls`.  The `adm/init-gdp.sh` script creates
-this directory if it doesn't already exist, but if you want
-to put it on a separate filesystem you might want to do
-that in advance.  For example:
+`/var/swarm/gdp/gcls`.  The `adm/init-gdp-server.sh` script
+creates this directory if it doesn not already exist, but if
+you want to put it on a separate filesystem you might want to
+do that in advance.  For example:
 
 	sudo mkdir -p /var/swarm/gdp/gcls
 	sudo chown -R gdp:gdp /var/swarm

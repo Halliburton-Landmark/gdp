@@ -18,26 +18,37 @@ source_file="$source_dir/$source_root.template"
 
 (test -r /usr/local/etc/gdp.conf.sh && . /usr/local/etc/gdp.conf.sh) ||
 	        (test -r /etc/gdp.conf.sh && . /etc/gdp.conf.sh)
-: ${GDP_LOGDIR:=/var/log/gdp}
+: ${GDP_LOG_DIR:=/var/log/gdp}
 : ${GDP_ROOT:=/usr}
-: ${GDP_ROUTER_CONF:=/etc/gdp-router-click.conf}
+if [ "$GDP_ROOT" = "/usr" ]
+then
+	: ${GDP_ETC:=/etc}
+else
+	: ${GDP_ETC:=$GDP_ROOT/etc}
+fi
 : ${GDP_SYSLOG_FACILITY:=local4}
 : ${GDP_SYSLOG_LEVEL:=notice}
 : ${GDP_USER:=gdp}
+: ${GDP_VAR:=/var/swarm/gdp}
+: ${GDP_KEYS:=$GDP_VAR/KEYS}
+: ${GDP_ROUTER_CONF:=/etc/gdp-router-click.conf}
 : ${GDPLOGD_ARGS:=}
 : ${GDPLOGD_DATADIR:=}
 
 (
 	echo "# Generated" `date +"%F %T %z"` from $source_file
 	sed \
-		-e "s;@GDP_LOGDIR@;$GDP_LOGDIR;g" \
+		-e "s;@GDP_LOG_DIR@;$GDP_LOG_DIR;g" \
 		-e "s;@GDP_ROOT@;$GDP_ROOT;g" \
-		-e "s;@GDP_ROUTER_CONF@;$GDP_ROUTER_CONF;g" \
+		-e "s;@GDP_ETC@;$GDP_ETC;g" \
 		-e "s;@GDP_SYSLOG_FACILITY@;$GDP_SYSLOG_FACILITY;g" \
 		-e "s;@GDP_SYSLOG_LEVEL@;$GDP_SYSLOG_LEVEL;g" \
 		-e "s;@GDP_USER@;$GDP_USER;g" \
+		-e "s;@GDP_VAR@;$GDP_VAR;g" \
+		-e "s;@GDP_KEYS@;$GDP_KEYS;g" \
+		-e "s;@GDP_ROUTER_CONF@;$GDP_ROUTER_CONF;g" \
 		-e "s;@GDPLOGD_ARGS@;$GDPLOGD_ARGS;g" \
 		-e "s;@GDPLOGD_DATADIR@;$GDPLOGD_DATADIR;g" \
 
-	echo "# End of generated" $1
+	echo "# End of generated text" $1
 ) < $source_file > $target_dir/$source_root

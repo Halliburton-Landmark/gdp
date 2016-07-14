@@ -1,15 +1,49 @@
 #!/bin/sh
 (test -r /usr/local/etc/gdp.conf.sh && . /usr/local/etc/gdp.conf.sh) ||
 	(test -r /etc/gdp.conf.sh && . /etc/gdp.conf.sh)
-: ${GDP_LOGDIR:=/var/log/gdp}
-: ${GDP_ROOT:=/usr}
-: ${GDP_USER:=gdp}
-: ${GDPLOGD_DATADIR:=/var/swarm/gdp/gcls}
 
 #
-#  Initialize server hosts
-#	This is specialized for Berkeley
+#  Initialize GDP server hosts
 #
+#	This script should not be needed for ordinary clients.
+#
+#	This should be portable to all environments.  In particular,
+#	it is not dependent on a particular version of Linux (or
+#	for that matter, Linux at all).
+#
+#	It does **not** install system binaries.  Compiling and
+#	installing should be done using "make install".
+#
+#	XXX  This assumes the Berkeley-based routers.  If you have
+#	XXX  your own router you'll need to modify $EP_PARAMS/gdp
+#	XXX  after this completes.
+#
+#	XXX  It also assumes you are in the eecs.berkeley.edu domain.
+#	XXX  If you aren't you'll need to modify $EP_PARAMS/gdplogd
+#	XXX  after this completes.
+#
+#	This script does not install a router or router
+#	startup scripts.  The router is a separate package
+#	and must be installed separately.
+#
+
+# we assume this is in the adm directory
+cd `dirname $0`/..
+
+# configure defaults
+: ${GDP_ROOT:=/usr}
+if [ "$GDP_ROOT" = "/usr" ]
+then
+	: ${GDP_ETC:=/etc}
+else
+	: ${GDP_ETC:=$GDP_ROOT/etc}
+fi
+: ${GDP_LOG_DIR:=/var/log/gdp}
+: ${GDP_USER:=gdp}
+: ${GDP_GROUP:=$GDP_USER}
+: ${GDP_VAR:=/var/swarm/gdp}
+: ${GDP_KEYS:=$GDP_VAR/KEYS}
+: ${GDPLOGD_DATADIR:=$GDP_VAR/gcls}
 
 #################### FUNCTIONS ####################
 
@@ -23,7 +57,7 @@ mkdir_gdp() {
 
 mkdir_gdp_opt() {
 	test -d $1 && return
-	info "Creating $1"
+	info "Creating directory $1"
 	mkdir -p $1
 	chmod ${2:-0755} $1
 	chown_gdp_opt $1
@@ -35,7 +69,7 @@ chown_gdp_opt() {
 	chown ${GDP_USER}:${GDP_GROUP} $1
 }
 
-if [ -d adm ]; then
+if [ -f adm/common-support.sh ]; then
 	. adm/common-support.sh
 else
 	info() {
@@ -68,26 +102,25 @@ umask 0022
 ## create system directories
 if [ "$GDP_ROOT" != "/usr" ]
 then
-	ETC=$GDP_ROOT/etc
 	mkdir_gdp_opt bin
 	mkdir_gdp_opt log
 	mkdir_gdp_opt etc
-else
-	ETC=/etc
 fi
 if [ "$GDP_ROOT" = "~${GDP_USER}" ]
 then
 	EP_PARAMS=$GDP_ROOT/.ep_adm_params
 else
-	EP_PARAMS=$ETC/ep_adm_params
+	EP_PARAMS=$GDP_ETC/ep_adm_params
 fi
 
-mkdir_gdp_opt $ETC
+mkdir_gdp_opt $GDP_ETC
 mkdir_gdp $EP_PARAMS
-mkdir_gdp $GDP_LOGDIR
+mkdir_gdp $GDP_LOG_DIR
+mkdir_gdp $GDP_VAR
+mkdir_gdp $GDP_KEYS 0750
 mkdir_gdp $GDPLOGD_DATADIR 0750
 
-## set up default parameters
+## set up default runtime administrative parameters
 hostname=`hostname`
 
 if [ ! -f $EP_PARAMS/gdp ]

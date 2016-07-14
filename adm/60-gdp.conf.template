@@ -1,7 +1,7 @@
 # Rsyslog rules for GDP programs
 
 # should really break out different programs into different logs
-local4.*				@GDP_LOGDIR@/gdp.log
+local4.*				@GDP_LOG_DIR@/gdp.log
 
-:msg, contains, "gdplogd"		@GDP_LOGDIR@/gdplogd.log
-:msg, contains, "gdp-router-click"	@GDP_LOGDIR@/gdp-router-click.log
+:msg, contains, "gdplogd"		@GDP_LOG_DIR@/gdplogd.log
+:msg, contains, "gdp-router-click"	@GDP_LOG_DIR@/gdp-router-click.log
