@@ -148,8 +148,8 @@ class GDPcache:
 
     def getRange(self, tStart, tEnd, numPoints=1000):
         """ return a sampled list of records, *roughly* numPoints long """
-        _startR = self __findRec(tStart)+1
-        _endR = self __findRec(tEnd)
+        _startR = self.__findRec(tStart)+1
+        _endR = self.__findRec(tEnd)
 
         # can we use multiread?
         if _endR+1-_startR<4*numPoints:
