@@ -24,6 +24,15 @@ fi
 # if we are running as root, start over as gdp
 test `whoami` = "root" && exec sudo -u $GDP_USER $0 "$@"
 
+fatal() {
+	echo "[FATAL] $1"
+	exit 1;
+}
+
+info() {
+	echo "[INFO] $1"
+}
+
 EX_USAGE=64
 EX_CONFIG=78
 
@@ -50,18 +59,18 @@ EX_CONFIG=78
 		exit $EX_CONFIG
 	fi
 
-
 	#echo "Running $0 with GDP_ROOT=$GDP_ROOT"
 	#echo "Using MQTT server at $mqtt_host"
 	#echo "Using log names $gcl_root.*"
 
 	args="-s -M $mqtt_host -d -K$GDP_KEYS $MQTT_GATEWAY_ARGS"
-	gw_prog="mqtt-gdp-gateway"
+	gw_prog="$GDP_ROOT/bin/mqtt-gdp-gateway"
 	devices=`cat $GDP_ETC/mqtt-devices.$hostname | sed -e 's/#.*//'`
 
 	for i in $devices
 	do
-		if gcl-create -q -K$GDP_KEYS -e none $gcl_root.device.$i
+		if $GDP_ROOT/bin/gcl-create \
+			-q -K$GDP_KEYS -e none $gcl_root.device.$i
 		then
 			echo "Created log $gcl_root.device.$i"
 		fi
