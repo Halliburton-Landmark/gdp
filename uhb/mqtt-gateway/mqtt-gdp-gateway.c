@@ -91,7 +91,7 @@ get_topic_info(const struct mosquitto_message *msg)
 {
 	int tno;
 
-	ep_dbg_cprintf(Dbg, 2, "get_topic_info(%s): ", msg->topic);
+	ep_dbg_cprintf(Dbg, 22, "get_topic_info(%s): ", msg->topic);
 	for (tno = 0; tno < NTopics; tno++)
 	{
 		struct topic_info *t = Topics[tno];
@@ -103,12 +103,12 @@ get_topic_info(const struct mosquitto_message *msg)
 			continue;
 
 		// topic matches
-		ep_dbg_cprintf(Dbg, 2, "%p (%s)\n", t, t->topic_pat);
+		ep_dbg_cprintf(Dbg, 22, "%p (%s)\n", t, t->topic_pat);
 		return t;
 	}
 
 	// no match
-	ep_dbg_cprintf(Dbg, 2, "not found\n");
+	ep_dbg_cprintf(Dbg, 22, "not found\n");
 	return NULL;
 }
 
@@ -295,7 +295,10 @@ message_cb(struct mosquitto *mosq,
 		estat = gdp_gcl_append(tinfo->gcl, datum);
 		if (!EP_STAT_ISOK(estat))
 		{
-			ep_log(estat, "cannot log MQTT message");
+			gdp_pname_t pname;
+
+			gdp_printable_name(*gdp_gcl_getname(tinfo->gcl), pname);
+			ep_log(estat, "cannot log MQTT message to %s", pname);
 		}
 		gdp_datum_free(datum);
 	}

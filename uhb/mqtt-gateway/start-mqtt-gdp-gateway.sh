@@ -1,45 +1,72 @@
 #!/bin/sh
+{ test -r /usr/local/etc/gdp.conf.sh && . /usr/local/etc/gdp.conf.sh } ||
+	{ test -r /etc/gdp.conf.sh && . /etc/gdp.conf.sh }
 
 #
 #  Helper script for starting up an mqtt-gdp-gateway instance
 #
-#	Normally this would exist in $GDP_ROOT/adm, where
-#	$GDP_ROOT is either /usr/gdp or /usr/local/gdp.
-#	The value of $GDP_ROOT is derived from $0.
 
-# if we are running as root, start over as gdp
-test `whoami` != "root" || exec sudo -u gdp $0 "$@"
-
-cd `dirname $0`/..
-root=`pwd`
-: ${GDP_ROOT:=$root}
-. adm/common-support.sh
-
-if [ $# -lt 3 ]
+# configure defaults
+: ${GDP_ROOT:=/usr}
+: ${GDP_VAR:=/var/swarm/gdp}
+: ${GDP_KEYS:=$GDP_VAR/KEYS}
+: ${GDP_LOG_DIR:=/var/log/gdp}
+: ${GDP_USER:=gdp}
+: ${MQTT_GATEWAY_ARGS:=-D*=2}
+: ${MQTT_GATEWAY_LOG:=$GDP_LOG_DIR/mqtt-gateway.log}
+if [ "$GDP_ROOT" = "/usr" ]
 then
-	fatal "Usage: $0 mqtt-broker logname-root devname..."
+	: ${GDP_ETC:=/etc}
+else
+	: ${GDP_ETC:=$GDP_ROOT/etc}
 fi
 
-mqtt_host=$1
-groot=$2
-shift;shift
+# if we are running as root, start over as gdp
+test `whoami` = "root" && exec sudo -u $GDP_USER $0 "$@"
 
-info "Running $0 in $root with GDP_ROOT=$GDP_ROOT"
-info "Using MQTT server at $mqtt_host"
-info "Using log names $groot.*"
+EX_USAGE=64
+EX_CONFIG=78
 
-args="-D *=2 -s -M $mqtt_host -d"
-gw_prog="mqtt-gdp-gateway"
-
-for i
-do
-	info "Running gcl-create -q -e none $groot.device.$i"
-	if gcl-create -q -e none $groot.device.$i
+{
+	echo `date +"%F %T %z"` Running $0 "$@" as `whoami`
+	if [ `whoami` != $GDP_USER ]
 	then
-		info "Created log $groot.device.$i"
+		echo "Warning: should be running as $GDP_USER"
 	fi
-	args="$args device/+/$i $groot.device.$i"
-done
+	if [ $# -ne 2 ]
+	then
+		echo "Usage: $0 mqtt-broker-host logname-root"
+		echo "Usage: $0 mqtt-broker-host logname-root" 1>&2
+		exit $EX_USAGE
+	fi
 
-info "running $gw_prog $args"
-exec $gw_prog $args
+	mqtt_host=$1
+	gcl_root=$2
+
+	hostname=`echo $mqtt_host | sed 's/\..*//'`
+	if [ ! -e $GDP_ETC/mqtt-devices.$hostname ]
+	then
+		echo "Fatal: no configuration $GDP_ETC/mqtt-devices.$hostname"
+		exit $EX_CONFIG
+	fi
+
+
+	#echo "Running $0 with GDP_ROOT=$GDP_ROOT"
+	#echo "Using MQTT server at $mqtt_host"
+	#echo "Using log names $gcl_root.*"
+
+	args="-s -M $mqtt_host -d -K$GDP_KEYS $MQTT_GATEWAY_ARGS"
+	gw_prog="mqtt-gdp-gateway"
+	devices=`cat $GDP_ETC/mqtt-devices.$hostname | sed -e 's/#.*//'`
+
+	for i in $devices
+	do
+		if gcl-create -q -K$GDP_KEYS -e none $gcl_root.device.$i
+		then
+			echo "Created log $gcl_root.device.$i"
+		fi
+		args="$args device/+/$i $gcl_root.device.$i"
+	done
+
+	exec $gw_prog $args
+} >> $MQTT_GATEWAY_LOG 2>&1
