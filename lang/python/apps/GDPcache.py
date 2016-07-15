@@ -89,7 +89,6 @@ class GDPcache:
         # A quick return for the case we don't need cleanup for
         if len(self.cache)<=2*self.limit: return
 
-        print "Length before cleanup", len(self.cache)
         min_recno = min(self.cache.keys())
         max_recno = max(self.cache.keys())
 
@@ -104,7 +103,6 @@ class GDPcache:
             lru = iLRUorder.pop()
             self.cache.pop(lru)
             self.atime.pop(lru)
-        print "Length after cleanup", len(self.cache)
 
     
     def __time(self, recno):        # cache for tMap
