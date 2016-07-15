@@ -44,6 +44,7 @@
 #include <ep/ep_log.h>
 #include <ep/ep_mem.h>
 #include <ep/ep_net.h>
+#include <ep/ep_string.h>
 #include <ep/ep_thr.h>
 
 #include <sys/file.h>
