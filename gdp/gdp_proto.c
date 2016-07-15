@@ -62,6 +62,8 @@ static uint8_t	RoutingLayerAddr[32] =
 **		waits to get a result, which makes it inappropriate for
 **		instances where multiple commands are in flight, or
 **		where a command can return multiple values (e.g., subscribe).
+**
+**		The req must be locked before this is called.
 */
 
 EP_STAT
@@ -87,6 +89,7 @@ _gdp_invoke(gdp_req_t *req)
 		_gdp_datum_dump(req->pdu->datum, ep_dbg_getfile());
 	}
 	EP_ASSERT(req->state == GDP_REQ_ACTIVE);
+	//EP_ASSERT_REQUIRE(ep_thr_mutex_islocked(&req->mutex));
 
 	// scale timeout to milliseconds
 	delta_to = ep_adm_getlongparam("swarm.gdp.invoke.timeout", 10000L);

@@ -156,8 +156,10 @@ _gdp_req_new(int cmd,
 	// keep track of all outstanding requests on a channel
 	if (chan != NULL)
 	{
+		ep_thr_mutex_lock(&chan->mutex);
 		LIST_INSERT_HEAD(&chan->reqs, req, chanlist);
 		req->flags |= GDP_REQ_ON_CHAN_LIST;
+		ep_thr_mutex_unlock(&chan->mutex);
 	}
 
 	// if we're not passing in a PDU, initialize the new one
@@ -451,7 +453,6 @@ _gdp_req_find(gdp_gcl_t *gcl, gdp_rid_t rid)
 			estat = EP_STAT_OK;
 			ep_thr_mutex_lock(&gcl->mutex);
 			req = LIST_FIRST(&gcl->reqs);
-			ep_thr_mutex_unlock(&gcl->mutex);
 			for (; req != NULL; req = nextreq)
 			{
 				estat = _gdp_req_lock(req);
@@ -461,8 +462,8 @@ _gdp_req_find(gdp_gcl_t *gcl, gdp_rid_t rid)
 					break;
 				_gdp_req_unlock(req);
 			}
-		}
-		while (!EP_STAT_ISOK(estat));
+			ep_thr_mutex_unlock(&gcl->mutex);
+		} while (!EP_STAT_ISOK(estat));
 		if (req == NULL)
 			break;				// nothing to find
 

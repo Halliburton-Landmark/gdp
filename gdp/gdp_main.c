@@ -240,30 +240,35 @@ gdp_pdu_proc_resp(void *pdu_)
 			"gdp_pdu_proc_resp(%s)\n",
 			_gdp_proto_cmd_name(cmd));
 	gcl = _gdp_gcl_cache_get(pdu->src, 0);
+	if (gcl == NULL)
+	{
+		if (ep_dbg_test(Dbg, 1))
+		{
+			ep_dbg_printf("gdp_pdu_proc_resp: discarding PDU for unknown GCL\n");
+			_gdp_pdu_dump(pdu, ep_dbg_getfile());
+		}
+		_gdp_pdu_free(pdu);
+		return;
+	}
 
 	// find the corresponding request
-	if (gcl != NULL)
-	{
-		req = _gdp_req_find(gcl, pdu->rid);
-	}
-	else if (ep_dbg_test(Dbg, 1))
-	{
-		gdp_pname_t pbuf;
-
-		ep_dbg_printf("gdp_pdu_proc_resp: GCL %s has no handle\n",
-				gdp_printable_name(pdu->src, pbuf));
-	}
-
+	req = _gdp_req_find(gcl, pdu->rid);
 	if (req == NULL)
 	{
-		ep_dbg_cprintf(Dbg, 43,
-				"gdp_pdu_proc_resp: allocating new req for GCL %p\n", gcl);
-		estat = _gdp_req_new(cmd, gcl, pdu->chan, pdu, GDP_REQ_CORE, &req);
-		EP_STAT_CHECK(estat, goto fail0);
+		// no req for incoming response --- "can't happen"
+		if (ep_dbg_test(Dbg, 1))
+		{
+			ep_dbg_printf("gdp_pdu_proc_resp: no req for incoming response\n");
+			_gdp_pdu_dump(pdu, ep_dbg_getfile());
+			_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
+		}
+		_gdp_pdu_free(pdu);
+		return;
 	}
-	else if (ep_dbg_test(Dbg, 43))
+
+	if (ep_dbg_test(Dbg, 43))
 	{
-		ep_dbg_printf("gdp_pdu_proc_resp: using existing ");
+		ep_dbg_printf("gdp_pdu_proc_resp: ");
 		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
@@ -321,12 +326,12 @@ gdp_pdu_proc_resp(void *pdu_)
 		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
-
 	// free up resources
 	if (EP_UT_BITSET(GDP_REQ_CORE, req->flags) &&
 		!EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
 	{
 		_gdp_req_free(&req);
+		pdu = NULL;
 	}
 	else
 	{
@@ -334,13 +339,6 @@ gdp_pdu_proc_resp(void *pdu_)
 	}
 
 	ep_dbg_cprintf(Dbg, 40, "gdp_pdu_proc_resp <<< done\n");
-
-	return;
-
-fail0:
-	ep_log(estat, "gdp_pdu_proc_resp: cannot allocate request; dropping PDU");
-	if (pdu != NULL)
-		_gdp_pdu_free(pdu);
 }
 
 
