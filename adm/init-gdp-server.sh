@@ -1,6 +1,6 @@
 #!/bin/sh
-(test -r /usr/local/etc/gdp.conf.sh && . /usr/local/etc/gdp.conf.sh) ||
-	(test -r /etc/gdp.conf.sh && . /etc/gdp.conf.sh)
+{ test -r /usr/local/etc/gdp.conf.sh && . /usr/local/etc/gdp.conf.sh; } ||
+	{ test -r /etc/gdp.conf.sh && . /etc/gdp.conf.sh; }
 
 #
 #  Initialize GDP server hosts
@@ -103,6 +103,8 @@ umask 0022
 if [ "$GDP_ROOT" != "/usr" ]
 then
 	mkdir_gdp_opt bin
+	mkdir_gdp_opt sbin
+	mkdir_gdp_opt lib
 	mkdir_gdp_opt log
 	mkdir_gdp_opt etc
 fi
