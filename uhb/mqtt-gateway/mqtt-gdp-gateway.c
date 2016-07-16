@@ -108,7 +108,10 @@ get_topic_info(const struct mosquitto_message *msg)
 	}
 
 	// no match
-	ep_dbg_cprintf(Dbg, 22, "not found\n");
+	if (ep_dbg_test(Dbg, 22))
+		ep_dbg_printf("not found\n");
+	else
+		ep_dbg_cprintf(Dbg, 2, "get_topic_info(%s): not found\n", msg->topic);
 	return NULL;
 }
 
