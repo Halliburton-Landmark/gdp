@@ -31,6 +31,7 @@ make O=
 make install LOCALROOT=$LOCALROOT
 
 export PATH=$GDP_ROOT/bin:$GDP_ROOT/sbin:$PATH
+export PROMPT_TAG=@
 
 echo "==== Now entering environment with GDP_ROOT=$GDP_ROOT"
 exec $SHELL
