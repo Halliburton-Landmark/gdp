@@ -1,9 +1,9 @@
 <!-- Use "pandoc -sS -o README.html README.md" to process this to HTML -->
 
-# URBAN HEART BEAT PROJECT
+# URBAN HEARTBEAT KIT MQTT-GDP GATEWAY
 
 This directory contains applications and scripts to support the
-Urban Heart Beat project from TerraSwarm.
+Urban Heartbeat project from TerraSwarm.
 
 This is included in the default git tree, but it isn't a make target
 from the root directory because it requires some other libraries that
@@ -13,11 +13,12 @@ This directory contains both common tools (which can be used for
 multiple things) and startup scripts for very specific purposes.
 Generically, the mqtt-gdp-gateway program will take one or more
 arbitrary MQTT topic patterns and log them into corresponding GDP
-logs.  The startup scripts are specifically for the Urban Heart
-Beat project.  Specifically, the startup scripts will set up
-daemons to log the MQTT feeds from the U. Michigan devices (BLEE
+logs.  The startup scripts are specifically for the Urban Heartbeat
+project.  Specifically, the startup scripts will set up daemons to
+log the MQTT feeds from the U. Michigan devices (BLEE, PowerBlade,
 and Blink for now) into one log per device.  You have to configure
-the names of the MQTT brokers but it will discover the devices.
+the names of the MQTT brokers and the names of the devices of
+interest.
 
 
 ## Required Packages
@@ -146,28 +147,52 @@ which will have the actual device name appended.
 
 A helper script used to start up the MQTT-GDP gateway program.  It
 is normally invoked by Upstart, but it can also be invoked by hand.
-It uses MQTT to discover the devices being published, creates any
-logs to support those devices as necessary, and starts the
-`mqtt-gdp-gateway` program to log the device topics into the device
-logs.  It takes two parameters: the DNS hostname of the MQTT broker
-(which must be running) and the prefix for the GDP logs.  For
-example, consider a broker that has topics for two devices named
-`dev1` and `dev2`.  The command:
+It takes the fully qualified domain name of the machine running the
+MQTT broker as its only argument.  The domain part of that name is
+stripped off and the remaining host name is used to find a
+configuration in `$GDP_ETC/mqtt-gateway.$host` (`$GDP_ETC`
+defaults to `/etc`.)  The first line of that file is the base
+name for the GDP log names that will be created; for example,
+it might be `edu.berkeley.eecs.swarmlab`, which will result in
+logs named `edu.berkeley.eecs.swarmlab.device._id_`.  The
+remaining lines of that file are the names of devices of interest.
+Those names will be used both for building the MQTT topic name
+and the GDP log name.
 
-        start-mqtt-gdp-gateway.sh mqtt.example.com com.example.device
+Logs will be created as necessary (it may be helpful to set the
+`swarm.gcl-create.server` administrative parameter).  They will
+be named `$basename.device.$id`, where `$basename` is from the
+first line of the `mqtt-gateway` file and `$id` is from subsequent
+lines in the same file.
 
-This will cause the script to connect to the MQTT broker on
-`mqtt.example.com`, search the topic `gateway-topics` for a list of
-known devices, and then gateway the topic `device/+/dev1` into log
-`com.example.device.dev1` and topic `device/+/dev2` into log
-`com.example.device.dev2`.
+It then starts `mqtt-gdp-gateway` with the necessary parameters
+built from the above information.
+
+For example, if the file `/etc/gdp/mqtt-gateway.foo` contains:
+
+	edu.berkeley.eecs.swarmlab
+	dev23
+	dev37
+
+then `start-mqtt-gdp-gateway.sh foo.example.org` will create the logs
+
+	edu.berkeley.eecs.swarmlab.device.dev23
+	edu.berkeley.eecs.swarmlab.device.dev37
+
+and then start reading the MQTT broker at `foo.example.org` for
+the topics
+
+	device/+/dev23
+	device/+/dev37
+
+Those topics will be copied into the corresponding logs.
+
 
 ## Bugs/Warnings
 
-* The start-mqtt-gdp-gateway.sh script only discovers devices on
-  startup, not on the fly.  To discover new devices the script must
-  be restarted.  Unfortunately, this also means that devices that are
-  down on startup will not be found.
+* The start-mqtt-gdp-gateway.sh script only discovers configuration
+  changes on startup, not on the fly.  To add or delete  devices the
+  script must be restarted.
 * The Upstart scripts assume that they are running on the same
   machine as `gdplogd`; in particular, they start and stop based
   on an Upstart job named `gdplogd` running on the same machine.
@@ -176,4 +201,4 @@ known devices, and then gateway the topic `device/+/dev1` into log
 * **Note:** The Debian systems running on the BeagleBone use
   systemd as their startup system; hence, the U. Michigan code
   uses systemd.  Conversely, Ubuntu 14.04 uses Upstart; hence,
-  the MQTT-GDP code uses Upstart.
+  the MQTT-GDP code uses Upstart.  Systemd support is in progress.

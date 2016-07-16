@@ -8,13 +8,11 @@ console log
 
 instance $MQTT_SERVER
 
-env PROG="adm/start-mqtt-gdp-gateway.sh"
-env MQTT_LOG_ROOT="edu.berkeley.eecs.swarmlab.device"
+env GDP_ROOT=@GDP_ROOT@
+env PROG="@GDP_ROOT@/sbin/start-mqtt-gdp-gateway.sh"
 env CONFIG="/etc/default/mqtt-gdp-gateway"
-env LOGFILE="/var/log/gdp/mqtt-gdp-gateway.log"
+env LOGFILE="@GDP_LOG_DIR@/mqtt-gdp-gateway.log"
 
-# needs to match GDPROOT in uhb/install-mqtt-gdp-gateway.sh
-chdir /usr/gdp
 setuid gdp
 
 pre-start script
@@ -27,7 +25,7 @@ pre-start script
 	else
 		true
 	fi
-	echo "[`date`] $NAME starting on $MQTT_SERVER => $MQTT_LOG_ROOT.\*"
+	echo "[`date`] $NAME starting on $MQTT_SERVER"
 	# debugging
 	echo "PROG=$PROG"
 	echo "CONFIG=$CONFIG"
@@ -37,9 +35,8 @@ end script
 script
 	test ! -r $CONFIG || . $CONFIG
 	exec >> $LOGFILE 2>&1
-	DEVICES=/usr/gdp/etc/$MQTT_SERVER.devices.conf
-	echo "[`date`] $PROG $MQTT_SERVER $MQTT_LOG_ROOT"
-	exec $PROG $MQTT_SERVER $DEVICES $MQTT_LOG_ROOT
+	echo "[`date`] sh $PROG $MQTT_SERVER"
+	exec sh $PROG $MQTT_SERVER
 end script
 
 pre-stop script

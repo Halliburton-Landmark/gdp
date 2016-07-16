@@ -1,0 +1,15 @@
+# see https://www.reddit.com/r/systemd/comments/3spd5k/start_multiple_instances_with_one_service_file/ for an explanation
+
+[Unit]
+Description=All mqtt-gdp-gateway instances
+After=gdplogd
+
+[Service]
+Type=oneshot
+Environment=GDP_ROOT=@GDP_ROOT@
+Environment=GDP_USER=@GDP_USER@
+ExecStart=@GDP_ROOT@/sbin/mqtt-gdp-gateway XXX
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

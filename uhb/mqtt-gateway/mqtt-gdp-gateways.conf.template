@@ -10,14 +10,10 @@ start on started gdplogd
 stop on stopping gdplogd
 
 env NAME="MQTT-GDP all gateways"
-env GDP_ROOT=/usr/gdp
-env LOGFILE="/var/log/gdp/mqtt-gdp-gateway.log"
-env PIDFILE="/var/run/mqtt-gdp-gateways.pid"
+env GDP_ROOT=@GDP_ROOT@
+env PIDFILE="@GDP_VAR_RUN@/mqtt-gdp-gateways.pid"
 
 script
 	echo $$ > $PIDFILE
-	test ! -r $CONFIG || . $CONFIG
-	exec >> $LOGFILE 2>&1
-	echo "[`date`] $NAME starting"
 	sh $GDP_ROOT/etc/start-mqtt-gdp-gateways.sh
 end script

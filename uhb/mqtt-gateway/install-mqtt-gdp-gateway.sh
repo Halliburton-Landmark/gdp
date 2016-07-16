@@ -1,22 +1,44 @@
 #!/bin/sh
 
 #
-#  Right now assumes you are using Upstart.  Should adapt to systemd.
+#  Requires manual choice of init system; should figure it out.
 #
 #	Only tested on certain Debian-derived systems.
 #	Sorry, will not work on MacOS or FreeBSD.
 #
 
-cd `dirname $0`/..
-root=`pwd`
+### Init system: "upstart", "systemd", or other
+: ${INITSYS:=upstart}
 
+{ test -r /usr/local/etc/gdp.conf.sh && . /usr/local/etc/gdp.conf.sh; } ||
+	{ test -r /etc/gdp.conf.sh && . /etc/gdp.conf.sh; }
+: ${GDP_ROOT:=/usr}
+: ${GDP_USER:=gdp}
+: ${GDP_GROUP:=gdp}
+if [ "$GDP_ROOT" = "/usr" ]
+then
+	: ${GDP_ETC:=/etc/gdp}
+else
+	: ${GDP_ETC:=$GDP_ROOT/etc}
+fi
+
+# yes, we really need the adm directory (for customize.sh)
+cd `dirname $0`
+dir=`pwd`
+while [ ! -d $dir/gdp/adm ]
+do
+	dir=`echo $dir | sed -e 's,/[^/]*$,,'`
+	if [ -z "$dir" ]
+	then
+		echo "[FATAL] Need gdp/adm directory somewhere in directory tree"
+		exit 1
+	fi
+done
+cd $dir/gdp
+pwd
+exit
 . adm/common-support.sh
 
-# default root of installation directories (usually /usr or /usr/local)
-: ${INSTALLROOT:=/usr}
-
-# GDP subtree within $INSTALLROOT
-: ${GDPROOT:=$INSTALLROOT/gdp}
 
 # Installation program
 : ${INSTALL:=install}
@@ -24,6 +46,7 @@ root=`pwd`
 if [ `uname -s` != Linux ]
 then
 	fatal "Only works on (some) Linux systems"
+	exit 1
 fi
 
 # create GDP user if necessary
@@ -34,45 +57,64 @@ then
 fi
 
 # make system directories if needed
-if [ ! -d $GDPROOT ]
+if [ ! -d $GDP_ROOT ]
 then
-	info "Creating $GDPROOT"
-	sudo mkdir -p $GDPROOT
-	sudo chown gdp:gdp $GDPROOT
+	info "Creating $GDP_ROOT"
+	sudo mkdir -p $GDP_ROOT
+	sudo chown $GDP_USER $GDP_ROOT
 	for d in bin sbin etc lib adm
 	do
-		sudo mkdir $GDPROOT/$d
-		sudo chown gdp:gdp $GDPROOT/$d
+		sudo mkdir $GDP_ROOT/$d
+		sudo chown $GDP_USER $GDP_ROOT/$d
 	done
 fi
 
 info "Installing mqtt-gdp-gateway program and documentation"
-(cd uhb; make mqtt-gdp-gateway)
-sudo $INSTALL -o gdp -g gdp uhb/mqtt-gdp-gateway ${INSTALLROOT}/sbin
-manroot=${INSTALLROOT}/share/man
-test -d $manroot || manroot=${INSTALLROOT}/man
-sudo $INSTALL -o gdp -g gdp uhb/mqtt-gdp-gateway.1 $manroot/man1
+make mqtt-gdp-gateway
+sudo $INSTALL -o $GDP_USER -g $GDP_GROUP mqtt-gdp-gateway $GDP_ROOT/sbin
+manroot=${GDP_ROOT}/share/man
+test -d $manroot || manroot=$GDP_ROOT/man
+sudo $INSTALL -o $GDP_USER -g $GDP_GROUP mqtt-gdp-gateway.1 $manroot/man1
 
 info "Installing mqtt-gdp-gateway startup scripts"
-sudo $INSTALL -o gdp -g gdp uhb/start-mqtt-gdp-gateway.sh $GDPROOT/sbin
-sudo $INSTALL -o gdp -g gdp adm/common-support.sh $GDPROOT/adm
+sudo $INSTALL -o $GDP_USER -g $GDP_GROUP start-mqtt-gdp-gateway.sh $GDP_ROOT/sbin
 
-info "Installing Upstart system startup configuration"
-sudo cp uhb/mqtt-gdp-gateway.conf uhb/mqtt-gdp-gateways.conf /etc/init
-sudo initctl check-config --system mqtt-gdp-gateway
-sudo initctl check-config --system mqtt-gdp-gateways
+info "Installing MQTT gateway configuration"
+cp -iv mqtt-gateway.*.conf $GDP_ETC
+
+if [ "$INITSYS" = "upstart" ]
+then
+	info "Installing Upstart system startup configuration"
+	sudo sh adm/customize.sh mqtt-gdp-gateway.conf /etc/init
+	sudo sh adm/customize.sh mqtt-gdp-gateways.conf /etc/init
+	sudo initctl check-config --system mqtt-gdp-gateway
+	sudo initctl check-config --system mqtt-gdp-gateways
+elif [ "$INITSYS" = "systemd" ]
+then
+	info "Installing systemd startup configuration"
+	sudo sh adm/customize.sh mqtt-gdp-gateway.service /etc/systemd/system
+	sudo sh adm/customize.sh mqtt-gdp-gateway@.service /etc/systemd/system
+	sudo systemctl daemon-reload
+	sudo systemctl enable mqtt-gdp-gateway@
+	sudo systemctl enable mqtt-gdp-gateway
+else
+	warn "Unknown init system; no system startup installed"
+fi
+
+### XXX Not clear we need this file at all
 if [ ! -e /etc/default/mqtt-gdp-gateway ]
 then
-	sudo dd of=/etc/default/mqtt-gdp-gateway << EOF
-	# list of MQTT servers to monitor (use # to comment out lines)
-	MQTT_SERVERS=`sed 's/#.*//' << 'EOF'
+	MQTT_SERVERS=`sed 's/#.*//' <<- 'EOF'
 		localhost
 EOF
 `
+	sudo dd of=/etc/default/mqtt-gdp-gateway <<- EOF
+	# list of MQTT servers to monitor (use # to comment out lines)
+	MQTT_SERVERS=$MQTT_SERVERS
 
 	# root of GDP log name; the device name will be appended
 	MQTT_LOG_ROOT="edu.berkeley.eecs.swarmlab.device"
 EOF
 	warn "Edit /etc/default/mqtt-gdp-gateway to define"
-	warn "   MQTT_SERVERS and MQTT_LOG_ROOT"
+	warn "    MQTT_SERVERS and MQTT_LOG_ROOT"
 fi
