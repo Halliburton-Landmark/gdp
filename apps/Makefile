@@ -29,7 +29,6 @@
 #ALL=	gcl-create gdp-writer gdp-reader gdp-rest rw-bench log-view
 BINALL=		gcl-create \
 		log-mirror \
-		log-view \
 		gdp-reader \
 		gdp-writer \
 		gdp-zcbrowse \
