@@ -50,4 +50,8 @@ If the daemons are running, try:
   py.test --logName=$logName run_tests.py
 
 
-
+The `enter-gdp-environment.sh` script sets up a parallel GDP
+environment (binaries, libraries, etc.).  The directory name is
+specified on the command line, and defaults to `$HOME/tmp/gdp`.
+It then starts a subshell with `$PATH` set to use these binaries.
+It must be run from the root of the source tree.
