@@ -1,6 +1,6 @@
 #!/bin/sh
-(test -r /usr/local/etc/gdp.conf.sh && . /usr/local/etc/gdp.conf.sh) ||
-	(test -r /etc/gdp.conf.sh && . /etc/gdp.conf.sh)
+{ test -r /usr/local/etc/gdp.conf.sh && . /usr/local/etc/gdp.conf.sh; } ||
+	{ test -r /etc/gdp.conf.sh && . /etc/gdp.conf.sh; }
 : ${GDP_ROOT:=/usr}
 
 #

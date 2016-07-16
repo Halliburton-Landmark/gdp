@@ -16,8 +16,8 @@ source_root=`basename $source_file .template`
 source_file="$source_dir/$source_root.template"
 #echo source_file=$source_file, source_dir=$source_dir, source_root=$source_root, target_dir=$target_dir
 
-(test -r /usr/local/etc/gdp.conf.sh && . /usr/local/etc/gdp.conf.sh) ||
-	        (test -r /etc/gdp.conf.sh && . /etc/gdp.conf.sh)
+{ test -r /usr/local/etc/gdp.conf.sh && . /usr/local/etc/gdp.conf.sh; } ||
+	{ test -r /etc/gdp.conf.sh && . /etc/gdp.conf.sh; }
 : ${GDP_LOG_DIR:=/var/log/gdp}
 : ${GDP_ROOT:=/usr}
 if [ "$GDP_ROOT" = "/usr" ]
