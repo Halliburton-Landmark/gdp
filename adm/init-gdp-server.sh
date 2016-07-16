@@ -34,7 +34,7 @@ cd `dirname $0`/..
 : ${GDP_ROOT:=/usr}
 if [ "$GDP_ROOT" = "/usr" ]
 then
-	: ${GDP_ETC:=/etc}
+	: ${GDP_ETC:=/etc/gdp}
 else
 	: ${GDP_ETC:=$GDP_ROOT/etc}
 fi
@@ -42,7 +42,7 @@ fi
 : ${GDP_USER:=gdp}
 : ${GDP_GROUP:=$GDP_USER}
 : ${GDP_VAR:=/var/swarm/gdp}
-: ${GDP_KEYS:=$GDP_VAR/KEYS}
+: ${GDP_KEYS_DIR:=$GDP_ETC/keys}
 : ${GDPLOGD_DATADIR:=$GDP_VAR/gcls}
 
 #################### FUNCTIONS ####################
@@ -119,7 +119,7 @@ mkdir_gdp_opt $GDP_ETC
 mkdir_gdp $EP_PARAMS
 mkdir_gdp $GDP_LOG_DIR
 mkdir_gdp $GDP_VAR
-mkdir_gdp $GDP_KEYS 0750
+mkdir_gdp $GDP_KEYS_DIR 0750
 mkdir_gdp $GDPLOGD_DATADIR 0750
 
 ## set up default runtime administrative parameters

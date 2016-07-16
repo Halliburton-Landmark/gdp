@@ -18,20 +18,21 @@ source_file="$source_dir/$source_root.template"
 
 { test -r /usr/local/etc/gdp.conf.sh && . /usr/local/etc/gdp.conf.sh; } ||
 	{ test -r /etc/gdp.conf.sh && . /etc/gdp.conf.sh; }
-: ${GDP_LOG_DIR:=/var/log/gdp}
 : ${GDP_ROOT:=/usr}
 if [ "$GDP_ROOT" = "/usr" ]
 then
-	: ${GDP_ETC:=/etc}
+	: ${GDP_ETC:=/etc/gdp}
 else
 	: ${GDP_ETC:=$GDP_ROOT/etc}
 fi
+: ${GDP_VAR_RUN:=/var/run/gdp}
+: ${GDP_LOG_DIR:=/var/log/gdp}
 : ${GDP_SYSLOG_FACILITY:=local4}
 : ${GDP_SYSLOG_LEVEL:=notice}
 : ${GDP_USER:=gdp}
 : ${GDP_VAR:=/var/swarm/gdp}
-: ${GDP_KEYS:=$GDP_VAR/KEYS}
-: ${GDP_ROUTER_CONF:=/etc/gdp-router-click.conf}
+: ${GDP_KEYS_DIR:=$GDP_ETC/keys}
+: ${GDP_ROUTER_CONF:=$GDP_VAR_RUN/gdp-router-click.conf}
 : ${GDPLOGD_ARGS:=}
 : ${GDPLOGD_DATADIR:=}
 
@@ -45,7 +46,7 @@ fi
 		-e "s;@GDP_SYSLOG_LEVEL@;$GDP_SYSLOG_LEVEL;g" \
 		-e "s;@GDP_USER@;$GDP_USER;g" \
 		-e "s;@GDP_VAR@;$GDP_VAR;g" \
-		-e "s;@GDP_KEYS@;$GDP_KEYS;g" \
+		-e "s;@GDP_KEYS_DIR@;$GDP_KEYS_DIR;g" \
 		-e "s;@GDP_ROUTER_CONF@;$GDP_ROUTER_CONF;g" \
 		-e "s;@GDPLOGD_ARGS@;$GDPLOGD_ARGS;g" \
 		-e "s;@GDPLOGD_DATADIR@;$GDPLOGD_DATADIR;g" \

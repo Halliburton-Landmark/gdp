@@ -57,8 +57,9 @@ that can be changed, the most useful of which is GDP_ROOT.
 There are three cases for `GDP_ROOT`:
 
   * `GDP_ROOT` = `/usr` means that everything will be installed
-    in the "normal" system directories: /usr/bin, /usr/sbin,
-	/var/log, and /etc.  This is the default.
+    in the "normal" system directories: `/usr/bin`, `/usr/sbin`,
+	`/var/log`, and `/etc/gdp`.  Note that files in `/etc` are in
+	a subdirectory.  This is the default.
   * `GDP_ROOT` = ~gdp (that is, the home directory for user
     `gdp`) means that everything will be installed in that
 	directory: ~gdp/bin, ~gdp/sbin, ~gdp/log, and ~gdp/etc.
@@ -68,6 +69,12 @@ There are three cases for `GDP_ROOT`:
     the indicated directory.  For example, if `GDP_ROOT` is
 	`/usr/local/gdp` then all installation will go into that
 	directory instead of the system directories.
+
+Other locations can be set explicitly (rather that deriving from
+`GDP_ROOT`):
+
+  * `GDP_ETC`: the location for configuration files.
+  * `GDP_LOG_DIR`: where system logs are stored.
 
 ### Initializing the Server
 
