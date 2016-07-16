@@ -52,11 +52,11 @@ clean:
 	rm -f gdp-client*.deb gdp-server*.deb python-gdp*.deb README*.html
 
 install:
-	(cd ep;		make install DESTDIR=${DESTDIR} INSTALLROOT=${INSTALLROOT})
-	(cd gdp;	make install DESTDIR=${DESTDIR} INSTALLROOT=${INSTALLROOT})
-	(cd gdplogd;	make install DESTDIR=${DESTDIR} INSTALLROOT=${INSTALLROOT})
-	(cd apps;	make install DESTDIR=${DESTDIR} INSTALLROOT=${INSTALLROOT})
-	(cd doc;	make install DESTDIR=${DESTDIR} INSTALLROOT=${INSTALLROOT})
+	(cd ep;		make install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
+	(cd gdp;	make install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
+	(cd gdplogd;	make install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
+	(cd apps;	make install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
+	(cd doc;	make install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
 	mkdir -p ${DOCDIR}
 	cp -rp examples ${DOCDIR}
 
