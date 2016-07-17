@@ -22,22 +22,22 @@ else
 	: ${GDP_ETC:=$GDP_ROOT/etc}
 fi
 
-# yes, we really need the adm directory (for customize.sh)
+# need to run from the mqtt-gdp-gateway source directory
 cd `dirname $0`
-dir=`pwd`
-while [ ! -d $dir/gdp/adm ]
+
+# yes, we really need the adm directory (for customize.sh)
+gdp=`pwd`
+while [ ! -d $gdp/gdp/adm ]
 do
-	dir=`echo $dir | sed -e 's,/[^/]*$,,'`
-	if [ -z "$dir" ]
+	gdp=`echo $gdp | sed -e 's,/[^/]*$,,'`
+	if [ -z "$gdp" ]
 	then
 		echo "[FATAL] Need gdp/adm directory somewhere in directory tree"
 		exit 1
 	fi
 done
-cd $dir/gdp
-pwd
-exit
-. adm/common-support.sh
+gdp=$gdp/gdp
+. $gdp/adm/common-support.sh
 
 
 # Installation program
@@ -48,6 +48,8 @@ then
 	fatal "Only works on (some) Linux systems"
 	exit 1
 fi
+
+info "Installing with GDP_ROOT=$GDP_ROOT, GDP_ETC=$GDP_ETC"
 
 # create GDP user if necessary
 if ! grep -q '^gdp:' /etc/passwd
@@ -85,15 +87,15 @@ cp -iv mqtt-gateway.*.conf $GDP_ETC
 if [ "$INITSYS" = "upstart" ]
 then
 	info "Installing Upstart system startup configuration"
-	sudo sh adm/customize.sh mqtt-gdp-gateway.conf /etc/init
-	sudo sh adm/customize.sh mqtt-gdp-gateways.conf /etc/init
+	sudo sh $gdp/adm/customize.sh mqtt-gdp-gateway.conf /etc/init
+	sudo sh $gdp/adm/customize.sh mqtt-gdp-gateways.conf /etc/init
 	sudo initctl check-config --system mqtt-gdp-gateway
 	sudo initctl check-config --system mqtt-gdp-gateways
 elif [ "$INITSYS" = "systemd" ]
 then
 	info "Installing systemd startup configuration"
-	sudo sh adm/customize.sh mqtt-gdp-gateway.service /etc/systemd/system
-	sudo sh adm/customize.sh mqtt-gdp-gateway@.service /etc/systemd/system
+	sudo sh $gdp/adm/customize.sh mqtt-gdp-gateway.service /etc/systemd/system
+	sudo sh $gdp/adm/customize.sh mqtt-gdp-gateway@.service /etc/systemd/system
 	sudo systemctl daemon-reload
 	sudo systemctl enable mqtt-gdp-gateway@
 	sudo systemctl enable mqtt-gdp-gateway
