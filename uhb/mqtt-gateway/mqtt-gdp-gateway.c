@@ -298,10 +298,7 @@ message_cb(struct mosquitto *mosq,
 		estat = gdp_gcl_append(tinfo->gcl, datum);
 		if (!EP_STAT_ISOK(estat))
 		{
-			gdp_pname_t pname;
-
-			gdp_printable_name(*gdp_gcl_getname(tinfo->gcl), pname);
-			ep_log(estat, "cannot log MQTT message to %s", pname);
+			ep_log(estat, "cannot log MQTT message for %s", msg->topic);
 		}
 		gdp_datum_free(datum);
 	}
