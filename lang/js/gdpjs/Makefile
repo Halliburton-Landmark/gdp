@@ -75,10 +75,20 @@ SHARED=	-shared
 #SHARED=	-shared -Wl,-soname,$@
 TIME=
 
-GDPJS_LIBMAJVER=	1
-GDPJS_LIBMINVER=	0
-GDPJS_LIBVER=	${GDPJS_LIBMAJVER}.${GDPJS_LIBMINVER}
-ALL=		libgdpjs.a libgdpjs.so.${GDPJS_LIBVER}
+GDPJSLIBMAJVER=	1
+GDPJSLIBMINVER=	0
+GDPJSLIBVER=	${GDPJSLIBMAJVER}.${GDPJSLIBMINVER}
+
+# Version of the GDP Library, should match ../../../gdp/Makefile
+GDPLIBMAJVER=	0
+GDPLIBMINVER=	5
+
+# Version of the EP Library, should match ../../../ep/Makefile
+EPLIBMAJVER=	3
+EPLIBMINVER=	0
+
+ALL=		libgdpjs.a libgdpjs.so.${GDPJSLIBVER}
+
 
 all: ${ALL}
 
@@ -86,13 +96,28 @@ libgdpjs.a: ${OBJS}
 	${AR} -r $@ ${OBJS}
 	${RANLIB} $@
 
-libgdpjs.so.${GDPJS_LIBVER}: ${OBJS}
+libgdpjs.so.${GDPJSLIBVER}: ${OBJS} ../gdp ../ep
 	${CC} ${SHARED} -o $@ ${OBJS} ${LDFLAGS}
-	(cd ${LIBDIR} && sh ${GDPROOT}/libs/makelinks.sh gdpjs ${GDPJS_LIBMAJVER} ${GDPJS_LIBMINVER})
+	(cd ${LIBDIR} && sh ${GDPROOT}/libs/makelinks.sh gdpjs ${GDPJSLIBMAJVER} ${GDPJSLIBMINVER})
+	(cd ${LIBDIR} && sh ${GDPROOT}/libs/makelinks.sh gdp ${GDPLIBMAJVER} ${GDPLIBMINVER})
+	(cd ${LIBDIR} && sh ${GDPROOT}/libs/makelinks.sh ep ${EPLIBMAJVER} ${EPLIBMINVER})
 
 gdpjs_version.o: gdpjs_version.c FORCE
 	${CC} ${CFLAGS} -D_CURRENT_DATE_=\"`date +'%Y-%m-%d_%H:%M'`\" -c gdpjs_version.c
 
+../gdp:
+	if [ ! -d ../gdp ]; then \
+		echo "Create a copy of libgdp* so that we can bundle it up"; \
+		mkdir ../gdp; \
+		cp ../../../gdp/libgdp* ../gdp; \
+	fi
+
+../ep:
+	if [ ! -d ../ep ]; then \
+		echo "Create a copy of libep* so that we can bundle it up"; \
+		mkdir ../ep; \
+		cp ../../../ep/libep* ../ep; \
+	fi
 FORCE:
 
 #

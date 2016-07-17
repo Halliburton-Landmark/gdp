@@ -267,7 +267,7 @@ var EP_TIME_SPEC_struct_Ptr = ref.refType(EP_TIME_SPEC_struct);
 var EP_TIME_SPEC_struct_PtrPtr = ref.refType(EP_TIME_SPEC_struct_Ptr);
 
 
-var libep = ffi.Library(GDP_DIR + '/libs/libep-3.0', {
+var libep = ffi.Library(GDP_DIR + '/libs/libep.3.0', {
 
     // From ep/ep_dbg.h
     //CJS // initialization
@@ -448,7 +448,7 @@ var GDP_EVENT_DATA = 1 // returned data
 var GDP_EVENT_EOS = 2 // end of subscription
 
 
-var libgdp = ffi.Library(GDP_DIR + '/libs/libgdp-0.5', {
+var libgdp = ffi.Library(GDP_DIR + '/libs/libgdp.0.5', {
 
     // From gdp/gdp.h
     //CJS // free an event (required after gdp_event_next)
@@ -630,7 +630,7 @@ exports.gdp_parse_name = libgdp.gdp_parse_name;
 
 // JS-to-GDP onion skin layer on selected GDP functions and macros.
 //
-var libgdpjs = ffi.Library(GDPJS_DIR + '/../libs/libgdpjs-1.0', {
+var libgdpjs = ffi.Library(GDPJS_DIR + '/../libs/libgdpjs.1.0', {
 
     // Some general libc-related functions
 
