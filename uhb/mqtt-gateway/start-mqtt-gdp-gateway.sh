@@ -43,9 +43,9 @@ EX_CONFIG=78
 	mqtt_host=$1
 
 	shorthost=`echo $mqtt_host | sed 's/\..*//'`
-	if [ ! -e $GDP_ETC/mqtt-devices.$shorthost.conf ]
+	if [ ! -e $GDP_ETC/mqtt-gateway.$shorthost.conf ]
 	then
-		echo "[FATAL] No configuration $GDP_ETC/mqtt-devices.$shorthost.conf"
+		echo "[FATAL] No configuration $GDP_ETC/mqtt-gateway.$shorthost.conf"
 		exit $EX_CONFIG
 	fi
 
