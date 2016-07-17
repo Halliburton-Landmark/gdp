@@ -35,6 +35,7 @@ cd `dirname $0`/..
 if [ "$GDP_ROOT" = "/usr" ]
 then
 	: ${GDP_ETC:=/etc/gdp}
+	: ${EP_PARAMS:=/etc/ep_adm_params}
 else
 	: ${GDP_ETC:=$GDP_ROOT/etc}
 fi
@@ -64,7 +65,7 @@ mkdir_gdp_opt() {
 }
 
 chown_gdp_opt() {
-	test "$GDP_ROOT" != "~${GDP_USER}" && return
+	#test "$GDP_ROOT" != "~${GDP_USER}" && return
 	info "Giving $1 to user ${GDP_USER}:${GDP_GROUP}"
 	chown ${GDP_USER}:${GDP_GROUP} $1
 }
@@ -108,7 +109,12 @@ then
 	mkdir_gdp_opt log
 	mkdir_gdp_opt etc
 fi
-if [ "$GDP_ROOT" = "~${GDP_USER}" ]
+
+# convert /etc/gdp/ep_adm_params => /etc/ep_adm_params
+if [ `basename $GDP_ETC` = "gdp" ]
+then
+	EP_PARAMS=`dirname $GDP_ETC`/ep_adm_params
+elif [ "$GDP_ROOT" = "~${GDP_USER}" ]
 then
 	EP_PARAMS=$GDP_ROOT/.ep_adm_params
 else
