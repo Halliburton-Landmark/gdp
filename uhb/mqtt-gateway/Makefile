@@ -106,8 +106,6 @@ all:	${ALL}
 mqtt-gdp-gateway:	mqtt-gdp-gateway.o
 	${CC} -o $@ mqtt-gdp-gateway.o ${LDFLAGS}
 
-${ALL}:		${LIBROOT}/gdp/libgdp.a ${LIBROOT}/ep/libep.a
-
 clean:
 	-rm -f ${CLEANALL} *.o *.core
 
