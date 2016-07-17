@@ -22,10 +22,16 @@
 
 // debugging:
 var fs = require('fs'),
-    path = require('path');
+    path = require('path'),
+    mod_getopt = require('posix-getopt');
 var dirString = path.dirname(fs.realpathSync(__filename));
 console.log('working directory:', dirString);
 
+try {
+    var gdpjs = require('gdpjs');
+} catch (exception) {
+    var gdpjs = require('../gdpjs/gdpjs');
+}
 // Load Node.js modules for calling foreign functions -- C functions here.
 // See libgdp_h.js for details and assumptions about the directory
 // where Node.js modules must be placed.
@@ -33,19 +39,19 @@ console.log('working directory:', dirString);
 // Parameters needed for libgdp_h.js and gdpjs_supt.js
 // They MUST be adapted to the directory where this program will be run.
 // See libgdp_h.js for details.
-var GDP_DIR = process.env.GDP_DIR;
-if (GDP_DIR == undefined) GDP_DIR = "../../..";
-var GDPJS_DIR = GDP_DIR + "/lang/js/gdpjs/";
-var NODE_MODULES_DIR = "";
-//
-var LIBGDP_H_DIR = GDPJS_DIR;
-// Here we include and evaluate our shared GDP Javascript "header file",
-// 'libgdp_h.js', within the global scope/environment.
-var fs = require('fs'); // Node.js's built-in File System module
-eval(fs.readFileSync(LIBGDP_H_DIR + 'libgdp_h.js').toString());
-// We similarly include & evaluate some JS support functions.
-eval(fs.readFileSync(LIBGDP_H_DIR + 'gdpjs_supt.js').toString());
-eval(fs.readFileSync(LIBGDP_H_DIR + 'rw_supt.js').toString());
+// var GDP_DIR = process.env.GDP_DIR;
+// if (GDP_DIR == undefined) GDP_DIR = "../../..";
+// var GDPJS_DIR = GDP_DIR + "/lang/js/gdpjs/";
+// var NODE_MODULES_DIR = "";
+// //
+// var LIBGDP_H_DIR = GDPJS_DIR;
+// // Here we include and evaluate our shared GDP Javascript "header file",
+// // 'libgdp_h.js', within the global scope/environment.
+// var fs = require('fs'); // Node.js's built-in File System module
+// eval(fs.readFileSync(LIBGDP_H_DIR + 'libgdp_h.js').toString());
+// // We similarly include & evaluate some JS support functions.
+// eval(fs.readFileSync(LIBGDP_H_DIR + 'gdpjs_supt.js').toString());
+// eval(fs.readFileSync(LIBGDP_H_DIR + 'rw_supt.js').toString());
 
 
 //C  /*
@@ -77,6 +83,7 @@ if (false) // Turn off local do_simpleread() and do_multiread() fcns
     //       numrecs is a JS Number not a ref int
     /* EP_STAT */
     function do_simpleread(gclh, firstrec, numrecs) {
+        console.log("reader-test.js: do_simple_read(, " + firstrec + ", " + numrecs);
         //C  	EP_STAT estat = EP_STAT_OK;
         // ?? make sure this can hold & allow access to gdp EP_STAT's
         var estat = /* EP_STAT */ ep_stat_ok_js();
@@ -102,6 +109,7 @@ if (false) // Turn off local do_simpleread() and do_multiread() fcns
         recno = firstrec;
         while (numrecs < 0 || --numrecs >= 0) {
             //C  		// ask the GDP to give us a record
+            console.log("reader-test.js: do_simple_read(): about to call gdp_gcl_read_js(," + recno);
             estat = gdp_gcl_read_js(gclh, recno, datum);
             //C  
             //C  		// make sure it did; if not, break out of the loop
@@ -272,11 +280,11 @@ function main(argc, argv) {
     // Why doesn't this work??  var gclname = new gcl_name_t(32);
     // var gclname = ref.alloc(gcl_name_t);
     // Now it seems to work 2014-10-26
-    var gclname = new gcl_name_t(32);
+    //var gclname = new gcl_name_t(32);
     //C  	gcl_pname_t gclpname;
     // var gclpname = ref.alloc(gcl_pname_t);
     // Now try same as for gclname for gclpname - Seems to work 2014-10-26
-    var gclpname = new gcl_pname_t(GDP_GCL_PNAME_LEN);
+    //var gclpname = new gcl_pname_t(GDP_GCL_PNAME_LEN);
 
     //C  	int opt;
     var opt;
@@ -306,7 +314,7 @@ function main(argc, argv) {
 
     // Some useful variants for libep printf debugging output
     // Needed for the -D option below.
-    ep_dbg_init_js();
+    gdpjs.ep_dbg_init();
     // ep_dbg_set_js("*=99");  // start general debug output from libgdp
 
     //C  
@@ -331,7 +339,7 @@ function main(argc, argv) {
             // Note, ep_dbg_init_js() was called far above.
             // Will gdp_init() also call ep_dbg_init()??
             // For some reason we don't get libgdp debug print output??
-            ep_dbg_set_js(opt.optarg);
+            gdpjs.ep_dbg_set_js(opt.optarg);
             break;
             //C  
         case 'f':
@@ -434,7 +442,7 @@ function main(argc, argv) {
     //         Do the same for writer-test.js
     // console.log( 'In reader-test.js: main: calling read_gcl_records; firstrec = %d, numrecs = %d',
     //              firstrec, numrecs );
-    read_gcl_records(gdpd_addr, gcl_name,
+    gdpjs.read_gcl_records(gdpd_addr, gcl_name,
         gcl_firstrec, gcl_numrecs,
         gcl_subscribe, gcl_multiread, recdest,
         conout, gdp_event_cbfunc,

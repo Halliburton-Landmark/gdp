@@ -1,0 +1,26 @@
+{
+    "name": "gdpjs",
+    "version": "0.5.0",
+    "description": "The Global Data Plane",
+    "main": "index.js",
+    "directories": {
+        "test": "tests"
+    },
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "author": "Christopher Brooks",
+    "contributors": [
+        {
+            "email": "eric@cs.berkeley.edu",
+            "name": "Eric Allman"
+        }
+    ],
+    "license": "BSD-2-Clause",
+    "maintainers": [
+        {
+            "email": "cxh@eecs.berkeley.edu",
+            "name": "Christopher Brooks"
+        }
+    ]
+}

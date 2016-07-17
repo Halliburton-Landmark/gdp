@@ -19,6 +19,11 @@
 // with something like:
 //    sed  -e '/^\/\/C/d' <This file>.js
 
+var mod_getopt = require('posix-getopt');
+var os = require('os');
+var path = require('path');
+
+var gdpjs = require('gdpjs');
 
 // Load Node.js modules for calling foreign functions -- C functions here.
 // See libgdp_h.js for details and assumptions about the directory
@@ -27,18 +32,18 @@
 // Parameters needed for libgdp_h.js and gdpjs_supt.js
 // They MUST be adapted to the directory where this program will be run.
 // See libgdp_h.js for details.
-var GDP_DIR = "../../../";
-var GDPJS_DIR = GDP_DIR + "./lang/js/gdpjs/";
-var NODE_MODULES_DIR = "";
+//var GDP_DIR = "../../../";
+//var GDPJS_DIR = GDP_DIR + "./lang/js/gdpjs/";
+//var NODE_MODULES_DIR = "";
 //
-var LIBGDP_H_DIR = GDPJS_DIR;
+//var LIBGDP_H_DIR = GDPJS_DIR;
 // Here we include and evaluate our shared GDP Javascript "header file",
 // 'libgdp_h.js', within the global scope/environment.
-var fs = require('fs'); // Node.js's built-in File System module
-eval(fs.readFileSync(LIBGDP_H_DIR + 'libgdp_h.js').toString());
+//var fs = require('fs'); // Node.js's built-in File System module
+//eval(fs.readFileSync(LIBGDP_H_DIR + 'libgdp_h.js').toString());
 // We similarly include & evaluate some JS support functions.
-eval(fs.readFileSync(LIBGDP_H_DIR + 'gdpjs_supt.js').toString());
-eval(fs.readFileSync(LIBGDP_H_DIR + 'rw_supt.js').toString());
+//eval(fs.readFileSync(LIBGDP_H_DIR + 'gdpjs_supt.js').toString());
+//eval(fs.readFileSync(LIBGDP_H_DIR + 'rw_supt.js').toString());
 
 
 //C  /*
@@ -48,11 +53,12 @@ eval(fs.readFileSync(LIBGDP_H_DIR + 'rw_supt.js').toString());
 //C  **		and assumes they are text, but there is no text requirement
 //C  **		implied by the GDP.
 //C  */
+
 function main(argc, argv) {
     //C  	gdp_gcl_t *gclh;
     var gcl_Ptr; // gclh
     //C  	gcl_name_t gcliname;
-    var gcliname = ref.alloc(gcl_name_t);
+    //var gcliname = ref.alloc(gcl_name_t);
     //C  	int opt;
     var opt;
     var opt_parser;
@@ -75,17 +81,18 @@ function main(argc, argv) {
     // Moved earlier before first use:
     //   var char_t = ref.types.char;
     //   var buf_t = ref_array(char_t);
-    var buf_tPtr = ref.refType(buf_t); // not currently used
+    //var buf_tPtr = ref.refType(buf_t); // not currently used
     // Note, buf is re-allocated below for each item string read from stdin
-    var buf = new buf_t(10);
+    //var buf = new buf_t(10);
     //C  	bool show_usage = false;
     var show_usage = false;
     var usage_error = ""; // more detail for some errors in argc/argv
 
+    console.log("writer-test2.js: main()" + argc);
 
     // Some useful variants for libep printf debugging output
     // Needed for the -D option below.
-    ep_dbg_init_js();
+    gdpjs.ep_dbg_init();
     // ep_dbg_set_js("*=99");  // start general debug output from libgdp
 
     //C  	// collect command-line arguments
@@ -107,7 +114,7 @@ function main(argc, argv) {
             // Note, ep_dbg_init_js() was called far above.
             // Will gdp_init() also call ep_dbg_init()??
             // For some reason we don't get libgdp debug print output??
-            ep_dbg_set_js(opt.optarg);
+            gdpjs.ep_dbg_set_js(opt.optarg);
             break;
         case 'G':
             // set the port for connecting to the GDP daemon
@@ -124,6 +131,7 @@ function main(argc, argv) {
     var argv_index = opt_parser.optind();
 
     //C  	// name is optional for a new GCL; if omitted one will be created
+    console.log("writer-test2: argc: " + argc);
     if (argc > 0) {
         xname = argv[argv_index];
         argc--;
@@ -180,6 +188,7 @@ function main(argc, argv) {
     // Set up our particular call to write_gcl_records()
     gdpd_addr = gdpd_addr;
     gcl_name = xname;
+    logdxname = os.hostname();
     gcl_append = append;
 
     recsrc = -1; // read the gcl records to be written from stdin..
@@ -191,13 +200,13 @@ function main(argc, argv) {
         gcl_name: String
         }
     */
-    write_gcl_records(gdpd_addr, gcl_name, gcl_append, recsrc,
-        recarray, conout, recarray_out
-    );
+    console.log("writer-test2.main(): about to call write_gcl_records");
+    gdpjs.write_gcl_records(gdpd_addr, gcl_name, logdxname, gcl_append, recsrc,
+                            recarray, conout, recarray_out
+                           );
     // TBD: return ( ! ep_stat_isok_js(estat) );
 
 } /* end function main() */
-
 
 // Use the familiar C/*NIX names
 var argc = process.argv.length;
