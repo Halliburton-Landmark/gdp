@@ -522,16 +522,17 @@ cmd_append(gdp_req_t *req)
 			{
 				// may be a duplicate append
 				// XXX check that records match?
-				return gdpd_gcl_error(req->pdu->dst,
+				estat = gdpd_gcl_error(req->pdu->dst,
 						"cmd_append: writing duplicate record",
 						GDP_STAT_RECORD_DUPLICATED, GDP_STAT_NAK_CONFLICT);
 			}
 			else
 			{
-				return gdpd_gcl_error(req->pdu->dst,
+				estat = gdpd_gcl_error(req->pdu->dst,
 						"cmd_append: record sequence error",
 						GDP_STAT_RECNO_SEQ_ERROR, GDP_STAT_NAK_FORBIDDEN);
 			}
+			goto fail0;
 		}
 	}
 
@@ -600,7 +601,6 @@ cmd_append(gdp_req_t *req)
 
 	// create the message
 	estat = req->gcl->x->physimpl->append(req->gcl, req->pdu->datum);
-	req->gcl->nrecs = req->pdu->datum->recno;
 
 	// send the new data to any subscribers
 	if (EP_STAT_ISOK(estat))
@@ -612,7 +612,10 @@ fail1:
 		estat = GDP_STAT_NAK_FORBIDDEN;
 	}
 
-//fail0:
+fail0:
+	// return the actual last record number (even on error)
+	req->gcl->nrecs = req->pdu->datum->recno;
+
 	// we can now let the data in the request go
 	evbuffer_drain(req->pdu->datum->dbuf,
 			evbuffer_get_length(req->pdu->datum->dbuf));
