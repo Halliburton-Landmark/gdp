@@ -70,11 +70,6 @@ platform OS
 info "Installing packages needed by GDP for $OS"
 case "$OS" in
     "ubuntu" | "debian")
-	if ! ls /etc/apt/sources.list.d/mosquitto* > /dev/null 2>&1
-	then
-		info "Setting up mosquitto repository"
-		sudo apt-add-repository ppa:mosquitto-dev/mosquitto-ppa
-	fi
 	sudo apt-get update
 	sudo apt-get clean
 	package libevent-dev
@@ -85,9 +80,15 @@ case "$OS" in
 	package libavahi-common-dev
 	package libavahi-client-dev
 	package avahi-daemon
+	package pandoc
+	if ! ls /etc/apt/sources.list.d/mosquitto* > /dev/null 2>&1
+	then
+		package software-properties-common
+		info "Setting up mosquitto repository"
+		sudo apt-add-repository ppa:mosquitto-dev/mosquitto-ppa
+	fi
 	package libmosquitto-dev
 	package mosquitto-clients
-	package pandoc
 	;;
 
     "darwin")
