@@ -39,7 +39,7 @@ The first thing that you will need to do is call `gdp_init`. `gdp_init`
 sets up the connection to a remote `gdp_router`. Example:
 
 ```
-gdp_init("127.0.0.1", 8007)
+gdp_init("127.0.0.1:8007")
 ```
 
 Next, you would like to have a `GDP_NAME` object that represents the 
