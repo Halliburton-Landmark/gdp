@@ -58,13 +58,11 @@ INSTALLROOT=	${DESTDIR}${LOCALROOT}
 BINDIR=		${INSTALLROOT}/bin
 SBINDIR=	${INSTALLROOT}/sbin
 MANDIR=		${INSTALLROOT}/share/man
-GDPROOT=	${INSTALLROOT}/gdp
 ALLDIRS=	${BINDIR} \
 		${SBINDIR} \
 		${LIBDIR} \
 		${INCDIR}/ep \
 		${MANDIR}/man1 \
-		${GDPROOT}/adm
 
 INSTALL=	install
 
@@ -109,7 +107,7 @@ mqtt-gdp-gateway:	mqtt-gdp-gateway.o
 clean:
 	-rm -f ${CLEANALL} *.o *.core
 
-install:	${BINDIR} ${SBINDIR} ${GDPROOT}/adm ${ALL} \
+install:	${BINDIR} ${SBINDIR} ${ALL} \
 		${SCRIPTS} ${MANALL} FORCE
 	test -z "${BINALL}"  || ${INSTALL} ${BINALL}  ${BINDIR}
 	test -z "${SBINALL}" || ${INSTALL} ${SBINALL} ${SBINDIR}
@@ -118,10 +116,9 @@ install:	${BINDIR} ${SBINDIR} ${GDPROOT}/adm ${ALL} \
 	test -z "${MAN5ALL}" || ${INSTALL} ${MAN5ALL} ${MANDIR}/man5
 	test -z "${MAN7ALL}" || ${INSTALL} ${MAN7ALL} ${MANDIR}/man7
 	test -z "${MAN8ALL}" || ${INSTALL} ${MAN8ALL} ${MANDIR}/man8
-	test -z "${SCRIPTS}" || ${INSTALL} ${SCRIPTS} ${GDPROOT}/adm
 	INSTALLROOT=${INSTALLROOT} sh install-mqtt-gdp-gateway.sh
 
-${BINDIR} ${SBINDIR} ${GDPROOT}/adm:
+${BINDIR} ${SBINDIR}:
 	${MKDIR} $@
 
 ADM=		../../adm

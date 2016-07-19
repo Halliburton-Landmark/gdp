@@ -66,7 +66,6 @@ package() {
     esac
 }
 
-platform OS
 info "Installing packages needed by GDP for $OS"
 case "$OS" in
     "ubuntu" | "debian")

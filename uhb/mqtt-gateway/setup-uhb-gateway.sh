@@ -32,7 +32,7 @@ echo ""
 info "Determining OS version"
 
 case $OS-$OSVER in
-	ubuntu-1[46]0004*)
+	ubuntu-1[46]04*)
 		pkgadd="libmosquitto0-dev mosquitto-clients"
 		;;
 
