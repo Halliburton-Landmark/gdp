@@ -137,6 +137,13 @@ cd $GDP_SRC_ROOT
 info "Installing gdplogd wrapper script"
 install -o ${GDP_USER} adm/gdplogd-wrapper.sh $GDP_ROOT/sbin
 
+if [ -d /etc/rsyslog.d ]
+then
+	info "Installing rsyslog configuration"
+	sh adm/customize.sh adm/60-gdp.conf.template /etc/rsyslog.d
+	chown ${GDP_USER}:${GDP_GROUP} /etc/rsyslog.d/60-gdp.conf
+fi
+
 if [ "$INITSYS" = "systemd" ]
 then
 	sudo adm/customize.sh adm/gdplogd.service.template /etc/systemd/system
