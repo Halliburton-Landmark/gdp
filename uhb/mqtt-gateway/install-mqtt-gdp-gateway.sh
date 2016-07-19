@@ -51,7 +51,7 @@ fi
 
 info "Installing mqtt-gdp-gateway program and documentation"
 make mqtt-gdp-gateway
-sudo $INSTALL -o $GDP_USER -g $GDP_GROUP mqtt-gdp-gateway $GDP_ROOT/sbin
+sudo $INSTALL -o $GDP_USER -g $GDP_GROUP mqtt-gdp-gateway $GDP_ROOT/bin
 manroot=${GDP_ROOT}/share/man
 test -d $manroot || manroot=$GDP_ROOT/man
 sudo $INSTALL -o $GDP_USER -g $GDP_GROUP mqtt-gdp-gateway.1 $manroot/man1
