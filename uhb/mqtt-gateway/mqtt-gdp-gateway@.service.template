@@ -10,11 +10,7 @@ BindsTo=mqtt-gdp-gateway.service
 Type=simple
 SyslogIdentifier=mqtt-gdp-gateway-%i
 TimeoutStartSec=300
-Environment=GDP_ROOT=@GDP_ROOT@
-ExecStart=/bin/sh $GDP_ROOT/adm/start-mqtt-gdp-gateway.sh %i.eecs.berkeley.edu
-#ExecStart=/usr/local/sbin/mqtt-gdp-gateway $MQTT_GDP_GATEWAY_ARGS
-#ExecStartPost=/bin/sh -c 'until [ -f /var/run/mqtt-gdp-gateway_%i.pid]; do sleep 0.1; done;'
-#ExecStopPost=/bin/rm /var/run/mqtt-gdp-gateway_%i*
+ExecStart=/bin/sh @GDP_ROOT@/sbin/start-mqtt-gdp-gateway.sh %i
 Restart=on-failure
 RestartSec=10s
 
