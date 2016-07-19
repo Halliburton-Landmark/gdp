@@ -172,7 +172,7 @@ class GDPcache:
         _endR = self.__findRec(tEnd)
 
         # can we use multiread?
-        if _endR+1-_startR<4*numPoints:
+        if _endR+1-_startR<4*numPoints and (_endR+1)-_startR>0:
             return self.__multiread(_startR, (_endR+1)-_startR)
 
         # if not, let's read one by one
