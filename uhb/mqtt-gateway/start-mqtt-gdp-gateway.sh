@@ -19,7 +19,7 @@ fi
 : ${GDP_LOG_DIR:=/var/log/gdp}
 : ${GDP_USER:=gdp}
 : ${MQTT_GATEWAY_ARGS:=-D*=2}
-: ${MQTT_GATEWAY_LOG:=$GDP_LOG_DIR/mqtt-gateway.log}
+: ${MQTT_GATEWAY_LOG:=$GDP_LOG_DIR/mqtt-gdp-gateway.log}
 
 # if we are running as root, start over as gdp
 test `whoami` = "root" && exec sudo -u $GDP_USER $0 "$@"
