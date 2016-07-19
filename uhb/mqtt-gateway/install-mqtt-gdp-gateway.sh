@@ -1,43 +1,20 @@
 #!/bin/sh
 
 #
-#  Requires manual choice of init system; should figure it out.
+#  Install mqtt-gdp-gateway code and system configuration scripts.
 #
-#	Only tested on certain Debian-derived systems.
-#	Sorry, will not work on MacOS or FreeBSD.
+#	Only tested on certain Debian-derived systems (including
+#		Ubuntu).
+#	Sorry, will not work on MacOS, FreeBSD, or RedHat.
+#	Uses heuristics to try to figure out system initialization
+#		mechanism.  If it guesses wrong, you can set
+#		the envariable INITSYS to "upstart" or "systemd"
+#		before running this script.
 #
-
-### Init system: "upstart", "systemd", or other
-: ${INITSYS:=upstart}
-
-{ test -r /usr/local/etc/gdp.conf.sh && . /usr/local/etc/gdp.conf.sh; } ||
-	{ test -r /etc/gdp.conf.sh && . /etc/gdp.conf.sh; }
-: ${GDP_ROOT:=/usr}
-: ${GDP_USER:=gdp}
-: ${GDP_GROUP:=gdp}
-if [ "$GDP_ROOT" = "/usr" ]
-then
-	: ${GDP_ETC:=/etc/gdp}
-else
-	: ${GDP_ETC:=$GDP_ROOT/etc}
-fi
 
 # need to run from the mqtt-gdp-gateway source directory
 cd `dirname $0`
-
-# yes, we really need the adm directory (for customize.sh)
-gdp=`pwd`
-while [ ! -d $gdp/gdp/adm ]
-do
-	gdp=`echo $gdp | sed -e 's,/[^/]*$,,'`
-	if [ -z "$gdp" ]
-	then
-		echo "[FATAL] Need gdp/adm directory somewhere in directory tree"
-		exit 1
-	fi
-done
-gdp=$gdp/gdp
-. $gdp/adm/common-support.sh
+. setup-common.sh
 
 
 # Installation program
@@ -49,7 +26,7 @@ then
 	exit 1
 fi
 
-info "Installing with GDP_ROOT=$GDP_ROOT, GDP_ETC=$GDP_ETC"
+info "Installing with GDP_ROOT=$GDP_ROOT, GDP_ETC=$GDP_ETC, INITSYS=$INITSYS"
 
 # create GDP user if necessary
 if ! grep -q '^gdp:' /etc/passwd

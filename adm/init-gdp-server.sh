@@ -74,15 +74,22 @@ if [ -f adm/common-support.sh ]; then
 	. adm/common-support.sh
 else
 	info() {
-		echo "[I] $1" 1>&2
+		echo "[INFO] $1" 1>&2
 	}
 
 	warn() {
-		echo "[W] $1" 1>&2
+		echo "[WARN] $1" 1>&2
 	}
 fi
 
 #################### END OF FUNCTIONS ####################
+
+if [ ! -x $GDP_ROOT/sbin/gdplogd ]
+then
+	warn "It appears GDP server code is not yet installed in $GDP_ROOT"
+	info "Press <return> to continue, ^C to abort"
+	read nothing
+fi
 
 ## be sure we're running as root
 test `whoami` = "root" || exec sudo $0 "$@"

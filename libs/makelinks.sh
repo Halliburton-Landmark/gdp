@@ -4,16 +4,41 @@ lib=$1
 major=$2
 minor=$3
 
-rm -f lib$lib.so.$major.$minor
-cp ../$lib/lib$lib.so.$major.$minor .
-if [ -f ../adm/common-support.sh ]; then 
-    . ../adm/common-support.sh
+
+{ test -r /usr/local/etc/gdp.conf.sh && . /usr/local/etc/gdp.conf.sh; } ||
+	{ test -r /etc/gdp.conf.sh && . /etc/gdp.conf.sh; }
+: ${GDP_ROOT:=/usr}
+: ${GDP_USER:=gdp}
+: ${GDP_GROUP:=gdp}
+if [ "$GDP_ROOT" = "/usr" ]
+then
+	: ${GDP_ETC:=/etc/gdp}
 else
-    # If we run this script in lang/js/gdpjs, then we need to look further up the tree.
-    . ../../../adm/common-support.sh
+	: ${GDP_ETC:=$GDP_ROOT/etc}
 fi
 
-platform OS
+# can override search for GDP source root node by setting GDP_SRC_ROOT.
+if [ -z "${GDP_SRC_ROOT-}" ]
+then
+	gdp=`pwd`
+	while [ ! -d $gdp/gdp/adm ]
+	do
+		gdp=`echo $gdp | sed -e 's,/[^/]*$,,'`
+		if [ -z "$gdp" ]
+		then
+			echo "[FATAL] Need gdp/adm directory somewhere in directory tree"
+			exit 1
+		fi
+	done
+	GDP_SRC_ROOT=$gdp/gdp
+fi
+. $GDP_SRC_ROOT/adm/common-support.sh
+
+info "Installing $lib/lib$lib.so.$major.$minor"
+rm -f lib$lib.so.$major.$minor
+cp ../$lib/lib$lib.so.$major.$minor .
+
+info "Creating library links"
 case "$OS" in
     "ubuntu" | "debian" | "freebsd" | "centos")
     	rm -f lib$lib.so.$major lib$lib.so

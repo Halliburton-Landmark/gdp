@@ -5,6 +5,8 @@
 #
 #	This does not include the Michigan code, which will often run
 #		on another host.
+#	This only runs on Debian-based systems.  It should really be
+#		more portable.
 #
 
 cd `dirname $0`
@@ -23,7 +25,8 @@ sudo apt-get install -y \
 
 echo ""
 info "Compiling and installing UHK code (assumes GDP base code already installed)"
-make clean all install
+make clean all
+sudo make install
 
 # start mosquitto
 # foreach server: create list of devices
