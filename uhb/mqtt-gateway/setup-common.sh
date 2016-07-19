@@ -4,18 +4,6 @@
 #  Common code for setup scripts
 #
 
-{ test -r /usr/local/etc/gdp.conf.sh && . /usr/local/etc/gdp.conf.sh; } ||
-	{ test -r /etc/gdp.conf.sh && . /etc/gdp.conf.sh; }
-: ${GDP_ROOT:=/usr}
-: ${GDP_USER:=gdp}
-: ${GDP_GROUP:=gdp}
-if [ "$GDP_ROOT" = "/usr" ]
-then
-	: ${GDP_ETC:=/etc/gdp}
-else
-	: ${GDP_ETC:=$GDP_ROOT/etc}
-fi
-
 # yes, we really need the adm directory (for customize.sh).
 # can override search by setting GDP_SRC_ROOT.
 if [ -z "${GDP_SRC_ROOT-}" ]

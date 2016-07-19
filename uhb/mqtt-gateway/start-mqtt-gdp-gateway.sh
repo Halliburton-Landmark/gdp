@@ -27,6 +27,9 @@ test `whoami` = "root" && exec sudo -u $GDP_USER $0 "$@"
 EX_USAGE=64
 EX_CONFIG=78
 
+# make sure log file exists so we can append to it
+test -f $MQTT_GATEWAY_LOG || cp /dev/null $MQTT_GATEWAY_LOG
+
 {
 	echo `date +"%F %T %z"` Running $0 "$@" as `whoami`
 	if [ `whoami` != $GDP_USER ]
@@ -65,10 +68,11 @@ EX_CONFIG=78
 		if $GDP_ROOT/bin/gcl-create \
 			-q -K$GDP_KEYS_DIR -e none $gcl_root.device.$i
 		then
-			echo "[INFO] Created log $gcl_root.device.$i"
+			echo "[INFO] Created GDP log $gcl_root.device.$i"
 		fi
 		args="$args device/+/$i $gcl_root.device.$i"
 	done
 
+	echo "[INFO] Running $gw_prog $args"
 	exec $gw_prog $args
 } >> $MQTT_GATEWAY_LOG 2>&1
