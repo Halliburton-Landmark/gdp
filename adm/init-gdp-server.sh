@@ -133,6 +133,10 @@ else
 fi
 
 cd $GDP_SRC_ROOT
+
+info "Installing gdplogd wrapper script"
+install -o ${GDP_USER} adm/gdplogd-wrapper.sh $GDP_ROOT/sbin
+
 if [ "$INITSYS" = "systemd" ]
 then
 	sudo adm/customize.sh adm/gdplogd.service.template /etc/systemd/system
