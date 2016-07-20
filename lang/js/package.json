@@ -24,7 +24,7 @@
     ],
     "description": "The Global Data Plane",
     "devDependencies": {
-        "ffi": "~2.2.0",
+        "ffi": "2.0.0",
         "fs": "",
         "jsesc": "~2.2.0",
         "os": "",
