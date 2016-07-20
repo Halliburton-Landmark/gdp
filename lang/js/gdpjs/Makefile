@@ -129,7 +129,7 @@ gdpjs_version.o: gdpjs_version.c FORCE
 			echo "Copying ../../../libs/libgdp.${GDPLIBMAJVER}.${GDPLIBMINVER}.dylib to ../gdp"; \
 			cp ../../../libs/libgdp.${GDPLIBMAJVER}.${GDPLIBMINVER}.dylib ../gdp/libgdp.so.${GDPLIBMAJVER}.${GDPLIBMINVER}; \
 		else \
-			cp ../../../libs/libgdp.* ../gdp/; \
+			cp ../../../libs/libgdp* ../gdp/; \
 		fi \
 	fi
 
@@ -146,6 +146,53 @@ gdpjs_version.o: gdpjs_version.c FORCE
 		fi \
 	fi
 FORCE:
+
+
+# If we are running under Darwin, then copy the .so files from $PTII/lib.
+# If we are running under Linux, then copy the .dylib files from $PTII/lib.
+LIBEPDYLIB=libep.${EPLIBMAJVER}.${EPLIBMINVER}.dylib
+../libs/${LIBEPDYLIB}:
+	@echo "Creating $@"
+	if [ ! -f ../ep/${LIBEPDYLIB} ]; then \
+		cp ${PTII}/lib/${LIBEPDYLIB} $@; \
+	fi
+
+LIBGDPDYLIB=libgdp.${GDPLIBMAJVER}.${GDPLIBMINVER}.dylib
+../libs/${LIBGDPDYLIB}:
+	if [ ! -f ../ep/${LIBGDPDYLIB} ]; then \
+		cp ${PTII}/lib/${LIBGDPDYLIB} $@; \
+	fi
+
+LIBGDPJSDYLIB=libgdpjs.${GDPJSLIBMAJVER}.${GDPJSLIBMINVER}.dylib
+../libs/${LIBGDPJSDYLIB}:
+	if [ ! -f ../ep/${LIBGDPSJDYLIB} ]; then \
+		cp ${PTII}/lib/${LIBGDPJSDYLIB} $@; \
+	fi
+
+
+LIBEPSO=libep-${EPLIBMAJVER}.${EPLIBMINVER}.so
+../libs/${LIBEPSO}:
+	if [ ! -f ../ep/${LIBEPSO} ]; then \
+		cp ${PTII}/lib/${LIBEPSO} $@; \
+	fi
+
+LIBGDPSO=libgdp-${GDPLIBMAJVER}.${GDPLIBMINVER}.so
+../libs/${LIBGDPSO}:
+	if [ ! -f ../ep/${LIBGDPSO} ]; then \
+		cp ${PTII}/lib/${LIBGDPSO} $@; \
+	fi
+
+LIBGDPJSSO=libgdpjs-${GDPJSLIBMAJVER}.${GDPJSLIBMINVER}.so
+../libs/${LIBGDPJSSO}:
+	if [ ! -f ../ep/${LIBGDPSJSO} ]; then \
+		cp ${PTII}/lib/${LIBGDPJSSO} $@; \
+	fi
+
+LIBS=../libs/${LIBEPDYLIB} ../libs/${LIBGDPDYLIB} ../libs/${LIBGDPJSDYLIB} ../libs/${LIBEPSO} ../libs/${LIBGDPSO} ../libs/${LIBGDPJSSO}
+
+npmPublish: $(LIBS)
+	(cd ..; npm publish -access public)
+
 
 #
 #  Administrative stuff
