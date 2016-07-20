@@ -39,6 +39,7 @@ var NODE_MODULES_DIR = '/Users/cxh/ptII/vendors/node_modules/';
 var gdpjsSupport = require(LIBGDP_H_DIR + 'gdpjs.js');
 
 exports.ep_dbg_init = gdpjsSupport.ep_dbg_init;
+exports.ep_dbg_set = gdpjsSupport.ep_dbg_set;
 
 exports.gclPrintableNameType = gdpjsSupport.gcl_pname_t;
 
@@ -112,7 +113,8 @@ exports.read_gcl_records = function (gdpdAddress, gclName,
  * @param gdpdAddress gdp daemon's <host:port>; if null, use default
  * "127.0.0.1:2468" @param gclName name of existing GCL @param
  * logdxname String: the name of the log server.  Use os.hostname()
- * for local @param gclAppend Boolean: append to an existing GCL
+ * for loca
+ * @param gclAppend Boolean: append to an existing GCL
  *
  * @param recordSource The source of the records. recordSource == -1:
  * read the gcl records to be written from stdin with prompts to and
