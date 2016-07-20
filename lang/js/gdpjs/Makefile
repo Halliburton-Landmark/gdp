@@ -1,15 +1,31 @@
 #
 #  Makefile for libgdpjs  (based on gdp/libep/Makefile)
-#
-#	$Id$
-#
-#	Copyright (c) 2014, <TBD>.  All rights reserved.
-#
 
-# Alec Dara-Abrams
+#	Copyright (c) 2008-2015, Eric P. Allman.  All rights reserved.
+#	Copyright (c) 2014-2016, Regents of the University of California.
+#	All rights reserved.
+#
+#	Permission is hereby granted, without written agreement and without
+#	license or royalty fees, to use, copy, modify, and distribute this
+#	software and its documentation for any purpose, provided that the above
+#	copyright notice and the following two paragraphs appear in all copies
+#	of this software.
+#
+#	IN NO EVENT SHALL REGENTS BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT,
+#	SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST
+#	PROFITS, ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION,
+#	EVEN IF REGENTS HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+#	REGENTS SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT
+#	LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+#	FOR A PARTICULAR PURPOSE. THE SOFTWARE AND ACCOMPANYING DOCUMENTATION,
+#	IF ANY, PROVIDED HEREUNDER IS PROVIDED "AS IS". REGENTS HAS NO
+#	OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS,
+#	OR MODIFICATIONS.#
+#
+# Author: Alec Dara-Abrams, Christopher Brooks
 # 2014-10-24
 #
-# TBD: Copyrights, one-button tests, README files
 #
 # Caveats:
 #
@@ -109,14 +125,25 @@ gdpjs_version.o: gdpjs_version.c FORCE
 	if [ ! -d ../gdp ]; then \
 		echo "Create a copy of libgdp* so that we can bundle it up"; \
 		mkdir ../gdp; \
-		cp ../../../gdp/libgdp* ../gdp; \
+		if [ -f ../../../libs/libgdp.${GDPLIBMAJVER}.${GDPLIBMINVER}.dylib ]; then \
+			echo "Copying ../../../libs/libgdp.${GDPLIBMAJVER}.${GDPLIBMINVER}.dylib to ../gdp"; \
+			cp ../../../libs/libgdp.${GDPLIBMAJVER}.${GDPLIBMINVER}.dylib ../gdp/libgdp.so.${GDPLIBMAJVER}.${GDPLIBMINVER}; \
+		else \
+			cp ../../../libs/libgdp.* ../gdp/; \
+		fi \
 	fi
+
 
 ../ep:
 	if [ ! -d ../ep ]; then \
 		echo "Create a copy of libep* so that we can bundle it up"; \
 		mkdir ../ep; \
-		cp ../../../ep/libep* ../ep; \
+		if [ -f ../../../libs/libep.${EPLIBMAJVER}.${EPLIBMINVER}.dylib ]; then \
+			echo "Copying ../../../libs/libep.${EPLIBMAJVER}.${EPLIBMINVER}.dylib to ../ep"; \
+			cp ../../../libs/libep.${EPLIBMAJVER}.${EPLIBMINVER}.dylib ../ep/libep.so.${EPLIBMAJVER}.${EPLIBMINVER}; \
+		else \
+			cp ../../../libs/libep* ../ep/; \
+		fi \
 	fi
 FORCE:
 
@@ -126,5 +153,5 @@ FORCE:
 
 clean:
 	-${RM} -f ${ALL} *.o *.core
-
+	rm -rf ../ep ../gdp
 ${OBJS}: ${HFILES}
