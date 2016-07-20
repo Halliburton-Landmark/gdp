@@ -35,6 +35,19 @@ then
 	sudo adduser --system --group ${GDP_USER}
 fi
 
+# install packages as needed
+info "Installing packages"
+package gcc
+case $OS in
+    ubuntu|debian)
+	package libmosquitto-dev
+	package mosquitto-clients
+	;;
+    *)
+	warn "You may have to install mosquitto by hand"
+	;;
+esac
+
 # make system directories if needed
 mkdir_gdp $GDP_ROOT
 for d in bin sbin etc lib
