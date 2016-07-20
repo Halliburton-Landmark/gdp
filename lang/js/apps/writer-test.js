@@ -23,7 +23,11 @@ var mod_getopt = require('posix-getopt');
 var os = require('os');
 var path = require('path');
 
-var gdpjs = require('gdpjs');
+try {
+    var gdpjs = require('gdpjs');
+} catch (exception) {
+    var gdpjs = require('../gdpjs/gdpjs');
+}
 
 // Load Node.js modules for calling foreign functions -- C functions here.
 // See libgdp_h.js for details and assumptions about the directory

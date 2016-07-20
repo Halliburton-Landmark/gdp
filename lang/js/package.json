@@ -1,20 +1,46 @@
 {
-    "name": "gdpjs",
+    "name": "@terraswarm/gdp",
     "version": "0.5.0",
-    "description": "The Global Data Plane",
-    "main": "index.js",
-    "directories": {
-        "test": "tests"
+    "author": {
+        "email": "cxh@eecs.berkeley.edu",
+        "name": "Christopher Brooks"
     },
-    "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1"
-    },
-    "author": "Christopher Brooks",
     "contributors": [
         {
             "email": "eric@cs.berkeley.edu",
             "name": "Eric Allman"
-        }
+        },
+        {
+            "name": "Eric Dara-Abrams"
+        },
+        {
+            "email": "lutz@berkeley.edu",
+            "name": "Kenneth Lutz"
+        },        
+        {
+            "email": "mor@eecs.berkeley.edu",
+            "name": "Nitesh Mor"
+        }        
+    ],
+    "description": "The Global Data Plane",
+    "devDependencies": {
+        "ffi": "~2.2.0",
+        "fs": "",
+        "jsesc": "~2.2.0",
+        "os": "",
+        "path": "",
+        "posix-getopt": "~1.2.0",
+        "ref": "~1.3.2",
+        "ref-array": "~1.1.2",
+        "ref-struct": "~1.0.2",
+        "ref-union": "",
+        "sleep": "~3.0.1"
+    },
+    "files": [
+        "apps",
+        "gdpjs",
+        "index.js",
+        "libs"
     ],
     "license": "BSD-2-Clause",
     "maintainers": [
@@ -22,5 +48,10 @@
             "email": "cxh@eecs.berkeley.edu",
             "name": "Christopher Brooks"
         }
-    ]
+    ],
+    "main": "index.js",
+    "os" : [ "darwin" ],
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    }
 }

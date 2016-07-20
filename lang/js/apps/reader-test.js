@@ -27,11 +27,12 @@ var fs = require('fs'),
 var dirString = path.dirname(fs.realpathSync(__filename));
 console.log('working directory:', dirString);
 
-try {
-    var gdpjs = require('gdpjs');
-} catch (exception) {
-    var gdpjs = require('../gdpjs/gdpjs');
-}
+//try {
+    var gdpjs = require('@terraswarm/gdp');
+//} catch (exception) {
+//    var gdpjs = require('../gdpjs/gdpjs');
+//}
+
 // Load Node.js modules for calling foreign functions -- C functions here.
 // See libgdp_h.js for details and assumptions about the directory
 // where Node.js modules must be placed.
@@ -444,7 +445,7 @@ function main(argc, argv) {
     //              firstrec, numrecs );
     gdpjs.read_gcl_records(gdpd_addr, gcl_name,
         gcl_firstrec, gcl_numrecs,
-        gcl_subscribe, gcl_multiread, recdest,
+        gcl_subscribe, gcl_multiread,
         conout, gdp_event_cbfunc,
         wait_for_events
     );

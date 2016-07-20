@@ -1,33 +1,51 @@
 /* vim: set ai sw=4 sts=4 ts=4 : */
 
-// libgdp_h.js - GDP Javascript "header file"
-// 2014-11-02
-// Alec Dara-Abrams
+// Copyright (c) 2016 The Regents of the University of California.
+// All rights reserved.
 
-// TBD: put this code into a Node.js module; add Copyrights
+// Permission is hereby granted, without written agreement and without
+// license or royalty fees, to use, copy, modify, and distribute this
+// software and its documentation for any purpose, provided that the above
+// copyright notice and the following two paragraphs appear in all copies
+// of this software.
 
-// Provides Node.js Javascript definitions for use in accessing the GDP
-// from a Node.js Javascript program.
-//
-// In particular these definitions are used in:
-//     writer-test.js - a JS version of gdp/apps/writer-test.c
-//     reader-test.js - "               gdp/apps/reader-test.c
+// IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY
+// FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+// ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+// THE UNIVERSITY OF CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF
+// SUCH DAMAGE.
 
-// Important build and execute parameters:
-// They MUST be supplied by the JS program that "includes" this file.
-// The values supplied as defaults below are for a including JS program
-// which resides in the same directory as this file.
-// 
-//
+// THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+// INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE SOFTWARE
+// PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE UNIVERSITY OF
+// CALIFORNIA HAS NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES,
+// ENHANCEMENTS, OR MODIFICATIONS.
+
+/**
+ * Global Data Plane (GDP) JavaScript interface.
+ *
+ * See ../apps/writer-test.js and reader-test.js for versions
+ * of the gdp-writer and gdp-reader executables.
+ 
+ * @author Christopher Brooks, Alec Dara-Abrams
+ * @version $$Id: gdp.js 838 2016-06-23 22:08:30Z cxh $$
+ */
+
+// Because of issues with require, it was necessary to combine
+// libgdp_h.js gdpjs_supt.js and rw_supt.js into one file.  Those
+// three files were created by Alec Dara-Abrams starting on
+// 2014-11-02.
+
+// This file supports both use as an installed module and use from
+// with the gdp git repo.
+
 // Path to the gdp/ directory.  Importantly, with a libs/ subdirectory
 // holding the gdp dynamic libraries:
 //    gdp/libs/libep,  gdp/libs/libgdp
 // Be aware of particular major and minor version numbers in these names.
 // See uses of ffi.Library( GDP_DIR +  ) below.
 // Note: Here we are using a relative path for our default value:
-//if (GDP_DIR == undefined) GDP_DIR = process.env.GDP_DIR;
-//if (GDP_DIR == undefined) GDP_DIR = "../../..";
-
 
 // Set GDP_DIR so that we can find the GDP shared libraries.
 try {
@@ -49,11 +67,8 @@ try {
 
 // Path to the gdp/lang/js/gdpjs/ directory where this file usually resides.
 // And which also has a libs/ subdirectory holding the gdpjs dynamic
-// library:  gdpjs/../libs/libgdpjs.0.1
+// library:  gdpjs/../libs/libgdpjs.1.0.dylib
 // See uses of ffi.Library( GDPJS_DIR +  ) below.
-// Note: Here we are using a relative path for our default value:
-// ?? OLD if ( GDPJS_DIR == undefined) GDPJS_DIR  = "./";
-//if (GDPJS_DIR == undefined) GDPJS_DIR = GDP_DIR + "/lang/js/gdpjs";
 
 try {
     if (GDPJS_DIR == undefined) {
@@ -68,7 +83,8 @@ try {
 // Note: a null path prefix, evidently, means use the usual node module
 // lookup mechanism (below); otherwise if the prefix is not null, ONLY
 // look for the module in the directory:  prefix + <<module name>> .
-//if (NODE_MODULES_DIR == undefined) NODE_MODULES_DIR = "";
+// NODE_MODULES_DIR is set to force a particular directory to be
+// searched, which is usefule for debugging.
 
 try {
     if (NODE_MODULES_DIR == undefined) {
@@ -92,7 +108,7 @@ try {
 //   // Here we include and evaluate our shared GDP Javascript "header file",
 //   // 'libgdp_h.js', within the global scope/environment.
 //   var fs = require('fs');   // Node.js's built-in File System module
-//   eval( fs.readFileSync( LIBGDP_H_DIR + 'libgdp_h.js').toString() );
+//   eval( fs.readFileSync( GDPJS_DIR + 'gdpjs.js').toString() );
 //
 // Note, we can't usefully wrap the include device within a JS function.  
 // In such a case, new names would only be available within the scope of
@@ -121,6 +137,7 @@ try {
 //    sed  -e '/^\/\/C/d' liggdp_h.js
 
 
+////////////////////////////////////
 // Load Node.js modules for calling foreign functions; C functions here.
 // The node modules below are installed locally in this file's directory
 // via npm.
@@ -136,27 +153,27 @@ var ref_array = require(NODE_MODULES_DIR + 'ref-array');
 var ref_struct = require(NODE_MODULES_DIR + 'ref-struct');
 // var ref_union  = require( 'ref-union'  );   // currently, not used
 
-// Some additional supporting Node.js modules
-//
+// Some additional supporting Node.js modules:
+
 // Node.js's built-in utilities for file paths
 var path = require('path');
-//
+
 // POSIX style getopt()
 var mod_getopt = require(NODE_MODULES_DIR + 'posix-getopt');
-//
-// escape non-printing charcters
+
+// escape non-printing characters
 var jsesc = require(NODE_MODULES_DIR + 'jsesc');
-//
+
 // for a *NIX-like sleep(3), (synchronous - so not be very Node.js-ish)
 var sleep = require(NODE_MODULES_DIR + 'sleep');
-//
+
 // The npm module 'printf', useful for debugging, seems to have problems.
 // A use like: printf( "estat = %16X\n", estat ); may cause a core dump??
 // var printf = require( 'printf' );
 
 
-
-
+////////////////////////////////////
+// Define types and constants
 var gdp_gcl_open_info_tPtr = ref.refType(ref.types.void);
 
 // { GRRRRRR... trying to get stdout up to the JS level using libc.fcntl()
@@ -225,7 +242,7 @@ var int32_t = ref.types.int32;
 var bool_t = ref.types.int;
 
 
-// Now we provide some definitions and functions from libep
+// Now we provide some definitions and functions from libep.
 
 // First, some C types to define for Node.js ffi/ref modules.
 // From ep/ep_stat.h
@@ -261,11 +278,10 @@ var EP_TIME_SPEC_struct = ref_struct({
     tv_accuracy: tv_accuracy_t
 });
 //
-// a pointer to a C "struct EP_TIME_SPEC"
+// A pointer to a C "struct EP_TIME_SPEC".
 var EP_TIME_SPEC_struct_Ptr = ref.refType(EP_TIME_SPEC_struct);
 //?? just below is not used yet
 var EP_TIME_SPEC_struct_PtrPtr = ref.refType(EP_TIME_SPEC_struct_Ptr);
-
 
 var libep = ffi.Library(GDP_DIR + '/libs/libep.3.0', {
 
@@ -716,346 +732,14 @@ exports.ep_stat_isok = libgdpjs.ep_stat_isok;
 exports.ep_stat_tostr = libep.ep_stat_tostr;
 
 
-/* vim: set ai sw=4 sts=4 ts=4 : */
 
-// Node.js Javascript support routines for reading and writing gcl's
+////////////////////////////////////
+// JavaScript support routines for reading and writing gcl's
 //
-// Alec Dara-Abrams
-// 2014-11-05
-//
-// TBD: Copyright, clean up code; bring internal doc up to date;
+// TBD: lean up code; bring internal doc up to date;
 //      regularize indenting with JS-aware tool
 //      Check for possible error returns from libgdp calls - see TBD1 .
 //
-// Used by:
-//  writer-test.js    -- Node.js Javascript version of gdp/apps/writer-test.c
-//  reader-test.js    -- Node.js Javascript version of gdp/apps/reader-test.c
-//  gdpREST_server.js -- Node.js-Based JavaScript server to provide a
-//                       REST interface to the GDP
-
-
-// ========================================================================
-// Example set ups for calls to write_gcl_records()
-//
-// A: write to gcl from stdin
-// recsrc   = -1;   // read from stdin the gcl records to be written,
-//                  // with optional prompts to and echoing for the
-//                  // user on stdout.
-// conout   = true; // do prompt and echo to stdout.
-// recarray = [ ]; recarray_out = []; // ignored for recsrc = -1
-//
-// B: write to gcl from JS Array, recarray[]
-// recsrc   =  0;      // read the gcl records from the Array recarray[]
-// recarray = [ "Item 01 - from recarray", "Item 02", "Item 03" ];
-// conout   = false;   // don't echo to console.log()
-// recarray_out = [];  // will hold recno's and timestamps for newly
-//                     // written records
-//
-// C: write to gcl N records with integers as contents
-// recsrc >  0;     // write recsrc records with automatically generated
-//                  // content: the integers starting at 1 and going
-//                  // up to recsrc, inclusive.
-// recsrc =  7;
-// conout = false;  // don't echo to console.log()
-// recarray = [ ]; recarray_out = []; // ignored for recsrc > 0
-//
-// write_gcl_records( gdpd_addr, gcl_name, gcl_append, recsrc,
-//                    recarray, conout, recarray_out
-//                  );
-
-/*  Returns:
-    { error_isok: false|true, error_code: EP_STAT, error_msg: String,
-    gcl_name: String
-    }
-*/
-function write_gcl_records(gdpd_addr, gcl_name, logdxname, gcl_append,
-    recsrc, recarray, conout, recarray_out)
-
-// gdpd_addr    gdp daemon's <host:port>; if null, use default "127.0.0.1:2468"
-// gcl_name     if gcl_append is true, name of existing GCL; 
-//              if gcl_append is false, ignored.  A new GCL will be created.
-// logdxname    String: the name of the log server.  Use os.hostname() for local
-// gcl_append   Boolean: append to an existing GCL
-// recsrc = -1  read the gcl records to be written from stdin with
-//              prompts to and echoing for the user on stdout
-// recsrc =  0  read the gcl records from the Array recarray
-//              In this case only, 
-//              For each gcl record written we will return in the parallel array
-//              recarray_out:
-//                 { recno: Integer, time_stamp: <timestamp_as_String> }.
-//              Note, recarray_out must be in the incoming parameter list above.
-// recsrc >  0  write recsrc records with automatically generated
-//              content: the integers starting at 1 and going up to
-//              recsrc, inclusive.
-// conout       Boolean: iff true,
-//              for recsrc = -1, prompt user and echo written records on stdout;
-//              for recsrc = 0, echo written records on stdout, not recommended;
-//              for recsrc > 0,  "
-//              Note, echoed written records also include GCL record number
-//              (recno) and timestamp.
-// recarray_out Array: see recsrc = 0, above.
-//
-// TBD: Note, there still may be undesired output via console.log() and
-// console.error(). Check all uses of  if ( conout == true ) below.
-// TBD: We could also return recarray_out[] for recsrc > 0. And, even
-// augmented with the manually entered record content, for recsrc = -1.
-{
-    console.log("gdpjs.js: write_gcl_records() start");
-    // internal variables for historical reasons
-    var xname = gcl_name;
-    var append = gcl_append;
-    var numrecs = recsrc;
-
-    var ebuf = ref.allocCString('123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890');
-
-    // Local working variables
-    var gcl_Ptr; // gclh
-    var estat; // EP_STAT
-    //var gcliname = ref.alloc(gcl_name_t);
-    var gcliname = new gcl_name_t(32);
-
-    // Note, buf is re-allocated below for each item string read from stdin
-    var buf = new buf_t(10);
-
-
-    console.log("gdpjs.js: write_gcl_records() about to call gdp_init_js()");
-    estat = gdp_init_js( /* String */ gdpd_addr);
-    if ( ! ep_stat_isok_js(estat) ) {
-        var emsg = "gdpjs.js: read_gcl_records(): gdp_init_js() is not ok";
-        console.log(emsg);
-        console.log(ep_stat_tostr_js(estat, ebuf, ebuf.length));
-        rv = {
-            error_isok: ((ep_stat_isok_js(estat) == 0) ? false : true),
-            error_code: ("0x" + estat.toString(16)),
-            error_msg: emsg,
-            gcl_name: gcl_name
-        };
-        return rv;
-    }
-    // TBD: check for errors:  if ( ! ep_stat_isok_js(estat) )
-
-    if (conout == true) { // allow thread to settle to avoid interspersed debug output
-        // TBD check this
-        sleep.sleep(1); // needed only for stdout and stderr
-    }
-
-    if (xname == null) {
-        // TBD: check signature
-        console.log("gdpjs.js: write_gcl_records() xname is null. About to call gdp_gcl_create_js()");
-        var gclcreaterv = gdp_gcl_create_js(null);
-        estat = gclcreaterv.error_code;
-        gcl_Ptr = gclcreaterv.gclH;
-        // grab the name of the newly created gcl
-        gcl_name = gdp_get_pname_from_gclh_js(gcl_Ptr);
-    } else {
-        console.log("gdpjs.js: write_gcl_records() about to call gdp_parse_name_js():" + xname + ", " + gcliname);
-
-        console.log("gdpjs.js: write_gcl_records() gcliname:");
-        for (i=0; i<gcliname.length; i++) {
-            process.stdout.write(gcliname[i].toString(16));
-        }
-        console.log("\n");
-
-        gdp_parse_name_js(xname, gcliname);
-
-        console.log("gdpjs.js: write_gcl_records() gcliname:");
-        for (i=0; i<gcliname.length; i++) {
-            process.stdout.write(gcliname[i].toString(16));
-        }
-        console.log("\n");
-
-        // TBD: especially check for gcliname already existing??!!
-
-        if (append) {
-            // TBD: check signature
-            console.log("gdpjs.js: write_gcl_records() about to call gdp_gcl_open_js()");
-            var gclopenrv = gdp_gcl_open_js(gcliname, GDP_MODE_AO);
-            estat = gclopenrv.error_code;
-            gcl_Ptr = gclopenrv.gclH;
-            if ( ! ep_stat_isok_js(estat) ) {
-                var emsg = "gdpjs.js: write_gcl_records(), gdp_gcl_open_js() returned a non-ok ep_stat.  Check to be sure that the log name exists.";
-                console.log(emsg);
-                console.log(ep_stat_tostr_js(estat, ebuf, ebuf.length));
-                rv = {
-                    error_isok: ((ep_stat_isok_js(estat) == 0) ? false : true),
-                    error_code: ("0x" + estat.toString(16)),
-                    error_msg: emsg,
-                    gcl_name: gcl_name
-                };
-                return rv;            
-            }
-        } else {
-            // TBD: check signature
-            console.log("gdpjs.js: write_gcl_records() about to call gdp_gcl_create_js()");
-            var gclPtrPtr = ref.alloc(gdp_gcl_tPtrPtr);
-            var gclcreaterv = gdp_gcl_create_js(xname, logdxname, gclPtrPtr);
-            estat = gclcreaterv.error_code;
-            if ( ! ep_stat_isok_js(estat) ) {
-                var emsg = "gdpjs.js: write_gcl_records(), gdp_gcl_create_js() returned a non-ok ep_stat";
-                console.log(emsg);
-                console.log(ep_stat_tostr_js(estat, ebuf, ebuf.length));
-                rv = {
-                    error_isok: ((ep_stat_isok_js(estat) == 0) ? false : true),
-                    error_code: ("0x" + estat.toString(16)),
-                    error_msg: emsg,
-                    gcl_name: gcl_name
-                };
-                return rv;
-
-            }
-            gcl_Ptr = gclcreaterv.gclH;
-        }
-    }
-    // TBD: check for errors:  if ( ! ep_stat_isok_js(estat) )
-
-    // don't always send gcl name to stdout
-    if (conout == true) {
-        gdp_gcl_print_stdout_js(gcl_Ptr);
-    }
-
-    var datum;
-    datum = gdp_datum_new_js();
-
-    if (numrecs < 0) {
-        // Read records from stdin, prompting & echoing to user on stdout
-
-        if (conout == true) // TBD is if(conout) is correct here?
-        {
-            console.log("\nStarting to read input - ^D to end");
-        }
-        var rvget; /* String */
-        // really a dummy for gets's parameter; we ignore its value.
-        // Just trying to avoid possible buffer overruns inside gets().
-        var strbuf = new Array(200 + 1).join(" "); // long enough??
-
-        while ((rvgets = libc.gets(strbuf)) != null) {
-            var buf = new buf_t(rvgets.length + 1); // we'll tack on a \0
-            for (var i = 0; i < rvgets.length; i++) {
-                buf[i] = rvgets.charCodeAt(i); // not sure if really necessary
-            }
-            buf[rvgets.length] = 0; // Hopefully, interpreted in C as \0
-            if (conout == true) // TBD is if(conout) is correct here?
-            {
-                console.log("Got input %s%s%s", "<<", rvgets, ">>");
-            }
-
-            console.log("gdpjs.js: write_gcl_records() about to call gdp_gcl_publish_buf_js()");
-            estat = gdp_gcl_publish_buf_js(gcl_Ptr, datum, buf);
-            // TBD: check for errors:  if ( ! ep_stat_isok_js(estat) )
-            console.log("gdpjs.js: write_gcl_records() done with to call gdp_gcl_publish_buf_js()");
-
-            if (conout == true) // TBD is if(conout) is correct here?
-            {
-                gdp_datum_print_stdout_js(datum);
-            }
-
-        } /* end while */
-    } else if (numrecs > 0) {
-        // Generate numrecs records with contents = integers 1 to numrecs.
-
-        // For each gcl record written we will return in the parallel array
-        // recarray_out:
-        //    { recno: Integer, time_stamp: <timestamp_as_String> }.
-        // Note, recarray_out must be in the incoming parameter list above.
-
-        for (var crec = 1; crec <= numrecs; crec++) {
-            var rvgets; /* String */
-            rvgets = crec.toString();
-
-            var buf = new buf_t(rvgets.length + 1); // we'll tack on a \0
-            for (var i = 0; i < rvgets.length; i++) {
-                buf[i] = rvgets.charCodeAt(i); // not sure if really necessary
-            }
-            buf[rvgets.length] = 0; // Hopefully, interpreted in C as \0
-            if (conout == true) // TBD is if(conout) is correct here?
-            {
-                console.log("Got input %s%s%s", "<<", rvgets, ">>");
-            }
-
-            estat = gdp_gcl_publish_buf_js(gcl_Ptr, datum, buf);
-            // TBD: check for errors:  if ( ! ep_stat_isok_js(estat) )
-
-            // grab record number and timestamp for this newly written record
-            var ts = gdp_datum_getts_as_string_js(datum, true /* format */ );
-            // TBD: below check for 64-bit integer return type, gdp_recno_t
-            var rn = gdp_datum_getrecno_js(datum);
-            recarray_out[crec - 1] = {
-                recno: rn,
-                time_stamp: ts
-            };
-
-            if (conout == true) // TBD is if(conout) is correct here?
-            {
-                gdp_datum_print_stdout_js(datum);
-            }
-        } /* end for ( var crec = 1 ...) */
-    } else // numrecs == 0
-    {
-        // Write contents of recarray[] to the gcl
-
-        // For each gcl record written we will return in the parallel array
-        // recarray_out:
-        //    { recno: Integer, time_stamp: <timestamp_as_String> }.
-        // Note, recarray_out must be in the incoming parameter list above.
-
-        for (var crec = 0; crec < recarray.length; crec++) {
-            var rvgets; /* String */
-            rvgets = recarray[crec].toString();
-
-            var buf = new buf_t(rvgets.length + 1); // we'll tack on a \0
-            for (var i = 0; i < rvgets.length; i++) {
-                buf[i] = rvgets.charCodeAt(i); // not sure if really necessary
-            }
-            buf[rvgets.length] = 0; // Hopefully, interpreted in C as \0
-            if (conout == true) {
-                console.log("Got input %s%s%s", "<<", rvgets, ">>");
-            }
-
-            estat = gdp_gcl_publish_buf_js(gcl_Ptr, datum, buf);
-            // TBD: check for errors:  if ( ! ep_stat_isok_js(estat) )
-
-            // grab record number and timestamp for this newly written record
-            var ts = gdp_datum_getts_as_string_js(datum, true /* format */ );
-            // TBD: below check for 64-bit integer return type, gdp_recno_t
-            var rn = gdp_datum_getrecno_js(datum);
-            recarray_out[crec] = {
-                recno: rn,
-                time_stamp: ts
-            };
-
-            if (conout == true) {
-                gdp_datum_print_stdout_js(datum);
-            }
-        } /* end for ( var crec = 0 ...) */
-    }
-
-    gdp_datum_free_js(datum);
-
-    estat = gdp_gcl_close_js(gcl_Ptr);
-
-    // TBD: fix this error return - see corresponding location in writer-test.js
-    // string.repeat not available for us here in ECMASscript<6
-    var str = new Array(200 + 1).join(" "); // long enough??
-    var emsg = ("exiting with status " +
-        ep_stat_tostr_js(estat, str, str.length));
-    if (conout == true) {
-        fflush_all_js(); // sometimes Node.js may not empty buffers
-        console.error(emsg);
-    }
-    // console.error( "exiting with status %s",
-    // 				ep_stat_tostr_js(estat, str, str.length) );
-    // OLD return ( ! ep_stat_isok_js(estat) );
-    rv = {
-        error_isok: ((ep_stat_isok_js(estat) == 0) ? false : true),
-        error_code: ("0x" + estat.toString(16)),
-        error_msg: emsg,
-        gcl_name: gcl_name
-    };
-    return rv;
-
-} /* end function write_gcl_records() */
-console.log('gdpjs.js: about to export write_gcl_records');
-exports.write_gcl_records = write_gcl_records;
 
 // ========================================================================
 // Example set ups for calls to read_gcl_records()
@@ -1084,39 +768,24 @@ exports.write_gcl_records = write_gcl_records;
 //   do_multiread(gcl_Ptr, gcl_firstrec, gcl_numrecs, gcl_subscribe, ... );
 //   do_simpleread(gcl_Ptr, gcl_firstrec, gcl_numrecs, ... );
 
-/* Returns:
-   { error_isok: false|true, error_code: EP_STAT, error_msg: String,
-   records: Array of records, each element with record data
-   }
-   where an element of the Array is:
-   {
-   recno:     <integer record number>,
-   timestamp: <String timestamp of record>,
-   value:     <String contents of record>
-   }
-*/
+/**
+ * Read from a log.
+ *
+ * @param gdpdAddress  gdp daemon's <host:port>; if null, use default "127.0.0.1:2468"
+ * @param gclName      name of existing GCL 
+ * @param firstRecord  The first record number to be read
+ * @param numberOfRecords The number of records to read.
+ * @param consoleOut   Iff recdest == 0 and consoleOut == true; the Array entries written to the gcl will also be echoed to console.log().  The other recdest destinations will
+ * ALL result in console.log() output; conout is ignored. Note, there still may be undesired output via console.log() and console.error().
+ * @return  error_isok: false|true, error_code: EP_STAT, error_msg: String,  records: Array of records, each element with record data  where an element of the Array is: recno:     <integer record number>, timestamp: <String timestamp of record>, value:     <String contents of record>}
+ */
 function read_gcl_records(gdpd_addr, gcl_name,
     gcl_firstrec, gcl_numrecs,
-    gcl_subscribe, gcl_multiread, recdest,
+    gcl_subscribe, gcl_multiread,
     conout, gdp_event_cbfunc,
     /* Boolean */
     wait_for_events
-)
-
-// gdpd_addr     gdp daemon's <host:port>; if null, use default "127.0.0.1:2468"
-// gcl_name      name of existing GCL 
-// gcl_firstrec, gcl_numrecs, gcl_subscribe, gcl_multiread
-//               as for reader-test.js -f, -n, -s and -m cmd line options
-// TBD recdest is not used anymore
-// recdest = -1  writes the gcl records to stdout with readable formatting
-// recdest =  0  read the gcl records into the return value's Array { records: }
-// conout        Boolean
-// Iff recdest == 0 and conout == true; the Array entries written to the gcl
-// will also be echoed to console.log().  The other recdest destinations will
-// ALL result in console.log() output; conout is ignored.
-// Note, there still may be undesired output via console.log() and
-// console.error(). TBD
-{
+) {
     // Local working variables
     var gcl_Ptr; // gclh
     var estat; // EP_STAT
@@ -1124,9 +793,15 @@ function read_gcl_records(gdpd_addr, gcl_name,
     var gclpname = new gcl_pname_t(GDP_GCL_PNAME_LEN);
     var recarray_out = []; // will hold contents of records read
 
+    // FIXEM: Need a way to allocate a C string of a certain size.
     var ebuf = ref.allocCString('123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890');
 
-    console.log("gdpjs.js: read_gcl_records");
+    var debug = true;
+
+    if (debug) {
+        console.log("gdpjs.js: read_gcl_records");
+    }
+
     estat = gdp_init_js( /* String */ gdpd_addr);
     if ( ! ep_stat_isok_js(estat) ) {
         var emsg = "gdpjs.js: read_gcl_records(): gdp_init_js() is not ok";
@@ -1143,17 +818,21 @@ function read_gcl_records(gdpd_addr, gcl_name,
         return rv;
     }
 
-    if (conout == true) { // allow thread to settle to avoid interspersed debug output
+    // Allow thread to settle to avoid interspersed debug output.
+    if (conout == true) { 
         // TBD check this
         sleep.sleep(1); // needed only for stdout and stderr
     }
 
     estat = gdp_parse_name_js(gcl_name, gclname);
-    console.log("gdpjs.js: read_gcl_records: gclname: " + gclname.length);
-    for (i=0; i<gclname.length; i++) {
-        process.stdout.write(gclname[i].toString(16));
-    }
+    if (debug) {
+        console.log("gdpjs.js: read_gcl_records: gclname: " + gclname.length);
+        for (i=0; i<gclname.length; i++) {
+            process.stdout.write(gclname[i].toString(16));
+        }
         console.log("\n");
+    }
+
     if ( ! ep_stat_isok_js(estat) ) {
         var emsg = "gdpjs.js: read_gcl_records(): gdp_parse_name_js() is not ok";
         console.log(emsg);
@@ -2281,4 +1960,356 @@ function misc_lower_level_inline_tests( /* Boolean */ do_tests) {
 
 } /* end function misc_lower_level_inline_tests() */
 
-// ==========================================================================
+// ========================================================================
+// Example set ups for calls to write_gcl_records()
+//
+// A: write to gcl from stdin
+// recsrc   = -1;   // read from stdin the gcl records to be written,
+//                  // with optional prompts to and echoing for the
+//                  // user on stdout.
+// conout   = true; // do prompt and echo to stdout.
+// recarray = [ ]; recarray_out = []; // ignored for recsrc = -1
+//
+// B: write to gcl from JS Array, recarray[]
+// recsrc   =  0;      // read the gcl records from the Array recarray[]
+// recarray = [ "Item 01 - from recarray", "Item 02", "Item 03" ];
+// conout   = false;   // don't echo to console.log()
+// recarray_out = [];  // will hold recno's and timestamps for newly
+//                     // written records
+//
+// C: write to gcl N records with integers as contents
+// recsrc >  0;     // write recsrc records with automatically generated
+//                  // content: the integers starting at 1 and going
+//                  // up to recsrc, inclusive.
+// recsrc =  7;
+// conout = false;  // don't echo to console.log()
+// recarray = [ ]; recarray_out = []; // ignored for recsrc > 0
+//
+// write_gcl_records( gdpd_addr, gcl_name, gcl_append, recsrc,
+//                    recarray, conout, recarray_out
+//                  );
+
+/** Write to a Global Data Plane log.
+ *  
+ * @param gdpdAddress gdp daemon's <host:port>; if null, use default
+ * "127.0.0.1:2468" @param gclName name of existing GCL @param
+ * logdxname String: the name of the log server.  Use os.hostname()
+ * for local @param gclAppend Boolean: append to an existing GCL
+ *
+ * @param recordSource The source of the records. recordSource == -1:
+ * read the gcl records to be written from stdin with prompts to and
+ * echoing for the user on stdout. recordSource = 0: read the gcl
+ * records from the Array recarray In this case only, for each gcl
+ * record written we will return in the parallel array recarray_out:
+ * recno: Integer, time_stamp: <timestamp_as_String> }. Note,
+ * recordArrayOut must be in the incoming parameter list. recordSource
+ * > 0 write recordSource records with automatically generated
+ * content: the integers starting at 1 and going up to recsrc,
+ * inclusive.
+ *
+ * @param recordArray if recordSource is 0, then the records are written to 
+ * recordArray.
+ *
+ * @param consoleOut Boolean: iff true, for recsrc = -1, prompt user
+ * and echo written records on stdout; for recsrc = 0, echo written
+ * records on stdout, not recommended; for recsrc > 0, Note, echoed
+ * written records also include GCL record number (recno) and
+ * timestamp.
+ *
+ * @param recordArrayOut Array: see recsrc = 0, above.
+ *
+ * @return error_isok: false|true, error_code: EP_STAT, error_msg: String, gcl_name: String
+ */
+
+function write_gcl_records(gdpd_addr, gcl_name, logdxname, gcl_append,
+    recsrc, recarray, conout, recarray_out)
+
+// gdpd_addr    gdp daemon's <host:port>; if null, use default "127.0.0.1:2468"
+// gcl_name     if gcl_append is true, name of existing GCL; 
+//              if gcl_append is false, ignored.  A new GCL will be created.
+// logdxname    String: the name of the log server.  Use os.hostname() for local
+// gcl_append   Boolean: append to an existing GCL
+// recsrc = -1  read the gcl records to be written from stdin with
+//              prompts to and echoing for the user on stdout
+// recsrc =  0  read the gcl records from the Array recarray
+//              In this case only, 
+//              For each gcl record written we will return in the parallel array
+//              recarray_out:
+//                 { recno: Integer, time_stamp: <timestamp_as_String> }.
+//              Note, recarray_out must be in the incoming parameter list above.
+// recsrc >  0  write recsrc records with automatically generated
+//              content: the integers starting at 1 and going up to
+//              recsrc, inclusive.
+// conout       Boolean: iff true,
+//              for recsrc = -1, prompt user and echo written records on stdout;
+//              for recsrc = 0, echo written records on stdout, not recommended;
+//              for recsrc > 0,  "
+//              Note, echoed written records also include GCL record number
+//              (recno) and timestamp.
+// recarray_out Array: see recsrc = 0, above.
+//
+// TBD: Note, there still may be undesired output via console.log() and
+// console.error(). Check all uses of  if ( conout == true ) below.
+// TBD: We could also return recarray_out[] for recsrc > 0. And, even
+// augmented with the manually entered record content, for recsrc = -1.
+{
+    console.log("gdpjs.js: write_gcl_records() start");
+    // internal variables for historical reasons
+    var xname = gcl_name;
+    var append = gcl_append;
+    var numrecs = recsrc;
+
+    var ebuf = ref.allocCString('123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890');
+
+    // Local working variables
+    var gcl_Ptr; // gclh
+    var estat; // EP_STAT
+    //var gcliname = ref.alloc(gcl_name_t);
+    var gcliname = new gcl_name_t(32);
+
+    // Note, buf is re-allocated below for each item string read from stdin
+    var buf = new buf_t(10);
+
+
+    console.log("gdpjs.js: write_gcl_records() about to call gdp_init_js()");
+    estat = gdp_init_js( /* String */ gdpd_addr);
+    if ( ! ep_stat_isok_js(estat) ) {
+        var emsg = "gdpjs.js: read_gcl_records(): gdp_init_js() is not ok";
+        console.log(emsg);
+        console.log(ep_stat_tostr_js(estat, ebuf, ebuf.length));
+        rv = {
+            error_isok: ((ep_stat_isok_js(estat) == 0) ? false : true),
+            error_code: ("0x" + estat.toString(16)),
+            error_msg: emsg,
+            gcl_name: gcl_name
+        };
+        return rv;
+    }
+    // TBD: check for errors:  if ( ! ep_stat_isok_js(estat) )
+
+    if (conout == true) { // allow thread to settle to avoid interspersed debug output
+        // TBD check this
+        sleep.sleep(1); // needed only for stdout and stderr
+    }
+
+    if (xname == null) {
+        // TBD: check signature
+        console.log("gdpjs.js: write_gcl_records() xname is null. About to call gdp_gcl_create_js()");
+        var gclcreaterv = gdp_gcl_create_js(null);
+        estat = gclcreaterv.error_code;
+        gcl_Ptr = gclcreaterv.gclH;
+        // grab the name of the newly created gcl
+        gcl_name = gdp_get_pname_from_gclh_js(gcl_Ptr);
+    } else {
+        console.log("gdpjs.js: write_gcl_records() about to call gdp_parse_name_js():" + xname + ", " + gcliname);
+
+        console.log("gdpjs.js: write_gcl_records() gcliname:");
+        for (i=0; i<gcliname.length; i++) {
+            process.stdout.write(gcliname[i].toString(16));
+        }
+        console.log("\n");
+
+        gdp_parse_name_js(xname, gcliname);
+
+        console.log("gdpjs.js: write_gcl_records() gcliname:");
+        for (i=0; i<gcliname.length; i++) {
+            process.stdout.write(gcliname[i].toString(16));
+        }
+        console.log("\n");
+
+        // TBD: especially check for gcliname already existing??!!
+
+        if (append) {
+            // TBD: check signature
+            console.log("gdpjs.js: write_gcl_records() about to call gdp_gcl_open_js()");
+            var gclopenrv = gdp_gcl_open_js(gcliname, GDP_MODE_AO);
+            estat = gclopenrv.error_code;
+            gcl_Ptr = gclopenrv.gclH;
+            if ( ! ep_stat_isok_js(estat) ) {
+                var emsg = "gdpjs.js: write_gcl_records(), gdp_gcl_open_js() returned a non-ok ep_stat.  Check to be sure that the log name exists.";
+                console.log(emsg);
+                console.log(ep_stat_tostr_js(estat, ebuf, ebuf.length));
+                rv = {
+                    error_isok: ((ep_stat_isok_js(estat) == 0) ? false : true),
+                    error_code: ("0x" + estat.toString(16)),
+                    error_msg: emsg,
+                    gcl_name: gcl_name
+                };
+                return rv;            
+            }
+        } else {
+            // TBD: check signature
+            console.log("gdpjs.js: write_gcl_records() about to call gdp_gcl_create_js()");
+            var gclPtrPtr = ref.alloc(gdp_gcl_tPtrPtr);
+            var gclcreaterv = gdp_gcl_create_js(xname, logdxname, gclPtrPtr);
+            estat = gclcreaterv.error_code;
+            if ( ! ep_stat_isok_js(estat) ) {
+                var emsg = "gdpjs.js: write_gcl_records(), gdp_gcl_create_js() returned a non-ok ep_stat";
+                console.log(emsg);
+                console.log(ep_stat_tostr_js(estat, ebuf, ebuf.length));
+                rv = {
+                    error_isok: ((ep_stat_isok_js(estat) == 0) ? false : true),
+                    error_code: ("0x" + estat.toString(16)),
+                    error_msg: emsg,
+                    gcl_name: gcl_name
+                };
+                return rv;
+
+            }
+            gcl_Ptr = gclcreaterv.gclH;
+        }
+    }
+    // TBD: check for errors:  if ( ! ep_stat_isok_js(estat) )
+
+    // don't always send gcl name to stdout
+    if (conout == true) {
+        gdp_gcl_print_stdout_js(gcl_Ptr);
+    }
+
+    var datum;
+    datum = gdp_datum_new_js();
+
+    if (numrecs < 0) {
+        // Read records from stdin, prompting & echoing to user on stdout
+
+        // TBD is if(conout) is correct here?
+        if (conout == true) {
+
+            console.log("\nStarting to read input - ^D to end");
+        }
+        var rvget; /* String */
+        // really a dummy for gets's parameter; we ignore its value.
+        // Just trying to avoid possible buffer overruns inside gets().
+        var strbuf = new Array(200 + 1).join(" "); // long enough??
+
+        while ((rvgets = libc.gets(strbuf)) != null) {
+            var buf = new buf_t(rvgets.length + 1); // we'll tack on a \0
+            for (var i = 0; i < rvgets.length; i++) {
+                buf[i] = rvgets.charCodeAt(i); // not sure if really necessary
+            }
+            buf[rvgets.length] = 0; // Hopefully, interpreted in C as \0
+            // TBD is if(conout) is correct here?
+            if (conout == true) {
+                console.log("Got input %s%s%s", "<<", rvgets, ">>");
+            }
+
+            console.log("gdpjs.js: write_gcl_records() about to call gdp_gcl_publish_buf_js()");
+            estat = gdp_gcl_publish_buf_js(gcl_Ptr, datum, buf);
+            // TBD: check for errors:  if ( ! ep_stat_isok_js(estat) )
+            console.log("gdpjs.js: write_gcl_records() done with to call gdp_gcl_publish_buf_js()");
+
+            // TBD is if(conout) is correct here?
+            if (conout == true) {
+                gdp_datum_print_stdout_js(datum);
+            }
+
+        } /* end while */
+    } else if (numrecs > 0) {
+        // Generate numrecs records with contents = integers 1 to numrecs.
+
+        // For each gcl record written we will return in the parallel array
+        // recarray_out:
+        //    { recno: Integer, time_stamp: <timestamp_as_String> }.
+        // Note, recarray_out must be in the incoming parameter list above.
+
+        for (var crec = 1; crec <= numrecs; crec++) {
+            var rvgets; /* String */
+            rvgets = crec.toString();
+
+            var buf = new buf_t(rvgets.length + 1); // we'll tack on a \0
+            for (var i = 0; i < rvgets.length; i++) {
+                buf[i] = rvgets.charCodeAt(i); // not sure if really necessary
+            }
+            buf[rvgets.length] = 0; // Hopefully, interpreted in C as \0
+
+            // TBD is if(conout) is correct here?
+            if (conout == true) {
+                console.log("Got input %s%s%s", "<<", rvgets, ">>");
+            }
+
+            estat = gdp_gcl_publish_buf_js(gcl_Ptr, datum, buf);
+            // TBD: check for errors:  if ( ! ep_stat_isok_js(estat) )
+
+            // grab record number and timestamp for this newly written record
+            var ts = gdp_datum_getts_as_string_js(datum, true /* format */ );
+            // TBD: below check for 64-bit integer return type, gdp_recno_t
+            var rn = gdp_datum_getrecno_js(datum);
+            recarray_out[crec - 1] = {
+                recno: rn,
+                time_stamp: ts
+            };
+
+            // TBD is if(conout) is correct here?
+            if (conout == true) {
+                gdp_datum_print_stdout_js(datum);
+            }
+        } /* end for ( var crec = 1 ...) */
+    } else {
+        // numrecs == 0 
+
+        // Write contents of recarray[] to the gcl
+
+        // For each gcl record written we will return in the parallel array
+        // recarray_out:
+        //    { recno: Integer, time_stamp: <timestamp_as_String> }.
+        // Note, recarray_out must be in the incoming parameter list above.
+
+        for (var crec = 0; crec < recarray.length; crec++) {
+            var rvgets; /* String */
+            rvgets = recarray[crec].toString();
+
+            var buf = new buf_t(rvgets.length + 1); // we'll tack on a \0
+            for (var i = 0; i < rvgets.length; i++) {
+                buf[i] = rvgets.charCodeAt(i); // not sure if really necessary
+            }
+            buf[rvgets.length] = 0; // Hopefully, interpreted in C as \0
+            if (conout == true) {
+                console.log("Got input %s%s%s", "<<", rvgets, ">>");
+            }
+
+            estat = gdp_gcl_publish_buf_js(gcl_Ptr, datum, buf);
+            // TBD: check for errors:  if ( ! ep_stat_isok_js(estat) )
+
+            // grab record number and timestamp for this newly written record
+            var ts = gdp_datum_getts_as_string_js(datum, true /* format */ );
+            // TBD: below check for 64-bit integer return type, gdp_recno_t
+            var rn = gdp_datum_getrecno_js(datum);
+            recarray_out[crec] = {
+                recno: rn,
+                time_stamp: ts
+            };
+
+            if (conout == true) {
+                gdp_datum_print_stdout_js(datum);
+            }
+        } /* end for ( var crec = 0 ...) */
+    }
+
+    gdp_datum_free_js(datum);
+
+    estat = gdp_gcl_close_js(gcl_Ptr);
+
+    // TBD: fix this error return - see corresponding location in writer-test.js
+    // string.repeat not available for us here in ECMASscript<6
+    var str = new Array(200 + 1).join(" "); // long enough??
+    var emsg = ("exiting with status " +
+        ep_stat_tostr_js(estat, str, str.length));
+    if (conout == true) {
+        fflush_all_js(); // sometimes Node.js may not empty buffers
+        console.error(emsg);
+    }
+    // console.error( "exiting with status %s",
+    // 				ep_stat_tostr_js(estat, str, str.length) );
+    // OLD return ( ! ep_stat_isok_js(estat) );
+    rv = {
+        error_isok: ((ep_stat_isok_js(estat) == 0) ? false : true),
+        error_code: ("0x" + estat.toString(16)),
+        error_msg: emsg,
+        gcl_name: gcl_name
+    };
+    return rv;
+
+} /* end function write_gcl_records() */
+
+exports.write_gcl_records = write_gcl_records;
+

@@ -84,29 +84,25 @@ exports.gdp_gcl_open = function (name, iomode) {
 }
 
 /**
+ * Read from a log.
+ *
  * @param gdpdAddress  gdp daemon's <host:port>; if null, use default "127.0.0.1:2468"
  * @param gclName      name of existing GCL 
  * @param firstRecord  The first record number to be read
  * @param numberOfRecords The number of records to read.
- * TBD recdest is not used anymore
- * recdest = -1  writes the gcl records to stdout with readable formatting
- * recdest =  0  read the gcl records into the return value's Array { records: }
- * conout        Boolean
- * Iff recdest == 0 and conout == true; the Array entries written to the gcl
- * will also be echoed to console.log().  The other recdest destinations will
- * ALL result in console.log() output; conout is ignored.
- * Note, there still may be undesired output via console.log() and
- * console.error(). TBD
-*/
+ * @param consoleOut   Iff recdest == 0 and consoleOut == true; the Array entries written to the gcl will also be echoed to console.log().  The other recdest destinations will
+ * ALL result in console.log() output; conout is ignored. Note, there still may be undesired output via console.log() and console.error().
+ * @return  error_isok: false|true, error_code: EP_STAT, error_msg: String,  records: Array of records, each element with record data  where an element of the Array is: recno:     <integer record number>, timestamp: <String timestamp of record>, value:     <String contents of record>}
+ */
 exports.read_gcl_records = function (gdpdAddress, gclName,
-                                   firstRecord, numberOfRecords,
-                                   subscribe, multiread, recordDestination,
-                                   consoleOut, eventCallBackFunction,
-                                   waitForEvents) {
+                                     firstRecord, numberOfRecords,
+                                     subscribe, multiread,
+                                     consoleOut, eventCallBackFunction,
+                                     waitForEvents) {
 
     return gdpjsSupport.read_gcl_records(gdpdAddress, gclName,
                          firstRecord, numberOfRecords,
-                         subscribe, multiread, recordDestination,
+                         subscribe, multiread,
                          consoleOut, eventCallBackFunction,
                          waitForEvents);
 }
@@ -122,11 +118,12 @@ exports.read_gcl_records = function (gdpdAddress, gclName,
  * read the gcl records to be written from stdin with prompts to and
  * echoing for the user on stdout. recordSource = 0: read the gcl
  * records from the Array recarray In this case only, for each gcl
- * record written we will return in the parallel array recarray_out: {
+ * record written we will return in the parallel array recarray_out:
  * recno: Integer, time_stamp: <timestamp_as_String> }. Note,
- * recarray_out must be in the incoming parameter list. recsrc > 0
- * write recsrc records with automatically generated content: the
- * integers starting at 1 and going up to recsrc, inclusive.
+ * recordArrayOut must be in the incoming parameter list. recordSource
+ * > 0 write recordSource records with automatically generated
+ * content: the integers starting at 1 and going up to recsrc,
+ * inclusive.
  *
  * @param recordArray if recordSource is 0, then the records are written to 
  * recordArray.
