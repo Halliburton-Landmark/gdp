@@ -188,6 +188,7 @@ G=		-g
 O=		-O
 STD=
 COPTS=		${PG} ${WALL} $G $O ${STD}
+INCROOT=	..
 INCSEARCH=	${INCLOCAL} \
 		-I${INCROOT} \
 		-I${LOCAL1}/include \
@@ -199,9 +200,9 @@ INCS=		${INCSEARCH}
 CFLAGS=		${COPTS} ${INCS} -I${CURDIR} -I.. -fPIC
 RM=		rm
 LD=		ld
-LDFLAGS=	-L. ${LIBSEARCH}
+LIBCRYPTO=	-lcrypto
+LDFLAGS=	-L. ${LIBSEARCH} ${LIBCRYPTO}
 LDLIBS=		${LIBNAME}.a -pthread
-LIBS=		-lcrypto
 LN=		ln
 MV=		mv
 CP=		cp
@@ -231,7 +232,7 @@ ${LIBNAME}.a: ${OBJS}
 	${CP} $@ ${LOCALLIBSDIR}
 
 ${LIBNAME}.so.${EPLIBVER}: ${OBJS}
-	${CC} ${SHARED} -o $@ ${OBJS} ${LIBS}
+	${CC} ${SHARED} -o $@ ${OBJS} ${LDFLAGS}
 	(cd ${LOCALLIBSDIR} && sh makelinks.sh ep ${EPLIBMAJVER} ${EPLIBMINVER})
 
 ${OBJS}: ${HFILES}
