@@ -44,6 +44,77 @@ mkdir_gdp() {
 	sudo chown ${GDP_USER}:${GDP_GROUP} $1
 }
 
+package() {
+    info "Checking package $1..."
+    case "$OS" in
+	"ubuntu" | "debian")
+	    if dpkg --get-selections | grep --quiet $1; then
+		info "$1 is already installed. skipping."
+	    else
+		sudo apt-get install -y $@
+	    fi
+	    ;;
+	"centos" | "redhat")
+	    if rpm -qa | grep --quiet $1; then
+		info "$1 is already installed. skipping."
+	    else
+		sudo yum install -y $@
+	    fi
+	    ;;
+	"darwin")
+	    if [ -z "$pkgmgr" ]; then
+		if type brew > /dev/null 2>&1 && [ ! -z "`brew list`" ]; then
+		    pkgmgr=brew
+		    sudo brew update
+		fi
+		if type port > /dev/null 2>&1 && port installed | grep -q .; then
+		    if [ "$pkgmgr" = "brew" ]; then
+			warn "You seem to have both macports and homebrew installed."
+			fatal "You will have to deactivate one (or modify this script)"
+		    else
+			pkgmgr=port
+			sudo port selfupdate
+		    fi
+		fi
+		if [ -z "$pkgmgr" ]; then
+		    fatal "you must install macports or homebrew"
+		fi
+	    fi
+	    if [ "$pkgmgr" = "brew" ]; then
+		if brew list | grep --quiet $1; then
+		    info "$1 is already installed. skipping."
+		else
+		    brew install --build-bottle $@ || brew upgrade $@
+		fi
+	    else
+		if port -q installed $1 | grep -q "."; then
+		    info "$1 is already installed. skipping."
+		else
+		    sudo port install $1
+		fi
+	    fi
+	    ;;
+	"freebsd")
+	    export PATH="/sbin:/usr/sbin:$PATH"
+	    if sudo pkg info -q $1; then
+		info "$1 is already installed. skipping."
+	    else
+		sudo pkg install $@
+	    fi
+	    ;;
+	"gentoo")
+	    if equery list $1 >& /dev/null; then
+		info "$1 is already installed. skipping."
+	    else
+		sudo emerge $1
+	    fi
+	    ;;
+	*)
+	    fatal "unrecognized OS $OS"
+	    ;;
+    esac
+}
+
 #################### END OF FUNCTIONS ####################
 
 # configure defaults
