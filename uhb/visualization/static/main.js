@@ -67,14 +67,18 @@ function drawChart(logname, startTime, endTime) {
 
     var query = new google.visualization.Query(baseurl+query_string);
     query.send(handleQueryResponse);
-    document.getElementById('request_status').innerHTML = "Request sent...";
+    document.getElementById('request_status').innerHTML = "<p>Request sent...</p>";
 }
 
 function handleQueryResponse(response) {
 
-    document.getElementById('request_status').innerHTML = "The first graph is an overview graph with controllable sliders to zoom in/out, followed by individual parameters plotted separately.";
-
     data = response.getDataTable();
+    if (data.getNumberOfRows() == 0) {
+        document.getElementById('request_status').innerHTML = "<p>Sorry, no data for the time-range specified. Please pick a different time range.</p>";
+        return;
+    }
+
+    document.getElementById('request_status').innerHTML = "<p>The first graph is an overview graph with controllable sliders to zoom in/out, followed by individual parameters plotted separately.</p>";
 
     dashboard = new google.visualization.Dashboard(
         document.getElementById('dashboard_div'));
