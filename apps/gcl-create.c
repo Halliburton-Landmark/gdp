@@ -75,7 +75,7 @@ select_logd_name(void)
 		srandom(tv.tv_usec);
 
 		// default to one of the berkeley servers
-		int r = random() % 3 + 1;
+		int r = random() % 4 + 1;
 		int l = sizeof "edu.berkeley.eecs.gdp-00.gdplogd" + 1;
 		char *nbuf;
 

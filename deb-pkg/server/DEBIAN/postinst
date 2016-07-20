@@ -22,7 +22,7 @@ chown -R gdp:root $GCLDIR
 # Get list of routers <hardcoded for now>
 echo "Figuring out router information..."
 hostname=`hostname`
-routers="gdp-01.eecs.berkeley.edu; gdp-02.eecs.berkeley.edu; gdp-03.eecs.berkeley.edu"
+routers="gdp-01.eecs.berkeley.edu; gdp-02.eecs.berkeley.edu; gdp-03.eecs.berkeley.edu; gdp-04.eecs.berkeley.edu"
 t=`echo $routers | sed "s/; /\n/g" | shuf | tr -s '\n' ';' | sed "s/;/; /g"`
 routers="127.0.0.1; $t"
 

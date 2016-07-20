@@ -15,7 +15,8 @@ if [ ! -r /etc/ep_adm_params/gdp ]; then
         >> /etc/ep_adm_params/gdp
     echo `shuf -e gdp-01.eecs.berkeley.edu \
         gdp-02.eecs.berkeley.edu \
-        gdp-03.eecs.berkeley.edu ` | \
+        gdp-03.eecs.berkeley.edu \
+        gdp-04.eecs.berkeley.edu ` | \
         sed -e 's/ /; /g' -e 's/^/swarm.gdp.routers=/' \
             >> /etc/ep_adm_params/gdp
 fi
