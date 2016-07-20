@@ -728,6 +728,7 @@ var libgdpjs = ffi.Library(GDPJS_DIR + '/../libs/libgdpjs.1.0', {
 })
 
 exports.ep_dbg_init = libep.ep_dbg_init;
+exports.ep_dbg_set = libep.ep_dbg_set;
 exports.ep_stat_isok = libgdpjs.ep_stat_isok;
 exports.ep_stat_tostr = libep.ep_stat_tostr;
 
@@ -793,10 +794,10 @@ function read_gcl_records(gdpd_addr, gcl_name,
     var gclpname = new gcl_pname_t(GDP_GCL_PNAME_LEN);
     var recarray_out = []; // will hold contents of records read
 
-    // FIXEM: Need a way to allocate a C string of a certain size.
+    // FIXME: Need a way to allocate a C string of a certain size.
     var ebuf = ref.allocCString('123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890');
 
-    var debug = true;
+    var debug = false;
 
     if (debug) {
         console.log("gdpjs.js: read_gcl_records");
@@ -1266,12 +1267,19 @@ function gdp_init_js( /* String */ gdpd_addr) {
     // null string but an undefined argument works OK to start the
     // library on the default gdpd host:port .
     // So we protect this call from incoming JS null strings.
-    console.log("gdpjs.js: gdp_init_js(" + gdpd_addr + ")");
+    var debug = false;
+    if (debug) {
+        console.log("gdpjs.js: gdp_init_js(" + gdpd_addr + ")");
+    }
     if (gdpd_addr == "") { // DEBUG: console.log( 'then: gdpd_addr = \"' + gdpd_addr + '\"' );
-        console.log("gdpjs.js: gdp_init_js(" + gdpd_addr + "): calling libgdp.gdp_init(undefined)");
+        if (debug) {
+            console.log("gdpjs.js: gdp_init_js(" + gdpd_addr + "): calling libgdp.gdp_init(undefined)");
+        }
         return libgdp.gdp_init(undefined);
     } else { // DEBUG: console.log( 'else: gdpd_addr = \"' + gdpd_addr + '\"' );
-        console.log("gdpjs.js: gdp_init_js(" + gdpd_addr + "): calling libgdp.gdp_init(" + gdpd_addr + ")");
+        if (debug) {
+            console.log("gdpjs.js: gdp_init_js(" + gdpd_addr + "): calling libgdp.gdp_init(" + gdpd_addr + ")");
+        }
         return libgdp.gdp_init(gdpd_addr);
     }
 }
@@ -1994,14 +2002,16 @@ function misc_lower_level_inline_tests( /* Boolean */ do_tests) {
  * @param gdpdAddress gdp daemon's <host:port>; if null, use default
  * "127.0.0.1:2468" @param gclName name of existing GCL @param
  * logdxname String: the name of the log server.  Use os.hostname()
- * for local @param gclAppend Boolean: append to an existing GCL
+ * for local 
+ * @param logdxname String: the name of the log server.  Use os.hostname() for local.
+ * @param gclAppend Boolean: append to an existing GCL
  *
  * @param recordSource The source of the records. recordSource == -1:
  * read the gcl records to be written from stdin with prompts to and
  * echoing for the user on stdout. recordSource = 0: read the gcl
- * records from the Array recarray In this case only, for each gcl
- * record written we will return in the parallel array recarray_out:
- * recno: Integer, time_stamp: <timestamp_as_String> }. Note,
+ * records from the Array recordArray. In this case only, for each gcl
+ * record written we will return in the parallel array recordArrayOut:
+ * recno: Integer, time_stamp: <timestamp_as_String>. Note,
  * recordArrayOut must be in the incoming parameter list. recordSource
  * > 0 write recordSource records with automatically generated
  * content: the integers starting at 1 and going up to recsrc,
@@ -2053,7 +2063,10 @@ function write_gcl_records(gdpd_addr, gcl_name, logdxname, gcl_append,
 // TBD: We could also return recarray_out[] for recsrc > 0. And, even
 // augmented with the manually entered record content, for recsrc = -1.
 {
-    console.log("gdpjs.js: write_gcl_records() start");
+    var debug = false;
+    if (debug) {
+        console.log("gdpjs.js: write_gcl_records() start");
+    }
     // internal variables for historical reasons
     var xname = gcl_name;
     var append = gcl_append;
@@ -2071,7 +2084,9 @@ function write_gcl_records(gdpd_addr, gcl_name, logdxname, gcl_append,
     var buf = new buf_t(10);
 
 
-    console.log("gdpjs.js: write_gcl_records() about to call gdp_init_js()");
+    if (debug) {
+        console.log("gdpjs.js: write_gcl_records() about to call gdp_init_js()");
+    }
     estat = gdp_init_js( /* String */ gdpd_addr);
     if ( ! ep_stat_isok_js(estat) ) {
         var emsg = "gdpjs.js: read_gcl_records(): gdp_init_js() is not ok";
@@ -2094,34 +2109,42 @@ function write_gcl_records(gdpd_addr, gcl_name, logdxname, gcl_append,
 
     if (xname == null) {
         // TBD: check signature
-        console.log("gdpjs.js: write_gcl_records() xname is null. About to call gdp_gcl_create_js()");
+        if (debug) {
+            console.log("gdpjs.js: write_gcl_records() xname is null. About to call gdp_gcl_create_js()");
+        }
         var gclcreaterv = gdp_gcl_create_js(null);
         estat = gclcreaterv.error_code;
         gcl_Ptr = gclcreaterv.gclH;
         // grab the name of the newly created gcl
         gcl_name = gdp_get_pname_from_gclh_js(gcl_Ptr);
     } else {
-        console.log("gdpjs.js: write_gcl_records() about to call gdp_parse_name_js():" + xname + ", " + gcliname);
+        if (debug) {
+            console.log("gdpjs.js: write_gcl_records() about to call gdp_parse_name_js():" + xname + ", " + gcliname);
+            console.log("gdpjs.js: write_gcl_records() gcliname:");
 
-        console.log("gdpjs.js: write_gcl_records() gcliname:");
-        for (i=0; i<gcliname.length; i++) {
-            process.stdout.write(gcliname[i].toString(16));
+            for (i=0; i<gcliname.length; i++) {
+                process.stdout.write(gcliname[i].toString(16));
+            }
+            console.log("\n");
         }
-        console.log("\n");
 
         gdp_parse_name_js(xname, gcliname);
 
-        console.log("gdpjs.js: write_gcl_records() gcliname:");
-        for (i=0; i<gcliname.length; i++) {
-            process.stdout.write(gcliname[i].toString(16));
+        if (debug) {
+            console.log("gdpjs.js: write_gcl_records() gcliname:");
+            for (i=0; i<gcliname.length; i++) {
+                process.stdout.write(gcliname[i].toString(16));
+            }
+            console.log("\n");
         }
-        console.log("\n");
 
         // TBD: especially check for gcliname already existing??!!
 
         if (append) {
             // TBD: check signature
-            console.log("gdpjs.js: write_gcl_records() about to call gdp_gcl_open_js()");
+            if (debug) {
+                console.log("gdpjs.js: write_gcl_records() about to call gdp_gcl_open_js()");
+            }
             var gclopenrv = gdp_gcl_open_js(gcliname, GDP_MODE_AO);
             estat = gclopenrv.error_code;
             gcl_Ptr = gclopenrv.gclH;
@@ -2139,7 +2162,9 @@ function write_gcl_records(gdpd_addr, gcl_name, logdxname, gcl_append,
             }
         } else {
             // TBD: check signature
-            console.log("gdpjs.js: write_gcl_records() about to call gdp_gcl_create_js()");
+            if (debug) {
+                console.log("gdpjs.js: write_gcl_records() about to call gdp_gcl_create_js()");
+            }
             var gclPtrPtr = ref.alloc(gdp_gcl_tPtrPtr);
             var gclcreaterv = gdp_gcl_create_js(xname, logdxname, gclPtrPtr);
             estat = gclcreaterv.error_code;
@@ -2174,7 +2199,6 @@ function write_gcl_records(gdpd_addr, gcl_name, logdxname, gcl_append,
 
         // TBD is if(conout) is correct here?
         if (conout == true) {
-
             console.log("\nStarting to read input - ^D to end");
         }
         var rvget; /* String */
@@ -2193,10 +2217,14 @@ function write_gcl_records(gdpd_addr, gcl_name, logdxname, gcl_append,
                 console.log("Got input %s%s%s", "<<", rvgets, ">>");
             }
 
-            console.log("gdpjs.js: write_gcl_records() about to call gdp_gcl_publish_buf_js()");
+            if (debug) {
+                console.log("gdpjs.js: write_gcl_records() about to call gdp_gcl_publish_buf_js()");
+            }
             estat = gdp_gcl_publish_buf_js(gcl_Ptr, datum, buf);
             // TBD: check for errors:  if ( ! ep_stat_isok_js(estat) )
-            console.log("gdpjs.js: write_gcl_records() done with to call gdp_gcl_publish_buf_js()");
+            if (debug) {
+                console.log("gdpjs.js: write_gcl_records() done with to call gdp_gcl_publish_buf_js()");
+            }
 
             // TBD is if(conout) is correct here?
             if (conout == true) {
