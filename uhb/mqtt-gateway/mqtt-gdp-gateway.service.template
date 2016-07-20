@@ -8,7 +8,9 @@ After=gdplogd
 Type=oneshot
 Environment=GDP_ROOT=@GDP_ROOT@
 Environment=GDP_USER=@GDP_USER@
-ExecStart=@GDP_ROOT@/sbin/mqtt-gdp-gateway XXX
+ExecStart=/bin/true
+ExecStop=/bin/true
+ExecReload=/bin/true
 RemainAfterExit=yes
 
 [Install]

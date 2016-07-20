@@ -37,13 +37,6 @@ Installing Step by Step
 
 		make install LOCAL_ROOT=/usr/local/gdp
 
-  * Run the script `adm/install-config.sh`.  This configures
-    rsyslog and systemd.  ***This only works on Linux systems
-	running `rsyslog` and `systemd`, such as Ubuntu 16.04.***
-	On any other system (including Ubuntu 14.04) you will have
-	to do these steps yourself, adjusting as appropriate for
-	your system.
-
 Details
 -------
 

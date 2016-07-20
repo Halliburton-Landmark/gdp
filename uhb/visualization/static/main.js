@@ -23,7 +23,21 @@ deviceData = {
             { "logname": "edu.berkeley.eecs.bwrc.device.c098e530005d", "type": "BLEES", "humanName": 'bwrc BLEE: mid wall'},
             { "logname": "edu.berkeley.eecs.bwrc.device.c098e570008f", "type": "PowerBlade", "humanName": 'bwrc PowerBlade: utility power to sump pump'},
             { "logname": "edu.berkeley.eecs.bwrc.device.c098e5700090", "type": "PowerBlade", "humanName": 'bwrc PowerBlade: power to air compressor'},
-            { "logname": "edu.berkeley.eecs.bwrc.device.c098e590001e", "type": "Blink", "humanName": 'bwrc Blink'}],
+            { "logname": "edu.berkeley.eecs.bwrc.device.c098e590001e", "type": "Blink", "humanName": 'bwrc Blink'}, 
+
+
+            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e530002b", "type": "BLEES", "humanName": 'immersion BLEE: Chair 1'},
+            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e5300058", "type": "BLEES", "humanName": 'immersion BLEE: Chair 2'},
+            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e530005c", "type": "BLEES", "humanName": 'immersion BLEE: Chair 3'},
+            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e530005f", "type": "BLEES", "humanName": 'immersion BLEE: Chair 4'},
+            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e5300074", "type": "BLEES", "humanName": 'immersion BLEE: Chair 5'},
+            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e5300075", "type": "BLEES", "humanName": 'immersion BLEE: Chair 6'},
+            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e5300076", "type": "BLEES", "humanName": 'immersion BLEE: Chair 7'},
+            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e5300077", "type": "BLEES", "humanName": 'immersion BLEE: Chair 8'},
+            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e5300078", "type": "BLEES", "humanName": 'immersion BLEE: Chair 9'},
+            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e530007a", "type": "BLEES", "humanName": 'immersion BLEE: Chair 10'},
+            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e530007b", "type": "BLEES", "humanName": 'immersion BLEE: Chair 11'},
+            { "logname": "edu.berkeley.eecs.swarmlab.device.c098e530007c", "type": "BLEES", "humanName": 'immersion BLEE: Chair 12'} ],
     };
 
 
@@ -67,14 +81,18 @@ function drawChart(logname, startTime, endTime) {
 
     var query = new google.visualization.Query(baseurl+query_string);
     query.send(handleQueryResponse);
-    document.getElementById('request_status').innerHTML = "Request sent...";
+    document.getElementById('request_status').innerHTML = "<p>Request sent...</p>";
 }
 
 function handleQueryResponse(response) {
 
-    document.getElementById('request_status').innerHTML = "The first graph is an overview graph with controllable sliders to zoom in/out, followed by individual parameters plotted separately.";
-
     data = response.getDataTable();
+    if (data.getNumberOfRows() == 0) {
+        document.getElementById('request_status').innerHTML = "<p>Sorry, no data for the time-range specified. Please pick a different time range.</p>";
+        return;
+    }
+
+    document.getElementById('request_status').innerHTML = "<p>The first graph is an overview graph with controllable sliders to zoom in/out, followed by individual parameters plotted separately.</p>";
 
     dashboard = new google.visualization.Dashboard(
         document.getElementById('dashboard_div'));

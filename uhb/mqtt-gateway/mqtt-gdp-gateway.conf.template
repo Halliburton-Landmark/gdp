@@ -27,7 +27,7 @@ pre-start script
 	fi
 	echo "[`date`] $NAME starting on $MQTT_SERVER"
 	# debugging
-	echo "PROG=$PROG"
+	echo "GDP_ROOT=$GDP_ROOT
 	echo "CONFIG=$CONFIG"
 	echo cwd=`pwd`
 end script
@@ -35,8 +35,8 @@ end script
 script
 	test ! -r $CONFIG || . $CONFIG
 	exec >> $LOGFILE 2>&1
-	echo "[`date`] sh $PROG $MQTT_SERVER"
-	exec sh $PROG $MQTT_SERVER
+	echo "[`date`] sh $GDP_ROOT/sbin/start-mqtt-gdp-gateway.sh $MQTT_SERVER"
+	exec sh $GDP_ROOT/sbin/start-mqtt-gdp-gateway.sh $MQTT_SERVER
 end script
 
 pre-stop script

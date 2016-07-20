@@ -227,8 +227,8 @@ cmd_create(gdp_req_t *req)
 	flush_input_data(req, "cmd_create");
 
 	// do the physical create
-	estat = gcl->x->physimpl->create(gcl, gmd);
-	gdp_gclmd_free(gmd);
+	gcl->gclmd = gmd;
+	estat = gcl->x->physimpl->create(gcl, gcl->gclmd);
 	EP_STAT_CHECK(estat, goto fail1);
 
 	// advertise this new GCL

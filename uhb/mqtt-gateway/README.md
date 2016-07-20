@@ -20,18 +20,86 @@ and Blink for now) into one log per device.  You have to configure
 the names of the MQTT brokers and the names of the devices of
 interest.
 
+Note that there is no necessity that this gateway code run on
+the same system that is collecting the data; in fact, it is
+probably better to limit the BBB to doing data collection and
+not data storage.
 
-## Required Packages
+***NOTE WELL:*** The code in this directory is mostly about reading
+data from MQTT and gatewaying it into the GDP.  It is *not* about
+collecting the data from the sensors and gatewaying it into MQTT
+(that's what the U. Michigan code does).  However, there is a
+script (`setup-uhk-gateway.sh`) that will install the necessary
+packages, fetch and install the Michigan code, and install startup
+scripts for those programs.  This is completely customized for the
+BBB, and may require tweaking for your environment.
+
+
+## Installing
+
+If everything is reasonably vanilla in your environment, the
+`install-mqtt-gdp-gateway.sh script should do everything you
+need, including creating a `gdp` user if necessary, downloading
+required packages, creating necessary system directories, and
+so forth.  You may have problems with mosquitto (see below).
+
+### Required Packages
 
 The mqtt-gdp-gateway application requires Mosquitto, an MQTT
 client library.  On Debian and Ubuntu you'll need to install
-`libmosquitto0-dev`.  On FreeBSD the package is named `mosquitto`.
-On MacOS mosquitto is supported by brew, but not bsdports.
-However it is easy to download and compile the library from source.
+`libmosquitto-dev` and `mosquitto-clients`.  On FreeBSD the
+package is named `mosquitto`.  On MacOS mosquitto is supported
+by brew, but not macports.  However it is easy to download and
+compile the library from source.
 
-Except for MacOS, the setup-mqtt-gateway.sh script will install the
-prerequisite packages.  It will also download and build the third
-party code (notably the U. Michigan code).
+On Debian, the `install-mqtt-gdp-gateway.sh` script will install
+the prerequisite packages.  Other platforms may work, but there
+are no guarantees.
+
+## Operations
+
+There is one configuration file per MQTT broker.  In actual deployment
+that equals one Beaglebone Black.  Each broker has a configuration
+file for the sensors it understands in `/etc/gdp/mqtt-gateway.host.conf`
+(where host is the short hostname for the broker server, that is,
+without any domain information included).  The configuration file
+can contain comment lines beginning with a `#`, and blank lines are
+ignored.
+
+The first line of the configuration file is the "root" of the GDP
+log name, e.g., `edu.berkeley.eecs.swarmlab`.  The detailed device
+information will be appended to this name.  Remaining lines are
+the MAC addresses of the devices with all colons deleted and in
+lower case.
+
+### Adding a new sensor to an existing BBB gateway
+
+This is just a matter of adding a new line to the corresponding
+configuration file.  The mqtt-gdp-gateway service for that gateway
+will need to be restarted.  New logs should be created as needed.
+
+### Adding a new BBB gateway
+
+This requires creating a new configuration file.  The location
+and syntax is described above.  The _host_ part of the name
+**must** be the hostname part of the domain name of the BBB,
+that is, the part of the DNS name up to the first dot.
+
+You then need to tell the logging system to read the configuration
+file.  On a `systemd`-based system this is done by executing the
+command:
+
+	systemctl enable mqtt-gdp-gateway@host.dom.ain
+
+where "host.dom.ain" is the fully qualified domain name.  For
+example, at Berkeley we have a BBB with the DNS name of
+`uhkbbb001.eecs.berkeley.edu`.  The name of the configuration
+file is `/etc/gdp/mqtt-gdp-gateway.uhkbbb001.conf`, but the
+`systemctl` command to start it is:
+
+	systemctl enable mqtt-gdp-gateway@uhkbbb001.eecs.berkeley.edu
+
+Once a gateway service is enabled, it will persist over a reboot.
 
 
 ## What's in This Directory?
@@ -111,7 +179,7 @@ would match against a subscription of "a/topic/+" or "a/topic/#".
 
 See the mqtt-gdp-gateway(1) man page for more details.
 
-### setup-uhb-gateway.sh
+### setup-uhk-gateway.sh
 
 Fetch the U. Michigan from the `lab11` repository, install
 prerequisite packages, compile everything necessary, and install

@@ -55,7 +55,8 @@ class DataResource(Resource):
         sampleData = json.loads(sampleRecord['data'])
         if sampleData['device'] == "BLEES":
             keys = ['pressure_pascals', 'humidity_percent',
-                    'temperature_celcius', 'light_lux']
+                    'temperature_celcius', 'light_lux',
+                    'acceleration_advertisement', 'acceleration_interval']
         elif sampleData['device'] == "Blink":
             keys = ['current_motion', 'motion_since_last_adv',
                     'motion_last_minute']

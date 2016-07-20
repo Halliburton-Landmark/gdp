@@ -107,7 +107,10 @@ gdp_buf_read(gdp_buf_t *buf, void *out, size_t sz)
 size_t
 gdp_buf_peek(gdp_buf_t *buf, void *out, size_t sz)
 {
-	return evbuffer_copyout(buf, out, sz);
+	ssize_t s = evbuffer_copyout(buf, out, sz);
+	if (s < 0)
+		return 0;
+	return s;
 }
 
 /*

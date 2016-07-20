@@ -13,68 +13,9 @@ root=`pwd`
 info "Setting up packages for GDP compilation."
 info "This is overkill if you are only installing binaries."
 
-package() {
-    info "Checking package $1..."
-    case "$OS" in
-	"ubuntu" | "debian")
-	    if dpkg --get-selections | grep --quiet $1; then
-		info "$1 is already installed. skipping."
-	    else
-		sudo apt-get install -y $@
-	    fi
-	    ;;
-	"centos" | "redhat")
-	    if rpm -qa | grep --quiet $1; then
-		info "$1 is already installed. skipping."
-	    else
-		sudo yum install -y $@
-	    fi
-	    ;;
-	"darwin")
-	    if [ "$pkgmgr" = "brew" ]; then
-		if brew list | grep --quiet $1; then
-		    info "$1 is already installed. skipping."
-		else
-		    brew install --build-bottle $@ || brew upgrade $@
-		fi
-	    else
-		if port -q installed $1 | grep -q "."; then
-		    info "$1 is already installed. skipping."
-		else
-		    sudo port install $1
-		fi
-	    fi
-	    ;;
-	"freebsd")
-	    export PATH="/sbin:/usr/sbin:$PATH"
-	    if sudo pkg info -q $1; then
-		info "$1 is already installed. skipping."
-	    else
-		sudo pkg install $@
-	    fi
-	    ;;
-	"gentoo")
-	    if equery list $1 >& /dev/null; then
-		info "$1 is already installed. skipping."
-	    else
-		sudo emerge $1
-	    fi
-	    ;;
-	*)
-	    fatal "unrecognized OS $OS"
-	    ;;
-    esac
-}
-
-platform OS
 info "Installing packages needed by GDP for $OS"
 case "$OS" in
     "ubuntu" | "debian")
-	if ! ls /etc/apt/sources.list.d/mosquitto* > /dev/null 2>&1
-	then
-		info "Setting up mosquitto repository"
-		sudo apt-add-repository ppa:mosquitto-dev/mosquitto-ppa
-	fi
 	sudo apt-get update
 	sudo apt-get clean
 	package libevent-dev
@@ -85,29 +26,18 @@ case "$OS" in
 	package libavahi-common-dev
 	package libavahi-client-dev
 	package avahi-daemon
+	package pandoc
+	if ! ls /etc/apt/sources.list.d/mosquitto* > /dev/null 2>&1
+	then
+		package software-properties-common
+		info "Setting up mosquitto repository"
+		sudo apt-add-repository ppa:mosquitto-dev/mosquitto-ppa
+	fi
 	package libmosquitto-dev
 	package mosquitto-clients
-	package pandoc
 	;;
 
     "darwin")
-	pkgmgr=none
-	if type brew > /dev/null 2>&1 && [ ! -z "`brew list`" ]; then
-	    pkgmgr=brew
-	    sudo brew update
-	fi
-	if type port > /dev/null 2>&1 && port installed | grep -q .; then
-	    if [ "$pkgmgr" = "none" ]; then
-		pkgmgr=port
-		sudo port selfupdate
-	    else
-		info "You seem to have both macports and homebrew installed."
-		fatal "You will have to deactivate one (or modify this script)"
-	    fi
-	fi
-	if [ "$pkgmgr" = "none" ]; then
-	    fatal "you must install macports or homebrew"
-	fi
 	package libevent
 	package openssl
 	package lighttpd

@@ -283,6 +283,7 @@ message_cb(struct mosquitto *mosq,
 	{
 		EP_STAT estat;
 		gdp_datum_t *datum = gdp_datum_new();
+		gdp_recno_t oldnrecs;
 
 		if (SkipMetadata)
 		{
@@ -295,10 +296,13 @@ message_cb(struct mosquitto *mosq,
 					"{topic:\"%s\", qos:%d, len:%d, payload:%s}\n",
 					msg->topic, msg->qos, paylen, payload);
 		}
+		oldnrecs = gdp_gcl_getnrecs(tinfo->gcl);
 		estat = gdp_gcl_append(tinfo->gcl, datum);
 		if (!EP_STAT_ISOK(estat))
 		{
-			ep_log(estat, "cannot log MQTT message for %s", msg->topic);
+			ep_log(estat, "cannot log MQTT message for %s "
+					"(nrecs %" PRIgdp_recno " => %" PRIgdp_recno ")",
+					msg->topic, oldnrecs, gdp_gcl_getnrecs(tinfo->gcl));
 		}
 		gdp_datum_free(datum);
 	}
