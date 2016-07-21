@@ -641,6 +641,7 @@ post_subscribe(gdp_req_t *req)
 {
 	EP_STAT estat;
 
+	EP_ASSERT_REQUIRE(req != NULL);
 	ep_dbg_cprintf(Dbg, 38,
 			"post_subscribe: numrecs = %d, nextrec = %"PRIgdp_recno"\n",
 			req->numrecs, req->nextrec);
@@ -650,6 +651,8 @@ post_subscribe(gdp_req_t *req)
 
 	while (req->numrecs >= 0)
 	{
+		EP_ASSERT_INSIST(req->gcl != NULL);
+
 		// see if data pre-exists in the GCL
 		if (req->nextrec > req->gcl->nrecs)
 		{
