@@ -30,6 +30,6 @@
 **	----- END LICENSE BLOCK -----
 */
 
-#include "gdp_version.h"
+#include <gdp/gdp_version.h>
 
-const char	GdpVersion[] = "@(#)Gdplib " GDP_VER_STRING " " _VERSION_INFO_;
+const char	GdplogdVersion[] = "@(#)gdplogd " GDP_VER_STRING " " _VERSION_INFO_;

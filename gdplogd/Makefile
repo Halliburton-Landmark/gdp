@@ -105,6 +105,7 @@ OBJS=	\
 		logd_gcl.o \
 		logd_proto.o \
 		logd_pubsub.o \
+		logd_version.o \
 
 HDEPS=	\
 		logd.h \
@@ -119,6 +120,11 @@ LIBDEPS= \
 		${LIBROOT}/ep/libep.a \
 
 all: ${CLEANALL}
+
+logd_version.o: logd_version.c ${OBJS_MOST} Makefile
+	${CC} ${CFLAGS} \
+		-D_VERSION_INFO_="\"`sh ../adm/get-version-info.sh`\"" \
+		-c logd_version.c
 
 gdplogd: ${OBJS} ${LIBDEPS}
 	${CC} -o $@ ${OBJS} ${LDFLAGS}
