@@ -263,7 +263,7 @@ ep_adm_getintparam(
 	if (p == NULL)
 		return def;
 	else
-		return atoi(p);
+		return (int) strtol(p, NULL, 0);
 }
 
 
@@ -290,7 +290,7 @@ ep_adm_getlongparam(
 	if (p == NULL)
 		return def;
 	else
-		return atol(p);
+		return strtol(p, NULL, 0);
 }
 
 
