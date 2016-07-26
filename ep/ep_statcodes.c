@@ -46,6 +46,7 @@ static struct ep_stat_to_string	Stats[] =
     { EP_STAT_END_OF_FILE,	"end of file",				},
     { EP_STAT_TIME_BADFORMAT,	"bad time format",			},
     { EP_STAT_BUF_OVERFLOW,	"potential buffer overflow",		},
+    { EP_STAT_TIME_PARSE,	"cannot parse date/time string",	},
 
     // cryptographic status codes
     { _EP_STAT_INTERNAL(OK, EP_STAT_MOD_CRYPTO, 0), "crypto"		},

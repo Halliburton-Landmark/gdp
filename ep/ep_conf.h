@@ -72,6 +72,10 @@
 **		System memory free routine; defaults to "free"
 **	EP_OSCF_USE_PTHREADS
 **		Compile in pthreads support
+**	EP_OSCF_HAS_STRPTIME
+**		Use strptime(3) for time/date parsing
+**	EP_OSCF_USE_GETDATE
+**		Use getdate(3) for time/date parsing
 **
 **  Configuration is probably better done using autoconf
 **
@@ -82,6 +86,9 @@
 # ifndef EP_OSCF_USE_PTHREADS
 #  define EP_OSCF_USE_PTHREADS		1
 # endif
+# ifndef EP_OSCF_USE_GETDATE
+#  define EP_OSCF_USE_GETDATE		0
+# endif
 
 // these should be defined on all POSIX platforms
 # define EP_OSCF_HAS_INTTYPES_H		1	// does <inttypes.h> exist?
@@ -91,6 +98,7 @@
 # define EP_OSCF_HAS_STRING_H		1	// does <string.h> exist?
 # define EP_OSCF_HAS_SYS_TYPES_H	1	// does <sys/types.h> exist?
 # define EP_OSCF_HAS_UNISTD_H		1	// does <unistd.h> exist?
+# define EP_OSCF_HAS_STRPTIME		1	// does strptime(3) exist?
 
 # ifdef __FreeBSD__
 #  define EP_OSCF_HAS_UCHAR_T		0	// does uchar_t exist?
@@ -99,6 +107,9 @@
 #  define EP_OSCF_HAS_LSTAT		1	// does lstat(2) exist?
 #  if __FreeBSD_version >= 440000
 #   define EP_OSCF_HAS_GETPROGNAME	1	// does getprogname(3) exist?
+#  endif
+#  ifndef EP_OSCF_USE_GETDATE
+#   define EP_OSCF_USE_GETDATE		0	// does getdate(3) exist?
 #  endif
 # endif // __FreeBSD__
 
@@ -109,11 +120,17 @@
 #  define EP_OSCF_HAS_LSTAT		1	// does lstat(2) exist?
 #  define EP_OSCF_HAS_GETPROGNAME	1	// does getprogname(3) exist?
 #  define EP_OSCF_SYSTEM_VALLOC		valloc	// aligned memory allocator
+#  ifndef EP_OSCF_USE_GETDATE
+#   define EP_OSCF_USE_GETDATE		1	// does getdate(3) exist?
+#  endif
 # endif // __APPLE__
 
 #ifdef __linux__
 # define EP_TYPE_PRINTFLIKE(a, b)
 # define EP_OSCF_HAS_STRLCPY		0	// no strlcpy on linux
+# ifndef EP_OSCF_USE_GETDATE
+#  define EP_OSCF_USE_GETDATE		1	// does getdate(3) exist?
+# endif
 
 # define _BSD_SOURCE			1	// needed to compile on Linux
 # define _POSIX_C_SOURCE		200809L	// specify a modern environment

@@ -31,9 +31,10 @@
 #ifndef _EP_TIME_H_
 #define _EP_TIME_H_
 
+#include <ep/ep.h>
+
 #include <time.h>
 #include <sys/time.h>
-#include <stdint.h>
 
 #pragma pack(push, 1)
 typedef struct
@@ -93,7 +94,10 @@ extern void	ep_time_print(const EP_TIME_SPEC *tv,
 
 // parse a time string
 extern EP_STAT	ep_time_parse(const char *timestr,
-				EP_TIME_SPEC *tv);
+				EP_TIME_SPEC *tv,
+				uint32_t flags);
+
+#define EP_TIME_USE_LOCALTIME	0x00000001	// assume times in local zone
 
 // sleep for the indicated number of nanoseconds
 extern EP_STAT	ep_time_nanosleep(int64_t);
