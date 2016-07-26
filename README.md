@@ -38,7 +38,8 @@ discusses configuration.
 If your system is set up with Zeroconf enabled you shouldn't have
 to do anything.  If not you may need to to adjust the parameter
 specifying the address of the routing node(s) for clients to use
-to contact the GDP.
+to contact the GDP.  In most cases you shouldn't have to create a
+configuration file at all &mdash; it should "just work."
 
 Configuration files are simple "name=value" pairs, one per line.
 There is a built-in search path

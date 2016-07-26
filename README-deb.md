@@ -8,6 +8,10 @@ make software distribution easier. The reason for this particular platform
 is guided by *swarmbox* testbed that we support. Any software packaging for
 other platforms is certainly welcome.
 
+**This README is only relevant if you are installing from the Debian
+packages.  Those packages are *not* included with the source distribution.
+If you are installing from source, please read `README-compiling.md`.**
+
 Package structure:
 =================
 
