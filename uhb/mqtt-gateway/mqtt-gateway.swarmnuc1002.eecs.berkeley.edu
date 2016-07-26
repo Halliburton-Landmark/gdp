@@ -1,0 +1,10 @@
+edu.berkeley.eecs.bwrc
+C0:98:E5:30:00:37	# BLEE, center of student seating area, above thermostat
+C0:98:E5:30:00:A0	# BLEE, Brian Office above thermostat
+C0:98:E5:30:00:A1	# BLEE, Ken's Office
+C0:98:E5:30:00:A2	# BLEE, conf room, Brodersen room
+C0:98:E5:30:00:A3	# BLEE, conf room, Rabaey Room
+C0:98:E5:30:00:A4	# BLEE, Admin office
+C0:98:E5:30:00:A5	# BLEE, main seating area
+C0:98:E5:90:00:87	# Blink, Brodersen Conference Room
+C0:98:E5:90:00:94	# Blink, Rabaey Conference Room

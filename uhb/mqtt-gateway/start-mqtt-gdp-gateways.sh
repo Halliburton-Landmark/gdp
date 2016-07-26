@@ -28,4 +28,5 @@ START="sh $GDP_ROOT/sbin/start-mqtt-gdp-gateway.sh"
 $START uhkbbb001.eecs.berkeley.edu &
 $START uhkbbb002.eecs.berkeley.edu &
 $START uhkbbb004.eecs.berkeley.edu &
+$START swarmnuc1002.eecs.berkeley.edu &
 wait
