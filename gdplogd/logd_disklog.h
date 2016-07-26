@@ -32,6 +32,7 @@
 #define _GDPLOGD_DISKLOG_H_		1
 
 #include "logd.h"
+#include <db.h>
 
 /*
 **	Headers for the physical log implementation.
@@ -51,11 +52,13 @@
 #define GCL_LDF_MAXVERS		UINT32_C(20151001)		// highest readable version
 #define GCL_LDF_SUFFIX		".gdplog"
 
-#define GCL_LXF_MAGIC		UINT32_C(0x47434C78)	// 'GCLx'
-#define GCL_LXF_VERSION		UINT32_C(20160101)		// on-disk version
-#define GCL_LXF_MINVERS		UINT32_C(20160101)		// lowest readable version
-#define GCL_LXF_MAXVERS		UINT32_C(20160101)		// highest readable version
-#define GCL_LXF_SUFFIX		".gdpndx"
+#define GCL_RIDX_MAGIC		UINT32_C(0x47434C78)	// 'GCLx'
+#define GCL_RIDX_VERSION	UINT32_C(20160101)		// on-disk version
+#define GCL_RIDX_MINVERS	UINT32_C(20160101)		// lowest readable version
+#define GCL_RIDX_MAXVERS	UINT32_C(20160101)		// highest readable version
+#define GCL_RIDX_SUFFIX		".gdpndx"
+
+#define GCL_TIDX_SUFFIX		".gdptidx"
 
 #define GCL_READ_BUFFER_SIZE 4096			// size of I/O buffers
 
@@ -167,9 +170,9 @@ typedef struct
 
 
 /*
-**  On-disk index record format
+**  On-disk recno index record format
 **
-**		Currently the index consists of (essentially) an array of fixed
+**		Currently the recno index consists of (essentially) an array of fixed
 **		size entries.  The index header contains the record offset (i.e.,
 **		the lowest record number that can be accessed).
 **
@@ -189,25 +192,53 @@ typedef struct
 **		set of segment files, it should be possible to rebuild the index.
 */
 
-typedef struct index_entry
+typedef struct ridx_entry
 {
 	gdp_recno_t	recno;			// record number
 	int64_t		offset;			// offset into segment file
 	uint32_t	segment;		// id of segment (for segmented logs)
 	uint32_t	reserved;		// make padding explicit
-} index_entry_t;
+} ridx_entry_t;
 
-typedef struct index_header
+typedef struct ridx_header
 {
-	uint32_t	magic;			// GCL_LDX_MAGIC
-	uint32_t	version;		// GCL_LDX_VERSION
+	uint32_t	magic;			// GCL_RIDX_MAGIC
+	uint32_t	version;		// GCL_RIDX_VERSION
 	uint32_t	header_size;	// offset to first index entry
 	uint32_t	reserved1;		// must be zero
 	gdp_recno_t	min_recno;		// the first record number in the log
-} index_header_t;
+} ridx_header_t;
 
-#define SIZEOF_INDEX_HEADER		(sizeof(index_header_t))
-#define SIZEOF_INDEX_RECORD		(sizeof(index_entry_t))
+#define SIZEOF_RIDX_HEADER		(sizeof(ridx_header_t))
+#define SIZEOF_RIDX_RECORD		(sizeof(ridx_entry_t))
+
+
+/*
+**  On-disk timestamp index record format
+**
+**		This uses a Berkeley DB btree; hence, there is no header.
+**		It is essentially a secondary index mapping timestamp to
+**			recno (the primary key).
+**		An alternative implementation could map the timestamp to
+**			a ridx_entry_t, thereby eliminating the need to read
+**			the ridx file at the cost of using more space.
+*/
+
+struct ts_index
+{
+	DB				*db;			// the Berkeley DB (btree) handle
+};
+
+typedef struct tidx_key
+{
+	int64_t			sec;			// seconds since Jan 1, 1970
+	int32_t			nsec;			// nanoseconds
+} tidx_key_t;
+
+typedef struct tidx_value
+{
+	gdp_recno_t		recno;			// the primary key
+} tidx_value_t;
 
 
 /*
@@ -227,19 +258,19 @@ typedef struct index_header
 //{
 //	size_t				max_size;			// number of entries in data
 //	size_t				current_size;		// number of filled entries in data
-//	index_entry_t		data[];
-//} index_cache_t;
+//	ridx_entry_t		data[];
+//} ridx_cache_t;
 
 
 /*
-**  The in-memory representation of the on-disk log index.
+**  The in-memory representation of the on-disk log index (by recno).
 **
 **		Note that index.min_recno need not be the same as phys->min_recno
 **		because the index may include entries for segments that have been
 **		expired.
 */
 
-struct phys_index
+struct recno_index
 {
 	// information about on-disk format
 	FILE				*fp;					// recno -> offset file handle
@@ -248,7 +279,7 @@ struct phys_index
 	gdp_recno_t			min_recno;				// lowest recno in index
 
 	// a cache of the contents
-//	index_cache_t		cache;					// in-memory cache
+//	ridx_cache_t		cache;					// in-memory cache
 };
 
 
@@ -275,8 +306,9 @@ struct physinfo
 	segment_t			**segments;				// list of segment pointers
 												// can be dynamically expanded
 
-	// info regarding the index file
-	struct phys_index	index;
+	// info regarding the indices
+	struct recno_index	ridx;					// index by recno
+	struct ts_index		tidx;					// index by timestamp
 };
 
 #endif //_GDPLOGD_DISKLOG_H_

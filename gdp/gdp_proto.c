@@ -457,7 +457,7 @@ static dispatch_ent_t	DispatchTable[256] =
 	{ NULL,				"CMD_OPEN_RA"			},			// 75
 	{ NULL,				"CMD_NEWSEGMENT"		},			// 76
 	{ NULL,				"CMD_FWD_APPEND"		},			// 77
-	NOENT,				// 78
+	{ NULL,				"CMD_READ_BY_TS"		},			// 78
 	NOENT,				// 79
 	NOENT,				// 80
 	NOENT,				// 81

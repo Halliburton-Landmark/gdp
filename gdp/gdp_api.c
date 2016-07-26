@@ -435,9 +435,11 @@ gdp_gcl_append_async(gdp_gcl_t *gcl,
 
 
 /*
-**	GDP_GCL_READ --- read a message from a GCL
+**	GDP_GCL_READ --- read a message from a GCL based on recno
 **
 **	The data is returned through the passed-in datum.
+**
+**	Should be named gdp_gcl_read_by_recno.
 **
 **		Parameters:
 **			gcl --- the gcl from which to read
@@ -452,8 +454,35 @@ gdp_gcl_read(gdp_gcl_t *gcl,
 {
 	EP_ASSERT_POINTER_VALID(datum);
 	datum->recno = recno;
+	EP_TIME_INVALIDATE(&datum->ts);
 
-	return _gdp_gcl_read(gcl, datum, _GdpChannel, 0);
+	return _gdp_gcl_read(gcl, datum, GDP_CMD_READ_BY_RECNO, _GdpChannel, 0);
+}
+
+
+/*
+**	GDP_GCL_READ_BY_TS --- read a message from a GCL based on timestamp
+**
+**	The data is returned through the passed-in datum.
+**
+**		Parameters:
+**			gcl --- the gcl from which to read
+**			ts --- the lowest timestamp we are interested in.  The
+**				result will be the lowest timestamp that is greater than
+**				or equal to this value.
+**			datum --- the message header (to avoid dynamic memory)
+*/
+
+EP_STAT
+gdp_gcl_read_by_ts(gdp_gcl_t *gcl,
+			EP_TIME_SPEC *ts,
+			gdp_datum_t *datum)
+{
+	EP_ASSERT_POINTER_VALID(datum);
+	memcpy(&datum->ts, ts, sizeof datum->ts);
+	datum->recno = GDP_PDU_NO_RECNO;
+
+	return _gdp_gcl_read(gcl, datum, GDP_CMD_READ_BY_TS, _GdpChannel, 0);
 }
 
 

@@ -147,7 +147,7 @@ struct gcl_phys_stats
 struct gcl_phys_impl
 {
 	EP_STAT		(*init)(void);
-	EP_STAT		(*read)(
+	EP_STAT		(*read_by_recno)(
 						gdp_gcl_t *gcl,
 						gdp_datum_t *datum);
 	EP_STAT		(*create)(
@@ -173,6 +173,9 @@ struct gcl_phys_impl
 	void		(*getstats)(
 						gdp_gcl_t *gcl,
 						struct gcl_phys_stats *stats);
+	EP_STAT		(*read_by_ts)(
+						gdp_gcl_t *gcl,
+						gdp_datum_t *datum);
 };
 
 // known implementations

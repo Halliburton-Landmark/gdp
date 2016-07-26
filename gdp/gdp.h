@@ -48,7 +48,6 @@
 #include <inttypes.h>
 #include <stdbool.h>
 #include <sys/queue.h>
-#include <sys/time.h>
 #include <sys/types.h>
 
 /**********************************************************************
@@ -218,10 +217,16 @@ extern EP_STAT gdp_gcl_append_async(
 					gdp_event_cbfunc_t,		// callback function
 					void *udata);
 
-// read from a readable GCL
+// read from a readable GCL based on record number
 extern EP_STAT	gdp_gcl_read(
 					gdp_gcl_t *gcl,			// readable GCL handle
 					gdp_recno_t recno,		// GCL record number
+					gdp_datum_t *datum);	// pointer to result message
+
+// read from a readable GCL based on timestamp
+extern EP_STAT	gdp_gcl_read_by_ts(
+					gdp_gcl_t *gcl,			// readable GCL handle
+					EP_TIME_SPEC *ts,		// minimum timestamp
 					gdp_datum_t *datum);	// pointer to result message
 
 // subscribe to a readable GCL

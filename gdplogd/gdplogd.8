@@ -70,11 +70,9 @@ parameter below for details.
 This option is only intended to be used during a transition period;
 it will go away in the future.
 .El
-
-
+.
 .Sh EXIT STATUS
-
-
+.
 .Sh ADMINISTRATIVE PARAMETERS
 These only describe the parameters specific to
 .Nm .
@@ -82,6 +80,7 @@ See
 .Xr gdp 7
 for descriptions of shared parameters.
 .Bl -tag
+.
 .It swarm.gdplogd.admin.output
 Specify the location for output of administrative information.
 This is intended to be used for management and visualization
@@ -102,11 +101,13 @@ Append output to the named file.
 The information printed includes interesting events
 (e.g., when logs are created) as well as optional probe results
 (see below).
+.
 .It swarm.gdplogd.admin.probeintvl
 If set to a positive integer,
 this specifies the interval in seconds
 at which gdplogd will output a summary of the known logs.
 If zero or negative no summaries will be produced.
+.
 .It swarm.gdplogd.crypto.strictness
 Specifies how strict the daemon will be about enforcing signatures
 on append (write) requests to logs.
@@ -131,20 +132,32 @@ and
 are semantically the same.
 This variable is only intended to be used during a transition period;
 it will go away in the future.
+.
 .It swarm.gdplogd.gcl.dir
 The directory in which physical logs are written.
 Defaults to
 .Qq Pa /var/swarm/gdp/gcls .
+.
+.It swarm.gdplogd.gcl.mode
+The file mode to use when creating on-disk log files.
+Defaults to 0600.
+.
+.It swarm.gdplogd.gcl.mode
+The file mode for on-disk GCL storage.
+Defaults to 0600.
+.
 .It swarm.gdplogd.gdpname
 Sets the name of this instance of
 .Nm .
 This is needed when using
 .Xr gcl-create 8
 to create a new log.
+.
 .It swarm.gdplogd.index.cachesize
 The size (in entries) of the internal record offset cache.
 This can be used to speed access to recently accessed records.
 Defaults to 65536, which equals 1MiB.
+.
 .It swarm.gdplogd.reclaim.age
 When an in-memory log reference count drops to zero
 that log is a candidate for having resources
@@ -153,12 +166,14 @@ reclaimed.
 However there is a high likelihood that the log will be referenced again soon,
 so reclaimation is deferred for this parameter's value (in seconds).
 Defaults to 300 (five minutes).
+.
 .It swarm.gdplogd.reclaim.interval
 How often to scan the cached but unreferenced resources
 that might be cleared (in seconds).
 Defaults to 15.
 This should generally be less than
 .Va swarm.gdplogd.reclaim.age .
+.
 .It swarm.gdplogd.subscr.timeout
 How old a subscription can be (in seconds) without being refreshed
 and still be considered active.
@@ -168,11 +183,11 @@ Should be greater than two times
 .Va swarm.gdp.subscr.pokeintvl .
 Defaults to 600 (ten minutes).
 .El
-
+.
 .Sh SEE ALSO
 .Xr gdp 7 ,
 .Xr gcl-create 8
-
+.
 .Sh BUGS
 The
 .Fl S

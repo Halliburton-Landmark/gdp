@@ -621,20 +621,23 @@ fail0:
 
 
 /*
-**  _GDP_GCL_READ --- shared operation for reading a message from a GCL
-**
-**		Used both in GDP client library and gdpd.
+**  _GDP_GCL_READ --- read a record from a GCL
 **
 **		Parameters:
 **			gcl --- the gcl from which to read
-**			datum --- the message header (to avoid dynamic memory)
+**			datum --- the data buffer (to avoid dynamic memory)
+**			cmd --- the actually command to use
 **			chan --- the data channel used to contact the remote
 **			reqflags --- flags for the request
+**
+**		This might be read by recno or read by timestamp based on
+**		the command.  In any case the cmd is the defining factor.
 */
 
 EP_STAT
 _gdp_gcl_read(gdp_gcl_t *gcl,
 			gdp_datum_t *datum,
+			int cmd,
 			gdp_chan_t *chan,
 			uint32_t reqflags)
 {
@@ -647,10 +650,8 @@ _gdp_gcl_read(gdp_gcl_t *gcl,
 	EP_ASSERT_POINTER_VALID(datum);
 	if (!EP_UT_BITSET(GDP_MODE_RO, gcl->iomode))
 		goto fail0;
-	estat = _gdp_req_new(GDP_CMD_READ, gcl, chan, NULL, reqflags, &req);
+	estat = _gdp_req_new(cmd, gcl, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
-
-	EP_TIME_INVALIDATE(&datum->ts);
 
 	gdp_datum_free(req->pdu->datum);
 	req->pdu->datum = datum;

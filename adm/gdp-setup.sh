@@ -18,6 +18,7 @@ case "$OS" in
     "ubuntu" | "debian")
 	sudo apt-get update
 	sudo apt-get clean
+	package libdb-dev
 	package libevent-dev
 	package libevent-pthreads
 	package libssl-dev

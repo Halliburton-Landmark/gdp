@@ -357,26 +357,26 @@ cmd_close(gdp_req_t *req)
 
 
 /*
-**  CMD_READ --- read a single record from a GCL
+**  CMD_READ_BY_RECNO --- read a single record from a GCL given a recno
 **
 **		This returns the data as part of the response.  To get multiple
 **		values in one call, see cmd_subscribe.
 */
 
 EP_STAT
-cmd_read(gdp_req_t *req)
+cmd_read_by_recno(gdp_req_t *req)
 {
 	EP_STAT estat;
 
 	req->pdu->cmd = GDP_ACK_CONTENT;
 
 	// should have no input data; ignore anything there
-	flush_input_data(req, "cmd_read");
+	flush_input_data(req, "cmd_read_by_recno");
 
 	estat = get_open_handle(req, GDP_MODE_RO);
 	if (!EP_STAT_ISOK(estat))
 	{
-		return gdpd_gcl_error(req->pdu->dst, "cmd_read: GCL open failure",
+		return gdpd_gcl_error(req->pdu->dst, "cmd_read_by_recno: GCL open failure",
 							estat, GDP_STAT_NAK_INTERNAL);
 	}
 
@@ -391,7 +391,39 @@ cmd_read(gdp_req_t *req)
 		}
 	}
 
-	estat = req->gcl->x->physimpl->read(req->gcl, req->pdu->datum);
+	estat = req->gcl->x->physimpl->read_by_recno(req->gcl, req->pdu->datum);
+
+	// deliver "record expired" as "not found"
+	if (EP_STAT_IS_SAME(estat, GDP_STAT_RECORD_EXPIRED))
+		estat = GDP_STAT_NAK_GONE;
+
+	_gdp_gcl_decref(&req->gcl);
+	return estat;
+}
+
+
+/*
+**  CMD_READ_BY_TS --- read record given a timestamp
+*/
+
+EP_STAT
+cmd_read_by_ts(gdp_req_t *req)
+{
+	EP_STAT estat;
+
+	req->pdu->cmd = GDP_ACK_CONTENT;
+
+	// should have no input data; ignore anything there
+	flush_input_data(req, "cmd_read_by_ts");
+
+	estat = get_open_handle(req, GDP_MODE_RO);
+	if (!EP_STAT_ISOK(estat))
+	{
+		return gdpd_gcl_error(req->pdu->dst, "cmd_read_by_ts: GCL open failure",
+							estat, GDP_STAT_NAK_INTERNAL);
+	}
+
+	estat = req->gcl->x->physimpl->read_by_ts(req->gcl, req->pdu->datum);
 
 	// deliver "record expired" as "not found"
 	if (EP_STAT_IS_SAME(estat, GDP_STAT_RECORD_EXPIRED))
@@ -662,7 +694,7 @@ post_subscribe(gdp_req_t *req)
 
 		// get the next record and return it as an event
 		req->pdu->datum->recno = req->nextrec;
-		estat = req->gcl->x->physimpl->read(req->gcl, req->pdu->datum);
+		estat = req->gcl->x->physimpl->read_by_recno(req->gcl, req->pdu->datum);
 		if (EP_STAT_ISOK(estat))
 		{
 			// OK, the next record exists: send it
@@ -974,7 +1006,7 @@ cmd_getmetadata(gdp_req_t *req)
 	estat = get_open_handle(req, GDP_MODE_RO);
 	if (!EP_STAT_ISOK(estat))
 	{
-		return gdpd_gcl_error(req->pdu->dst, "cmd_read: GCL open failure",
+		return gdpd_gcl_error(req->pdu->dst, "cmd_getmetadata: GCL open failure",
 							estat, GDP_STAT_NAK_INTERNAL);
 	}
 
@@ -1159,20 +1191,21 @@ dispatch_cmd(gdp_req_t *req)
 
 static struct cmdfuncs	CmdFuncs[] =
 {
-	{ GDP_CMD_PING,			cmd_ping		},
-	{ GDP_CMD_CREATE,		cmd_create		},
-	{ GDP_CMD_OPEN_AO,		cmd_open		},
-	{ GDP_CMD_OPEN_RO,		cmd_open		},
-	{ GDP_CMD_CLOSE,		cmd_close		},
-	{ GDP_CMD_READ,			cmd_read		},
-	{ GDP_CMD_APPEND,		cmd_append		},
-	{ GDP_CMD_SUBSCRIBE,	cmd_subscribe	},
-	{ GDP_CMD_MULTIREAD,	cmd_multiread	},
-	{ GDP_CMD_GETMETADATA,	cmd_getmetadata	},
-	{ GDP_CMD_OPEN_RA,		cmd_open		},
-	{ GDP_CMD_NEWSEGMENT,	cmd_newsegment	},
-	{ GDP_CMD_FWD_APPEND,	cmd_fwd_append	},
-	{ 0,					NULL			}
+	{ GDP_CMD_PING,			cmd_ping				},
+	{ GDP_CMD_CREATE,		cmd_create				},
+	{ GDP_CMD_OPEN_AO,		cmd_open				},
+	{ GDP_CMD_OPEN_RO,		cmd_open				},
+	{ GDP_CMD_CLOSE,		cmd_close				},
+	{ GDP_CMD_READ,			cmd_read_by_recno		},
+	{ GDP_CMD_APPEND,		cmd_append				},
+	{ GDP_CMD_SUBSCRIBE,	cmd_subscribe			},
+	{ GDP_CMD_MULTIREAD,	cmd_multiread			},
+	{ GDP_CMD_GETMETADATA,	cmd_getmetadata			},
+	{ GDP_CMD_OPEN_RA,		cmd_open				},
+	{ GDP_CMD_NEWSEGMENT,	cmd_newsegment			},
+	{ GDP_CMD_FWD_APPEND,	cmd_fwd_append			},
+	{ GDP_CMD_READ_BY_TS,	cmd_read_by_ts			},
+	{ 0,					NULL					}
 };
 
 EP_STAT

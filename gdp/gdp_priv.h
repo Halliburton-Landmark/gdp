@@ -283,9 +283,10 @@ EP_STAT			_gdp_gcl_close(				// close a GCL (handle)
 						gdp_chan_t *chan,
 						uint32_t reqflags);
 
-EP_STAT			_gdp_gcl_read(				// read a GCL record (gdpd shared)
+EP_STAT			_gdp_gcl_read(				// read GCL record based on datum
 						gdp_gcl_t *gcl,
 						gdp_datum_t *datum,
+						int cmd,				// the underlying read command
 						gdp_chan_t *chan,
 						uint32_t reqflags);
 

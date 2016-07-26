@@ -7,6 +7,7 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl c
+.Op Fl d Ar start-time
 .Op Fl D Ar debug-spec
 .Op Fl f Ar first-recno
 .Op Fl G Ar router-ip
@@ -30,6 +31,15 @@ and displays the output to the standard output.
 Use asynchronous callbacks when doing multi-record reads
 (multireads or subscriptions).
 Normally the data records are processed using synchronous events.
+.It Op Fl d Ar start-time
+Start reading from timestamps no earlier than the indicated
+.Ar start-time .
+This is incompatible with the
+.Fl f ,
+.Fl m ,
+and
+.Fl s
+flags.
 .It Op Fl D Ar debug-spec
 Turn on debugging flags using the libep-style format.
 Useful only with the code in hand.
@@ -44,6 +54,9 @@ for example
 .Fl f
 \-2
 prints starting from the next-to-last record in the log.
+This is incompatible with the
+.Fl d
+flag.
 .It Fl G Ar router-ip
 Contact the given IP address (which may be a DNS name)
 to get a connection to the GDP routing layer.

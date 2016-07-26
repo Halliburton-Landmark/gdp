@@ -280,88 +280,88 @@ show_record(segment_record_t *rec, FILE *dfp, size_t *foffp, int plev)
 
 
 FILE *
-open_index(const char *index_filename, struct stat *st, index_header_t *phdr)
+open_index(const char *ridx_filename, struct stat *st, ridx_header_t *phdr)
 {
-	FILE *index_fp = NULL;
-	index_header_t index_header;
+	FILE *ridx_fp = NULL;
+	ridx_header_t ridx_header;
 
-	if (stat(index_filename, st) != 0)
+	if (stat(ridx_filename, st) != 0)
 	{
 		fprintf(stderr, "could not stat %s (%s)\n",
-				index_filename, strerror(errno));
+				ridx_filename, strerror(errno));
 		return NULL;
 	}
 
-	index_fp = fopen(index_filename, "r");
-	if (index_fp == NULL)
+	ridx_fp = fopen(ridx_filename, "r");
+	if (ridx_fp == NULL)
 	{
 		fprintf(stderr, "Could not open %s (%s)\n",
-				index_filename, strerror(errno));
+				ridx_filename, strerror(errno));
 		return NULL;
 	}
 
-	if (st->st_size < SIZEOF_INDEX_HEADER)
+	if (st->st_size < SIZEOF_RIDX_HEADER)
 	{
 		phdr->magic = 0;
-		return index_fp;
+		return ridx_fp;
 	}
-	if (fread(&index_header, sizeof index_header, 1, index_fp) != 1)
+	if (fread(&ridx_header, sizeof ridx_header, 1, ridx_fp) != 1)
 	{
 		fprintf(stderr, "Could not read hdr for %s (%s)\n",
-				index_filename, strerror(errno));
+				ridx_filename, strerror(errno));
 	}
 	else
 	{
-		phdr->magic = ep_net_ntoh32(index_header.magic);
-		phdr->version = ep_net_ntoh32(index_header.version);
-		phdr->header_size = ep_net_ntoh32(index_header.header_size);
-		phdr->reserved1 = ep_net_ntoh32(index_header.reserved1);
-		phdr->min_recno = ep_net_ntoh64(index_header.min_recno);
+		phdr->magic = ep_net_ntoh32(ridx_header.magic);
+		phdr->version = ep_net_ntoh32(ridx_header.version);
+		phdr->header_size = ep_net_ntoh32(ridx_header.header_size);
+		phdr->reserved1 = ep_net_ntoh32(ridx_header.reserved1);
+		phdr->min_recno = ep_net_ntoh64(ridx_header.min_recno);
 	}
 
-	return index_fp;
+	return ridx_fp;
 }
 
 
 gdp_recno_t
-show_index_header(const char *index_filename,
+show_ridx_header(const char *ridx_filename,
 		int plev,
 		int *min_segment,
 		int *max_segment)
 {
 	struct stat st;
-	index_entry_t xent;
-	index_header_t index_header;
-	FILE *index_fp = open_index(index_filename, &st, &index_header);
+	ridx_entry_t xent;
+	ridx_header_t ridx_header;
+	FILE *ridx_fp = open_index(ridx_filename, &st, &ridx_header);
 
 	*min_segment = 0;
 	*max_segment = 0;
 
-	if (index_fp == NULL)
+	if (ridx_fp == NULL)
 		return -1;
 
-	if (index_header.magic == 0)
+	if (ridx_header.magic == 0)
 		goto no_header;
-	else if (index_header.magic != GCL_LXF_MAGIC)
+	else if (ridx_header.magic != GCL_RIDX_MAGIC)
 	{
-		fprintf(stderr, "Bad index magic %04x\n", index_header.magic);
+		fprintf(stderr, "Bad index magic %04x\n", ridx_header.magic);
 	}
 
 	// get info from the first record
-	if (st.st_size <= index_header.header_size)
+	if (st.st_size <= ridx_header.header_size)
 	{
 		// no records yet
 		if (plev > 1)
 			printf("\tno index records\n");
 		goto done;
 	}
-	else if (fseek(index_fp, index_header.header_size, SEEK_SET) < 0)
+	else if (fseek(ridx_fp, ridx_header.header_size, SEEK_SET) < 0)
 	{
-		printf("show_index_header: cannot seek (1)\n");
+		printf("show_ridx_header: cannot seek (1)\n");
 	}
-	else if (fread(&xent, SIZEOF_INDEX_RECORD, 1, index_fp) != 1)
+	else if (fread(&xent, SIZEOF_RIDX_RECORD, 1, ridx_fp) != 1)
 	{
-		printf("show_index_header: fread failure (1)\n");
+		printf("show_ridx_header: fread failure (1)\n");
 	}
 	else
 	{
@@ -370,13 +370,13 @@ show_index_header(const char *index_filename,
 
 	// get info from the last record
 	*max_segment = *min_segment;
-	if (fseek(index_fp, st.st_size - SIZEOF_INDEX_RECORD, SEEK_SET) < 0)
+	if (fseek(ridx_fp, st.st_size - SIZEOF_RIDX_RECORD, SEEK_SET) < 0)
 	{
-		printf("show_index_header: cannot seek (2)\n");
+		printf("show_ridx_header: cannot seek (2)\n");
 	}
-	else if (fread(&xent, SIZEOF_INDEX_RECORD, 1, index_fp) != 1)
+	else if (fread(&xent, SIZEOF_RIDX_RECORD, 1, ridx_fp) != 1)
 	{
-		printf("show_index_header: fread failure (2)\n");
+		printf("show_ridx_header: fread failure (2)\n");
 	}
 	else
 	{
@@ -387,8 +387,8 @@ show_index_header(const char *index_filename,
 	{
 		printf("    Index: magic=%04" PRIx32 ", vers=%" PRId32
 				", header_size=%" PRId32 ", min_recno=%" PRIgdp_recno "\n",
-				index_header.magic, index_header.version,
-				index_header.header_size, index_header.min_recno);
+				ridx_header.magic, ridx_header.version,
+				ridx_header.header_size, ridx_header.min_recno);
 
 		printf("\tfirst segment %d, last recno %" PRIgdp_recno
 				" offset %jd segment %d reserved %x\n",
@@ -399,15 +399,15 @@ show_index_header(const char *index_filename,
 				ep_net_ntoh32(xent.reserved));
 	}
 done:
-	fclose(index_fp);
-	return ((st.st_size - index_header.header_size) / SIZEOF_INDEX_RECORD)
-				+ index_header.min_recno;
+	fclose(ridx_fp);
+	return ((st.st_size - ridx_header.header_size) / SIZEOF_RIDX_RECORD)
+				+ ridx_header.min_recno;
 
 no_header:
-	fclose(index_fp);
+	fclose(ridx_fp);
 	if (plev > 1)
 		printf("Old-style headerless index\n");
-	return st.st_size / SIZEOF_INDEX_RECORD;
+	return st.st_size / SIZEOF_RIDX_RECORD;
 	return -1;
 }
 
@@ -416,25 +416,25 @@ int
 show_index_contents(const char *gcl_dir_name, gdp_name_t gcl_name, int plev)
 {
 	struct stat st;
-	index_header_t index_header;
+	ridx_header_t ridx_header;
 	gdp_pname_t gcl_pname;
 
 	(void) gdp_printable_name(gcl_name, gcl_pname);
 
 	// Add 5 in the middle for '/_xx/'
 	int filename_size = strlen(gcl_dir_name) + 5 + strlen(gcl_pname) +
-			strlen(GCL_LXF_SUFFIX) + 1;
-	char *index_filename = alloca(filename_size);
-	snprintf(index_filename, filename_size,
+			strlen(GCL_RIDX_SUFFIX) + 1;
+	char *ridx_filename = alloca(filename_size);
+	snprintf(ridx_filename, filename_size,
 			"%s/_%02x/%s%s",
-			gcl_dir_name, gcl_name[0], gcl_pname, GCL_LXF_SUFFIX);
+			gcl_dir_name, gcl_name[0], gcl_pname, GCL_RIDX_SUFFIX);
 
-	FILE *index_fp = open_index(index_filename, &st, &index_header);
+	FILE *ridx_fp = open_index(ridx_filename, &st, &ridx_header);
 
-	if (index_fp == NULL)
+	if (ridx_fp == NULL)
 	{
 		fprintf(stderr, "Could not open %s (%s)\n",
-				index_filename, strerror(errno));
+				ridx_filename, strerror(errno));
 		return EX_NOINPUT;
 	}
 
@@ -442,20 +442,20 @@ show_index_contents(const char *gcl_dir_name, gdp_name_t gcl_name, int plev)
 
 	while (true)
 	{
-		index_entry_t index_entry;
-		if (fread(&index_entry, sizeof index_entry, 1, index_fp) != 1)
+		ridx_entry_t ridx_entry;
+		if (fread(&ridx_entry, sizeof ridx_entry, 1, ridx_fp) != 1)
 			break;
-		index_entry.recno = ep_net_ntoh64(index_entry.recno);
-		index_entry.offset = ep_net_ntoh64(index_entry.offset);
-		index_entry.segment = ep_net_ntoh32(index_entry.segment);
-		index_entry.reserved = ep_net_ntoh32(index_entry.reserved);
+		ridx_entry.recno = ep_net_ntoh64(ridx_entry.recno);
+		ridx_entry.offset = ep_net_ntoh64(ridx_entry.offset);
+		ridx_entry.segment = ep_net_ntoh32(ridx_entry.segment);
+		ridx_entry.reserved = ep_net_ntoh32(ridx_entry.reserved);
 
 		printf("\trecno %" PRIgdp_recno ", segment %" PRIu32
 				", offset %" PRIu64 ", reserved %" PRIu32 "\n",
-				index_entry.recno, index_entry.segment,
-				index_entry.offset, index_entry.reserved);
+				ridx_entry.recno, ridx_entry.segment,
+				ridx_entry.offset, ridx_entry.reserved);
 	}
-	fclose(index_fp);
+	fclose(ridx_fp);
 	return EX_OK;
 }
 
@@ -598,13 +598,13 @@ show_gcl(const char *gcl_dir_name, gdp_name_t gcl_name, int plev)
 
 	// Add 5 in the middle for '/_xx/'
 	int filename_size = strlen(gcl_dir_name) + 5 + strlen(gcl_pname) +
-			strlen(GCL_LXF_SUFFIX) + 1;
+			strlen(GCL_RIDX_SUFFIX) + 1;
 	char *filename = alloca(filename_size);
 
 	snprintf(filename, filename_size,
 			"%s/_%02x/%s%s",
-			gcl_dir_name, gcl_name[0], gcl_pname, GCL_LXF_SUFFIX);
-	max_recno = show_index_header(filename, 0,
+			gcl_dir_name, gcl_name[0], gcl_pname, GCL_RIDX_SUFFIX);
+	max_recno = show_ridx_header(filename, 0,
 						&min_segment, &max_segment);
 	printf("\t%" PRIgdp_recno " recs\n", max_recno - 1);
 

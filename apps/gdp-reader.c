@@ -64,6 +64,10 @@
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdp-reader", "GDP Reader Application");
 
+#ifndef USE_GETDATE
+# define USE_GETDATE		1
+#endif
+
 
 /*
 **  DO_LOG --- log a timestamp (for performance checking).
@@ -97,6 +101,9 @@ printdatum(gdp_datum_t *datum, FILE *fp)
 {
 	uint32_t prflags = 0;
 
+	// logging for simple performance testing
+	LOG("R");
+
 	if (TextData)
 		prflags |= GDP_DATUM_PRTEXT;
 	if (PrintSig)
@@ -117,10 +124,12 @@ printdatum(gdp_datum_t *datum, FILE *fp)
 */
 
 EP_STAT
-do_simpleread(gdp_gcl_t *gcl, gdp_recno_t firstrec, int numrecs)
+do_simpleread(gdp_gcl_t *gcl,
+		gdp_recno_t firstrec,
+		const char *dtstr,
+		int numrecs)
 {
 	EP_STAT estat = EP_STAT_OK;
-	gdp_recno_t recno;
 	gdp_datum_t *datum = gdp_datum_new();
 
 	// change the "infinity" sentinel to make the loop easier
@@ -131,22 +140,34 @@ do_simpleread(gdp_gcl_t *gcl, gdp_recno_t firstrec, int numrecs)
 	if (firstrec == 0)
 		firstrec = 1;
 
-	// start reading data, one record at a time
-	recno = firstrec;
-	while (numrecs < 0 || --numrecs >= 0)
+	// are we reading by record number or by timestamp?
+	if (dtstr == NULL)
 	{
-		// ask the GDP to give us a record
-		estat = gdp_gcl_read(gcl, recno, datum);
-		LOG("R");
+		// record number
+		estat = gdp_gcl_read(gcl, firstrec, datum);
+	}
+	else
+	{
+		// timestamp
+		EP_TIME_SPEC ts;
 
-		// make sure it did; if not, break out of the loop
-		EP_STAT_CHECK(estat, break);
+		estat = ep_time_parse(dtstr, &ts);
+		if (!EP_STAT_ISOK(estat))
+		{
+			fprintf(stderr, "Cannot convert date/time string \"%s\"\n", dtstr);
+			goto done;
+		}
 
-		// print out the value returned
+		estat = gdp_gcl_read_by_ts(gcl, &ts, datum);
+	}
+
+	// start reading data, one record at a time
+	while (EP_STAT_ISOK(estat) && (numrecs < 0 || --numrecs > 0))
+	{
+		gdp_recno_t recno;
+
+		// print the previous value
 		printdatum(datum, stdout);
-
-		// move to the next record
-		recno++;
 
 		// flush any left over data
 		if (gdp_buf_reset(gdp_datum_getbuf(datum)) < 0)
@@ -157,12 +178,23 @@ do_simpleread(gdp_gcl_t *gcl, gdp_recno_t firstrec, int numrecs)
 			fprintf(stderr, "*** WARNING: buffer reset failed: %s\n",
 					nbuf);
 		}
-	}
+
+		// move to next record
+		recno = gdp_datum_getrecno(datum) + 1;
+		estat = gdp_gcl_read(gcl, recno, datum);
+	};
+
+	// print the final value
+	if (EP_STAT_ISOK(estat))
+		printdatum(datum, stdout);
 
 	// end of data is returned as a "not found" error: turn it into a warning
 	//    to avoid scaring the unsuspecting user
 	if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOTFOUND))
 		estat = EP_STAT_END_OF_FILE;
+
+done:
+	gdp_datum_free(datum);
 	return estat;
 }
 
@@ -318,9 +350,11 @@ void
 usage(void)
 {
 	fprintf(stderr,
-			"Usage: %s [-c] [-D dbgspec] [-f firstrec] [-G router_addr] [-m]\n"
-			"  [-L logfile] [-M] [-n nrecs] [-s] [-t] [-v] log_name\n"
+			"Usage: %s [-c] [-d datetime] [-D dbgspec] [-f firstrec]\n"
+			"  [-G router_addr] [-m] [-L logfile] [-M] [-n nrecs]\n"
+			"  [-s] [-t] [-v] log_name\n"
 			"    -c  use callbacks\n"
+			"    -d  first date/time to read from\n"
 			"    -D  turn on debugging flags\n"
 			"    -f  first record number to read (from 1)\n"
 			"    -G  IP host to contact for gdp_router\n"
@@ -358,13 +392,14 @@ main(int argc, char **argv)
 	bool show_usage = false;
 	char *log_file_name = NULL;
 	gdp_iomode_t open_mode = GDP_MODE_RO;
+	const char *dtstr = NULL;
 
 	setlinebuf(stdout);								//DEBUG
 	//char outbuf[65536];							//DEBUG
 	//setbuffer(stdout, outbuf, sizeof outbuf);		//DEBUG
 
 	// parse command-line options
-	while ((opt = getopt(argc, argv, "AcD:f:G:L:mMn:qstv")) > 0)
+	while ((opt = getopt(argc, argv, "Acd:D:f:G:L:mMn:qstv")) > 0)
 	{
 		switch (opt)
 		{
@@ -375,6 +410,10 @@ main(int argc, char **argv)
 		  case 'c':
 			// use callbacks
 			use_callbacks = true;
+			break;
+
+		  case 'd':
+			dtstr = optarg;
 			break;
 
 		  case 'D':
@@ -437,6 +476,12 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
+	if (firstrec > 0 && dtstr != NULL)
+	{
+		fprintf(stderr, "Cannot specify -f and -d\n");
+		exit(EX_USAGE);
+	}
+
 	// we require a GCL name
 	if (show_usage || argc <= 0)
 		usage();
@@ -491,6 +536,10 @@ main(int argc, char **argv)
 		goto fail0;
 	}
 
+	// if we are converting a date/time string, set the local timezone
+	if (dtstr != NULL)
+		tzset();
+
 	if (showmetadata)
 		print_metadata(gcl);
 
@@ -498,7 +547,7 @@ main(int argc, char **argv)
 	if (subscribe || multiread || use_callbacks)
 		estat = do_multiread(gcl, firstrec, numrecs, subscribe, use_callbacks);
 	else
-		estat = do_simpleread(gcl, firstrec, numrecs);
+		estat = do_simpleread(gcl, firstrec, dtstr, numrecs);
 
 	// might as well let the GDP know we're going away
 	gdp_gcl_close(gcl);

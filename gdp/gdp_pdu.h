@@ -185,6 +185,7 @@ typedef struct gdp_pdu
 #define GDP_CMD_OPEN_RO			68			// open a GCL for read-only
 #define GDP_CMD_CLOSE			69			// close a GCL
 #define GDP_CMD_READ			70			// read a given record by index
+#define GDP_CMD_READ_BY_RECNO	70			//   (alias)
 #define GDP_CMD_APPEND			71			// append a record
 #define GDP_CMD_SUBSCRIBE		72			// subscribe to a GCL
 #define GDP_CMD_MULTIREAD		73			// read more than one records
@@ -192,6 +193,7 @@ typedef struct gdp_pdu
 #define GDP_CMD_OPEN_RA			75			// open a GCL for read or append
 #define GDP_CMD_NEWSEGMENT		76			// create a new segment for a log
 #define GDP_CMD_FWD_APPEND		77			// forward (replicate) APPEND
+#define GDP_CMD_READ_BY_TS		78			// read using timestamp as key
 //		128-191			Positive acks (HTTP 200-263)
 #define GDP_ACK_MIN			128			// minimum ack code
 #define GDP_ACK_SUCCESS			_GDP_ACK_FROM_CODE(SUCCESS)				// 128

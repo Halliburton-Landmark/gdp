@@ -35,6 +35,10 @@ The directory should be mode 700 or 750, owned by gdp:gdp:
 Mode 750 is just to allow users in the gdp group to be able
 to peek into the directory.  This should be limited to
 people who are maintaining the GDP.
+They still won't be able to read the files unless you change
+the `swarm.gdplogd.gcl.mode` parameter to change the default
+file mode from 0600 to something more permissive.  Note that
+the umask may modify this value.
 
 Adjust Administrative Parameters
 --------------------------------

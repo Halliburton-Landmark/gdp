@@ -66,6 +66,7 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.physlog", "GDP Log Daemon Physical Log"
 #define GCL_PATH_MAX		200		// max length of pathname
 
 static const char	*GCLDir;		// the gcl data directory
+static int			GCLfilemode;	// the file mode on create
 
 #define GETPHYS(gcl)	((gcl)->x->physinfo)
 
@@ -112,6 +113,177 @@ posix_error(int _errno, const char *fmt, ...)
 
 
 /*
+**  Berkeley DB compatibility routines
+*/
+
+#define DB_VERSION_THRESHOLD	5	// XXX not clear the number is right
+#if DB_VERSION_MAJOR < DB_VERSION_THRESHOLD
+
+// flags for db->open (back compatilibity)
+# define DB_CREATE		0x00000001
+# define DB_EXCL		0x00000004
+#endif
+
+
+static EP_STAT
+ep_stat_from_dbstat(int dbstat)
+{
+	EP_STAT estat;
+
+	if (dbstat == 0)
+		estat = EP_STAT_OK;
+#if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
+	else if (dbstat == DB_NOTFOUND || dbstat == DB_KEYEMPTY)
+		estat = GDP_STAT_NAK_NOTFOUND;
+	else if (dbstat > 0)
+		estat = ep_stat_from_errno(dbstat);
+	else
+	{
+		ep_dbg_cprintf(Dbg, 40, "ep_stat_from_dbstat(%d): %s\n",
+				dbstat, db_strerror(dbstat));
+		estat = GDP_STAT_NAK_INTERNAL;
+	}
+#else
+	else if (dbstat > 0)
+		estat = GDP_STAT_NAK_NOTFOUND;
+	else
+		estat = ep_stat_from_errno(errno);
+#endif
+	return estat;
+}
+
+
+static EP_STAT
+bdb_open(const char *filename,
+		int dbflags,
+		int filemode,
+		int dbtype,
+		DB **pdb)
+{
+	DB *db = NULL;
+	EP_STAT estat = EP_STAT_OK;
+
+#if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
+	const char *phase = "db_create";
+	int dbstat = db_create(&db, NULL, 0);
+	if (dbstat != 0)
+		goto fail0;
+	phase = "db->open";
+	dbstat = db->open(db, NULL, filename, NULL, dbtype, dbflags, filemode);
+	if (dbstat != 0)
+	{
+fail0:
+		db = NULL;
+		estat = ep_stat_from_dbstat(dbstat);
+		ep_dbg_cprintf(Dbg, 1, "db_open: error during %s: %s\n",
+					phase, db_strerror(dbstat));
+		if (db != NULL && (dbstat = db->close(db, 0)) != 0)
+		{
+			ep_dbg_cprintf(Dbg, 1, "db_open: error during dbclose: %s\n",
+					db_strerror(dbstat));
+		}
+	}
+#else
+	int fileflags = O_RDWR;
+
+	if (EP_UT_BITSET(DB_CREATE, dbflags))
+		fileflags |= O_CREAT;
+	if (EP_UT_BITSET(DB_EXCL, dbflags))
+		fileflags |= O_EXCL;
+	db = dbopen(filename, fileflags, filemode, dbtype, NULL);
+	if (db == NULL)
+	{
+		int _errno = errno;
+
+		estat = ep_stat_from_errno(_errno);
+		ep_dbg_cprintf(Dbg, 1, "bdb_open: %s\n", strerror(_errno));
+	}
+#endif
+
+	*pdb = db;
+	return estat;
+}
+
+
+static EP_STAT
+bdb_close(DB *db)
+{
+	int dbstat;
+
+#if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
+	dbstat = db->close(db, 0);
+#else
+	dbstat = db->close(db);
+#endif
+	return ep_stat_from_dbstat(dbstat);
+}
+
+
+static EP_STAT
+bdb_get_first_after_key(DB *db,
+		DBT *key,
+		DBT *val)
+{
+	int dbstat;
+	EP_STAT estat;
+
+	if (ep_dbg_test(Dbg, 47))
+	{
+		ep_dbg_printf("bdb_get_first_after_key: len = %ld, key =\n",
+				key->size);
+		ep_hexdump(key->data, key->size, ep_dbg_getfile(), 0, 0);
+	}
+#if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
+	DBC *dbc = NULL;
+
+	// need cursor to get approximate keys (next entry >= key)
+	dbstat = db->cursor(db, NULL, &dbc, 0);
+	if (dbstat == 0)
+		dbstat = dbc->c_get(dbc, key, val, DB_SET_RANGE);
+
+	// we always close the cursor --- XXX we really should cache it
+	if (dbc != NULL)
+		(void) dbc->c_close(dbc);
+#else
+	dbstat = db->seq(db, key, val, R_CURSOR);
+#endif
+
+	estat = ep_stat_from_dbstat(dbstat);
+	if (!EP_STAT_ISOK(estat) && !EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOTFOUND))
+		ep_log(estat, "bdb_get_first_after_key");
+	return estat;
+}
+
+
+static EP_STAT
+bdb_put(DB *db,
+		DBT *key,
+		DBT *val)
+{
+	int dbstat;
+	EP_STAT estat;
+
+	if (ep_dbg_test(Dbg, 47))
+	{
+		ep_dbg_printf("bdb_put: len = %ld, key =\n",
+				key->size);
+		ep_hexdump(key->data, key->size, ep_dbg_getfile(), 0, 0);
+	}
+
+#if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
+	dbstat = db->put(db, NULL, key, val, 0);
+#else
+	dbstat = db->put(db, key, val, 0);
+#endif
+	estat = ep_stat_from_dbstat(dbstat);
+	if (!EP_STAT_ISOK(estat))
+		ep_log(estat, "bdb_put");
+	return estat;
+}
+
+
+
+/*
 **  Initialize the physical I/O module
 */
 
@@ -122,7 +294,12 @@ disk_init()
 
 	// find physical location of GCL directory
 	GCLDir = ep_adm_getstrparam("swarm.gdplogd.gcl.dir", GCL_DIR);
-	ep_dbg_cprintf(Dbg, 8, "disk_init: log dir = %s\n", GCLDir);
+
+	// find the file creation mode
+	GCLfilemode = ep_adm_getintparam("swarm.gdplogd.gcl.mode", 0600);
+
+	ep_dbg_cprintf(Dbg, 8, "disk_init: log dir = %s, mode = 0%o\n",
+			GCLDir, GCLfilemode);
 
 	return estat;
 }
@@ -529,7 +706,8 @@ segment_create(gdp_gcl_t *gcl,
 		EP_STAT_CHECK(estat, goto fail1);
 
 		ep_dbg_cprintf(Dbg, 20, "segment_create: creating %s\n", data_pbuf);
-		data_fd = open(data_pbuf, O_RDWR | O_CREAT | O_APPEND | O_EXCL, 0644);
+		data_fd = open(data_pbuf, O_RDWR | O_CREAT | O_APPEND | O_EXCL,
+						GCLfilemode);
 		if (data_fd < 0 || (flock(data_fd, LOCK_EX) < 0))
 		{
 			char nbuf[40];
@@ -699,13 +877,25 @@ physinfo_free(gcl_physinfo_t *phys)
 	if (phys == NULL)
 		return;
 
-	if (phys->index.fp != NULL)
+	if (phys->ridx.fp != NULL)
 	{
-		ep_dbg_cprintf(Dbg, 41, "physinfo_free: closing index fp @ %p\n",
-				phys->index.fp);
-		if (fclose(phys->index.fp) != 0)
-			(void) posix_error(errno, "physinfo_free: cannot close index fp");
-		phys->index.fp = NULL;
+		ep_dbg_cprintf(Dbg, 41, "physinfo_free: closing ridx fp @ %p\n",
+				phys->ridx.fp);
+		if (fclose(phys->ridx.fp) != 0)
+			(void) posix_error(errno, "physinfo_free: cannot close ridx fp");
+		phys->ridx.fp = NULL;
+	}
+
+	if (phys->tidx.db != NULL)
+	{
+		EP_STAT estat;
+
+		ep_dbg_cprintf(Dbg, 41, "physinfo_free: closing tidx db @ %p\n",
+				phys->tidx.db);
+		estat = bdb_close(phys->tidx.db);
+		if (!EP_STAT_ISOK(estat))
+			ep_log(estat, "physinfo_free: cannot close tidx db");
+		phys->tidx.db = NULL;
 	}
 
 	for (segno = 0; segno < phys->nsegments; segno++)
@@ -735,11 +925,11 @@ physinfo_dump(gcl_physinfo_t *phys, FILE *fp)
 			phys, phys->min_recno, phys->max_recno);
 	fprintf(fp, "\tnsegments %d, last_segment %d\n",
 			phys->nsegments, phys->last_segment);
-	fprintf(fp, "\tindex: fp %p, min_recno %" PRIgdp_recno
+	fprintf(fp, "\tridx: fp %p, min_recno %" PRIgdp_recno
 			", max_offset %jd, header_size %zd\n",
-			phys->index.fp, phys->index.min_recno,
-			(intmax_t) phys->index.max_offset,
-			phys->index.header_size);
+			phys->ridx.fp, phys->ridx.min_recno,
+			(intmax_t) phys->ridx.max_offset,
+			phys->ridx.header_size);
 
 	for (segno = 0; segno < phys->nsegments; segno++)
 	{
@@ -760,7 +950,7 @@ xcache_create(gcl_physinfo_t *phys)
 }
 
 
-index_entry_t *
+ridx_entry_t *
 xcache_get(gcl_physinfo_t *phys, gdp_recno_t recno)
 {
 	return NULL;
@@ -780,14 +970,13 @@ xcache_free(gcl_physinfo_t *phys)
 
 
 /*
-**  GCL_PHYSCREATE --- create a brand new GCL on disk
+**  DISK_CREATE --- create a brand new GCL on disk
 */
 
 static EP_STAT
 disk_create(gdp_gcl_t *gcl, gdp_gclmd_t *gmd)
 {
 	EP_STAT estat = EP_STAT_OK;
-	FILE *index_fp;
 	gcl_physinfo_t *phys;
 
 	EP_ASSERT_POINTER_VALID(gcl);
@@ -795,7 +984,7 @@ disk_create(gdp_gcl_t *gcl, gdp_gclmd_t *gmd)
 	// allocate space for the physical information
 	phys = physinfo_alloc(gcl);
 	if (phys == NULL)
-		goto fail1;
+		goto fail0;
 	phys->last_segment = 0;
 	gcl->x->physinfo = phys;
 
@@ -808,18 +997,19 @@ disk_create(gdp_gcl_t *gcl, gdp_gclmd_t *gmd)
 	// create an initial segment for the GCL
 	estat = segment_create(gcl, gmd, 0, 0);
 
-	// create an offset index for that gcl
+	// create an offset record index for that gcl
 	{
-		int index_fd;
+		int ridx_fd;
 		char index_pbuf[GCL_PATH_MAX];
 
-		estat = get_gcl_path(gcl, -1, GCL_LXF_SUFFIX,
+		estat = get_gcl_path(gcl, -1, GCL_RIDX_SUFFIX,
 						index_pbuf, sizeof index_pbuf);
-		EP_STAT_CHECK(estat, goto fail2);
+		EP_STAT_CHECK(estat, goto fail0);
 
 		ep_dbg_cprintf(Dbg, 20, "disk_create: creating %s\n", index_pbuf);
-		index_fd = open(index_pbuf, O_RDWR | O_CREAT | O_APPEND | O_EXCL, 0644);
-		if (index_fd < 0)
+		ridx_fd = open(index_pbuf, O_RDWR | O_CREAT | O_APPEND | O_EXCL,
+						GCLfilemode);
+		if (ridx_fd < 0)
 		{
 			char nbuf[40];
 
@@ -827,10 +1017,10 @@ disk_create(gdp_gcl_t *gcl, gdp_gclmd_t *gmd)
 			strerror_r(errno, nbuf, sizeof nbuf);
 			ep_log(estat, "disk_create: cannot create %s: %s",
 				index_pbuf, nbuf);
-			goto fail2;
+			goto fail0;
 		}
-		index_fp = fdopen(index_fd, "a+");
-		if (index_fp == NULL)
+		phys->ridx.fp = fdopen(ridx_fd, "a+");
+		if (phys->ridx.fp == NULL)
 		{
 			char nbuf[40];
 
@@ -838,46 +1028,58 @@ disk_create(gdp_gcl_t *gcl, gdp_gclmd_t *gmd)
 			strerror_r(errno, nbuf, sizeof nbuf);
 			ep_log(estat, "disk_create: cannot fdopen %s: %s",
 				index_pbuf, nbuf);
-			(void) close(index_fd);
-			goto fail2;
+			(void) close(ridx_fd);
+			goto fail0;
 		}
 	}
 
-	// write the index header
+	// write the recno index header
 	{
-		index_header_t index_header;
+		ridx_header_t ridx_header;
 
-		index_header.magic = ep_net_hton32(GCL_LXF_MAGIC);
-		index_header.version = ep_net_hton32(GCL_LXF_VERSION);
-		index_header.header_size = ep_net_hton32(SIZEOF_INDEX_HEADER);
-		index_header.reserved1 = 0;
-		index_header.min_recno = ep_net_hton64(1);
+		ridx_header.magic = ep_net_hton32(GCL_RIDX_MAGIC);
+		ridx_header.version = ep_net_hton32(GCL_RIDX_VERSION);
+		ridx_header.header_size = ep_net_hton32(SIZEOF_RIDX_HEADER);
+		ridx_header.reserved1 = 0;
+		ridx_header.min_recno = ep_net_hton64(1);
 
-		if (fwrite(&index_header, sizeof index_header, 1, index_fp) != 1)
+		if (fwrite(&ridx_header, sizeof ridx_header, 1, phys->ridx.fp) != 1)
 		{
 			estat = posix_error(errno, "disk_create: cannot write header");
-			goto fail3;
+			goto fail0;
 		}
 	}
 
-	// create a cache for that index
+	// create a cache for that recno index
 	estat = xcache_create(phys);
-	EP_STAT_CHECK(estat, goto fail2);
+	EP_STAT_CHECK(estat, goto fail0);
+
+	// create a database for the timestamp index
+	{
+		char tidx_pbuf[GCL_PATH_MAX];
+
+		estat = get_gcl_path(gcl, -1, GCL_TIDX_SUFFIX,
+						tidx_pbuf, sizeof tidx_pbuf);
+		EP_STAT_CHECK(estat, goto fail0);
+
+		ep_dbg_cprintf(Dbg, 20, "disk_create: creating %s\n", tidx_pbuf);
+		estat = bdb_open(tidx_pbuf, DB_CREATE | DB_EXCL, GCLfilemode,
+							DB_BTREE, &phys->tidx.db);
+		if (!EP_STAT_ISOK(estat))
+		{
+			ep_log(estat, "disk_create: cannot create %s", tidx_pbuf);
+			goto fail0;
+		}
+	}
 
 	// success!
-	phys->index.fp = index_fp;
-	phys->index.max_offset = phys->index.header_size = SIZEOF_INDEX_HEADER;
-	phys->index.min_recno = phys->min_recno = 1;
+	phys->ridx.max_offset = phys->ridx.header_size = SIZEOF_RIDX_HEADER;
+	phys->ridx.min_recno = phys->min_recno = 1;
 	phys->max_recno = 0;
 	ep_dbg_cprintf(Dbg, 10, "Created new GCL %s\n", gcl->pname);
 	return estat;
 
-fail3:
-	ep_dbg_cprintf(Dbg, 20, "disk_create: closing index_fp @ %p\n",
-			index_fp);
-	fclose(index_fp);
-fail2:
-fail1:
+fail0:
 	// turn OK into an errno-based code
 	if (EP_STAT_ISOK(estat))
 		estat = ep_stat_from_errno(errno);
@@ -885,6 +1087,13 @@ fail1:
 	// turn "file exists" into a meaningful response code
 	if (EP_STAT_IS_SAME(estat, ep_stat_from_errno(EEXIST)))
 			estat = GDP_STAT_NAK_CONFLICT;
+
+	// free up resources
+	if (phys != NULL)
+	{
+		physinfo_free(phys);
+		gcl->x->physinfo = phys = NULL;
+	}
 
 	if (ep_dbg_test(Dbg, 1))
 	{
@@ -915,7 +1124,7 @@ disk_open(gdp_gcl_t *gcl)
 {
 	EP_STAT estat = EP_STAT_OK;
 	int fd;
-	FILE *index_fp;
+	FILE *ridx_fp;
 	gcl_physinfo_t *phys;
 	char index_pbuf[GCL_PATH_MAX];
 	const char *phase;
@@ -930,103 +1139,103 @@ disk_open(gdp_gcl_t *gcl)
 		goto fail0;
 	}
 
-	// open the index file
-	phase = "get_gcl_path(index)";
-	estat = get_gcl_path(gcl, -1, GCL_LXF_SUFFIX,
+	// open the recno index file (ridx)
+	phase = "get_gcl_path(ridx)";
+	estat = get_gcl_path(gcl, -1, GCL_RIDX_SUFFIX,
 					index_pbuf, sizeof index_pbuf);
 	EP_STAT_CHECK(estat, goto fail0);
 	ep_dbg_cprintf(Dbg, 39, "disk_open: opening %s\n", index_pbuf);
-	phase = "open index";
+	phase = "open ridx";
 	fd = open(index_pbuf, O_RDWR | O_APPEND);
 	if (fd < 0 || flock(fd, LOCK_SH) < 0 ||
-			(index_fp = fdopen(fd, "a+")) == NULL)
+			(ridx_fp = fdopen(fd, "a+")) == NULL)
 	{
 		estat = ep_stat_from_errno(errno);
 		if (EP_STAT_IS_SAME(estat, ep_stat_from_errno(ENOENT)))
 			estat = GDP_STAT_NAK_NOTFOUND;
-		ep_log(estat, "disk_open(%s): index open failure", index_pbuf);
+		ep_log(estat, "disk_open(%s): ridx open failure", index_pbuf);
 		if (fd >= 0)
 			close(fd);
 		goto fail0;
 	}
 
-	// check for valid index header (distinguish old and new format)
-	phase = "index header read";
-	index_header_t index_header;
+	// check for valid ridx header (distinguish old and new format)
+	phase = "ridx header read";
+	ridx_header_t ridx_header;
 
-	index_header.magic = 0;
-	if (fsizeof(index_fp) < sizeof index_header)
+	ridx_header.magic = 0;
+	if (fsizeof(ridx_fp) < sizeof ridx_header)
 	{
 		// must be old style
 	}
-	else if (fread(&index_header, sizeof index_header, 1, index_fp) != 1)
+	else if (fread(&ridx_header, sizeof ridx_header, 1, ridx_fp) != 1)
 	{
 		estat = posix_error(errno,
-					"disk_open(%s): index header read failure",
+					"disk_open(%s): ridx header read failure",
 					index_pbuf);
 		goto fail0;
 	}
-	else if (index_header.magic == 0)
+	else if (ridx_header.magic == 0)
 	{
 		// must be old style
 	}
-	else if (ep_net_ntoh32(index_header.magic) != GCL_LXF_MAGIC)
+	else if (ep_net_ntoh32(ridx_header.magic) != GCL_RIDX_MAGIC)
 	{
 		estat = GDP_STAT_CORRUPT_INDEX;
-		ep_log(estat, "disk_open(%s): bad index magic", index_pbuf);
+		ep_log(estat, "disk_open(%s): bad ridx magic", index_pbuf);
 		goto fail0;
 	}
-	else if (ep_net_ntoh32(index_header.version) < GCL_LXF_MINVERS ||
-			 ep_net_ntoh32(index_header.version) > GCL_LXF_MAXVERS)
+	else if (ep_net_ntoh32(ridx_header.version) < GCL_RIDX_MINVERS ||
+			 ep_net_ntoh32(ridx_header.version) > GCL_RIDX_MAXVERS)
 	{
 		estat = GDP_STAT_CORRUPT_INDEX;
-		ep_log(estat, "disk_open(%s): bad index version", index_pbuf);
+		ep_log(estat, "disk_open(%s): bad ridx version", index_pbuf);
 		goto fail0;
 	}
 
-	if (index_header.magic == 0)
+	if (ridx_header.magic == 0)
 	{
-		// old-style index; fake the header
-		index_header.min_recno = 1;
-		index_header.header_size = 0;
+		// old-style ridx; fake the header
+		ridx_header.min_recno = 1;
+		ridx_header.header_size = 0;
 	}
 	else
 	{
-		index_header.min_recno = ep_net_ntoh64(index_header.min_recno);
-		index_header.header_size = ep_net_ntoh32(index_header.header_size);
+		ridx_header.min_recno = ep_net_ntoh64(ridx_header.min_recno);
+		ridx_header.header_size = ep_net_ntoh32(ridx_header.header_size);
 	}
 
-	// create a cache for the index information
+	// create a cache for the ridx information
 	//XXX should do data too, but that's harder because it's variable size
 	phase = "xcache_create";
 	estat = xcache_create(phys);
 	EP_STAT_CHECK(estat, goto fail0);
 
-	phys->index.fp = index_fp;
-	phys->index.max_offset = fsizeof(index_fp);
-	phys->index.header_size = index_header.header_size;
-	phys->index.min_recno = index_header.min_recno;
-	phys->min_recno = index_header.min_recno;
-	phys->max_recno = ((phys->index.max_offset - index_header.header_size)
-							/ SIZEOF_INDEX_RECORD) - index_header.min_recno + 1;
+	phys->ridx.fp = ridx_fp;
+	phys->ridx.max_offset = fsizeof(ridx_fp);
+	phys->ridx.header_size = ridx_header.header_size;
+	phys->ridx.min_recno = ridx_header.min_recno;
+	phys->min_recno = ridx_header.min_recno;
+	phys->max_recno = ((phys->ridx.max_offset - ridx_header.header_size)
+							/ SIZEOF_RIDX_RECORD) - ridx_header.min_recno + 1;
 	gcl->nrecs = phys->max_recno;
 
 	/*
 	**  Index header has been read.
-	**  Find the last segment mentioned in that index.
+	**  Find the last segment mentioned in that ridx.
 	*/
 
-	phase = "initial index read";
-	if (phys->index.max_offset == 0)
+	phase = "initial ridx read";
+	if (phys->ridx.max_offset == 0)
 	{
 		phys->last_segment = 0;
 	}
 	else
 	{
-		index_entry_t xent;
-		if (fseek(phys->index.fp, phys->index.max_offset - SIZEOF_INDEX_RECORD,
+		ridx_entry_t xent;
+		if (fseek(phys->ridx.fp, phys->ridx.max_offset - SIZEOF_RIDX_RECORD,
 					SEEK_SET) < 0 ||
-				fread(&xent, SIZEOF_INDEX_RECORD, 1, phys->index.fp) != 1)
+				fread(&xent, SIZEOF_RIDX_RECORD, 1, phys->ridx.fp) != 1)
 		{
 			goto fail0;
 		}
@@ -1065,6 +1274,22 @@ disk_open(gdp_gcl_t *gcl)
 		EP_STAT_CHECK(estat, goto fail0);
 	}
 
+	/*
+	**  Open timestamp index (tidx)
+	*/
+
+	phase = "get_gcl_path(tidx)";
+	{
+		char tidx_pbuf[GCL_PATH_MAX];
+
+		estat = get_gcl_path(gcl, -1, GCL_TIDX_SUFFIX,
+						tidx_pbuf, sizeof tidx_pbuf);
+		EP_STAT_CHECK(estat, goto fail0);
+		// it's not an error if the database doesn't exist (back compat)
+		(void) bdb_open(tidx_pbuf, 0, GCLfilemode, DB_BTREE, &phys->tidx.db);
+		//EP_STAT_CHECK(estat, goto fail0);
+	}
+
 	if (ep_dbg_test(Dbg, 20))
 	{
 		ep_dbg_printf("disk_open => ");
@@ -1075,6 +1300,8 @@ disk_open(gdp_gcl_t *gcl)
 fail0:
 	if (EP_STAT_ISOK(estat))
 		estat = ep_stat_from_errno(errno);
+	physinfo_free(phys);
+	gcl->x->physinfo = phys = NULL;
 
 	if (ep_dbg_test(Dbg, 10))
 	{
@@ -1087,7 +1314,7 @@ fail0:
 }
 
 /*
-**	GCL_PHYSCLOSE --- physically close an open gcl
+**	DISK_CLOSE --- physically close an open gcl
 */
 
 static EP_STAT
@@ -1104,9 +1331,7 @@ disk_close(gdp_gcl_t *gcl)
 
 
 /*
-**	GCL_PHYSREAD --- read a message from a gcl
-**
-**		Reads in a message indicated by datum->recno into datum.
+**	FSEEK_TO_INDEX_RECNO --- seek to record number in record index
 */
 
 static EP_STAT
@@ -1117,14 +1342,14 @@ fseek_to_index_recno(
 {
 	off_t xoff;
 
-	xoff = (recno - phys->index.min_recno) * SIZEOF_INDEX_RECORD +
-			phys->index.header_size;
+	xoff = (recno - phys->ridx.min_recno) * SIZEOF_RIDX_RECORD +
+			phys->ridx.header_size;
 	ep_dbg_cprintf(Dbg, 14,
 			"recno=%" PRIgdp_recno ", min_recno=%" PRIgdp_recno
-			", index_hdrsize=%zd, xoff=%jd\n",
+			", ridx_hdrsize=%zd, xoff=%jd\n",
 			recno, phys->min_recno,
-			phys->index.header_size, (intmax_t) xoff);
-	if (xoff < phys->index.header_size || xoff > phys->index.max_offset)
+			phys->ridx.header_size, (intmax_t) xoff);
+	if (xoff < phys->ridx.header_size || xoff > phys->ridx.max_offset)
 	{
 		// computed offset is out of range
 		ep_log(GDP_STAT_CORRUPT_INDEX,
@@ -1132,12 +1357,12 @@ fseek_to_index_recno(
 				" out of range (%jd - %jd)",
 				gclpname,
 				(intmax_t) xoff,
-				(intmax_t) phys->index.header_size,
-				(intmax_t) phys->index.max_offset);
+				(intmax_t) phys->ridx.header_size,
+				(intmax_t) phys->ridx.max_offset);
 		return GDP_STAT_CORRUPT_INDEX;
 	}
 
-	if (fseek(phys->index.fp, xoff, SEEK_SET) < 0)
+	if (fseek(phys->ridx.fp, xoff, SEEK_SET) < 0)
 	{
 		return posix_error(errno, "fseek_to_index_recno: fseek failed");
 	}
@@ -1145,14 +1370,21 @@ fseek_to_index_recno(
 	return EP_STAT_OK;
 }
 
+
+/*
+**  DISK_READ_BY_RECNO --- read record indexed by record number
+**
+**		Reads in a message indicated by datum->recno into datum.
+*/
+
 static EP_STAT
-disk_read(gdp_gcl_t *gcl,
+disk_read_by_recno(gdp_gcl_t *gcl,
 		gdp_datum_t *datum)
 {
 	gcl_physinfo_t *phys = GETPHYS(gcl);
 	EP_STAT estat = EP_STAT_OK;
-	index_entry_t index_entry;
-	index_entry_t *xent;
+	ridx_entry_t ridx_entry;
+	ridx_entry_t *xent;
 
 	EP_ASSERT_POINTER_VALID(gcl);
 	gdp_buf_reset(datum->dbuf);
@@ -1179,7 +1411,7 @@ disk_read(gdp_gcl_t *gcl,
 		goto fail0;
 	}
 
-	// check if recno offset is in the index cache
+	// check if recno offset is in the ridx cache
 	xent = xcache_get(phys, datum->recno);
 	if (xent != NULL)
 	{
@@ -1187,16 +1419,16 @@ disk_read(gdp_gcl_t *gcl,
 	}
 	else
 	{
-		xent = &index_entry;
+		xent = &ridx_entry;
 
-		// recno is not in the index cache: read it from disk
-		flockfile(phys->index.fp);
+		// recno is not in the ridx cache: read it from disk
+		flockfile(phys->ridx.fp);
 
 		estat = fseek_to_index_recno(phys, datum->recno, gcl->pname);
 		EP_STAT_CHECK(estat, goto fail3);
-		if (fread(xent, SIZEOF_INDEX_RECORD, 1, phys->index.fp) < 1)
+		if (fread(xent, SIZEOF_RIDX_RECORD, 1, phys->ridx.fp) < 1)
 		{
-			estat = posix_error(errno, "gcl_diskread: fread failed");
+			estat = posix_error(errno, "disk_read_by_recno: fread failed");
 			goto fail3;
 		}
 		xent->recno = ep_net_ntoh64(xent->recno);
@@ -1205,7 +1437,7 @@ disk_read(gdp_gcl_t *gcl,
 		xent->reserved = ep_net_ntoh32(xent->reserved);
 
 		ep_dbg_cprintf(Dbg, 14,
-				"got index entry: recno %" PRIgdp_recno ", segment %" PRIu32
+				"got ridx entry: recno %" PRIgdp_recno ", segment %" PRIu32
 				", offset=%jd, rsvd=%" PRIu32 "\n",
 				xent->recno, xent->segment,
 				(intmax_t) xent->offset, xent->reserved); 
@@ -1217,12 +1449,12 @@ disk_read(gdp_gcl_t *gcl,
 		}
 
 fail3:
-		funlockfile(phys->index.fp);
+		funlockfile(phys->ridx.fp);
 	}
 
 	EP_STAT_CHECK(estat, goto fail0);
 
-	// xent now points to the index entry for this record
+	// xent now points to the ridx entry for this record
 
 	// get the open segment
 	segment_t *seg = segment_get(gcl, xent->segment);
@@ -1242,7 +1474,7 @@ fail3:
 	if (fseek(seg->fp, xent->offset, SEEK_SET) < 0 ||
 			fread(&log_record, sizeof log_record, 1, seg->fp) < 1)
 	{
-		ep_dbg_cprintf(Dbg, 1, "gcl_diskread: header fread failed: %s\n",
+		ep_dbg_cprintf(Dbg, 1, "disk_read_by_recno: header fread failed: %s\n",
 				strerror(errno));
 		estat = ep_stat_from_errno(errno);
 		goto fail1;
@@ -1254,13 +1486,13 @@ fail3:
 	log_record.flags = ep_net_ntoh16(log_record.flags);
 	log_record.data_length = ep_net_ntoh32(log_record.data_length);
 
-	ep_dbg_cprintf(Dbg, 29, "gcl_diskread: recno %" PRIgdp_recno
+	ep_dbg_cprintf(Dbg, 29, "disk_read_by_recno: recno %" PRIgdp_recno
 				", sigmeta 0x%x, dlen %" PRId32 ", offset %" PRId64 "\n",
 				log_record.recno, log_record.sigmeta, log_record.data_length,
 				xent->offset);
 
 	if (log_record.recno != datum->recno)
-		EP_ASSERT_FAILURE("gcl_diskread: recno mismatch: wanted %" PRIgdp_recno
+		EP_ASSERT_FAILURE("disk_read_by_recno: recno mismatch: wanted %" PRIgdp_recno
 				", got %" PRIgdp_recno,
 				datum->recno, log_record.recno);
 
@@ -1313,7 +1545,7 @@ fail3:
 	if (false)
 	{
 fail2:
-		ep_dbg_cprintf(Dbg, 1, "gcl_diskread: %s fread failed: %s\n",
+		ep_dbg_cprintf(Dbg, 1, "disk_read_by_recno: %s fread failed: %s\n",
 				phase, strerror(errno));
 		estat = ep_stat_from_errno(errno);
 	}
@@ -1325,8 +1557,75 @@ fail0:
 	return estat;
 }
 
+
 /*
-**	GCL_PHYSAPPEND --- append a message to a writable gcl
+**  DISK_READ_BY_TS --- read record indexed by timestamp
+*/
+
+static EP_STAT
+disk_read_by_ts(gdp_gcl_t *gcl,
+		gdp_datum_t *datum)
+{
+	EP_STAT estat = EP_STAT_OK;
+	tidx_key_t tkey;
+	DBT tkey_dbt;
+	DBT tval_dbt;
+	gcl_physinfo_t *phys;
+
+	if (ep_dbg_test(Dbg, 14))
+	{
+		ep_dbg_printf("disk_read_by_ts ");
+		_gdp_datum_dump(datum, ep_dbg_getfile());
+	}
+
+	phys = GETPHYS(gcl);
+	EP_ASSERT_POINTER_VALID(phys);
+	ep_thr_rwlock_rdlock(&phys->lock);
+
+	if (phys->tidx.db == NULL)
+	{
+		// no timestamp index available
+		estat = GDP_STAT_NAK_METHNOTALLOWED;
+		ep_dbg_cprintf(Dbg, 11, "disk_read_by_ts: no index available\n");
+		goto fail0;
+	}
+
+	// keys need to be in network byte order so they sort properly
+	memset(&tkey, 0, sizeof tkey);
+	tkey.sec = ep_net_hton64(datum->ts.tv_sec);
+	tkey.nsec = ep_net_hton32(datum->ts.tv_nsec);
+	tkey_dbt.data = &tkey;
+	tkey_dbt.size = sizeof tkey;
+
+	estat = bdb_get_first_after_key(phys->tidx.db, &tkey_dbt, &tval_dbt);
+
+	if (EP_STAT_ISOK(estat))
+	{
+		// use the regular recno lookup now
+		if (tval_dbt.size != sizeof (tidx_value_t))
+		{
+			// I have no idea what this value means
+			estat = GDP_STAT_CORRUPT_INDEX;
+			goto fail0;
+		}
+		tidx_value_t *tval = tval_dbt.data;
+		datum->recno = tval->recno;
+		estat = disk_read_by_recno(gcl, datum);
+	}
+
+fail0:
+	ep_thr_rwlock_unlock(&phys->lock);
+
+	char ebuf[80];
+	ep_dbg_cprintf(Dbg, EP_STAT_ISOK(estat) ? 52 : 7,
+			"disk_read_by_ts: recno = %" PRIgdp_recno " stat =\n\t%s\n",
+			datum->recno, ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	return estat;
+}
+
+
+/*
+**	DISK_APPEND --- append a message to a writable gcl
 */
 
 static EP_STAT
@@ -1335,7 +1634,6 @@ disk_append(gdp_gcl_t *gcl,
 {
 	segment_record_t log_record;
 	int64_t record_size = sizeof log_record;
-	index_entry_t index_entry;
 	size_t dlen;
 	gcl_physinfo_t *phys;
 	segment_t *seg;
@@ -1405,27 +1703,65 @@ disk_append(gdp_gcl_t *gcl,
 				datum->siglen);
 	}
 
-	index_entry.recno = log_record.recno;	// already in net byte order
-	index_entry.offset = ep_net_hton64(seg->max_offset);
-	index_entry.segment = ep_net_hton32(phys->last_segment);
-	index_entry.reserved = 0;
-
-	// write index record
-	estat = fseek_to_index_recno(phys, datum->recno, gcl->pname);
-	EP_STAT_CHECK(estat, goto fail0);
-	fwrite(&index_entry, sizeof index_entry, 1, phys->index.fp);
-
-	// commit
+	// commit data portion (everything else can be rebuilt)
 	if (fflush(seg->fp) < 0 || ferror(seg->fp))
-		estat = posix_error(errno, "disk_append: cannot flush data");
-	else if (fflush(phys->index.fp) < 0 || ferror(seg->fp))
-		estat = posix_error(errno, "disk_append: cannot flush index");
-	else
 	{
-		xcache_put(phys, index_entry.recno, index_entry.offset);
-		++phys->max_recno;
-		phys->index.max_offset += sizeof index_entry;
-		seg->max_offset += record_size;
+		estat = posix_error(errno, "disk_append: cannot flush data");
+		goto fail0;
+	}
+
+	// write recno index record
+	{
+		ridx_entry_t ridx_entry;
+
+		ridx_entry.recno = log_record.recno;	// already in net byte order
+		ridx_entry.offset = ep_net_hton64(seg->max_offset);
+		ridx_entry.segment = ep_net_hton32(phys->last_segment);
+		ridx_entry.reserved = 0;
+
+		// write ridx record
+		estat = fseek_to_index_recno(phys, datum->recno, gcl->pname);
+		EP_STAT_CHECK(estat, goto fail0);
+		if (fwrite(&ridx_entry, sizeof ridx_entry, 1, phys->ridx.fp) != 1)
+		{
+			estat = posix_error(errno, "disk_append: cannot write ridx entry");
+		}
+		else if (fflush(phys->ridx.fp) < 0 || ferror(seg->fp))
+			estat = posix_error(errno, "disk_append: cannot flush ridx");
+		else
+		{
+			xcache_put(phys, ridx_entry.recno, ridx_entry.offset);
+			++phys->max_recno;
+			phys->ridx.max_offset += sizeof ridx_entry;
+			seg->max_offset += record_size;
+		}
+		EP_STAT_CHECK(estat, goto fail0);
+	}
+
+	// write timestamp index record
+	if (phys->tidx.db != NULL)
+	{
+		tidx_key_t tkey;
+		tidx_value_t tvalue;
+		DBT tkey_dbt;
+		DBT tval_dbt;
+
+		// must be in network byte order so keys sort properly
+		memset(&tkey, 0, sizeof tkey);
+		tkey.sec = ep_net_hton64(datum->ts.tv_sec);
+		tkey.nsec = ep_net_hton32(datum->ts.tv_nsec);
+		tkey_dbt.data = &tkey;
+		tkey_dbt.size = sizeof tkey;
+
+		memset(&tvalue, 0, sizeof tvalue);
+		tvalue.recno = datum->recno;
+		tval_dbt.data = &tvalue;
+		tval_dbt.size = sizeof tvalue;
+
+		estat = bdb_put(phys->tidx.db, &tkey_dbt, &tval_dbt);
+		if (!EP_STAT_ISOK(estat))
+			ep_log(estat, "disk_append: cannot put tidx value");
+		//EP_STAT_CHECK(estat, goto fail0);
 	}
 
 fail0:
@@ -1598,7 +1934,7 @@ disk_foreach(void (*func)(gdp_name_t, void *), void *ctx)
 
 			// we're only interested in .gdpndx files
 			char *p = strrchr(dent->d_name, '.');
-			if (p == NULL || strcmp(p, GCL_LXF_SUFFIX) != 0)
+			if (p == NULL || strcmp(p, GCL_RIDX_SUFFIX) != 0)
 				continue;
 
 			// strip off the file extension
@@ -1642,16 +1978,17 @@ disk_getstats(
 
 struct gcl_phys_impl	GdpDiskImpl =
 {
-	.init =			disk_init,
-	.read =			disk_read,
-	.create =		disk_create,
-	.open =			disk_open,
-	.close =		disk_close,
-	.append =		disk_append,
-	.getmetadata =	disk_getmetadata,
+	.init =				disk_init,
+	.read_by_recno =	disk_read_by_recno,
+	.read_by_ts =		disk_read_by_ts,
+	.create =			disk_create,
+	.open =				disk_open,
+	.close =			disk_close,
+	.append =			disk_append,
+	.getmetadata =		disk_getmetadata,
 #if SEGMENT_SUPPORT
-	.newsegment =	disk_newsegment,
+	.newsegment =		disk_newsegment,
 #endif
-	.foreach =		disk_foreach,
-	.getstats =		disk_getstats,
+	.foreach =			disk_foreach,
+	.getstats =			disk_getstats,
 };
