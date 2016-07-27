@@ -919,14 +919,19 @@ ep_time_print(                       // format a time string to a file
 EP_STAT
 ep_time_parse(                       // parse a time string
         const char *timestr,
-        EP_TIME_SPEC *tv);
+        EP_TIME_SPEC *tv,
+        uint32_t flags);
+
+// values for ep_time_parse flags
+#define EP_TIME_USE_UTC         0x00000000      // assume UTC (default)
+#define EP_TIME_USE_LOCALTIME   0x00000001      // assume times in local zone
 
 EP_STAT
 ep_time_nanosleep(                   // sleep for the indicated number of nanoseconds
         int64_t nanoseconds);
 
 bool
-EP_TIME_ISVALID(                     // test to see if a timestamp is valid
+EP_TIME_IS_VALID(                    // test to see if a timestamp is valid
         EP_TIME_SPEC *tv);
 
 void

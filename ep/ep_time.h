@@ -97,13 +97,14 @@ extern EP_STAT	ep_time_parse(const char *timestr,
 				EP_TIME_SPEC *tv,
 				uint32_t flags);
 
+#define EP_TIME_USE_UTC		0x00000000	// assume UTC (default)
 #define EP_TIME_USE_LOCALTIME	0x00000001	// assume times in local zone
 
 // sleep for the indicated number of nanoseconds
 extern EP_STAT	ep_time_nanosleep(int64_t);
 
 // test to see if a timestamp is valid
-#define EP_TIME_ISVALID(ts)	((ts)->tv_sec != EP_TIME_NOTIME)
+#define EP_TIME_IS_VALID(ts)	((ts)->tv_sec != EP_TIME_NOTIME)
 
 // invalidate a timestamp
 #define EP_TIME_INVALIDATE(ts)	((ts)->tv_sec = EP_TIME_NOTIME)

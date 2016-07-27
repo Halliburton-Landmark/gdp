@@ -104,7 +104,7 @@ _gdp_pdu_dump(gdp_pdu_t *pdu, FILE *fp)
 						gdp_buf_getlength(pdu->datum->dbuf));
 		fprintf(fp, "\n\t\tts=");
 		ep_time_print(&pdu->datum->ts, fp, EP_TIME_FMT_HUMAN);
-		if (EP_TIME_ISVALID(&pdu->datum->ts))
+		if (EP_TIME_IS_VALID(&pdu->datum->ts))
 			len += sizeof pdu->datum->ts;
 		fprintf(fp, "\n\tsigmdalg=0x%x, siglen=%d, sig=%p",
 				pdu->datum->sigmdalg, pdu->datum->siglen, pdu->datum->sig);
@@ -330,7 +330,7 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 	}
 
 	// timestamp
-	if (pdu->datum != NULL && EP_TIME_ISVALID(&pdu->datum->ts))
+	if (pdu->datum != NULL && EP_TIME_IS_VALID(&pdu->datum->ts))
 	{
 		pbuf[FOFF] |= GDP_PDU_HAS_TS;
 		PUT64(pdu->datum->ts.tv_sec);

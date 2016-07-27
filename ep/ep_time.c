@@ -223,7 +223,7 @@ ep_time_format(const EP_TIME_SPEC *tv, char *tbuf, size_t tbsiz, uint32_t flags)
 	bool human = EP_UT_BITSET(EP_TIME_FMT_HUMAN, flags);
 	bool showfuzz = !EP_UT_BITSET(EP_TIME_FMT_NOFUZZ, flags);
 
-	if (!EP_TIME_ISVALID(tv))
+	if (!EP_TIME_IS_VALID(tv))
 	{
 		snprintf(tbuf, tbsiz, "%s", human ? "(none)" : "-");
 		return tbuf;

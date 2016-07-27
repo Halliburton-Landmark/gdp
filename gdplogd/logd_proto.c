@@ -81,6 +81,39 @@ flush_input_data(gdp_req_t *req, char *where)
 	}
 }
 
+
+/*
+**  GET_STARTING_POINT --- get the starting point for a read or subscribe
+*/
+
+static EP_STAT
+get_starting_point(gdp_req_t *req)
+{
+	EP_STAT estat = EP_STAT_OK;
+	gdp_datum_t *datum = req->pdu->datum;
+
+	if (EP_TIME_IS_VALID(&datum->ts) && datum->recno <= 0)
+	{
+		// read by timestamp instead of record number
+		estat = req->gcl->x->physimpl->ts_to_recno(req->gcl, datum);
+	}
+	else
+	{
+		// handle record numbers relative to the end
+		if (datum->recno <= 0)
+		{
+			datum->recno += req->gcl->nrecs + 1;
+			if (datum->recno <= 0)
+			{
+				// can't read before the beginning
+				datum->recno = 1;
+			}
+		}
+	}
+	req->nextrec = req->pdu->datum->recno;
+	return estat;
+}
+
 /*
 **	Command implementations
 */
@@ -357,39 +390,31 @@ cmd_close(gdp_req_t *req)
 
 
 /*
-**  CMD_READ_BY_RECNO --- read a single record from a GCL given a recno
+**  CMD_READ --- read a single record from a GCL
 **
 **		This returns the data as part of the response.  To get multiple
 **		values in one call, see cmd_subscribe.
 */
 
 EP_STAT
-cmd_read_by_recno(gdp_req_t *req)
+cmd_read(gdp_req_t *req)
 {
 	EP_STAT estat;
 
 	req->pdu->cmd = GDP_ACK_CONTENT;
 
 	// should have no input data; ignore anything there
-	flush_input_data(req, "cmd_read_by_recno");
+	flush_input_data(req, "cmd_read");
 
 	estat = get_open_handle(req, GDP_MODE_RO);
 	if (!EP_STAT_ISOK(estat))
 	{
-		return gdpd_gcl_error(req->pdu->dst, "cmd_read_by_recno: GCL open failure",
+		return gdpd_gcl_error(req->pdu->dst, "cmd_read: GCL open failure",
 							estat, GDP_STAT_NAK_INTERNAL);
 	}
 
-	// handle record numbers relative to the end
-	if (req->pdu->datum->recno <= 0)
-	{
-		req->pdu->datum->recno += req->gcl->nrecs + 1;
-		if (req->pdu->datum->recno <= 0)
-		{
-			// can't read before the beginning
-			req->pdu->datum->recno = 1;
-		}
-	}
+	estat = get_starting_point(req);
+	EP_STAT_CHECK(estat, goto fail0);
 
 	estat = req->gcl->x->physimpl->read_by_recno(req->gcl, req->pdu->datum);
 
@@ -397,38 +422,7 @@ cmd_read_by_recno(gdp_req_t *req)
 	if (EP_STAT_IS_SAME(estat, GDP_STAT_RECORD_EXPIRED))
 		estat = GDP_STAT_NAK_GONE;
 
-	_gdp_gcl_decref(&req->gcl);
-	return estat;
-}
-
-
-/*
-**  CMD_READ_BY_TS --- read record given a timestamp
-*/
-
-EP_STAT
-cmd_read_by_ts(gdp_req_t *req)
-{
-	EP_STAT estat;
-
-	req->pdu->cmd = GDP_ACK_CONTENT;
-
-	// should have no input data; ignore anything there
-	flush_input_data(req, "cmd_read_by_ts");
-
-	estat = get_open_handle(req, GDP_MODE_RO);
-	if (!EP_STAT_ISOK(estat))
-	{
-		return gdpd_gcl_error(req->pdu->dst, "cmd_read_by_ts: GCL open failure",
-							estat, GDP_STAT_NAK_INTERNAL);
-	}
-
-	estat = req->gcl->x->physimpl->read_by_ts(req->gcl, req->pdu->datum);
-
-	// deliver "record expired" as "not found"
-	if (EP_STAT_IS_SAME(estat, GDP_STAT_RECORD_EXPIRED))
-		estat = GDP_STAT_NAK_GONE;
-
+fail0:
 	_gdp_gcl_decref(&req->gcl);
 	return estat;
 }
@@ -666,6 +660,8 @@ fail0:
 **		previously existing records.  Once those are all sent we can
 **		convert this to an ordinary subscription.  If the subscribe
 **		request is satisified, we remove it.
+**
+**		This code is also the core of multiread.
 */
 
 void
@@ -809,16 +805,8 @@ cmd_subscribe(gdp_req_t *req)
 	}
 
 	// get our starting point, which may be relative to the end
-	req->nextrec = req->pdu->datum->recno;
-	if (req->nextrec <= 0)
-	{
-		req->nextrec += req->gcl->nrecs + 1;
-		if (req->nextrec <= 0)
-		{
-			// still starts before beginning; start from beginning
-			req->nextrec = 1;
-		}
-	}
+	estat = get_starting_point(req);
+	EP_STAT_CHECK(estat, goto fail0);
 
 	ep_dbg_cprintf(Dbg, 24,
 			"cmd_subscribe: starting from %" PRIgdp_recno ", %d records\n",
@@ -885,6 +873,7 @@ cmd_subscribe(gdp_req_t *req)
 
 	// we don't drop the GCL reference until the subscription is satisified
 
+fail0:
 	return EP_STAT_OK;
 }
 
@@ -925,33 +914,14 @@ cmd_multiread(gdp_req_t *req)
 	// should have no more input data; ignore anything there
 	flush_input_data(req, "cmd_multiread");
 
-	// get our starting point, which may be relative to the end
-	req->nextrec = req->pdu->datum->recno;
-	if (req->nextrec <= 0)
-	{
-		req->nextrec += req->gcl->nrecs + 1;
-		if (req->nextrec <= 0)
-		{
-			// still starts before beginning; start from beginning
-			req->nextrec = 1;
-		}
-	}
-
 	if (req->numrecs < 0)
 	{
 		return GDP_STAT_NAK_BADOPT;
 	}
 
 	// get our starting point, which may be relative to the end
-	if (req->nextrec <= 0)
-	{
-		req->nextrec += req->gcl->nrecs + 1;
-		if (req->nextrec <= 0)
-		{
-			// still starts before beginning; start from beginning
-			req->nextrec = 1;
-		}
-	}
+	estat = get_starting_point(req);
+	EP_STAT_CHECK(estat, goto fail0);
 
 	ep_dbg_cprintf(Dbg, 24, "cmd_multiread: starting from %" PRIgdp_recno
 			", %d records\n",
@@ -977,6 +947,7 @@ cmd_multiread(gdp_req_t *req)
 		estat = GDP_STAT_NAK_NOTFOUND;
 	}
 
+fail0:
 	return estat;
 }
 
@@ -1196,7 +1167,7 @@ static struct cmdfuncs	CmdFuncs[] =
 	{ GDP_CMD_OPEN_AO,		cmd_open				},
 	{ GDP_CMD_OPEN_RO,		cmd_open				},
 	{ GDP_CMD_CLOSE,		cmd_close				},
-	{ GDP_CMD_READ,			cmd_read_by_recno		},
+	{ GDP_CMD_READ,			cmd_read				},
 	{ GDP_CMD_APPEND,		cmd_append				},
 	{ GDP_CMD_SUBSCRIBE,	cmd_subscribe			},
 	{ GDP_CMD_MULTIREAD,	cmd_multiread			},
@@ -1204,7 +1175,6 @@ static struct cmdfuncs	CmdFuncs[] =
 	{ GDP_CMD_OPEN_RA,		cmd_open				},
 	{ GDP_CMD_NEWSEGMENT,	cmd_newsegment			},
 	{ GDP_CMD_FWD_APPEND,	cmd_fwd_append			},
-	{ GDP_CMD_READ_BY_TS,	cmd_read_by_ts			},
 	{ 0,					NULL					}
 };
 

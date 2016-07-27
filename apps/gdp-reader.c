@@ -151,14 +151,14 @@ do_simpleread(gdp_gcl_t *gcl,
 		// timestamp
 		EP_TIME_SPEC ts;
 
-		estat = ep_time_parse(dtstr, &ts);
+		estat = ep_time_parse(dtstr, &ts, EP_TIME_USE_LOCALTIME);
 		if (!EP_STAT_ISOK(estat))
 		{
 			fprintf(stderr, "Cannot convert date/time string \"%s\"\n", dtstr);
 			goto done;
 		}
 
-		estat = gdp_gcl_read_by_ts(gcl, &ts, datum);
+		estat = gdp_gcl_read_ts(gcl, &ts, datum);
 	}
 
 	// start reading data, one record at a time
@@ -254,20 +254,37 @@ multiread_cb(gdp_event_t *gev)
 EP_STAT
 do_multiread(gdp_gcl_t *gcl,
 		gdp_recno_t firstrec,
+		const char *dtstr,
 		int32_t numrecs,
 		bool subscribe,
 		bool use_callbacks)
 {
 	EP_STAT estat;
 	void (*cbfunc)(gdp_event_t *) = NULL;
+	EP_TIME_SPEC ts;
 
 	if (use_callbacks)
 		cbfunc = multiread_cb;
 
+	// are we reading by record number or by timestamp?
+	if (dtstr != NULL)
+	{
+		// timestamp
+		estat = ep_time_parse(dtstr, &ts, EP_TIME_USE_LOCALTIME);
+		if (!EP_STAT_ISOK(estat))
+		{
+			fprintf(stderr, "Cannot convert date/time string \"%s\"\n", dtstr);
+			return estat;
+		}
+	}
+
 	if (subscribe)
 	{
 		// start up a subscription
-		estat = gdp_gcl_subscribe(gcl, firstrec, numrecs, NULL, cbfunc, NULL);
+		if (dtstr == NULL)
+			estat = gdp_gcl_subscribe(gcl, firstrec, numrecs, NULL, cbfunc, NULL);
+		else
+			estat = gdp_gcl_subscribe_ts(gcl, &ts, numrecs, NULL, cbfunc, NULL);
 	}
 	else
 	{
@@ -276,7 +293,10 @@ do_multiread(gdp_gcl_t *gcl,
 			firstrec = 1;
 
 		// start up a multiread
-		estat = gdp_gcl_multiread(gcl, firstrec, numrecs, cbfunc, NULL);
+		if (dtstr == NULL)
+			estat = gdp_gcl_multiread(gcl, firstrec, numrecs, cbfunc, NULL);
+		else
+			estat = gdp_gcl_multiread_ts(gcl, &ts, numrecs, cbfunc, NULL);
 	}
 
 	// check to make sure the subscribe/multiread succeeded; if not, bail
@@ -545,7 +565,8 @@ main(int argc, char **argv)
 
 	// arrange to do the reading via one of the helper routines
 	if (subscribe || multiread || use_callbacks)
-		estat = do_multiread(gcl, firstrec, numrecs, subscribe, use_callbacks);
+		estat = do_multiread(gcl, firstrec, dtstr, numrecs,
+						subscribe, use_callbacks);
 	else
 		estat = do_simpleread(gcl, firstrec, dtstr, numrecs);
 

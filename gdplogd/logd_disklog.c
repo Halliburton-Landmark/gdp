@@ -1559,11 +1559,11 @@ fail0:
 
 
 /*
-**  DISK_READ_BY_TS --- read record indexed by timestamp
+**  DISK_TS_TO_RECNO --- map a timestamp to a record number
 */
 
 static EP_STAT
-disk_read_by_ts(gdp_gcl_t *gcl,
+disk_ts_to_recno(gdp_gcl_t *gcl,
 		gdp_datum_t *datum)
 {
 	EP_STAT estat = EP_STAT_OK;
@@ -1574,7 +1574,7 @@ disk_read_by_ts(gdp_gcl_t *gcl,
 
 	if (ep_dbg_test(Dbg, 14))
 	{
-		ep_dbg_printf("disk_read_by_ts ");
+		ep_dbg_printf("disk_ts_to_recno ");
 		_gdp_datum_dump(datum, ep_dbg_getfile());
 	}
 
@@ -1586,7 +1586,7 @@ disk_read_by_ts(gdp_gcl_t *gcl,
 	{
 		// no timestamp index available
 		estat = GDP_STAT_NAK_METHNOTALLOWED;
-		ep_dbg_cprintf(Dbg, 11, "disk_read_by_ts: no index available\n");
+		ep_dbg_cprintf(Dbg, 11, "disk_ts_to_recno: no index available\n");
 		goto fail0;
 	}
 
@@ -1604,22 +1604,24 @@ disk_read_by_ts(gdp_gcl_t *gcl,
 		// use the regular recno lookup now
 		if (tval_dbt.size != sizeof (tidx_value_t))
 		{
-			// I have no idea what this value means
 			estat = GDP_STAT_CORRUPT_INDEX;
 			goto fail0;
 		}
 		tidx_value_t *tval = tval_dbt.data;
 		datum->recno = tval->recno;
-		estat = disk_read_by_recno(gcl, datum);
 	}
 
 fail0:
 	ep_thr_rwlock_unlock(&phys->lock);
 
+	char dbuf[80];
 	char ebuf[80];
 	ep_dbg_cprintf(Dbg, EP_STAT_ISOK(estat) ? 52 : 7,
-			"disk_read_by_ts: recno = %" PRIgdp_recno " stat =\n\t%s\n",
-			datum->recno, ep_stat_tostr(estat, ebuf, sizeof ebuf));
+			"disk_ts_to_recno: ts = %s, recno = %" PRIgdp_recno
+			",\n    stat =\n\t%s\n",
+			ep_time_format(&datum->ts, dbuf, sizeof dbuf, EP_TIME_FMT_HUMAN),
+			datum->recno,
+			ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	return estat;
 }
 
@@ -1980,7 +1982,7 @@ struct gcl_phys_impl	GdpDiskImpl =
 {
 	.init =				disk_init,
 	.read_by_recno =	disk_read_by_recno,
-	.read_by_ts =		disk_read_by_ts,
+	.ts_to_recno =		disk_ts_to_recno,
 	.create =			disk_create,
 	.open =				disk_open,
 	.close =			disk_close,

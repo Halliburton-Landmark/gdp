@@ -286,7 +286,6 @@ EP_STAT			_gdp_gcl_close(				// close a GCL (handle)
 EP_STAT			_gdp_gcl_read(				// read GCL record based on datum
 						gdp_gcl_t *gcl,
 						gdp_datum_t *datum,
-						int cmd,				// the underlying read command
 						gdp_chan_t *chan,
 						uint32_t reqflags);
 
@@ -313,15 +312,11 @@ EP_STAT			_gdp_gcl_append_async(		// append asynchronously
 						uint32_t reqflags);
 
 EP_STAT			_gdp_gcl_subscribe(			// subscribe to data
-						gdp_gcl_t *gcl,
-						int cmd,
-						gdp_recno_t start,
+						gdp_req_t *req,
 						int32_t numrecs,
 						EP_TIME_SPEC *timeout,
 						gdp_event_cbfunc_t cbfunc,
-						void *cbarg,
-						gdp_chan_t *chan,
-						uint32_t reqflags);
+						void *cbarg);
 
 EP_STAT			_gdp_gcl_unsubscribe(		// unsubscribe
 						gdp_gcl_t *gcl,			// the GCL with the subscription

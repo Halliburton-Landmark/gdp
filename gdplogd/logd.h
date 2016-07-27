@@ -173,7 +173,7 @@ struct gcl_phys_impl
 	void		(*getstats)(
 						gdp_gcl_t *gcl,
 						struct gcl_phys_stats *stats);
-	EP_STAT		(*read_by_ts)(
+	EP_STAT		(*ts_to_recno)(
 						gdp_gcl_t *gcl,
 						gdp_datum_t *datum);
 };

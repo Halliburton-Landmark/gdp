@@ -280,16 +280,17 @@
     <br>
     <hr size="2" width="100%">
     <h4> Name</h4>
-    gdp_gcl_read &mdash; Read from a readable GCL
+    gdp_gcl_read, gdp_gcl_read_ts &mdash; Read from a readable GCL
     <h4> Synopsis</h4>
     <pre>EP_STAT gdp_gcl_read(gdp_gcl_t *gcl,
 		gdp_recno_t recno,
-		gdp_datum_t *datum)
-</pre>
+		gdp_datum_t *datum)<br>EP_STAT gdp_gcl_read_ts(gdp_gcl_t *gcl,
+		EP_TIME_SPEC *ts,
+		gdp_datum_t *datum)<br> </pre>
     <h4> Notes</h4>
     <ul>
-      <li> Reads the specified record number and returns it in the user-supplied
-        datum (see below).</li>
+      <li> <code>gdp_gcl_read</code> reads the specified record number and returns it in the user-supplied
+        datum (see below).</li><li><code>gdp_gcl_read_ts</code> reads the record dated on or immediately after the indicated timestamp.</li>
       <li>Presents a message-oriented interface.</li>
       <li> An OK stat includes the number of octets actually read. Probably
         passed back in datum, so unneeded here.</li>
@@ -380,8 +381,8 @@
     gdp_gcl_subscribe &mdash; Subscribe to a readable GCL
     <h4> Synopsis</h4>
     <pre>EP_STAT gdp_gcl_subscribe(<br>		gdp_gcl_t *gcl,
-		gdp_recno_t start,<br>		int32_t numrecs,<br>		EP_TIME_SPEC *timeout;<br>		gdp_event_cbfunc_t *cbfunc,<br>		void *udata)
-</pre>
+		gdp_recno_t start,<br>		int32_t numrecs,<br>		EP_TIME_SPEC *timeout;<br>		gdp_event_cbfunc_t *cbfunc,<br>		void *udata)<br>EP_STAT gdp_gcl_subscribe_ts(<br>		gdp_gcl_t *gcl,
+		EP_TIME_SPEC *start,<br>		int32_t numrecs,<br>		EP_TIME_SPEC *timeout;<br>		gdp_event_cbfunc_t *cbfunc,<br>		void *udata) </pre>
     <h4> Notes</h4>
     <ul>
       <li>If a <code>cbfunc</code> is specified, arranges to call callback when
@@ -398,15 +399,15 @@
         subscription is terminated.&nbsp; If <code>numrecs</code> is 0 it waits
         for data forever. </li>
       <li> The <code>start</code> parameter tells when to start the
-        subscription (that is, the starting record number).</li>
-      <li>If <code>start</code> is negative, returns the most recent &ndash;<code>start</code>
+        subscription (that is, the starting record number for <code>gdp_gcl_subscribe</code> or the earliest time of interest for <code>gdp_gcl_subscribe_ts</code>).</li>
+      <li>In <code>gdp_gcl_subscribe</code>, if <code>start</code> is negative, returns the most recent &ndash;<code>start</code>
         records.&nbsp; If a negative <code>start</code> indicates going back
         more records than are available, it starts from the first record. </li>
       <li>If <code>start</code> specifies an existing record but there are
         fewer than <code>numrecs</code> records available, this returns the
         available records and then waits for the additional data to appear as it
         is published.</li>
-      <li>If <code>start</code> is zero, no current records are returned (i.e.,
+      <li>In <code>gdp_gcl_subscribe</code>, if <code>start</code> is zero, or in <code>gdp_gcl_subscribe_ts</code>, it points past the last record already in the log, no current records are returned (i.e.,
         it returns new records as they are published).</li>
       <li><em>Callbacks make binding to languages like Java particularly
           difficult, but fit more naturally in with languages such as
@@ -481,9 +482,8 @@
     gdp_gcl_multiread&mdash; Read multiple records from a readable GCL
     <h4> Synopsis</h4>
     <pre>EP_STAT gdp_gcl_multiread(<br>		gdp_gcl_t *gcl,
-		gdp_recno_t start,<br>		int32_t numrecs,<br>		gdp_event_cbfunc_t cbfunc,<br>		void *udata)
-
-void (*cbfunc)(gdp_event_t *gev)
+		gdp_recno_t start,<br>		int32_t numrecs,<br>		gdp_event_cbfunc_t cbfunc,<br>		void *udata)<br>EP_STAT gdp_gcl_multiread_ts(<br>		gdp_gcl_t *gcl,
+		EP_TIME_SPEC *start,<br>		int32_t numrecs,<br>		gdp_event_cbfunc_t cbfunc,<br>		void *udata) void (*cbfunc)(gdp_event_t *gev)
 </pre>
     <h4> Notes</h4>
     <ul>
@@ -1142,6 +1142,7 @@ class="filename">/etc/swarm/gdp/keys</span>".</p>
         </tr>
       </tbody>
     </table>
+
 
 
 </body></html>

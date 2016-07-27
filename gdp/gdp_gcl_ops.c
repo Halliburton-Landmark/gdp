@@ -637,7 +637,6 @@ fail0:
 EP_STAT
 _gdp_gcl_read(gdp_gcl_t *gcl,
 			gdp_datum_t *datum,
-			int cmd,
 			gdp_chan_t *chan,
 			uint32_t reqflags)
 {
@@ -650,7 +649,7 @@ _gdp_gcl_read(gdp_gcl_t *gcl,
 	EP_ASSERT_POINTER_VALID(datum);
 	if (!EP_UT_BITSET(GDP_MODE_RO, gcl->iomode))
 		goto fail0;
-	estat = _gdp_req_new(cmd, gcl, chan, NULL, reqflags, &req);
+	estat = _gdp_req_new(GDP_CMD_READ, gcl, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	gdp_datum_free(req->pdu->datum);

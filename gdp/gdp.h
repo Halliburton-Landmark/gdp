@@ -224,7 +224,7 @@ extern EP_STAT	gdp_gcl_read(
 					gdp_datum_t *datum);	// pointer to result message
 
 // read from a readable GCL based on timestamp
-extern EP_STAT	gdp_gcl_read_by_ts(
+extern EP_STAT	gdp_gcl_read_ts(
 					gdp_gcl_t *gcl,			// readable GCL handle
 					EP_TIME_SPEC *ts,		// minimum timestamp
 					gdp_datum_t *datum);	// pointer to result message
@@ -242,10 +242,28 @@ extern EP_STAT	gdp_gcl_subscribe(
 											// callback function for next datum
 					void *cbarg);			// argument passed to callback
 
+extern EP_STAT	gdp_gcl_subscribe_ts(
+					gdp_gcl_t *gcl,			// readable GCL handle
+					EP_TIME_SPEC *start,	// first record to retrieve
+					int32_t numrecs,		// number of records to retrieve
+					EP_TIME_SPEC *timeout,	// timeout
+					gdp_event_cbfunc_t cbfunc,
+											// callback function for next datum
+					void *cbarg);			// argument passed to callback
+
 // read multiple records (no subscriptions)
 extern EP_STAT	gdp_gcl_multiread(
 					gdp_gcl_t *gcl,			// readable GCL handle
 					gdp_recno_t start,		// first record to retrieve
+					int32_t numrecs,		// number of records to retrieve
+					gdp_event_cbfunc_t cbfunc,
+											// callback function for next datum
+					void *cbarg);			// argument passed to callback
+
+// read multiple records starting from timestamp (no subscriptions)
+extern EP_STAT	gdp_gcl_multiread_ts(
+					gdp_gcl_t *gcl,			// readable GCL handle
+					EP_TIME_SPEC *start,	// first record to retrieve
 					int32_t numrecs,		// number of records to retrieve
 					gdp_event_cbfunc_t cbfunc,
 											// callback function for next datum

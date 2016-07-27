@@ -502,7 +502,7 @@ a_append(scgi_request *req, gdp_name_t gcliname, gdp_datum_t *datum)
 		char *jbuf;
 
 		json_object_set_nocheck(j, "recno", json_integer(datum->recno));
-		if (EP_TIME_ISVALID(&datum->ts))
+		if (EP_TIME_IS_VALID(&datum->ts))
 		{
 			char tbuf[100];
 
@@ -574,7 +574,7 @@ a_read_datum(scgi_request *req, gdp_name_t gcliname, gdp_recno_t recno)
 						"GDP-Record-Number: %" PRIgdp_recno "\r\n",
 						gclpname,
 						recno);
-			if (EP_TIME_ISVALID(&datum->ts))
+			if (EP_TIME_IS_VALID(&datum->ts))
 			{
 				fprintf(fp, "GDP-Commit-Timestamp: ");
 				ep_time_print(&datum->ts, fp, EP_TIME_FMT_DEFAULT);

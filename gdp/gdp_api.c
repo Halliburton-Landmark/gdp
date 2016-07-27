@@ -456,12 +456,12 @@ gdp_gcl_read(gdp_gcl_t *gcl,
 	datum->recno = recno;
 	EP_TIME_INVALIDATE(&datum->ts);
 
-	return _gdp_gcl_read(gcl, datum, GDP_CMD_READ_BY_RECNO, _GdpChannel, 0);
+	return _gdp_gcl_read(gcl, datum, _GdpChannel, 0);
 }
 
 
 /*
-**	GDP_GCL_READ_BY_TS --- read a message from a GCL based on timestamp
+**	GDP_GCL_READ_TS --- read a message from a GCL based on timestamp
 **
 **	The data is returned through the passed-in datum.
 **
@@ -474,7 +474,7 @@ gdp_gcl_read(gdp_gcl_t *gcl,
 */
 
 EP_STAT
-gdp_gcl_read_by_ts(gdp_gcl_t *gcl,
+gdp_gcl_read_ts(gdp_gcl_t *gcl,
 			EP_TIME_SPEC *ts,
 			gdp_datum_t *datum)
 {
@@ -482,12 +482,12 @@ gdp_gcl_read_by_ts(gdp_gcl_t *gcl,
 	memcpy(&datum->ts, ts, sizeof datum->ts);
 	datum->recno = GDP_PDU_NO_RECNO;
 
-	return _gdp_gcl_read(gcl, datum, GDP_CMD_READ_BY_TS, _GdpChannel, 0);
+	return _gdp_gcl_read(gcl, datum, _GdpChannel, 0);
 }
 
 
 /*
-**	GDP_GCL_SUBSCRIBE --- subscribe to a GCL
+**	GDP_GCL_SUBSCRIBE --- subscribe to a GCL starting from a record number
 */
 
 EP_STAT
@@ -498,13 +498,60 @@ gdp_gcl_subscribe(gdp_gcl_t *gcl,
 		gdp_event_cbfunc_t cbfunc,
 		void *cbarg)
 {
-	return _gdp_gcl_subscribe(gcl, GDP_CMD_SUBSCRIBE, start, numrecs,
-					timeout, cbfunc, cbarg, _GdpChannel, 0);
+	EP_STAT estat;
+	gdp_req_t *req;
+
+	// create the subscribe request
+	estat = _gdp_req_new(GDP_CMD_SUBSCRIBE, gcl, _GdpChannel, NULL,
+			GDP_REQ_PERSIST | GDP_REQ_CLT_SUBSCR | GDP_REQ_ALLOC_RID,
+			&req);
+	EP_STAT_CHECK(estat, goto fail0);
+
+	// add start and stop parameters to PDU
+	req->pdu->datum->recno = start;
+	req->numrecs = numrecs;
+
+	// now do the hard work
+	estat = _gdp_gcl_subscribe(req, numrecs, timeout, cbfunc, cbarg);
+fail0:
+	return estat;
 }
 
 
 /*
-**	GDP_GCL_MULTIREAD --- read multiple records from a GCL
+**	GDP_GCL_SUBSCRIBE_TS --- subscribe to a GCL starting from a timestamp
+*/
+
+EP_STAT
+gdp_gcl_subscribe_ts(gdp_gcl_t *gcl,
+		EP_TIME_SPEC *start,
+		int32_t numrecs,
+		EP_TIME_SPEC *timeout,
+		gdp_event_cbfunc_t cbfunc,
+		void *cbarg)
+{
+	EP_STAT estat;
+	gdp_req_t *req;
+
+	// create the subscribe request
+	estat = _gdp_req_new(GDP_CMD_SUBSCRIBE, gcl, _GdpChannel, NULL,
+			GDP_REQ_PERSIST | GDP_REQ_CLT_SUBSCR | GDP_REQ_ALLOC_RID,
+			&req);
+	EP_STAT_CHECK(estat, goto fail0);
+
+	// add start and stop parameters to PDU
+	memcpy(&req->pdu->datum->ts, start, sizeof req->pdu->datum->ts);
+	req->numrecs = numrecs;
+
+	// now do the hard work
+	estat = _gdp_gcl_subscribe(req, numrecs, timeout, cbfunc, cbarg);
+fail0:
+	return estat;
+}
+
+
+/*
+**	GDP_GCL_MULTIREAD --- read multiple records from a GCL using recno start
 **
 **		Like gdp_gcl_subscribe, the data is returned through the event
 **		interface or callbacks.
@@ -517,8 +564,57 @@ gdp_gcl_multiread(gdp_gcl_t *gcl,
 		gdp_event_cbfunc_t cbfunc,
 		void *cbarg)
 {
-	return _gdp_gcl_subscribe(gcl, GDP_CMD_MULTIREAD, start, numrecs,
-					NULL, cbfunc, cbarg, _GdpChannel, 0);
+	EP_STAT estat;
+	gdp_req_t *req;
+
+	// create the multiread request
+	estat = _gdp_req_new(GDP_CMD_MULTIREAD, gcl, _GdpChannel, NULL,
+			GDP_REQ_PERSIST | GDP_REQ_CLT_SUBSCR | GDP_REQ_ALLOC_RID,
+			&req);
+	EP_STAT_CHECK(estat, goto fail0);
+
+	// add start and stop parameters to PDU
+	req->pdu->datum->recno = start;
+	req->numrecs = numrecs;
+
+	// now do the hard work
+	estat = _gdp_gcl_subscribe(req, numrecs, NULL, cbfunc, cbarg);
+fail0:
+	return estat;
+}
+
+
+/*
+**	GDP_GCL_MULTIREAD_TS --- read multiple records from a GCL using timestamp
+**
+**		Like gdp_gcl_subscribe, the data is returned through the event
+**		interface or callbacks.
+*/
+
+EP_STAT
+gdp_gcl_multiread_ts(gdp_gcl_t *gcl,
+		EP_TIME_SPEC *start,
+		int32_t numrecs,
+		gdp_event_cbfunc_t cbfunc,
+		void *cbarg)
+{
+	EP_STAT estat;
+	gdp_req_t *req;
+
+	// create the multiread request
+	estat = _gdp_req_new(GDP_CMD_MULTIREAD, gcl, _GdpChannel, NULL,
+			GDP_REQ_PERSIST | GDP_REQ_CLT_SUBSCR | GDP_REQ_ALLOC_RID,
+			&req);
+	EP_STAT_CHECK(estat, goto fail0);
+
+	// add start and stop parameters to PDU
+	memcpy(&req->pdu->datum->ts, start, sizeof req->pdu->datum->ts);
+	req->numrecs = numrecs;
+
+	// now do the hard work
+	estat = _gdp_gcl_subscribe(req, numrecs, NULL, cbfunc, cbarg);
+fail0:
+	return estat;
 }
 
 

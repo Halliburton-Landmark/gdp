@@ -191,39 +191,26 @@ subscr_poker_thread(void *chan_)
 /*
 **	_GDP_GCL_SUBSCRIBE --- subscribe to a GCL
 **
-**		This also implements multiread based on the cmd parameter.
+**		This also implements multiread.
 */
 
 EP_STAT
-_gdp_gcl_subscribe(gdp_gcl_t *gcl,
-		int cmd,
-		gdp_recno_t start,
+_gdp_gcl_subscribe(gdp_req_t *req,
 		int32_t numrecs,
 		EP_TIME_SPEC *timeout,
 		gdp_event_cbfunc_t cbfunc,
-		void *cbarg,
-		gdp_chan_t *chan,
-		uint32_t reqflags)
+		void *cbarg)
 {
 	EP_STAT estat = EP_STAT_OK;
-	gdp_req_t *req;
 
 	errno = 0;				// avoid spurious messages
 
-	EP_ASSERT_POINTER_VALID(gcl);
-
-	// certain flags are required
-	reqflags |= GDP_REQ_PERSIST | GDP_REQ_CLT_SUBSCR | GDP_REQ_ALLOC_RID;
-	estat = _gdp_req_new(cmd, gcl, chan, NULL, reqflags, &req);
-	EP_STAT_CHECK(estat, goto fail0);
+	EP_ASSERT_POINTER_VALID(req);
 
 	// arrange for responses to appear as events or callbacks
 	_gdp_event_setcb(req, cbfunc, cbarg);
 
-	// add start and stop parameters to PDU
-	req->pdu->datum->recno = start;
-	req->numrecs = numrecs;
-	gdp_buf_put_uint32(req->pdu->datum->dbuf, numrecs);
+	gdp_buf_put_uint32(req->pdu->datum->dbuf, req->numrecs);
 
 	// issue the subscription --- no data returned
 	estat = _gdp_invoke(req);
@@ -245,13 +232,13 @@ _gdp_gcl_subscribe(gdp_gcl_t *gcl,
 		// the req is still on the channel list
 
 		// start a subscription poker thread if needed
-		if (cmd == GDP_CMD_SUBSCRIBE)
+		if (req->pdu->cmd == GDP_CMD_SUBSCRIBE)
 		{
 			long poke = ep_adm_getlongparam("swarm.gdp.subscr.pokeintvl", 60L);
-			if (poke > 0 && !EP_UT_BITSET(GDP_CHAN_HAS_SUB_THR, chan->flags))
+			if (poke > 0 && !EP_UT_BITSET(GDP_CHAN_HAS_SUB_THR, req->chan->flags))
 			{
-				int istat = ep_thr_spawn(&chan->sub_thr_id, 
-									subscr_poker_thread, chan);
+				int istat = ep_thr_spawn(&req->chan->sub_thr_id, 
+									subscr_poker_thread, req->chan);
 				if (istat != 0)
 				{
 					EP_STAT spawn_stat = ep_stat_from_errno(istat);
@@ -262,7 +249,6 @@ _gdp_gcl_subscribe(gdp_gcl_t *gcl,
 		}
 	}
 
-fail0:
 	return estat;
 }
 
