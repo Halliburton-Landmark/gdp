@@ -173,6 +173,9 @@ admin_post_statsv(
 	if (forbidchars == NULL)
 		forbidchars = ep_adm_getstrparam("gdplogd.admin.forbidchars", "=;");
 
+	// make sure this message is atomic
+	flockfile(fp);
+
 	// output an initial indicator to make this easy to find
 	fprintf(fp, "%s", AdminPrefix);
 
@@ -226,6 +229,8 @@ admin_post_statsv(
 				xlatemode);
 	}
 	putc('\n', fp);
+	fflush(fp);
+	funlockfile(fp);
 }
 
 
