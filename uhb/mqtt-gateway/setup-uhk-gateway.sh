@@ -12,13 +12,38 @@
 
 . `dirname $0`/setup-common.sh
 
-test `whoami` = "debian" || fatal "$0 must be run as debian"
-cd ~debian
-root=`pwd`
+node_setup=true
+if [ "x$1" = "x-n" ]
+then
+	node_setup=false
+	shift
+fi
+
+nodevers=6
 
 # heuristic to see if we are running on a beaglebone
 beaglebone=false
 test `uname -m` = "arm7l" && beaglebone=true
+
+instdir=$1
+if [ ! -z "$instdir" ]
+then
+	# don't need to do anything yet
+	:
+elif [ `whoami` = "debian" ]
+then
+	cd ~debian
+	instdir=`pwd`/gateway/software
+elif $beaglebone
+then
+	fatal "$0 must be run as debian on beaglebone"
+else
+	warn "You may need to adjust paths in startup scripts"
+	instdir=/usr/lib/uhk
+fi
+
+root=`pwd`
+info "Installing Urban Heartbeat Kit from $root into $instdir"
 
 if $beaglebone
 then
@@ -28,15 +53,21 @@ else
 	gitdepth=""
 fi
 
+if ! grep -q "^mosquitto:" /etc/passwd
+then
+	info "Creating user mosquitto"
+	adduser --system mosquitto
+fi
+
 echo ""
 info "Determining OS version"
 
 case $OS-$OSVER in
-	ubuntu-1[46]04*)
+	ubuntu-1404*)
 		pkgadd="libmosquitto0-dev mosquitto-clients"
 		;;
 
-	debian-*)
+	debian-*|ubuntu-1604*)
 		pkgadd="libmosquitto-dev mosquitto-clients"
 		;;
 
@@ -46,7 +77,7 @@ case $OS-$OSVER in
 		;;
 esac
 
-echo 	""
+echo ""
 info "Installing Debian packages"
 test ! -d /var/lib/bluetooth &&
 	mkdir /var/lib/bluetooth &&
@@ -65,6 +96,7 @@ sudo apt-get install -y \
 	locales \
 	make \
 	psmisc \
+	mosquitto \
 	$pkgadd
 
 info "Enabling bluetooth daemon"
@@ -84,33 +116,48 @@ then
 	fatal "$0 must be run from root of gateway git tree" 1>&2
 fi
 
-echo ""
-info "Set up node.js"
-info ">>> NOTE WELL: this may give several warnings about xpc-connection."
-info ">>> These should be ignored."
-curl -sL https://deb.nodesource.com/setup_5.x | sudo -E bash -
-sudo apt-get install -y nodejs
-
-# get the names of the packages that might run
-cd systemd
-pkgs=`ls -d *.service | sed 's/\.service//'`
-
-# initialize remaining dependencies for each service
-#	We also install the packages themselves even though they are
-#	run out of the source tree; doing npm install in each source
-#	directory causes duplicate dependencies, and our disks are
-#	just too small.
-cd $root/gateway/software
-for i in $pkgs
-do
+if $node_setup
+then
 	echo ""
-	info "Initializing for package $i"
-	npm install $i
-done
+	info "Set up node.js"
+	info ">>> NOTE WELL: this may give several warnings about xpc-connection."
+	info ">>> These should be ignored."
+	curl -sL https://deb.nodesource.com/setup_$nodevers.x | sudo -E bash -
+	sudo apt-get install -y nodejs
 
-echo ""
-info "Clearing NPM cache"
-npm cache clean
+	# get the names of the packages that might run
+	cd systemd
+	pkgs=`ls -d *.service | sed 's/\.service//'`
+
+	# initialize remaining dependencies for each service
+	#	We also install the packages themselves even though they are
+	#	run out of the source tree; doing npm install in each source
+	#	directory causes duplicate dependencies, and our disks are
+	#	just too small.
+	cd $root/gateway/software
+	umask 022
+	if [ `pwd` != "$instdir" ]
+	then
+		if [ ! -d "$instdir" ]
+		then
+			info "Creating $instdir"
+			sudo mkdir -p $instdir && sudo chown `whoami` $instdir
+		fi
+		cp -rp [a-z]* $instdir
+		cd $instdir
+		mkdir node_modules
+	fi
+	for i in $pkgs
+	do
+		echo ""
+		info "Initializing for package $i"
+		npm install $i --prefix $instdir
+	done
+
+	echo ""
+	info "Clearing NPM cache"
+	npm cache clean
+fi
 
 # install system startup scripts
 if [ "$INITSYS" != "systemd" ]
@@ -118,10 +165,17 @@ then
 	fatal "Cannot initialize system startup scripts: only systemd supported"
 fi
 
-cd $root/gateway/systemd
 echo ""
 info "Installing system startup scripts"
-sudo cp *.service /etc/systemd/system
+info "  ... mosquitto.service"
+sudo cp $root/mosquitto.service /etc/systemd/system
+cd $root/gateway/systemd
+for i in *.service
+do
+	info "  ... $i"
+	sed "s;/home/debian/gateway/software/;$instdir/;" $i |
+		sudo dd of=/etc/systemd/system/$i
+done
 
 echo ""
 info "Selectively enabling system startup scripts"
@@ -140,6 +194,7 @@ skip() {
 	fi
 }
 
+enable	mosquitto
 enable	adv-gateway-ip
 enable	ble-address-sniffer-mqtt
 enable	ble-gateway-mqtt
