@@ -129,7 +129,13 @@ send_data(struct evbuffer *obuf,
 		ep_hexdump(data, len, ep_dbg_getfile(), dbgmode, offset);
 	}
 
-	if (data == NULL || evbuffer_add(obuf, data, len) < 0)
+	if (data == NULL)
+	{
+		ep_dbg_cprintf(Dbg, 1, "_gdp_pdu_out: %s: no data\n", where);
+		return GDP_STAT_PDU_WRITE_FAIL;
+	}
+
+	if (evbuffer_add(obuf, data, len) < 0)
 	{
 		char nbuf[40];
 
