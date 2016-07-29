@@ -84,9 +84,11 @@ LIBEP=		-lep
 LIBEVENT2=	-levent -levent_pthreads -pthread
 LIBCRYPTO=	-lcrypto
 LIBAVAHI=	-lavahi-client -lavahi-common
+LIBADD=		`sh ../adm/add-libs.sh gdplogd`
 INCS=		${INCSEARCH} ${INCGDP} ${INCEP}
 LDFLAGS=	${LIBSEARCH} ${LIBGDP} ${LIBEP} \
-		${LIBEVENT2} ${LIBCRYPTO} ${LIBAVAHI}
+		${LIBEVENT2} ${LIBCRYPTO} ${LIBAVAHI} \
+		${LIBADD}
 CC=		cc
 PG=
 WALL=		-Wall

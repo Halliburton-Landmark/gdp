@@ -94,9 +94,11 @@ LIBJANSSON=	-ljansson
 LIBEVENT2=	-levent -levent_pthreads -pthread
 LIBCRYPTO=	-lcrypto
 LIBAVAHI=	-lavahi-client -lavahi-common
+LIBADD=		`sh ../adm/add-libs.sh`
 INCS=		${INCSEARCH} ${INCGDP} ${INCEP}
 LDFLAGS=	${LIBSEARCH} ${LIBGDP} ${LIBEP} \
-		${LIBJANSSON} ${LIBEVENT2} ${LIBCRYPTO} ${LIBAVAHI}
+		${LIBJANSSON} ${LIBEVENT2} ${LIBCRYPTO} ${LIBAVAHI} \
+		${LIBADD}
 PG=
 WALL=		-Wall
 G=		-g
