@@ -307,16 +307,11 @@ ep_time_parse(const char *dtstr, EP_TIME_SPEC *ts, uint32_t flags)
 	int nbytes = 0;
 	struct tm tmb;
 	struct tm *tm = &tmb;
-	EP_TIME_SPEC now1;
-	time_t now;
 	bool zulu = !EP_UT_BITSET(EP_TIME_USE_LOCALTIME, flags);
 
 	memset(ts, 0, sizeof *ts);
 	ts->tv_accuracy = 0.0;
 
-	estat = ep_time_now(&now1);
-	EP_STAT_CHECK(estat, return estat);
-	now = now1.tv_sec;
 	estat = EP_STAT_TIME_PARSE;		// assume failure
 
 	// start with ISO format dates (including timezone & nsecs)
@@ -384,6 +379,12 @@ ep_time_parse(const char *dtstr, EP_TIME_SPEC *ts, uint32_t flags)
 	if (!EP_STAT_ISOK(estat))
 	{
 		const char **f = fmts;
+		EP_TIME_SPEC now1;
+		time_t now;
+
+		estat = ep_time_now(&now1);
+		EP_STAT_CHECK(estat, goto fail0);
+		now = now1.tv_sec;
 
 		while (*f != NULL)
 		{
@@ -398,6 +399,7 @@ ep_time_parse(const char *dtstr, EP_TIME_SPEC *ts, uint32_t flags)
 			}
 		}
 	}
+fail0:
 #endif // EP_OSCF_HAS_STRPTIME
 
 #if EP_OSCF_USE_GETDATE
