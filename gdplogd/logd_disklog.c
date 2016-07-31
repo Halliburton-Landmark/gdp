@@ -936,9 +936,10 @@ physinfo_dump(gcl_physinfo_t *phys, FILE *fp)
 	fprintf(fp, "\tnsegments %d, last_segment %d\n",
 			phys->nsegments, phys->last_segment);
 	fprintf(fp, "\tridx: fp %p, min_recno %" PRIgdp_recno
-			", max_offset %jd, header_size %zd\n",
+			", max_offset %jd (actual %jd), header_size %zd\n",
 			phys->ridx.fp, phys->ridx.min_recno,
 			(intmax_t) phys->ridx.max_offset,
+			(intmax_t) fsizeof(phys->ridx.fp),
 			phys->ridx.header_size);
 
 	for (segno = 0; segno < phys->nsegments; segno++)
@@ -1361,15 +1362,28 @@ fseek_to_index_recno(
 			phys->ridx.header_size, (intmax_t) xoff);
 	if (xoff < phys->ridx.header_size || xoff > phys->ridx.max_offset)
 	{
+		off_t actual_size = fsizeof(phys->ridx.fp);
+
 		// computed offset is out of range
 		ep_log(GDP_STAT_CORRUPT_INDEX,
-				"fseek_to_index_recno(%s): computed offset %jd"
-				" out of range (%jd - %jd)",
+				"fseek_to_index_recno(%s): recno %" PRIgdp_recno
+				" computed offset %jd out of range (%jd - %jd)"
+				" actual max %jd",
 				gclpname,
+				recno,
 				(intmax_t) xoff,
 				(intmax_t) phys->ridx.header_size,
-				(intmax_t) phys->ridx.max_offset);
-		return GDP_STAT_CORRUPT_INDEX;
+				(intmax_t) phys->ridx.max_offset,
+				(intmax_t) actual_size);
+
+#if _GDPLOGD_FORGIVING
+		// XXX could adjust max_offset to fsizeof value here, but
+		// XXX we might miss problems hidden in unread logs.
+		if (actual_size > phys->ridx.max_offset)
+			phys->ridx.max_offset = actual_size;
+		if (xoff < phys->ridx.header_size || xoff > actual_size)
+#endif
+			return GDP_STAT_CORRUPT_INDEX;
 	}
 
 	if (fseek(phys->ridx.fp, xoff, SEEK_SET) < 0)
