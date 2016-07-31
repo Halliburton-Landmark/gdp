@@ -15,9 +15,9 @@ if [ "$module" = "gdplogd" ]
 then
 	candidates=`ls \
 		/lib/libdb.* \
-		/usr/lib/libdb.* \
+		/usr/lib*/libdb.* \
 		/usr/lib/*/libdb.* \
-		/usr/local/lib/libdb.* \
+		/usr/local/lib*/libdb.* \
 		2>/dev/null`
 	if [ ! -z "$candidates" ]
 	then

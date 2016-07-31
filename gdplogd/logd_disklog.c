@@ -115,7 +115,7 @@ posix_error(int _errno, const char *fmt, ...)
 **  Berkeley DB compatibility routines
 */
 
-#define DB_VERSION_THRESHOLD	5	// XXX not clear the number is right
+#define DB_VERSION_THRESHOLD	4	// XXX not clear the number is right
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
 
 static void
