@@ -32,4 +32,4 @@
 
 #include "gdp_version.h"
 
-const char	GdpVersion[] = "@(#)Gdplib " GDP_VER_STRING " " _VERSION_INFO_;
+const char	GdpVersion[] = "@(#)libgdp " GDP_VER_STRING " " _VERSION_INFO_;
