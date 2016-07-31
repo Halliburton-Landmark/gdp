@@ -137,6 +137,8 @@ try {
 //    sed  -e '/^\/\/C/d' liggdp_h.js
 
 
+var debug = false;
+
 ////////////////////////////////////
 // Load Node.js modules for calling foreign functions; C functions here.
 // The node modules below are installed locally in this file's directory
@@ -797,8 +799,6 @@ function read_gcl_records(gdpd_addr, gcl_name,
     // FIXME: Need a way to allocate a C string of a certain size.
     var ebuf = ref.allocCString('123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890');
 
-    var debug = false;
-
     if (debug) {
         console.log("gdpjs.js: read_gcl_records");
     }
@@ -935,6 +935,10 @@ exports.read_gcl_records = read_gcl_records;
 
 // ========================================================================
 
+function setDebug(debugValue) {
+    // We have a separate function to set debug so that Coverity Scan does not warn about unreachable code.
+    debug = debugValue;
+}
 
 //C  /*
 //C  **  DO_SIMPLEREAD --- read from a GCL using the one-record-at-a-time call
