@@ -182,7 +182,7 @@ LIBGDPSO=libgdp-${GDPLIBMAJVER}.${GDPLIBMINVER}.so
 		cp ${PTII}/lib/${LIBGDPSO} $@; \
 	fi
 
-LIBGDPJSSO=libgdpjs-${GDPJSLIBMAJVER}.${GDPJSLIBMINVER}.so
+LIBGDPJSSO=libgdpjs.${GDPJSLIBMAJVER}.${GDPJSLIBMINVER}.so
 ../libs/${LIBGDPJSSO}:
 	if [ ! -f ../ep/${LIBGDPSJSO} ]; then \
 		cp ${PTII}/lib/${LIBGDPJSSO} $@; \
