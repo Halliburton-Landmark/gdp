@@ -111,17 +111,25 @@ posix_error(int _errno, const char *fmt, ...)
 	return estat;
 }
 
-
 /*
 **  Berkeley DB compatibility routines
 */
 
 #define DB_VERSION_THRESHOLD	5	// XXX not clear the number is right
-#if DB_VERSION_MAJOR < DB_VERSION_THRESHOLD
+#if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
+
+static void
+bdb_error(const DB_ENV *dbenv, const char *errpfx, const char *msg)
+{
+	ep_dbg_cprintf(Dbg, 11, "bdb_error: %s\n", msg);
+}
+
+#else
 
 // flags for db->open (back compatilibity)
 # define DB_CREATE		0x00000001
 # define DB_EXCL		0x00000004
+
 #endif
 
 
@@ -133,15 +141,16 @@ ep_stat_from_dbstat(int dbstat)
 	if (dbstat == 0)
 		estat = EP_STAT_OK;
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
-	else if (dbstat == DB_NOTFOUND || dbstat == DB_KEYEMPTY)
-		estat = GDP_STAT_NAK_NOTFOUND;
-	else if (dbstat > 0)
-		estat = ep_stat_from_errno(dbstat);
 	else
 	{
 		ep_dbg_cprintf(Dbg, 40, "ep_stat_from_dbstat(%d): %s\n",
 				dbstat, db_strerror(dbstat));
-		estat = GDP_STAT_NAK_INTERNAL;
+		if (dbstat == DB_NOTFOUND || dbstat == DB_KEYEMPTY)
+			estat = GDP_STAT_NAK_NOTFOUND;
+		else if (dbstat > 0)
+			estat = ep_stat_from_errno(dbstat);
+		else
+			estat = GDP_STAT_NAK_INTERNAL;
 	}
 #else
 	else if (dbstat > 0)
@@ -183,6 +192,7 @@ fail0:
 					db_strerror(dbstat));
 		}
 	}
+	db->set_errcall(db, bdb_error);
 #else
 	int fileflags = O_RDWR;
 
@@ -1592,10 +1602,12 @@ disk_ts_to_recno(gdp_gcl_t *gcl,
 
 	// keys need to be in network byte order so they sort properly
 	memset(&tkey, 0, sizeof tkey);
+	memset(&tkey_dbt, 0, sizeof tkey_dbt);
 	tkey.sec = ep_net_hton64(datum->ts.tv_sec);
 	tkey.nsec = ep_net_hton32(datum->ts.tv_nsec);
 	tkey_dbt.data = &tkey;
 	tkey_dbt.size = sizeof tkey;
+	memset(&tval_dbt, 0, sizeof tval_dbt);
 
 	estat = bdb_get_first_after_key(phys->tidx.db, &tkey_dbt, &tval_dbt);
 
@@ -1750,12 +1762,14 @@ disk_append(gdp_gcl_t *gcl,
 
 		// must be in network byte order so keys sort properly
 		memset(&tkey, 0, sizeof tkey);
+		memset(&tkey_dbt, 0, sizeof tkey_dbt);
 		tkey.sec = ep_net_hton64(datum->ts.tv_sec);
 		tkey.nsec = ep_net_hton32(datum->ts.tv_nsec);
 		tkey_dbt.data = &tkey;
 		tkey_dbt.size = sizeof tkey;
 
 		memset(&tvalue, 0, sizeof tvalue);
+		memset(&tval_dbt, 0, sizeof tval_dbt);
 		tvalue.recno = datum->recno;
 		tval_dbt.data = &tvalue;
 		tval_dbt.size = sizeof tvalue;
