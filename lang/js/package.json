@@ -1,6 +1,6 @@
 {
     "name": "@terraswarm/gdp",
-    "version": "0.5.0",
+    "version": "0.5.1",
     "author": {
         "email": "cxh@eecs.berkeley.edu",
         "name": "Christopher Brooks"
@@ -50,7 +50,7 @@
         }
     ],
     "main": "index.js",
-    "os" : [ "darwin" ],
+    "os" : [ "darwin", "linux" ],
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1"
     }
