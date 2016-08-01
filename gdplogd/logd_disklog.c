@@ -1379,11 +1379,16 @@ fseek_to_index_recno(
 #if _GDPLOGD_FORGIVING
 		// XXX could adjust max_offset to fsizeof value here, but
 		// XXX we might miss problems hidden in unread logs.
-		if (actual_size > phys->ridx.max_offset)
-			phys->ridx.max_offset = actual_size;
-		if (xoff < phys->ridx.header_size || xoff > actual_size)
+		if (GdplogdForgive.ridx_short_max_offset)
+		{
+			if (xoff < phys->ridx.header_size || xoff > actual_size)
+				return GDP_STAT_CORRUPT_INDEX;
+			if (actual_size > phys->ridx.max_offset)
+				phys->ridx.max_offset = actual_size;
+		}
+#else
+		return GDP_STAT_CORRUPT_INDEX;
 #endif
-			return GDP_STAT_CORRUPT_INDEX;
 	}
 
 	if (fseek(phys->ridx.fp, xoff, SEEK_SET) < 0)

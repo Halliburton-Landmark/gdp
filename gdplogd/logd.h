@@ -181,4 +181,22 @@ struct gcl_phys_impl
 // known implementations
 extern struct gcl_phys_impl		GdpDiskImpl;
 
+
+/*
+**  "Forgive" decisions.  Which problems will we forgive and repair?
+**
+**		Probably lowers security, but raises resilience.
+*/
+
+#ifndef _GDPLOGD_FORGIVING
+# define _GDPLOGD_FORGIVING	1
+#endif
+
+#if _GDPLOGD_FORGIVING
+struct gdplogd_forgive
+{
+	bool		ridx_short_max_offset;
+}	GdplogdForgive;
+#endif //_GDPLOGD_FORGIVING
+
 #endif //_GDPLOG_LOGD_H_

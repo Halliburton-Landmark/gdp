@@ -47,6 +47,18 @@
 static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.main", "GDP Log Daemon");
 
 
+#if _GDPLOGD_FORGIVING
+
+// how much should we forgive?
+
+struct gdplogd_forgive	GdplogdForgive =
+{
+	.ridx_short_max_offset		= true,		// fix recno index offset inconstencies
+};
+
+#endif //_GDPLOGD_FORGIVING
+
+
 
 /*
 **	LOGD_SOCK_CLOSE_CB --- free resources when we lose a router connection
