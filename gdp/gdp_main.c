@@ -544,8 +544,8 @@ run_as(const char *runasuser)
 		}
 		else
 		{
-			gid = setgid(pw->pw_gid);
-			uid = setuid(pw->pw_uid);
+			gid = pw->pw_gid;
+			uid = pw->pw_uid;
 		}
 		if (setgid(gid) < 0 || setuid(uid) < 0)
 			ep_app_warn("Cannot set user/group id (%d:%d)", uid, gid);
