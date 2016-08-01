@@ -211,6 +211,14 @@ case $OS in
 		INITguess=upstart
 	fi
 	;;
+
+  "redhat")
+	if expr $OSVER \< 070000 > /dev/null
+	then
+		INITguess=systemd
+	else
+		INITguess=upstart
+	fi
 esac
 
 # determine what init system we are using (heuristic!)
