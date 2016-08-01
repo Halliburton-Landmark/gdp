@@ -167,7 +167,7 @@ gdp_pdu_proc_cmd(void *pdu_)
 
 	if (resp >= GDP_NAK_S_MIN && resp <= GDP_NAK_S_MAX)
 	{
-		ep_log(estat, "_gdp_req_dispatch(%s): server error",
+		ep_log(estat, "gdp_pdu_proc_cmd(%s): server error",
 				_gdp_proto_cmd_name(cmd));
 	}
 
@@ -224,56 +224,95 @@ fail0:
 
 /*
 **  GDP_PDU_PROC_RESP --- process response (ack/nak) PDU
+**
+**		When this is called, the rpdu passed in will be the actual
+**		PDU off the wire and req->pdu should be the original command
+**		PDU that prompted this response.  We save the passed rpdu
+**		into req->rpdu for processing in _gdp_req_dispatch.
 */
 
 static void
-gdp_pdu_proc_resp(void *pdu_)
+gdp_pdu_proc_resp(void *_rpdu)
 {
-	gdp_pdu_t *pdu = pdu_;
-	int cmd = pdu->cmd;
+	gdp_pdu_t *rpdu = _rpdu;
+	int cmd = rpdu->cmd;
 	EP_STAT estat;
 	gdp_gcl_t *gcl;
 	gdp_req_t *req = NULL;
 	int resp;
+	int ocmd;					// original command prompting this response
 
 	ep_dbg_cprintf(Dbg, 50,
 			"gdp_pdu_proc_resp(%s)\n",
 			_gdp_proto_cmd_name(cmd));
-	gcl = _gdp_gcl_cache_get(pdu->src, 0);
+	gcl = _gdp_gcl_cache_get(rpdu->src, 0);
 	if (gcl == NULL)
 	{
 		if (ep_dbg_test(Dbg, 1))
 		{
 			ep_dbg_printf("gdp_pdu_proc_resp: discarding PDU for unknown GCL\n");
-			_gdp_pdu_dump(pdu, ep_dbg_getfile());
+			_gdp_pdu_dump(rpdu, ep_dbg_getfile());
 		}
-		_gdp_pdu_free(pdu);
+		_gdp_pdu_free(rpdu);
 		return;
 	}
 
 	// find the corresponding request
-	req = _gdp_req_find(gcl, pdu->rid);
+	req = _gdp_req_find(gcl, rpdu->rid);
 	if (req == NULL)
 	{
 		// no req for incoming response --- "can't happen"
 		if (ep_dbg_test(Dbg, 1))
 		{
 			ep_dbg_printf("gdp_pdu_proc_resp: no req for incoming response\n");
-			_gdp_pdu_dump(pdu, ep_dbg_getfile());
+			_gdp_pdu_dump(rpdu, ep_dbg_getfile());
 			_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
 		}
-		_gdp_pdu_free(pdu);
+		_gdp_pdu_free(rpdu);
 		return;
 	}
+	else if (rpdu == req->pdu)
+	{
+		// this could be an assertion
+		if (ep_dbg_test(Dbg, 1))
+		{
+			ep_dbg_printf("gdp_pdu_proc_resp(%d): pdu == rpdu\n", rpdu->cmd);
+			_gdp_pdu_dump(rpdu, ep_dbg_getfile());
+		}
+		// _gdp_pdu_free(rpdu); return; XXX
+	}
+
+	if (req->pdu == NULL)
+	{
+		ep_dbg_cprintf(Dbg, 3,
+				"gdp_pdu_proc_resp(%d): no corresponding command PDU\n",
+				rpdu->cmd);
+		ocmd = rpdu->cmd;
+		// return here?  with req->pdu == NULL, _gdp_req_dispatch
+		// will probably die
+	}
+	else
+	{
+		ocmd = req->pdu->cmd;
+	}
+
+	// save the response PDU for further processing
+	if (req->rpdu != NULL)
+	{
+		if (ep_dbg_test(Dbg, 1))
+		{
+			ep_dbg_printf("gdp_pdu_proc_resp: req->rpdu already set\n");
+			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+		}
+		_gdp_pdu_free(req->rpdu);
+	}
+	req->rpdu = rpdu;
 
 	if (ep_dbg_test(Dbg, 43))
 	{
 		ep_dbg_printf("gdp_pdu_proc_resp: ");
 		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
-
-	// save the response PDU for further processing
-	req->rpdu = pdu;
 
 	// request is locked
 
@@ -282,7 +321,10 @@ gdp_pdu_proc_resp(void *pdu_)
 
 	ep_dbg_cprintf(Dbg, 40, "gdp_pdu_proc_resp >>> req=%p\n", req);
 
+	// do ack/nak specific processing
 	estat = _gdp_req_dispatch(req);
+
+	// our PDU should now be in req->pdu (no longer req->rpdu)
 
 	// figure out potential response code
 	// we compute even if unused so we can log server errors
@@ -290,8 +332,9 @@ gdp_pdu_proc_resp(void *pdu_)
 
 	if (resp >= GDP_NAK_S_MIN && resp <= GDP_NAK_S_MAX)
 	{
-		ep_log(estat, "_gdp_req_dispatch(%s): server error",
-				_gdp_proto_cmd_name(cmd));
+		ep_log(estat, "gdp_pdu_proc_response(%s for %s): server error",
+				_gdp_proto_cmd_name(cmd),
+				_gdp_proto_cmd_name(ocmd));
 	}
 
 	// ASSERT(all data from chan has been consumed);
@@ -331,7 +374,6 @@ gdp_pdu_proc_resp(void *pdu_)
 		!EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
 	{
 		_gdp_req_free(&req);
-		pdu = NULL;
 	}
 	else
 	{

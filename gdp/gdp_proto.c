@@ -205,6 +205,9 @@ _gdp_invoke(gdp_req_t *req)
 
 /*
 **  Common code for ACKs and NAKs
+**
+**		When called, the ack/nak PDU should be in req->rpdu.
+**		Upon return, that will be in req->pdu, but with the old datum.
 */
 
 static EP_STAT
@@ -220,7 +223,15 @@ acknak(gdp_req_t *req, const char *where, bool reuse_pdu)
 	ep_dbg_cprintf(Dbg, 20, "%s: received %d\n", where, req->pdu->cmd);
 
 	// we want to re-use caller's datum for (e.g.) read commands
-	if (req->rpdu != NULL && req->rpdu != req->pdu && reuse_pdu)
+	if (req->rpdu == NULL)
+	{
+		if (ep_dbg_test(Dbg, 1))
+		{
+			ep_dbg_printf("acknak: req->rpdu == NULL\n");
+			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+		}
+	}
+	else if (req->rpdu != req->pdu && reuse_pdu)
 	{
 		if (req->pdu->datum != NULL)
 		{
