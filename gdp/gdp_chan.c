@@ -231,19 +231,21 @@ _gdp_chan_open(const char *gdp_addr,
 #if GDP_OSCF_USE_ZEROCONF
 		if (ep_adm_getboolparam("swarm.gdp.zeroconf.enable", true))
 		{
-			// zeroconf
-			zcinfo_t **list;
-			char *info = NULL;
-
 			ep_dbg_cprintf(DemoMode, 1, "Trying Zeroconf:\n");
 
 			if (gdp_zc_scan())
 			{
-				list = gdp_zc_get_infolist();
+				ep_dbg_cprintf(Dbg, 20, "... after gdp_zc_scan\n");
+				zcinfo_t **list = gdp_zc_get_infolist();
+				ep_dbg_cprintf(Dbg, 20, "... after gdp_zc_get_infolist: %p\n",
+						list);
 				if (list != NULL)
 				{
-					info = gdp_zc_addr_str(list);
+					char *info = gdp_zc_addr_str(list);
+					ep_dbg_cprintf(Dbg, 20, "... after gdp_zc_addr_str: %p\n",
+							info);
 					gdp_zc_free_infolist(list);
+					ep_dbg_cprintf(Dbg, 20, "... after gdp_zc_free_infolist\n");
 					if (info != NULL)
 					{
 						if (info[0] != '\0')
@@ -257,6 +259,8 @@ _gdp_chan_open(const char *gdp_addr,
 					}
 				}
 			}
+			else
+				ep_dbg_cprintf(Dbg, 20, "gdp_zc_scan failed\n");
 		}
 #endif // GDP_OSCF_USE_ZEROCONF
 		strlcat(abuf,
