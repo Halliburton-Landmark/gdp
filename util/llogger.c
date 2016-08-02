@@ -35,6 +35,7 @@ reopen(const char *fname, FILE **fpp, ino_t *inop)
 				fname, strerror(errno));
 		exit(EX_CANTCREAT);
 	}
+	setlinebuf(fp);
 	*inop = -1;
 	if (fstat(fileno(fp), &st) == 0)
 		*inop = st.st_ino;
