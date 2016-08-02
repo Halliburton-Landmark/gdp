@@ -132,9 +132,12 @@ else
 	warn "$EP_PARAMS/gdplogd already exists; check consistency" 1>&2
 fi
 
-cd $GDP_SRC_ROOT
+info "Installing llogger"
+cd $GDP_SRC_ROOT/util
+make install
 
 info "Installing gdplogd wrapper script"
+cd $GDP_SRC_ROOT
 install -o ${GDP_USER} adm/gdplogd-wrapper.sh $GDP_ROOT/sbin
 
 if [ -d /etc/rsyslog.d ]

@@ -16,4 +16,4 @@
 {
 	echo `date +"%F %T %z"` Running $GDPLOGD_BIN $GDPLOGD_ARGS
 	exec $GDPLOGD_BIN $GDPLOGD_ARGS
-} >> $GDPLOGD_LOG 2>& 1
+} 2>& 1 | llogger $GDPLOGD_LOG
