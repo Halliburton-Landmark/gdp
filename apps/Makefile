@@ -56,7 +56,7 @@ MANALL=		${MAN1ALL} ${MAN3ALL} ${MAN5ALL} ${MAN7ALL} ${MAN8ALL}
 # files that should be removed on "make clean"
 CLEANALL=	${BINALL} ${SBINALL}
 # files that should be made public
-PUBALL=		${SCRIPTS} ${MANALL}
+PUBALL=		${SCRIPTS} ${BINALL} ${SBINALL} ${MANALL}
 # "make all" targets (may be overlaps)
 ALL=		${CLEANALL} ${PUBALL}
 
