@@ -32,23 +32,16 @@
 #include <ep/ep_dbg.h>
 #include <ep/ep_string.h>
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <getopt.h>
 #include <assert.h>
-#include <string.h>
-#include <strings.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <net/if.h>
-#include <locale.h>
 #include <ctype.h>
+#include <errno.h>
 #include <arpa/inet.h>
-
-#include <time.h>
+#include <net/if.h>
+#include <sys/types.h>
 
 #include "gdp_zc_client.h"
 
+static EP_DBG	Dbg = EP_DBG_INIT("gdp.zc.client", "GDP Zeroconf client");
 static EP_DBG	DemoMode = EP_DBG_INIT("_demo", "Demo Mode");
 
 typedef enum
@@ -400,10 +393,13 @@ service_browser_callback(AvahiServiceBrowser *b,
 	assert(b);
 	assert(c);
 
+	ep_dbg_cprintf(Dbg, 20, "service_browser_callback: event %d\n", event);
+
 	switch (event)
 	{
 		case AVAHI_BROWSER_NEW:
 		{
+			ep_dbg_cprintf(Dbg, 20, "service_browser_callback: AVAHI_BROWSER_NEW\n");
 			if (c->ignore_local && (flags & AVAHI_LOOKUP_RESULT_LOCAL))
 				break;
 
@@ -423,6 +419,7 @@ service_browser_callback(AvahiServiceBrowser *b,
 		{
 			service_info_t *info;
 
+			ep_dbg_cprintf(Dbg, 20, "service_browser_callback: AVAHI_BROWSER_REMOVE\n");
 			if (!(info = find_service(interface, protocol, name, type, domain)))
 				return;
 
@@ -435,6 +432,8 @@ service_browser_callback(AvahiServiceBrowser *b,
 		}
 
 		case AVAHI_BROWSER_FAILURE:
+			ep_dbg_cprintf(Dbg, 20, "service_browser_callback: AVAHI_BROWSER_REMOVE: %s\n",
+					avahi_strerror(avahi_client_errno(Client)));
 			fprintf(stderr,
 					"service_browser failed: %s\n",
 					avahi_strerror(avahi_client_errno(Client)));
@@ -442,11 +441,13 @@ service_browser_callback(AvahiServiceBrowser *b,
 			break;
 
 		case AVAHI_BROWSER_CACHE_EXHAUSTED:
+			ep_dbg_cprintf(Dbg, 20, "service_browser_callback: AVAHI_BROWSER_CACHE_EXHAUSTED\n");
 			NCacheExhausted --;
 			check_terminate(c);
 			break;
 
 		case AVAHI_BROWSER_ALL_FOR_NOW:
+			ep_dbg_cprintf(Dbg, 20, "service_browser_callback: AVAHI_BROWSER_ALL_FOR_NOW\n");
 			NAllForNow --;
 			check_terminate(c);
 			break;
@@ -465,10 +466,17 @@ browse_service_type(config_t *c,
 	assert(Client);
 	assert(stype);
 
+	ep_dbg_cprintf(Dbg, 34, "browse_service_type: stype \"%s\" domain \"%s\"\n",
+			stype, domain);
+
 	for (i = BrowsedTypes; i; i = i->next)
+	{
+		ep_dbg_cprintf(Dbg, 34, "  ... \"%s\"\n", i->text);
 		if (avahi_domain_equal(stype, (char*) i->text))
 			return;
+	}
 
+	ep_dbg_cprintf(Dbg, 34, "browse_service_type: avahi_service_browser_new\n");
 	if (!(b = avahi_service_browser_new(
 			Client,
 			AVAHI_IF_UNSPEC,
@@ -499,6 +507,8 @@ start(config_t *conf)
 
 	const char *version, *hn;
 
+	//XXX why is this here?  version is never used
+	ep_dbg_cprintf(Dbg, 34, "start: avahi_client_get_version_string\n");
 	if (!(version = avahi_client_get_version_string(Client)))
 	{
 		fprintf(stderr,
@@ -507,6 +517,8 @@ start(config_t *conf)
 		return -1;
 	}
 
+	//XXX why is this here?  hn is never used
+	ep_dbg_cprintf(Dbg, 34, "start: avahi_client_get_host_name_fqdn\n");
 	if (!(hn = avahi_client_get_host_name_fqdn(Client)))
 	{
 		fprintf(stderr,
@@ -518,6 +530,7 @@ start(config_t *conf)
 	browse_service_type(conf, conf->stype, conf->domain);
 
 	Browsing = 1;
+	ep_dbg_cprintf(Dbg, 34, "start: returning 0\n");
 	return 0;
 }
 
@@ -536,6 +549,7 @@ client_callback(AvahiClient *c,
 	*/
 	Client = c;
 
+	ep_dbg_cprintf(Dbg, 20, "client_callback: state %d\n", state);
 	switch (state)
 	{
 		case AVAHI_CLIENT_FAILURE:
@@ -617,11 +631,15 @@ create_new_simple_poll_client(config_t *conf)
 			&error);
 	if (Client == NULL)
 	{
+		ep_dbg_cprintf(Dbg, 1,
+				"create_new_simple_poll_client: avahi_simple_poll_get: %s\n",
+				avahi_strerror(error));
 		if (conf->verbose)
 			fprintf(stderr, "Failed to create client object: %s\n",
 					avahi_strerror(error));
 		avahi_simple_poll_quit(SimplePoll);
 	}
+	ep_dbg_cprintf(Dbg, 34, "create_new_simple_poll_client => %d\n", error);
 	return error;
 }
 
@@ -636,31 +654,47 @@ gdp_zc_scan()
 {
 	int error;
 	config_t conf;
+	int rval = 0;
 
 	init_config(&conf);
 
-	if (!(SimplePoll = avahi_simple_poll_new()))
+	// clean up from possible previous call
+	Browsing = false;
+	if (SimplePoll != NULL)
+		avahi_simple_poll_free(SimplePoll);
+	if (BrowsedTypes != NULL)
+		avahi_string_list_free(BrowsedTypes);
+	BrowsedTypes = NULL;
+	NAllForNow = NResolving = NCacheExhausted = 0;
+
+
+	if ((SimplePoll = avahi_simple_poll_new()) == NULL)
 	{
-		fprintf(stderr, "Failed to create simple poll object.\n");
+		ep_dbg_cprintf(Dbg, 1, "gdp_zc_scan: avahi_simple_poll_new failed: %s\n",
+				strerror(errno));
 		goto fail0;
 	}
 
-	error = create_new_simple_poll_client(&conf);
-	if (error != 0)
+	if ((error = create_new_simple_poll_client(&conf)) != 0)
+	{
+		ep_dbg_cprintf(Dbg, 1, "gdp_zc_scan: create_new_simple_poll_client failed: %s\n",
+				strerror(errno));
 		goto fail1;
-
+	}
 
 	InfoList = (zcinfo_t**) avahi_malloc(sizeof(zcinfo_t*));
 	*InfoList = NULL;
+	ep_dbg_cprintf(Dbg, 30, "gdp_zc_scan: starting avahi_simple_poll_loop\n");
 	avahi_simple_poll_loop(SimplePoll);
-	return 1;
+	rval = 1;
 
 fail1:
+	ep_dbg_cprintf(Dbg, 34, "gdp_zc_scan: avahi_simple_poll_free\n");
 	avahi_simple_poll_free(SimplePoll);
 	SimplePoll = NULL;
 fail0:
 	// stub
-	return 0;
+	return rval;
 }
 
 /**
