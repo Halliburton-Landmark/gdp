@@ -112,7 +112,7 @@ then
 		echo "#libep.thr.mutex.type=errorcheck"
 		echo "libep.dbg.file=stdout"
 	} > $EP_PARAMS/gdp
-	chown_gdp $EP_PARAMS/gdp
+	chown ${GDP_USER}:${GDP_GROUP} $EP_PARAMS/gdp
 	cat $EP_PARAMS/gdp
 else
 	warn "$EP_PARAMS/gdp already exists; check consistency" 1>&2
@@ -126,7 +126,7 @@ then
 		echo "swarm.gdplogd.gcl.dir=$GDPLOGD_DATADIR"
 		echo "swarm.gdplogd.runasuser=gdp"
 	} > $EP_PARAMS/gdplogd
-	chown_gdp $EP_PARAMS/gdplogd
+	chown ${GDP_USER}:${GDP_GROUP} $EP_PARAMS/gdplogd
 	cat $EP_PARAMS/gdplogd
 else
 	warn "$EP_PARAMS/gdplogd already exists; check consistency" 1>&2
