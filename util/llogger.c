@@ -98,7 +98,7 @@ main(int argc, char **argv)
 		gettimeofday(&tv, NULL);
 		tm = gmtime(&tv.tv_sec);
 		long usec = tv.tv_usec;
-		fprintf(out_fp, "%04d-%02d-%02d %02d:%02d:%02d.%06ld %s",
+		fprintf(out_fp, "%04d-%02d-%02d %02d:%02d:%02d.%06ldZ %s",
 				tm->tm_year + 1900,
 				tm->tm_mon + 1,
 				tm->tm_mday,
