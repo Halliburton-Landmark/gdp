@@ -22,7 +22,7 @@ MANDIR=		${INSTALLROOT}/share/man
 all:		${ALL}
 
 clean:
-	rm ${ALL}
+	-rm -f ${CLEANALL} *.o *.core
 
 INSTALL=	install
 

@@ -97,14 +97,15 @@ main(int argc, char **argv)
 
 		gettimeofday(&tv, NULL);
 		tm = gmtime(&tv.tv_sec);
-		fprintf(out_fp, "%04d-%02d-%02d %02d:%02d:%02d.%06d %s",
+		long usec = tv.tv_usec;
+		fprintf(out_fp, "%04d-%02d-%02d %02d:%02d:%02d.%06ld %s",
 				tm->tm_year + 1900,
 				tm->tm_mon + 1,
 				tm->tm_mday,
 				tm->tm_hour,
 				tm->tm_min,
 				tm->tm_sec,
-				tv.tv_usec,
+				usec,
 				in_buf);
 	}
 }
