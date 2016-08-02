@@ -1,0 +1,35 @@
+BINALL=		llogger \
+
+SBINALL=
+
+MAN1ALL=
+
+MAN8ALL=
+
+MANALL=		${MAN1ALL} ${MAN8ALL}
+
+CLEANALL=	${BINALL} ${SBINALL}
+
+ALL=		${CLEANALL} ${PUBALL}
+
+DESTDIR=
+LOCALROOT=	/usr
+INSTALLROOT=	${DESTDIR}${LOCALROOT}
+BINDIR=		${INSTALLROOT}/bin
+SBINDIR=	${INSTALLROOT}/sbin
+MANDIR=		${INSTALLROOT}/share/man
+
+all:		${ALL}
+
+clean:
+	rm ${ALL}
+
+INSTALL=	install
+
+install:	${ALLDIRS} ${PUBALL} FORCE
+	test -z "${BINALL}"  || ${INSTALL} ${BINALL}  ${BINDIR}
+	test -z "${SBINALL}" || ${INSTALL} ${SBINALL} ${SBINDIR}
+	test -z "${MAN1ALL}" || ${INSTALL} ${MAN1ALL} ${MANDIR}/man1
+	test -z "${MAN8ALL}" || ${INSTALL} ${MAN8ALL} ${MANDIR}/man8
+
+FORCE:
