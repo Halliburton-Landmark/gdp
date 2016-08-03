@@ -262,7 +262,11 @@ cmd_create(gdp_req_t *req)
 	// do the physical create
 	gcl->gclmd = gmd;
 	estat = gcl->x->physimpl->create(gcl, gcl->gclmd);
-	EP_STAT_CHECK(estat, goto fail1);
+	if (!EP_STAT_ISOK(estat))
+	{
+		req->pdu->cmd = GDP_NAK_S_INTERNAL;
+		goto fail0;
+	}
 
 	// advertise this new GCL
 	logd_advertise_one(gcl->name, GDP_CMD_ADVERTISE);
@@ -276,12 +280,6 @@ cmd_create(gdp_req_t *req)
 
 	// leave this in the cache
 	gcl->flags |= GCLF_DEFER_FREE;
-
-	if (false)
-	{
-fail1:
-		req->pdu->cmd = GDP_NAK_S_INTERNAL;
-	}
 	_gdp_gcl_decref(&req->gcl);
 
 fail0:
