@@ -1015,6 +1015,7 @@ disk_create(gdp_gcl_t *gcl, gdp_gclmd_t *gmd)
 
 	// create an initial segment for the GCL
 	estat = segment_create(gcl, gmd, 0, 0);
+	EP_STAT_CHECK(estat, goto fail0);
 
 	// create an offset record index for that gcl
 	{
@@ -1102,6 +1103,8 @@ fail0:
 	// turn OK into an errno-based code
 	if (EP_STAT_ISOK(estat))
 		estat = ep_stat_from_errno(errno);
+	if (EP_STAT_ISOK(estat))
+		estat = GDP_STAT_NAK_INTERNAL;
 
 	// turn "file exists" into a meaningful response code
 	if (EP_STAT_IS_SAME(estat, ep_stat_from_errno(EEXIST)))
@@ -1350,11 +1353,15 @@ static EP_STAT
 disk_close(gdp_gcl_t *gcl)
 {
 	EP_ASSERT_POINTER_VALID(gcl);
-	EP_ASSERT_POINTER_VALID(gcl->x);
-	EP_ASSERT_POINTER_VALID(gcl->x->physinfo);
 
+	if (gcl->x == NULL || gcl->x->physinfo == NULL)
+	{
+		// close as a result of incomplete open; just ignore it
+		return EP_STAT_OK;
+	}
 	physinfo_free(gcl->x->physinfo);
 	gcl->x->physinfo = NULL;
+
 	return EP_STAT_OK;
 }
 
