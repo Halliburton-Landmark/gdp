@@ -48,8 +48,11 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <getopt.h>
+#include <netdb.h>
+#include <pwd.h>
 #include <string.h>
 #include <sysexits.h>
+#include <unistd.h>
 #include <sys/stat.h>
 
 
@@ -92,12 +95,16 @@ select_logd_name(void)
 void
 usage(void)
 {
-	fprintf(stderr, "Usage: %s [-D dbgspec] [-e key_enc_alg] [-G gdpd_addr]\n"
-			"\t[-h] [-k keytype] [-K keyfile] [-b keybits] [-c curve] [-q]\n"
-			"\t[-s logd_name] [<mdid>=<metadata>...] [gcl_name]\n"
+	fprintf(stderr, "Usage: %s [-C creator] [-D dbgspec] [-e key_enc_alg]\n"
+			"\t[-G gdpd_addr] [-q] [-s logd_name]\n"
+			"\t[-h] [-k keytype] [-K keyfile] [-b keybits] [-c curve]\n"
+			"\t[<mdid>=<metadata>...] [gcl_name]\n"
+			"    -C  set name of log creator (owner; for metadata)\n"
 			"    -D  set debugging flags\n"
 			"    -e  set secret key encryption algorithm\n"
 			"    -G  IP host to contact for GDP router\n"
+			"    -q  don't give error if log already exists\n"
+			"    -s  set name of log daemon on which to create the log\n"
 			"    -h  set the hash (message digest) algorithm (defaults to sha256)\n"
 			"    -k  type of key; valid key types are \"rsa\", \"dsa\", and \"ec\"\n"
 			"\t(defaults to ec); \"none\" turns off key generation\n"
@@ -106,11 +113,10 @@ usage(void)
 			"\twith the name of the GCL (defaults to \"KEYS\" or \".\")\n"
 			"    -b  set size of key in bits (RSA and DSA only)\n"
 			"    -c  set curve name (EC only)\n"
-			"    -q  don't give error if log already exists\n"
-			"    -s  set name of log daemon on which to create the log\n"
+			"    creator is the id of the creator, formatted as an email address\n"
 			"    logd_name is the name of the log server to host this log\n"
-			"    gcl_name is the name of the log to create\n"
-			"    metadata ids are (by convention) four letters or digits\n",
+			"    metadata ids are (by convention) four letters or digits\n"
+			"    gcl_name is the name of the log to create\n",
 			ep_app_getprogname());
 	exit(EX_USAGE);
 }
@@ -123,6 +129,7 @@ main(int argc, char **argv)
 	const char *gclxname = NULL;	// external name of GCL
 	gdp_name_t logdiname;			// internal name of log daemon
 	const char *logdxname = NULL;	// external name of log daemon
+	const char *cname = NULL;		// creator/owner name (for metadata)
 	gdp_gcl_t *gcl = NULL;
 	gdp_gclmd_t *gmd = NULL;
 	int opt;
@@ -148,7 +155,7 @@ main(int argc, char **argv)
 	gdp_lib_init(NULL);
 
 	// collect command-line arguments
-	while ((opt = getopt(argc, argv, "b:c:D:e:G:h:k:K:qs:")) > 0)
+	while ((opt = getopt(argc, argv, "b:c:C:D:e:G:h:k:K:qs:")) > 0)
 	{
 		switch (opt)
 		{
@@ -158,6 +165,10 @@ main(int argc, char **argv)
 
 		 case 'c':
 			curve = optarg;
+			break;
+
+		 case 'C':
+			cname = optarg;
 			break;
 
 		 case 'D':
@@ -305,7 +316,72 @@ main(int argc, char **argv)
 		gdp_gclmd_add(gmd, GDP_GCLMD_CTIME, strlen(timestring), timestring);
 	}
 
-	// should create GDP_GCLMD_CID here (creator id)
+	// creator id
+	{
+		char cnamebuf[200];
+
+		if (cname == NULL)
+		{
+			/*
+			**  Find the name of the creator.
+			*/
+
+			// user name (from password file)
+			char *uname;
+			char unamebuf[40];
+			struct passwd *pw = getpwuid(getuid());
+
+			if (pw != NULL)
+			{
+				uname = pw->pw_name;
+			}
+			else
+			{
+				snprintf(unamebuf, sizeof unamebuf, "%d", getuid());
+				uname = unamebuf;
+			}
+
+			// fully qualified domain name
+			//  (Linux sets HOST_NAME_MAX too low, so we use a magic constant)
+			char fqdn[1025];
+
+			// gethostname doesn't guarantee null termination
+			fqdn[sizeof fqdn - 1] = '\0';
+			if (gethostname(fqdn, sizeof fqdn - 1) != 0)
+			{
+				ep_app_error("Cannot find current host name");
+				strlcpy(fqdn, "localhost", sizeof fqdn);
+			}
+
+			if (strchr(fqdn, '.') == NULL)
+			{
+				// need to tack on a domain name
+				struct addrinfo hints, *ai;
+				int i;
+
+				memset(&hints, 0, sizeof hints);
+				hints.ai_family = AF_UNSPEC;
+				hints.ai_socktype = SOCK_STREAM;
+				hints.ai_flags = AI_CANONNAME;
+
+				if ((i = getaddrinfo(fqdn, NULL, &hints, &ai)) != 0)
+				{
+					ep_app_error("Cannot find DNS domain name: %s",
+							gai_strerror(i));
+				}
+				else
+				{
+					strlcpy(fqdn, ai->ai_canonname, sizeof fqdn);
+				}
+			}
+
+			// now put it together
+			snprintf(cnamebuf, sizeof cnamebuf, "%s@%s", uname, fqdn);
+			cname = cnamebuf;
+		}
+		ep_dbg_cprintf(Dbg, 1, "Creating log as %s\n", cname);
+		gdp_gclmd_add(gmd, GDP_GCLMD_CID, strlen(cname), cname);
+	}
 
 
 	/**************************************************************
