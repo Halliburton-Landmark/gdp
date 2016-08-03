@@ -124,6 +124,8 @@ send_data(struct evbuffer *obuf,
 		void *data, size_t len,
 		const char *where, int offset, int dbgmode)
 {
+	EP_STAT estat = GDP_STAT_PDU_WRITE_FAIL;
+
 	if (ep_dbg_test(Dbg, 33))
 	{
 		ep_hexdump(data, len, ep_dbg_getfile(), dbgmode, offset);
@@ -132,21 +134,28 @@ send_data(struct evbuffer *obuf,
 	if (data == NULL)
 	{
 		ep_dbg_cprintf(Dbg, 1, "_gdp_pdu_out: %s: no data\n", where);
-		return GDP_STAT_PDU_WRITE_FAIL;
 	}
-
-	if (evbuffer_add(obuf, data, len) < 0)
+	else if (len <= 0)
+	{
+		ep_dbg_cprintf(Dbg, 1, "_gdp_pdu_out: %s: empty data (%zd)\n",
+				where, len);
+	}
+	else if (evbuffer_add(obuf, data, len) < 0)
 	{
 		char nbuf[40];
 
 		// couldn't write output
 		strerror_r(errno, nbuf, sizeof nbuf);
-		ep_dbg_cprintf(Dbg, 1, "_gdp_pdu_out: %s write failure: %s\n",
-				where, nbuf);
-		return GDP_STAT_PDU_WRITE_FAIL;
+		ep_dbg_cprintf(Dbg, 1,
+				"_gdp_pdu_out: %s write failure (len = %zd): %s\n",
+				where, len, nbuf);
+	}
+	else
+	{
+		estat = EP_STAT_OK;
 	}
 
-	return EP_STAT_OK;
+	return estat;
 }
 
 
