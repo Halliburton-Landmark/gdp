@@ -35,6 +35,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
+#include <time.h>
 #include <arpa/inet.h>
 #include <net/if.h>
 #include <sys/types.h>
