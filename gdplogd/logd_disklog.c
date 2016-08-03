@@ -171,6 +171,14 @@ bdb_open(const char *filename,
 {
 	DB *db = NULL;
 	EP_STAT estat = EP_STAT_OK;
+	struct stat st;
+
+	// check file existence to avoid db->open complaints
+	if (stat(filename, &st) < 0)
+	{
+		if (errno != ENOENT || !EP_UT_BITSET(DB_CREATE, dbflags))
+			return ep_stat_from_errno(errno);
+	}
 
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
 	const char *phase = "db_create";
@@ -1161,9 +1169,10 @@ disk_open(gdp_gcl_t *gcl)
 	if (fd < 0 || flock(fd, LOCK_SH) < 0 ||
 			(ridx_fp = fdopen(fd, "a+")) == NULL)
 	{
-		estat = ep_stat_from_errno(errno);
-		if (EP_STAT_IS_SAME(estat, ep_stat_from_errno(ENOENT)))
+		if (errno == ENOENT)
 			estat = GDP_STAT_NAK_NOTFOUND;
+		else
+			estat = ep_stat_from_errno(errno);
 		ep_log(estat, "disk_open(%s): ridx open failure", index_pbuf);
 		if (fd >= 0)
 			close(fd);
@@ -1296,9 +1305,16 @@ disk_open(gdp_gcl_t *gcl)
 		estat = get_gcl_path(gcl, -1, GCL_TIDX_SUFFIX,
 						tidx_pbuf, sizeof tidx_pbuf);
 		EP_STAT_CHECK(estat, goto fail0);
+
 		// it's not an error if the database doesn't exist (back compat)
-		(void) bdb_open(tidx_pbuf, 0, GCLfilemode, DB_BTREE, &phys->tidx.db);
-		//EP_STAT_CHECK(estat, goto fail0);
+		phase = "bdb_open";
+		estat = bdb_open(tidx_pbuf, 0, GCLfilemode, DB_BTREE, &phys->tidx.db);
+		if (EP_STAT_IS_SAME(estat, ep_stat_from_errno(ENOENT)))
+		{
+			ep_dbg_cprintf(Dbg, 33, "disk_open(%s): no tidx\n", gcl->pname);
+			estat = EP_STAT_OK;
+		}
+		EP_STAT_CHECK(estat, goto fail0);
 	}
 
 	if (ep_dbg_test(Dbg, 20))
@@ -1311,6 +1327,8 @@ disk_open(gdp_gcl_t *gcl)
 fail0:
 	if (EP_STAT_ISOK(estat))
 		estat = ep_stat_from_errno(errno);
+	if (EP_STAT_ISOK(estat))
+		estat = GDP_STAT_NAK_INTERNAL;
 	physinfo_free(phys);
 	gcl->x->physinfo = phys = NULL;
 
