@@ -147,6 +147,12 @@ then
 	chown ${GDP_USER}:${GDP_GROUP} /etc/rsyslog.d/60-gdp.conf
 fi
 
+if [ -d /etc/logrotate.d ]
+then
+	info "Installing logrotate configuration"
+	cp adm/gdplogd-logrotate.conf /etc/logrotate.d/gdplogd
+fi
+
 if [ "$INITSYS" = "systemd" ]
 then
 	sudo adm/customize.sh adm/gdplogd.service.template /etc/systemd/system
