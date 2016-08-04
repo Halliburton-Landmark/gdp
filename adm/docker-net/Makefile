@@ -24,7 +24,7 @@ all = gdp-logds
 
 GDP_BASEIMAGE_DOCKERFILE = Dockerfile.baseimage
 
-GDP_ROOT = ../
+GDP_ROOT = ../../
 GDP_LOGD_DOCKERFILE = Dockerfile.gdplogd
 GDP_LOGD_VERSION = 0.3-1
 
