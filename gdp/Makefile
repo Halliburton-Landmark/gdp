@@ -170,7 +170,7 @@ ${LIBNAME}.so.${GDPLIBVER}: ${OBJS}
 	${CC} ${SHARED} -o $@ ${OBJS} ${LDFLAGS}
 	${RM} -f ${LOCALLIBSDIR}/$@
 	${INSTALL} $@ ${LOCALLIBSDIR}
-	(cd ${LOCALLIBSDIR}; sh makelinks.sh gdp ${GDP_VERSION_MAJOR} ${GDP_VERSION_MINOR})
+	sh ${LOCALLIBSDIR}/makelinks.sh gdp ${GDP_VERSION_MAJOR} ${GDP_VERSION_MINOR} ${LOCALLIBSDIR}
 
 ${OBJS}: ${HFILES}
 
@@ -201,7 +201,7 @@ install:	${ALLDIRS} ${PUBALL}
 	test -z "${MAN8ALL}" || ${INSTALL} ${MAN8ALL} ${MANDIR}/man8
 	${INSTALL} ${INCALL} ${INCDIR}/gdp
 	${INSTALL} ${LIBALL} ${LIBDIR}
-	(cd ${LIBDIR}; sh ${LOCALLIBSDIR}/makelinks.sh gdp ${GDP_VERSION_MAJOR} ${GDP_VERSION_MINOR})
+	sh ${LOCALLIBSDIR}/makelinks.sh gdp ${GDP_VERSION_MAJOR} ${GDP_VERSION_MINOR} ${LIBDIR}
 
 ${ALLDIRS}:
 	${MKDIR} $@
@@ -210,7 +210,7 @@ ${ALLDIRS}:
 # XXX Why is this needed?  It's done when the libraries are built.
 install-local:	${LOCALLIBSDIR} ${LIBALL}
 	${INSTALL} ${LIBALL} ${LOCALLIBSDIR}
-	(cd ${LOCALLIBSDIR}; sh makelinks.sh gdp ${GDP_VERSION_MAJOR} ${GDP_VERSION_MINOR})
+	sh ${LOCALLIBSDIR}/makelinks.sh gdp ${GDP_VERSION_MAJOR} ${GDP_VERSION_MINOR} ${LOCALLIBSDIR}
 
 UPDATE_LICENSE=	${ADM}/update-license.sh
 

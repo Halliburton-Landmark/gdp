@@ -229,11 +229,12 @@ ${LIBNAME}.a: ${OBJS}
 	${AR} -r $@ ${OBJS}
 	${RANLIB} $@
 	${RM} -f ${LOCALLIBSDIR}/$@
-	${CP} $@ ${LOCALLIBSDIR}
+	${INSTALL} $@ ${LOCALLIBSDIR}
 
 ${LIBNAME}.so.${EPLIBVER}: ${OBJS}
 	${CC} ${SHARED} -o $@ ${OBJS} ${LDFLAGS}
-	(cd ${LOCALLIBSDIR} && sh makelinks.sh ep ${EPLIBMAJVER} ${EPLIBMINVER})
+	${INSTALL} $@ ${LOCALLIBSDIR}
+	sh ${LOCALLIBSDIR}/makelinks.sh ep ${EPLIBMAJVER} ${EPLIBMINVER} ${LOCALLIBSDIR}
 
 ${OBJS}: ${HFILES}
 
@@ -254,19 +255,16 @@ clean:
 install:	${ALLDIRS} ${PUBALL}
 	${CP} ${INCALL} ${INCDIR}/ep
 	${INSTALL} ${LIBALL} ${LIBDIR}
-	(cd ${LIBDIR}; rm -f ${LIBNAME}.so.${EPLIBMAJVER}; ln -s ${LIBNAME}.so.${EPLIBVER} ${LIBNAME}.so.${EPLIBMAJVER})
-	(cd ${LIBDIR}; rm -f ${LIBNAME}.so; ln -s ${LIBNAME}.so.${EPLIBMAJVER} ${LIBNAME}.so)
-	(cd ${LIBDIR}; rm -f ${LIBNAME}.${EPLIBVER}.dylib; ln -s ${LIBNAME}.so.${EPLIBVER} ${LIBNAME}.${EPLIBVER}.dylib)
+	sh ${LOCALLIBSDIR}/makelinks.sh ep ${EPLIBMAJVER} ${EPLIBMINVER}) ${LIBDIR}
 
 ${ALLDIRS}:
 	${MKDIR} $@
 
 # local installation (into source tree, needed for Java & Debian package build)
+# XXX Why is this needed?  It's done when the libraries are built.
 install-local:	${LOCALLIBSDIR} ${LIBALL}
 	${INSTALL} ${LIBALL} ${LOCALLIBSDIR}
-	(cd ${LOCALLIBSDIR}; rm -f ${LIBNAME}.so.${EPLIBMAJVER}; ln -s ${LIBNAME}.so.${EPLIBVER} ${LIBNAME}.so.${EPLIBMAJVER})
-	(cd ${LOCALLIBSDIR}; rm -f ${LIBNAME}.so; ln -s ${LIBNAME}.so.${EPLIBMAJVER} ${LIBNAME}.so)
-	(cd ${LOCALLIBSDIR}; rm -f ${LIBNAME}.${EPLIBVER}.dylib; ln -s ${LIBNAME}.so.${EPLIBVER} ${LIBNAME}.${EPLIBVER}.dylib)
+	sh ${LOCALLIBSDIR}/makelinks.sh ep ${EPLIBMAJVER} ${EPLIBMINVER} ${LOCALLIBSDIR}
 
 # license update
 UPDATE_LICENSE=	${ADM}/update-license.sh
