@@ -3,7 +3,7 @@
 # @Version: $Id: makefile 72425 2015-05-27 21:01:46Z cxh $
 # @Author: Christopher Brooks
 #
-# @Copyright (c) 2014 The Regents of the University of California.
+# @Copyright (c) 2014-2016 The Regents of the University of California.
 # All rights reserved.
 #
 # Permission is hereby granted, without written agreement and without
@@ -33,8 +33,8 @@
 # If you change the GDP version, then also update $PTII/configure.in and
 # https://www.terraswarm.org/swarmos/wiki/Main/GDPJavaInterface
 GDPLIBMAJVER=	0
-GDPLIBMINVER=	5
-GDP_PATCH_VERSION=0
+GDPLIBMINVER=	6
+GDP_PATCH_VERSION=1
 
 GDP_MAJOR_MINOR_VERSION=$(GDPLIBMAJVER).$(GDPLIBMINVER)
 
