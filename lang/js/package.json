@@ -1,6 +1,6 @@
 {
     "name": "@terraswarm/gdp",
-    "version": "0.5.1",
+    "version": "0.6.1",
     "author": {
         "email": "cxh@eecs.berkeley.edu",
         "name": "Christopher Brooks"
@@ -11,7 +11,7 @@
             "name": "Eric Allman"
         },
         {
-            "name": "Eric Dara-Abrams"
+            "name": "Alec Dara-Abrams"
         },
         {
             "email": "lutz@berkeley.edu",
