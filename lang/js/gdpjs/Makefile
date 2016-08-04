@@ -97,7 +97,7 @@ GDPJSLIBVER=	${GDPJSLIBMAJVER}.${GDPJSLIBMINVER}
 
 # Version of the GDP Library, should match ../../../gdp/Makefile
 GDPLIBMAJVER=	0
-GDPLIBMINVER=	5
+GDPLIBMINVER=	6
 
 # Version of the EP Library, should match ../../../ep/Makefile
 EPLIBMAJVER=	3

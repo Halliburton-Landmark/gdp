@@ -39,16 +39,32 @@ A  (bin)  /Users/cxh/ptII/lib/gdp-0.6-1.jar
 bash-3.2$ 
       </pre>
       </li>
+      <li>Update the GDP shared library:<pre>
+bash-3.2$ svn delete --force $PTII/lib/libgdp.0.5.*
+D         /Users/cxh/ptII/lib/libgdp.0.5.dylib
+D         /Users/cxh/ptII/lib/libgdp.0.5.so
+bash-3.2$ cp ../../libs/libgdp.0.6.dylib $PTII/lib
+bash-3.2$ svn add $PTII/lib/libgdp.0.6.dylib 
+A  (bin)  /Users/cxh/ptII/lib/libgdp.0.6.dylib
+bash-3.2$ 
+          </pre>
       <li>Edit <code>$PTII/configure.in</code> and <code>$PTII/build.default.xml</code> and update the <code>gdp-N.M-P</code> string to the new version</li>
 
       <li> Run <code>(cd $PTII;autoconf;./configure)</code> and verify that <code>$PTII/mk/ptII.mk</code> refers to the new jar file</li>
       <li>Commit the changes to the ptII svn repo: <pre>
-          (cd $PTII; svn commit -m "Updated the gdp to 0.6-1." configure.in build.default.xml lib/gdp-0.5-0.jar lib/gdp*.jar)
-          </pre>
+          (cd $PTII; svn commit -m "Updated the gdp to 0.6-1." configure.in build.default.xml lib/gdp-0.5-0.jar lib/libgdp-0.5.dylib lib/libgdp0.5.so lib/libgdp*dylib lib/gdp*.jar)
+        </pre>
+        The above commands are for Mac OS X, which uses .dylib.  We delete the .so, which is used by Linux here anyway.  The gdp shared library must be updated on the build machine so that the nightly build will successfully run the GDP tests under Linux.
       <li>
       <li>Update <code>$PTII/configure</code>:<pre>
           (cd $PTII; autoconf; svn commit -m "configure.in changed." configure)
-          </pre>
+        </pre>
+      </li>
+      <li>Test out the GDP Java interface with:<pre>
+          $PTII/bin/vergil /Users/cxh/ptII/ptolemy/actor/lib/jjs/modules/gdp/test/auto/GDPLogAppendRead.xml
+        </pre>
+      </li>
+      <li>Log on to machines for other platforms (currently only Linux at terra.eecs.berkeley.edu) and build and install the shared library.</li>
     </ol>
     </li>
   <li>Add the changed gdp files: <pre>

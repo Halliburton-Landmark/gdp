@@ -69,3 +69,27 @@ Consider:
 
 // ===================================================================
 
+Updating the GDP Version Number
+
+If the GDP version number in ../../gdp/gdp_version.h changes, the make the following changes:
+
+1) gdpjs/Makefile: Update
+# Version of the GDP Library, should match ../../../gdp/Makefile
+GDPLIBMAJVER=	0
+GDPLIBMINVER=	6
+
+2) gdpjs/gdpjs.js: Update
+var libgdp = ffi.Library(GDP_DIR + '/libs/libgdp.0.6', {
+
+3) Update package.json:
+    "version": "0.6.1",
+
+4) Run make
+
+
+(Optional): update $PTII/lib:
+
+cp libgdpjs.1.0.dylib $PTII/lib
+svn commit -m "Updated to gdp0.6-1." $PTII/lib/libgdpjs.1.0.dylib
+
+
