@@ -43,10 +43,11 @@
 
 #include <ep/ep.h>
 
-// change these as necessary
-#define GDP_VERSION_MAJOR	0
-#define GDP_VERSION_MINOR	6
-#define GDP_VERSION_PATCH	1
+// get the actual auto-generated version info
+//   ***DO NOT EDIT THESE VALUES.  THIS FILE IS AUTO-GENERATED ***
+#define	GDP_VERSION_MAJOR	@GDP_VERSION_MAJOR@
+#define	GDP_VERSION_MINOR	@GDP_VERSION_MINOR@
+#define	GDP_VERSION_PATCH	@GDP_VERSION_PATCH@
 
 #define __GDP_STRING(x)		#x
 #define __GDP_VER_CONCAT(a, b, c)							\

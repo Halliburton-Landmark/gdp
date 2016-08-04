@@ -4,7 +4,6 @@ lib=$1
 major=$2
 minor=$3
 
-
 { test -r /usr/local/etc/gdp.conf.sh && . /usr/local/etc/gdp.conf.sh; } ||
 	{ test -r /etc/gdp.conf.sh && . /etc/gdp.conf.sh; }
 : ${GDP_ROOT:=/usr}
@@ -34,11 +33,7 @@ then
 fi
 . $GDP_SRC_ROOT/adm/common-support.sh
 
-info "Installing $lib/lib$lib.so.$major.$minor"
-rm -f lib$lib.so.$major.$minor
-cp ../$lib/lib$lib.so.$major.$minor .
-
-info "Creating library links"
+info "Creating lib$lib links in `pwd`"
 case "$OS" in
     "ubuntu" | "debian" | "freebsd" | "centos")
     	rm -f lib$lib.so.$major lib$lib.so

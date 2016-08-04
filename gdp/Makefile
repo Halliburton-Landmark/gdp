@@ -26,9 +26,10 @@
 #  ----- END LICENSE BLOCK -----
 #
 
-# Version number of library (should match gdp_version.h)
-GDPLIBMAJVER=	0
-GDPLIBMINVER=	6
+# Version number of library.  All others are derived from here.
+GDP_VERSION_MAJOR=	0
+GDP_VERSION_MINOR=	6
+GDP_VERSION_PATCH=	1
 
 # These are generally changed on make command line
 DESTDIR=
@@ -109,11 +110,11 @@ PRIVHFILES=	\
 
 HFILES=		${PUBHFILES} ${PRIVHFILES}
 
-GDPLIBVER=	${GDPLIBMAJVER}.${GDPLIBMINVER}
+GDPLIBVER=	${GDP_VERSION_MAJOR}.${GDP_VERSION_MINOR}
 INCALL=		${PUBHFILES}
 LIBALL=		libgdp.a libgdp.so.${GDPLIBVER}
 # files that should be removed on "make clean"
-CLEANALL=	${LIBALL} ${BINALL} ${SBINALL}
+CLEANALL=	${LIBALL} ${BINALL} ${SBINALL} gdp_version.h
 # files that should be publicly installed
 PUBALL=		${SCRIPTS} ${MANALL} ${INCALL} ${LIBALL}
 # "make all" targets (may be overlap)
@@ -163,18 +164,24 @@ ${LIBNAME}.a: ${OBJS}
 	${AR} -r $@ ${OBJS}
 	${RANLIB} $@
 	${RM} -f ${LOCALLIBSDIR}/$@
-	${CP} $@ ${LOCALLIBSDIR}
+	${INSTALL} $@ ${LOCALLIBSDIR}
 
 ${LIBNAME}.so.${GDPLIBVER}: ${OBJS}
 	${CC} ${SHARED} -o $@ ${OBJS} ${LDFLAGS}
-	(cd ${LOCALLIBSDIR} && sh makelinks.sh gdp ${GDPLIBMAJVER} ${GDPLIBMINVER})
+	${RM} -f ${LOCALLIBSDIR}/$@
+	${INSTALL} $@ ${LOCALLIBSDIR}
+	(cd ${LOCALLIBSDIR}; sh makelinks.sh gdp ${GDP_VERSION_MAJOR} ${GDP_VERSION_MINOR})
 
 ${OBJS}: ${HFILES}
 
-gdp_version.o: gdp_version.c ${OBJS_MOST} Makefile
+
+gdp_version.o: gdp_version.c ${OBJS_MOST} Makefile gdp_version.h
 	${CC} ${CFLAGS} \
 		-D_VERSION_INFO_="\"`sh ../adm/get-version-info.sh`\"" \
 		-c gdp_version.c
+
+gdp_version.h: gdp_version.template gdp_version.sh
+	sh gdp_version.sh ${GDP_VERSION_MAJOR} ${GDP_VERSION_MINOR} ${GDP_VERSION_PATCH}
 
 #
 #  Administrative stuff
@@ -194,19 +201,16 @@ install:	${ALLDIRS} ${PUBALL}
 	test -z "${MAN8ALL}" || ${INSTALL} ${MAN8ALL} ${MANDIR}/man8
 	${INSTALL} ${INCALL} ${INCDIR}/gdp
 	${INSTALL} ${LIBALL} ${LIBDIR}
-	(cd ${LIBDIR}; rm -f libgdp.so.${GDPLIBMAJVER}; ln -s libgdp.so.${GDPLIBVER} libgdp.so.${GDPLIBMAJVER})
-	(cd ${LIBDIR}; rm -f libgdp.so; ln -s libgdp.so.${GDPLIBMAJVER} libgdp.so)
-	(cd ${LIBDIR}; rm -f libgdp.${GDPLIBVER}.dylib; ln -s libgdp.so.${GDPLIBVER} libgdp.${GDPLIBVER}.dylib)
+	(cd ${LIBDIR}; sh ${LOCALLIBSDIR}/makelinks.sh gdp ${GDP_VERSION_MAJOR} ${GDP_VERSION_MINOR})
 
 ${ALLDIRS}:
 	${MKDIR} $@
 
 # local installation (into source tree, needed for Java & Debian package build)
+# XXX Why is this needed?  It's done when the libraries are built.
 install-local:	${LOCALLIBSDIR} ${LIBALL}
 	${INSTALL} ${LIBALL} ${LOCALLIBSDIR}
-	(cd ${LOCALLIBSDIR}; rm -f libgdp.so.${GDPLIBMAJVER}; ln -s libgdp.so.${GDPLIBVER} libgdp.so.${GDPLIBMAJVER})
-	(cd ${LOCALLIBSDIR}; rm -f libgdp.so; ln -s libgdp.so.${GDPLIBMAJVER} libgdp.so)
-	(cd ${LOCALLIBSDIR}; rm -f libgdp.${GDPLIBVER}.dylib; ln -s libgdp.so.${GDPLIBVER} libgdp.${GDPLIBVER}.dylib)
+	(cd ${LOCALLIBSDIR}; sh makelinks.sh gdp ${GDP_VERSION_MAJOR} ${GDP_VERSION_MINOR})
 
 UPDATE_LICENSE=	${ADM}/update-license.sh
 
