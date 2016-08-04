@@ -28,7 +28,7 @@
 
 # Version number of library (should match gdp_version.h)
 GDPLIBMAJVER=	0
-GDPLIBMINVER=	5
+GDPLIBMINVER=	6
 
 # These are generally changed on make command line
 DESTDIR=
