@@ -41,5 +41,6 @@ case "$OS" in
 	rm -f lib$lib-$major.$minor.so lib$lib.so.$major
 	mv lib$lib.so.$major.$minor lib$lib-$major.$minor.so
 	ln -s lib$lib-$major.$minor.so lib$lib.so.$major
+	ln -s lib$lib.so.$major lib$lib.so
 	;;
 esac
