@@ -10,6 +10,7 @@ of the GDP protocol.
 Files:
 ======
 
+- Dockerfile.baseimage : A base image with pre-requisite packages
 - Dockerfile.gdp-router: A recipe for generating gdp-router docker image
 - Dockerfile.gdplogd   : A recipe for generating gdplogd docker image
 - Makefile             : Wrapper script to start up everything
@@ -19,7 +20,8 @@ How to use:
 
 To get started, adjust parameters `NUM_ROUTERS` and `NUM_LOGDS_PER_ROUTER` in
 makefile, run `make`. To shut down the circus, use `make clean`. If you want 
-to get rid of the docker images, use `make clean-all`.
+to get rid of the base docker image (because it's too old with outdated
+packages, or you changed some dependency), use `make clean-all`.
 
 You can also pass additional commandline arguments by adjusting appropriate
 `*CMDLINE_ARGS` parameter in the Makefile. But before modifying it, first check
@@ -74,9 +76,9 @@ Notes:
   - GDP log servers attached to 172.30.0.x have IP addresses of the form
     172.30.y.x (y=> 1-15). This can be increased, if needed.
 
-- GDP routers include a random delay in the range 0-120 seconds, this is to 
-  make sure that we can start multiple instances of GDP routers with the same
-  command line arguments without running into race conditions. GDP log servers 
-  are executed using a wrapper script that adds a delay of 120 seconds to 
-  accommodate for the delay in GDP router startup. See dockerfile.
+- GDP routers include a random delay before starting, this is to make sure that
+  we can start multiple instances of GDP routers with the same command line
+  arguments without running into race conditions. GDP log servers are executed
+  using a wrapper script that adds a delay of 10 seconds to accommodate for the
+  delay in GDP router startup. See dockerfile.
 
