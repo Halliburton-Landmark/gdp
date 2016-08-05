@@ -38,10 +38,55 @@ GDP_PATCH_VERSION=1
 
 GDP_MAJOR_MINOR_VERSION=$(GDPLIBMAJVER).$(GDPLIBMINVER)
 
-GDP_JAR=gdp-$(GDP_MAJOR_MINOR_VERSION)-$(GDP_PATCH_VERSION).jar
+
+
+
 all: jclass
-install: all
-	jar cf $(GDP_JAR) org/terraswarm/gdp/*.class
+
+# JNA will look for the GDP shared library in the classpath.
+
+# https://github.com/java-native-access/jna/blob/master/www/GettingStarted.md
+# says that JNA will look in os-arch/library, where os-arch is JNA's
+# canonical prefix for the platform.  The shared library is
+# automatically extracted.
+
+
+GDP_JAR=gdp-$(GDP_MAJOR_MINOR_VERSION)-$(GDP_PATCH_VERSION).jar
+# The format of the gdp library version must be the same on all
+# platforms.  See org/terraswarm/gdp/GdpNLibrary.java, where N is the
+# version number.
+DARWIN_LIB=libgdp.$(GDP_MAJOR_MINOR_VERSION).dylib
+LINUX_LIB=libgdp.$(GDP_MAJOR_MINOR_VERSION).so
+install: all darwin/$(DARWIN_LIB) linux-amd64/$(LINUX_LIB)
+	jar cf $(GDP_JAR) org/terraswarm/gdp/*.class darwin linux-amd64
+
+darwin/$(DARWIN_LIB): 
+	if [ ! -d darwin ]; then mkdir darwin; fi
+	if [ -f ../../libs/$(DARWIN_LIB) ]; then \
+		echo "Copying ../../libs/$(DARWIN_LIB) to $@"; \
+		cp ../../libs/$(DARWIN_LIB) $@; \
+	else \
+		if [ -f $(PTII)/lib/$(DARWIN_LIB) ]; then \
+			echo "Copying $(PTII)/lib/$(DARWIN_LIB) to $@"; \
+			cp $(PTII)/lib/$(DARWIN_LIB) $@; \
+		else \
+			echo "Could not find the Darwin GDP shared library, so the jar file will not contain it."; \
+		fi \
+	fi
+
+linux-amd64/$(LINUX_LIB):
+	if [ ! -d linux-amd64 ]; then mkdir linux-amd64; fi
+	if [ -f ../../libs/$(LINUX_LIB) ]; then \
+		echo "Copying ../../libs/$(LINUX_LIB) to $@"; \
+		cp ../../libs/$(LINUX_LIB) $@; \
+	else \
+		if [ -f $(PTII)/lib/$(LINUX_LIB) ]; then \
+			echo "Copying $(PTII)/lib/$(LINUX_LIB) to $@"; \
+			cp $(PTII)/lib/$(LINUX_LIB) $@; \
+		else \
+			echo "Could not find the Linux GDP shared library, so the jar file will not contain it."; \
+		fi \
+	fi
 
 ##############################
 JNA_JAR = jna-4.2.2.jar
@@ -157,6 +202,7 @@ runHelloWorld: all
 
 clean:
 	rm -f jna _* org/terraswarm/gdp/*.class org/terraswarm/gdp/EP* org/terraswarm/gdp/e* org/terraswarm/gdp/*Library.java org/terraswarm/gdp/apps/*.class
+	rm -rf darwin linux-amd64
 
 distclean: clean
 	rm -f *.jar
