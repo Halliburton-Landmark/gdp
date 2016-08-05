@@ -87,9 +87,23 @@ var libgdp = ffi.Library(GDP_DIR + '/libs/libgdp.0.6', {
 4) Run make
 
 
-(Optional): update $PTII/lib:
+Testing using Ptolemy II
+Update $PTII/lib:
 
-cp libgdpjs.1.0.dylib $PTII/lib
-svn commit -m "Updated to gdp0.6-1." $PTII/lib/libgdpjs.1.0.dylib
+  cp libgdpjs.1.0.dylib $PTII/lib
+  svn commit -m "Updated to gdp0.6-1." $PTII/lib/libgdpjs.1.0.dylib
 
+See https://www.terraswarm.org/accessors/wiki/Main/GDPJS for how to
+1) start the GDP Daemons and initialize the log,
+2) create a log and
+3) add a record.
 
+Then run the model using Node:
+
+(cd $PTII/org/terraswarm/accessor/accessors/web/gdp/test/auto; node ../../../hosts/node/nodeHostInvoke.js -timeout 6000 gdp/test/auto/GDPLogRead)
+
+The string "foo" should appear in the output:
+ >>> recno 1, len 3, ts 2016-08-04T16:11:23.208583000Z
+00000000 66 6f 6f
+         f  o  o
+         
