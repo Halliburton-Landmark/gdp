@@ -178,6 +178,7 @@ typedef struct gdp_pdu
 #define GDP_CMD_KEEPALIVE		0			// used for keepalives
 #define GDP_CMD_ADVERTISE		1			// advertise known GCLs
 #define GDP_CMD_WITHDRAW		2			// withdraw advertisment
+#define GDP_CMD_ROUTER_META		3			// reserved for router-router msgs
 //		64-127			Acknowledged commands
 #define GDP_CMD_PING			64			// test connection/subscription
 #define GDP_CMD_HELLO			65			// initial startup/handshake
