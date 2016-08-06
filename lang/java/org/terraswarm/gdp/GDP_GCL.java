@@ -15,20 +15,57 @@ import com.sun.jna.ptr.PointerByReference;
 import org.terraswarm.gdp.NativeSize; // Fixed by cxh in makefile.
 
 /**
- * GCL: GDP Channel Log
- * A class that represents a log. The name GCL is for historical reasons.
- * This mimics the Python wrapper around the GDP C-library. However, be
- * aware that this Java wrapper may not make the latest features available.
+ * A representation of a Global Data Plane (GDP) Channel Log (GCL).
+ *
+ * <p>This Java wrapper may not have the latest features in the
+ * underlying C implementation.</p>
  * 
  * @author Nitesh Mor, based on Christopher Brooks' early implementation.
- *
  */
 public class GDP_GCL {
+    
+    // The underscores in the names of public methods and variables should
+    // be preserved so that they match the underlying C-based gdp code.
+
+    /** 
+     * Initialize a new Global Data Plane Channel Log (GCL) object.
+     *
+     * Signatures are not yet supported. 
+     *
+     * @param name   Name of the log, which should already exist.
+     * @param iomode Should this be opened read only, read-append,
+     * append-only.  See {@link #GDP_MODE}.
+     */
+    public GDP_GCL(GDP_NAME name, GDP_MODE iomode) {
+        // FIXME: No signatures support.
+
+        EP_STAT estat;
+        
+        PointerByReference gclhByReference = new PointerByReference();
+        this.iomode = iomode;
+        this.gclName = name.internal_name();
+        
+        // Open the GCL.
+        estat = Gdp06Library.INSTANCE.gdp_gcl_open(ByteBuffer.wrap(this.gclName), 
+                            iomode.ordinal(), (PointerByReference) null, 
+                            gclhByReference);
+        GDP.check_EP_STAT(estat);
+
+        // Associate the C pointer to this object.
+        this.gclh = gclhByReference.getValue();
+        assert this.gclh != null;
+
+        // Add ourselves to the global map of pointers=>objects 
+        _allGclhs.put(this.gclh, this);
+    }
+
+    ///////////////////////////////////////////////////////////////////
+    ////                   public fields                           ////
 
     /**
-     * internal 256 bit name for the log
+     * The internal 256 bit name for the log.
      */
-    public byte[] gclname;
+    public byte[] gclName;
 
     /**
      * A pointer to the C gdp_gcl_t structure
@@ -53,14 +90,82 @@ public class GDP_GCL {
         ANY, RO, AO, RA
     }
 
+   
+    ///////////////////////////////////////////////////////////////////
+    ////                   public methods                          ////
+
     /**
-     * A global list of objects. Useful for get_next_event
+     * Append data to a log. This will create a new record in the log.
+     * 
+     * @param datum_dict    A dictionary containing the key "data". The value
+     *                      associated should be a byte[] containing the data
+     *                      to be appended.
      */
-    public static HashMap<Pointer, Object> object_dir = 
-            new HashMap<Pointer, Object>();
-    
+    public void append(Map<String, Object>datum_dict) {
+
+        EP_STAT estat;
+        GDP_DATUM datum = new GDP_DATUM();
+        
+        Object data = datum_dict.get("data");
+        datum.setbuf((byte[]) data);
+        
+        estat = Gdp06Library.INSTANCE.gdp_gcl_append(this.gclh,
+                                datum.gdp_datum_ptr);
+        GDP.check_EP_STAT(estat);
+
+        return;
+    }
+
     /**
-     * Create a GCL. Note that this is a static method. 
+     * Append data to a log. This will create a new record in the log.
+     * 
+     * @param data  Data that should be appended
+     */
+    public void append(byte[] data) {
+        
+        HashMap<String, Object> datum = new HashMap<String, Object>();
+        datum.put("data", data);
+        
+        this.append(datum);
+    }
+
+    /**
+     * Append data to a log, asynchronously. This will create a new record in the log.
+     * 
+     * @param datum_dict    A dictionary containing the key "data". The value
+     *                      associated should be a byte[] containing the data
+     *                      to be appended.
+     */
+    public void append_async(Map<String, Object>datum_dict) {
+
+        EP_STAT estat;
+        GDP_DATUM datum = new GDP_DATUM();
+        
+        Object data = datum_dict.get("data");
+        datum.setbuf((byte[]) data);
+        
+        estat = Gdp06Library.INSTANCE.gdp_gcl_append_async(this.gclh, 
+                                datum.gdp_datum_ptr, null, null);
+        GDP.check_EP_STAT(estat);
+
+        return;
+    }
+
+    /**
+     * Append data to a log, asynchronously. This will create a new record in the log.
+     * 
+     * @param data  Data that should be appended
+     */
+    public void append_async(byte[] data) {
+        
+        HashMap<String, Object> datum = new HashMap<String, Object>();
+        datum.put("data", data);
+        
+        this.append_async(datum);
+    }
+
+    /**
+     * Create a GCL.
      * 
      * @param logName   Name of the log to be created
      * @param logdName  Name of the log server where this should be 
@@ -95,53 +200,58 @@ public class GDP_GCL {
         return;
     }
     
-
     /**
-     * Create a GCL (with empty metadata). Note that this is a static method    
+     * Create a GCL (with empty metadata).
+     * @param logName   Name of the log
+     * @param logdName  Name of the logserver that should host this log
+     */
+    public static void create(String logName, String logdName) {
+        GDP_GCL.create(new GDP_NAME(logdName), new GDP_NAME(logName));
+    }
+    /**
+     * Create a GCL (with empty metadata).
      * @param logName   Name of the log
      * @param logdName  Name of the logserver that should host this log
      */
     public static void create(GDP_NAME logName, GDP_NAME logdName) {
-        create (logdName, logName, new HashMap<Integer, byte[]>());
+        GDP_GCL.create(logdName, logName, new HashMap<Integer, byte[]>());
     }
 
-    /** 
-     * Initialize a new GCL object.
-     * No signatures support, yet. TODO
-     * 
-     * @param name   Name of the log.
-     * @param iomode Should this be opened read only, read-append, append-only
+    /** Remove the gcl from the global list and 
+     *  free the associated pointer.
+     *  Note that finalize() is only called when the 
+     *  garbage collector decides that there are no
+     *  references to an object.  There is no guarantee 
+     *  that an object will be gc'd and that finalize
+     *  will be called.
      */
-    public GDP_GCL(GDP_NAME name, GDP_MODE iomode) {
-
-        EP_STAT estat;
-        
-        PointerByReference gclhByReference = new PointerByReference();
-        this.iomode = iomode;
-        this.gclname = name.internal_name();
-        
-        // open the GCL
-        estat = Gdp06Library.INSTANCE.gdp_gcl_open(ByteBuffer.wrap(this.gclname), 
-                            iomode.ordinal(), (PointerByReference) null, 
-                            gclhByReference);
-        GDP.check_EP_STAT(estat);
-
-        // associate the C pointer to this object.
-        this.gclh = gclhByReference.getValue();
-        assert this.gclh != null;
-
-        // Add ourselves to the global map of pointers=>objects 
-        object_dir.put(this.gclh, this);
-    }
-
-    public void finalize() {
+   public void finalize() {
         
         // remove ourselves from the global list
-        object_dir.remove(this.gclh);
+        _allGclhs.remove(this.gclh);
         
         // free the associated gdp_gcl_t
         Gdp06Library.INSTANCE.gdp_gcl_close(this.gclh);
-        
+    }
+
+    /** 
+     * Multiread: Similar to subscription, but for existing data
+     * only. Not for any future records
+     * See the documentation in C library for examples.
+     * 
+     * @param firstrec  The record num to start reading from
+     * @param numrecs   Max number of records to be returned. 
+     */
+    public void multiread(long firstrec, int numrecs) {
+
+        EP_STAT estat;
+        estat = Gdp06Library.INSTANCE
+                    .gdp_gcl_multiread(this.gclh, firstrec, numrecs,
+                                        null, null);
+
+        GDP.check_EP_STAT(estat);
+
+        return;
     }
 
     /** 
@@ -207,78 +317,6 @@ public class GDP_GCL {
         return datum_dict;
     }
 
-    /**
-     * Append data to a log. This will create a new record in the log.
-     * 
-     * @param datum_dict    A dictionary containing the key "data". The value
-     *                      associated should be a byte[] containing the data
-     *                      to be appended.
-     */
-    public void append(Map<String, Object>datum_dict) {
-
-        EP_STAT estat;
-        GDP_DATUM datum = new GDP_DATUM();
-        
-        Object data = datum_dict.get("data");
-        datum.setbuf((byte[]) data);
-        
-        estat = Gdp06Library.INSTANCE.gdp_gcl_append(this.gclh,
-                                datum.gdp_datum_ptr);
-        GDP.check_EP_STAT(estat);
-
-        return;
-    }
-
-    /**
-     * Append data to a log. This will create a new record in the log.
-     * 
-     * @param data  Data that should be appended
-     */
-    public void append(byte[] data) {
-        
-        HashMap<String, Object> datum = new HashMap<String, Object>();
-        datum.put("data", data);
-        
-        this.append(datum);
-    }
-
-    /**
-     * Append data to a log, asynchronously. This will create a new record in the log.
-     * 
-     * @param datum_dict    A dictionary containing the key "data". The value
-     *                      associated should be a byte[] containing the data
-     *                      to be appended.
-     */
-    public void append_async(Map<String, Object>datum_dict) {
-
-        EP_STAT estat;
-        GDP_DATUM datum = new GDP_DATUM();
-        
-        Object data = datum_dict.get("data");
-        datum.setbuf((byte[]) data);
-        
-        estat = Gdp06Library.INSTANCE.gdp_gcl_append_async(this.gclh, 
-                                datum.gdp_datum_ptr, null, null);
-        GDP.check_EP_STAT(estat);
-
-        return;
-    }
-
-
-    /**
-     * Append data to a log, asynchronously. This will create a new record in the log.
-     * 
-     * @param data  Data that should be appended
-     */
-    public void append_async(byte[] data) {
-        
-        HashMap<String, Object> datum = new HashMap<String, Object>();
-        datum.put("data", data);
-        
-        this.append_async(datum);
-    }
-
-
     /** 
      * Start a subscription to a log.
      * See the documentation in C library for examples.
@@ -300,24 +338,43 @@ public class GDP_GCL {
     }
 
     /** 
-     * Multiread: Similar to subscription, but for existing data
-     * only. Not for any future records
-     * See the documentation in C library for examples.
+     * Get the next event.
      * 
-     * @param firstrec  The record num to start reading from
-     * @param numrecs   Max number of records to be returned. 
+     * @param timeout_msec  Time (in ms) for which to block. Can be used 
+     *                      to block eternally as well.
      */
-    public void multiread(long firstrec, int numrecs) {
-
-        EP_STAT estat;
-        estat = Gdp06Library.INSTANCE
-                    .gdp_gcl_multiread(this.gclh, firstrec, numrecs,
-                                        null, null);
-
-        GDP.check_EP_STAT(estat);
-
-        return;
+    public static HashMap<String, Object> get_next_event(
+                        GDP_GCL obj, int timeout_msec) {
+        // This method is used by the Ptolemy interface to the GDP.
+        EP_TIME_SPEC timeout_spec = new EP_TIME_SPEC(timeout_msec/1000,
+                0, /* nanoseconds */
+                0.001f /* accuracy in seconds */);
+        return get_next_event(obj, timeout_spec);
     }
+
+    /** 
+     * Get data from next record for a subscription or multiread
+     * This is a wrapper around 'get_next_event', and works only 
+     * for subscriptions, multireads.
+     * 
+     * @param timeout_msec  Time (in ms) for which to block. Can be used 
+     *                      to block eternally as well.
+     */
+    public static HashMap<String, Object> get_next_event(
+                        GDP_GCL obj, EP_TIME_SPEC timeout) {
+        if (obj == null) {
+            return _helper_get_next_event(null, timeout);
+        } else {
+            HashMap<String, Object> tmp = _helper_get_next_event(
+                    obj.gclh, timeout);
+            assert tmp.get("gcl_handle") == obj;
+
+            return tmp;
+        }
+    }
+    
+    ///////////////////////////////////////////////////////////////////
+    ////                   private methods                         ////
 
     /** 
      * Get data from next record for a subscription or multiread
@@ -378,7 +435,7 @@ public class GDP_GCL {
         // TODO Fix signatures
         
         HashMap<String, Object> gdp_event = new HashMap<String, Object>();
-        gdp_event.put("gcl_handle", object_dir.get(_gclh));
+        gdp_event.put("gcl_handle", _allGclhs.get(_gclh));
         gdp_event.put("datum", datum_dict);
         gdp_event.put("type", type);
         gdp_event.put("stat", event_ep_stat);
@@ -387,42 +444,6 @@ public class GDP_GCL {
         Gdp06Library.INSTANCE.gdp_event_free(gdp_event_ptr);
         
         return gdp_event;
-    }
-    
-    /** 
-     * Get the next event.
-     * 
-     * @param timeout_msec  Time (in ms) for which to block. Can be used 
-     *                      to block eternally as well.
-     */
-    public static HashMap<String, Object> get_next_event(
-                        GDP_GCL obj, int timeout_msec) {
-        // This method is used by the Ptolemy interface to the GDP.
-        EP_TIME_SPEC timeout_spec = new EP_TIME_SPEC(timeout_msec/1000,
-                0, /* nanoseconds */
-                0.001f /* accuracy in seconds */);
-        return get_next_event(obj, timeout_spec);
-    }
-
-    /** 
-     * Get data from next record for a subscription or multiread
-     * This is a wrapper around 'get_next_event', and works only 
-     * for subscriptions, multireads.
-     * 
-     * @param timeout_msec  Time (in ms) for which to block. Can be used 
-     *                      to block eternally as well.
-     */
-    public static HashMap<String, Object> get_next_event(
-                        GDP_GCL obj, EP_TIME_SPEC timeout) {
-        if (obj == null) {
-            return _helper_get_next_event(null, timeout);
-        } else {
-            HashMap<String, Object> tmp = _helper_get_next_event(
-                    obj.gclh, timeout);
-            assert tmp.get("gcl_handle") == obj;
-
-            return tmp;
-        }
     }
     
 
@@ -468,4 +489,14 @@ public class GDP_GCL {
 
     //     return ev;
     // }
+
+    ///////////////////////////////////////////////////////////////////
+    ////                   private variables                       ////
+
+    /**
+     * A global list of objects, which is useful for get_next_event().
+     */
+    private static HashMap<Pointer, Object> _allGclhs = 
+            new HashMap<Pointer, Object>();
+
 }
