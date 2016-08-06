@@ -12,8 +12,9 @@
 : ${GDPLOGD_ARGS:="-D*=10"}
 : ${GDPLOGD_BIN:=$GDP_ROOT/sbin/gdplogd}
 : ${GDPLOGD_LOG:=$GDP_LOG_DIR/gdplogd.log}
+: ${LLOGGER:=llogger}
 
 {
 	echo `date +"%F %T %z"` Running $GDPLOGD_BIN $GDPLOGD_ARGS
 	exec $GDPLOGD_BIN $GDPLOGD_ARGS
-} 2>& 1 | llogger $GDPLOGD_LOG
+} 2>& 1 | ${LLOGGER} $GDPLOGD_LOG

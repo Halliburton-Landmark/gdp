@@ -20,6 +20,7 @@ fi
 : ${GDP_USER:=gdp}
 : ${MQTT_GATEWAY_ARGS:=-D*=2}
 : ${MQTT_GATEWAY_LOG:=$GDP_LOG_DIR/mqtt-gdp-gateway.log}
+: ${LLOGGER:=llogger}
 
 # if we are running as root, start over as gdp
 test `whoami` = "root" && exec sudo -u $GDP_USER $0 "$@"
@@ -75,4 +76,4 @@ test -f $MQTT_GATEWAY_LOG || cp /dev/null $MQTT_GATEWAY_LOG
 
 	echo "[INFO] Running $gw_prog $args"
 	exec $gw_prog $args
-} >> $MQTT_GATEWAY_LOG 2>&1
+} 2>&1 | ${LLOGGER} $MQTT_GATEWAY_LOG
