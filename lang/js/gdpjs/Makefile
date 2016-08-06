@@ -91,20 +91,29 @@ SHARED=	-shared
 #SHARED=	-shared -Wl,-soname,$@
 TIME=
 
+# Version of this library
 GDPJSLIBMAJVER=	1
 GDPJSLIBMINVER=	0
+
 GDPJSLIBVER=	${GDPJSLIBMAJVER}.${GDPJSLIBMINVER}
 
 # Version of the GDP Library, should match ../../../gdp/Makefile
 GDPLIBMAJVER=	0
 GDPLIBMINVER=	6
 
+GDPLIBVER= 	${GDPLIBMAJVER}.${GDPLIBMINVER}
+# The name of the library in ../../../gdp
+LIBGDP=		libgdp-${GDPLIBVER}
+
 # Version of the EP Library, should match ../../../ep/Makefile
 EPLIBMAJVER=	3
 EPLIBMINVER=	0
 
-ALL=		libgdpjs.a libgdpjs.so.${GDPJSLIBVER}
+EPLIBVER=	${EPLIBMAJVER}.${EPLIBMINVER}
+# The name of the library in ../../../ep
+LIBEP=		libep-${EPLIBVER}
 
+ALL=		libgdpjs.a libgdpjs.so.${GDPJSLIBVER}
 
 all: ${ALL}
 
@@ -112,85 +121,118 @@ libgdpjs.a: ${OBJS}
 	${AR} -r $@ ${OBJS}
 	${RANLIB} $@
 
-libgdpjs.so.${GDPJSLIBVER}: ${OBJS} ../gdp ../ep
+# Mac and Linux have different naming conventions, so we
+# conditionalize a script instead of having rules.  If we ran
+# configure somewhere, then we could avoid this, but configure has its
+# own set of complexities.  This rule generates the libgdpjs shared
+# library and then creates links in the libs directory that include
+# the gdp and ep shared libraries.  We need to have all three
+# libraries so that we can build a npm package.  Unfortunatley, RHEL
+# and Ubuntu seem to have different versioning conventions, so we need
+# both libxx-n.m.so and libxx.so.n-m.
+# Even more unfortunately, the way the Node ffi interface works, we have lines like
+
+#   var libep = ffi.Library(GDP_DIR + '/libs/libep.3.0', {
+
+# that need to work under RHEL, Ubuntu and Darwin.  So we default to
+# libep.n.m.so and libep.n.m.dylib.  We copy libep-n.m.so so as to
+# preserve the choices made in ../../../libep.  We do something
+# similar with libgdp-x.y.so.
+#
+libgdpjs.so.${GDPJSLIBVER}: ${OBJS}
 	${CC} ${SHARED} -o $@ ${OBJS} ${LDFLAGS}
-	(cd ${LIBDIR} && sh ${GDPROOT}/libs/makelinks.sh gdpjs ${GDPJSLIBMAJVER} ${GDPJSLIBMINVER})
-	(cd ${LIBDIR} && sh ${GDPROOT}/libs/makelinks.sh gdp ${GDPLIBMAJVER} ${GDPLIBMINVER})
-	(cd ${LIBDIR} && sh ${GDPROOT}/libs/makelinks.sh ep ${EPLIBMAJVER} ${EPLIBMINVER})
+	if [ "`uname -s`" = "Darwin" ]; then \
+		cp libgdpjs.so.${GDPJSLIBVER} ${LIBDIR}/libgdpjs.${GDPJSLIBVER}.dylib; \
+		if [ -f ../../../libs/libgdp.${GDPLIBVER}.dylib ]; then \
+			echo "Copying ../../../libs/libgdp.${GDPLIBVER}.dylib to ${LIBDIR}"; \
+			cp ../../../libs/libgdp.${GDPLIBVER}.dylib ${LIBDIR}/; \
+		fi; \
+		if [ -f ../../../libs/libep.${EPLIBVER}.dylib ]; then \
+			echo "Copying ../../../libs/libep.${EPLIBVER}.dylib to ${LIBDIR}/"; \
+			cp ../../../libs/libep.${EPLIBVER}.dylib ${LIBDIR}/; \
+		fi; \
+	else \
+		echo "Setting up libgdpjs"; \
+		cp libgdpjs.so.${GDPJSLIBVER} ${LIBDIR}/; \
+		(cd ${LIBDIR}; rm -f libgdpjs.${GDPJSLIBVER}.so; ln -s libgdpjs.so.${GDPJSLIBVER} libgdpjs.${GDPJSLIBVER}.so); \
+		(cd ${LIBDIR}; rm -f libgdpjs.so; ln -s libgdpjs.so.${GDPJSLIBVER} libgdp.so); \
+		echo "Setting up libgdp"; \
+		cp ../../../libs/${LIBGDP}.so ${LIBDIR}/; \
+		(cd ${LIBDIR}; rm -f libgdp.so.${GDPLIBVER}; ln -s ${LIBGDP}.so libgdp.so.${GDPLIBVER}); \
+		(cd ${LIBDIR}; rm -f libgdp.so.${GDPLIBMAJVER}; ln -s ${LIBGDP}.so libgdp.so.${GDPLIBMAJVER}); \
+		(cd ${LIBDIR}; rm -f libgdp.so; ln -s libgdp.so.${GDPLIBMAJVER} libgdp.so); \
+		(cd ${LIBDIR}; rm -f libgdp.${GDPLIBVER}.so; ln -s ${LIBGDP}.so libgdp.${GDPLIBVER}.so); \
+		echo "Setting up libep"; \
+		cp ../../../libs/${LIBEP}.so ${LIBDIR}/; \
+		(cd ${LIBDIR}; rm -f libep.so.${EPLIBVER}; ln -s ${LIBEP}.so libep.so.${EPLIBVER}); \
+		(cd ${LIBDIR}; rm -f libep.so.${EPLIBMAJVER}; ln -s ${LIBEP}.so libep.so.${EPLIBMAJVER}); \
+		(cd ${LIBDIR}; rm -f libep.so; ln -s libep.so.${EPLIBMAJVER} libep.so); \
+		(cd ${LIBDIR}; rm -f libep.${EPLIBVER}.so; ln -s ${LIBEP}.so libep.${EPLIBVER}.so); \
+		echo "Created links in ${LIBDIR}/"; \
+	fi \
 
 gdpjs_version.o: gdpjs_version.c FORCE
 	${CC} ${CFLAGS} -D_CURRENT_DATE_=\"`date +'%Y-%m-%d_%H:%M'`\" -c gdpjs_version.c
 
-../gdp:
-	if [ ! -d ../gdp ]; then \
-		echo "Create a copy of libgdp* so that we can bundle it up"; \
-		mkdir ../gdp; \
-		if [ -f ../../../libs/libgdp.${GDPLIBMAJVER}.${GDPLIBMINVER}.dylib ]; then \
-			echo "Copying ../../../libs/libgdp.${GDPLIBMAJVER}.${GDPLIBMINVER}.dylib to ../gdp"; \
-			cp ../../../libs/libgdp.${GDPLIBMAJVER}.${GDPLIBMINVER}.dylib ../gdp/libgdp.so.${GDPLIBMAJVER}.${GDPLIBMINVER}; \
-		else \
-			cp ../../../libs/libgdp* ../gdp/; \
-		fi \
-	fi
-
-
-../ep:
-	if [ ! -d ../ep ]; then \
-		echo "Create a copy of libep* so that we can bundle it up"; \
-		mkdir ../ep; \
-		if [ -f ../../../libs/libep.${EPLIBMAJVER}.${EPLIBMINVER}.dylib ]; then \
-			echo "Copying ../../../libs/libep.${EPLIBMAJVER}.${EPLIBMINVER}.dylib to ../ep"; \
-			cp ../../../libs/libep.${EPLIBMAJVER}.${EPLIBMINVER}.dylib ../ep/libep.so.${EPLIBMAJVER}.${EPLIBMINVER}; \
-		else \
-			cp ../../../libs/libep* ../ep/; \
-		fi \
-	fi
 FORCE:
 
 
+# When uploading a npm package, we want to include shared libraries
+# for the other platform.
+
+# Here, we copy them from $PTII.  A better solution would be to check
+# in the shared library files somewhere.
+
 # If we are running under Darwin, then copy the .so files from $PTII/lib.
 # If we are running under Linux, then copy the .dylib files from $PTII/lib.
-LIBEPDYLIB=libep.${EPLIBMAJVER}.${EPLIBMINVER}.dylib
+
+# Darwin shared libraries.
+LIBEPDYLIB=libep.${EPLIBVER}.dylib
 ../libs/${LIBEPDYLIB}:
 	@echo "Creating $@"
-	if [ ! -f ../ep/${LIBEPDYLIB} ]; then \
+	if [ ! -f ../libs/${LIBEPDYLIB} ]; then \
 		cp ${PTII}/lib/${LIBEPDYLIB} $@; \
 	fi
 
-LIBGDPDYLIB=libgdp.${GDPLIBMAJVER}.${GDPLIBMINVER}.dylib
+LIBGDPDYLIB=libgdp.${GDPLIBVER}.dylib
 ../libs/${LIBGDPDYLIB}:
-	if [ ! -f ../ep/${LIBGDPDYLIB} ]; then \
+	if [ ! -f ../libs/${LIBGDPDYLIB} ]; then \
 		cp ${PTII}/lib/${LIBGDPDYLIB} $@; \
 	fi
 
-LIBGDPJSDYLIB=libgdpjs.${GDPJSLIBMAJVER}.${GDPJSLIBMINVER}.dylib
+LIBGDPJSDYLIB=libgdpjs.${GDPJSLIBVER}.dylib
 ../libs/${LIBGDPJSDYLIB}:
-	if [ ! -f ../ep/${LIBGDPSJDYLIB} ]; then \
+	if [ ! -f ../libs/${LIBGDPSJDYLIB} ]; then \
 		cp ${PTII}/lib/${LIBGDPJSDYLIB} $@; \
 	fi
 
 
-LIBEPSO=libep-${EPLIBMAJVER}.${EPLIBMINVER}.so
+# Linux shared libraries
+LIBEPSO=libep.${EPLIBVER}.so
 ../libs/${LIBEPSO}:
-	if [ ! -f ../ep/${LIBEPSO} ]; then \
+	if [ ! -f ../libs/${LIBEPSO} ]; then \
 		cp ${PTII}/lib/${LIBEPSO} $@; \
 	fi
 
-LIBGDPSO=libgdp-${GDPLIBMAJVER}.${GDPLIBMINVER}.so
+LIBGDPSO=libgdp.${GDPLIBVER}.so
 ../libs/${LIBGDPSO}:
-	if [ ! -f ../ep/${LIBGDPSO} ]; then \
+	if [ ! -f ../libs/${LIBGDPSO} ]; then \
 		cp ${PTII}/lib/${LIBGDPSO} $@; \
 	fi
 
-LIBGDPJSSO=libgdpjs.${GDPJSLIBMAJVER}.${GDPJSLIBMINVER}.so
+LIBGDPJSSO=libgdpjs.${GDPJSLIBVER}.so
 ../libs/${LIBGDPJSSO}:
 	if [ ! -f ../ep/${LIBGDPSJSO} ]; then \
 		cp ${PTII}/lib/${LIBGDPJSSO} $@; \
 	fi
 
-LIBS=../libs/${LIBEPDYLIB} ../libs/${LIBGDPDYLIB} ../libs/${LIBGDPJSDYLIB} ../libs/${LIBEPSO} ../libs/${LIBGDPSO} ../libs/${LIBGDPJSSO}
+# All the shared libraries necessary  for npm.
+NPMLIBS=../libs/${LIBEPDYLIB} ../libs/${LIBGDPDYLIB} ../libs/${LIBGDPJSDYLIB} ../libs/${LIBEPSO} ../libs/${LIBGDPSO} ../libs/${LIBGDPJSSO}
 
-npmPublish: $(LIBS)
+# Copy the libraries for the other platform from $PTII.
+copyNpmLibs: $(NPMLIBS)
+
+npmPublish: $(NPMLIBS)
 	(cd ..; npm publish -access public)
 
 
@@ -200,5 +242,6 @@ npmPublish: $(LIBS)
 
 clean:
 	-${RM} -f ${ALL} *.o *.core
-	rm -rf ../ep ../gdp
+	-${RM} -f ../libs/*
+
 ${OBJS}: ${HFILES}
