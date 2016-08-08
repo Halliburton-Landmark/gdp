@@ -12,6 +12,10 @@
 
 . `dirname $0`/setup-common.sh
 
+# commit of Michigan gateway code to run: avoid bleeding edge bits
+# (may be null to use latest commit)
+gw_commit=71f9a6fc3d192364182473538121d430d4f4bd79
+
 node_setup=true
 if [ "x$1" = "x-n" ]
 then
@@ -45,7 +49,7 @@ fi
 root=`pwd`
 info "Installing Urban Heartbeat Kit from $root into $instdir"
 
-if $beaglebone
+if $beaglebone && [ -z "$gw_commit" ]
 then
 	# beaglebone, not much disk space
 	gitdepth="--depth 1"
@@ -109,6 +113,13 @@ cd $root
 rm -rf gateway
 git clone $gitdepth https://github.com/lab11/gateway.git
 cd gateway
+
+if [ ! -z "$gw_commit" ]
+then
+	echo ""
+	info "Getting lab11/gateway commit $gw_commit"
+	git checkout $gw_commit
+fi
 
 # verify that we have checked things out
 if [ ! -d software -o ! -d systemd ]
