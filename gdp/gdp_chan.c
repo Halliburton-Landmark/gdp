@@ -154,7 +154,10 @@ gdp_event_cb(struct bufferevent *bev, short events, void *ctx)
 		chan->state = GDP_CHAN_ERROR;
 		ep_thr_cond_broadcast(&chan->cond);
 
-		//_gdp_chan_close(pchan);
+		// close the (now dead) socket file descriptor
+		close(bufferevent_getfd(chan->bev));
+		bufferevent_setfd(chan->bev, -1);
+
 		do
 		{
 			long delay = ep_adm_getlongparam("swarm.gdp.reconnect.delay", 1000L);
