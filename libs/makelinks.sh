@@ -22,7 +22,7 @@ then
 fi
 . $GDP_SRC_ROOT/adm/common-support.sh
 
-info "Creating lib$lib links in $dir
+info "Creating lib$lib links in $dir"
 cd $dir
 
 info "Creating library links"
