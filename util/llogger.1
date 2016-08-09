@@ -6,6 +6,7 @@
 .Nd timestamp output lines for local log files
 .Sh SYNOPSIS
 .Nm
+.Op Fl t
 .Ar file-name
 .Sh DESCRIPTION
 .Nm
@@ -21,7 +22,11 @@ without restarting the process being logged.
 It is similar to a non-syslog version of
 .Xr logger 1 .
 .Sh OPTIONS
-None.
+.Bl -tag
+.It Fl t
+In addition to logging,
+.Dq tee
+the output to stdout.
 .\".Sh EXIT STATUS
 .\".Sh ENVIRONMENT
 .\".Sh FILES

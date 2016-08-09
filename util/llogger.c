@@ -6,6 +6,7 @@
 **  	Also allows for log rotation.
 */
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -51,12 +52,14 @@ main(int argc, char **argv)
 	FILE *out_fp;
 	const char *out_fname;
 	ino_t prev_ino = -1;
+	bool tee = false;
 
-	while ((opt = getopt(argc, argv, "")) > 0)
+	while ((opt = getopt(argc, argv, "t")) > 0)
 	{
 		switch (opt)
 		{
-		case 'x':
+		case 't':
+			tee = true;
 			break;
 		}
 	}
@@ -108,5 +111,16 @@ main(int argc, char **argv)
 				tm->tm_sec,
 				usec,
 				in_buf);
+
+		if (tee)
+			printf("%04d-%02d-%02d %02d:%02d:%02d.%06ldZ %s",
+					tm->tm_year + 1900,
+					tm->tm_mon + 1,
+					tm->tm_mday,
+					tm->tm_hour,
+					tm->tm_min,
+					tm->tm_sec,
+					usec,
+					in_buf);
 	}
 }
