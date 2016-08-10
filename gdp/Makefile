@@ -28,8 +28,8 @@
 
 # Version number of library.  All others are derived from here.
 GDP_VERSION_MAJOR=	0
-GDP_VERSION_MINOR=	6
-GDP_VERSION_PATCH=	1
+GDP_VERSION_MINOR=	7
+GDP_VERSION_PATCH=	0
 
 # These are generally changed on make command line
 DESTDIR=
