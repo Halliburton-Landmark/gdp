@@ -2,7 +2,7 @@
 #	GDP: Global Data Plane
 #	From the Ubiquitous Swarm Lab, 490 Cory Hall, U.C. Berkeley.
 #
-#	Copyright (c) 2015, Regents of the University of California.
+#	Copyright (c) 2015-2016, Regents of the University of California.
 #	All rights reserved.
 #
 #	Permission is hereby granted, without written agreement and without
@@ -25,8 +25,8 @@
 # ----- END LICENSE BLOCK -----
 
 
-NOTE: 
-For latest version of this, use `pydoc`. 
+NOTE:
+For latest version of this, use `pydoc`.
 
 Help on package gdp:
 
@@ -45,7 +45,7 @@ DESCRIPTION
     sets up the connection to a remote `gdp_router`. Example:
     
     ```
-    gdp_init("127.0.0.1", 8007)
+    gdp_init("127.0.0.1:8007")
     ```
     
     Next, you would like to have a `GDP_NAME` object that represents the 
@@ -68,15 +68,6 @@ DESCRIPTION
     python dictionary. `GDP_GCL` supports append, reading by record number,
     or subscriptions. For more details, look at the sample programs
     provided.
-
-PACKAGE CONTENTS
-    GDP_DATUM
-    GDP_GCL
-    GDP_NAME
-    MISC
-
-DATA
-    __all__ = [0, 1, 2, <function gdp_init>, <function gdp_run_accept_even...
 
 
 Help on class GDP_NAME in gdp:
@@ -132,13 +123,20 @@ gdp.GDP_GCL = class GDP_GCL
  |  __del__(self)
  |      close this GCL handle, and free the allocated resources
  |  
- |  __init__(self, name, iomode)
+ |  __init__(self, name, iomode, open_info={})
  |      Open a GCL with given name and io-mode
  |      Creating new GCL's is no longer supported.
  |      
  |      name=<name-of-gcl>, iomode=<mode>
  |      name is a GDP_NAME object
- |      mode is one of the following: GDP_MODE_ANY, GDP_MODE_RO, GDP_MODE_AO
+ |      mode is one of the following: GDP_MODE_ANY, GDP_MODE_RO, GDP_MODE_AO,
+ |                                    GDP_MODE_RA
+ |      open_info is a dictionary. It contains extra information, such as the
+ |          private signature key, etc. The key may be optional, depending on
+ |          how the log was created and if a log-server is set up to reject 
+ |          unsigned appends, for example.
+ |          Here is the (incomplete) list of keys and their description:
+ |          'skey': an instance of EP_CRYPTO_KEY containing the signature key
  |  
  |  append(self, datum_dict)
  |      Write a datum to the GCL. The datum should be a dictionary, with
@@ -146,7 +144,12 @@ gdp.GDP_GCL = class GDP_GCL
  |          data that is to be written
  |  
  |  append_async(self, datum_dict)
- |      XXX: This is still work in progress. Async version of append
+ |      Async version of append. A writer ought to check return status by
+ |          invoking get_next_event, potentially in a different thread
+ |  
+ |  getmetadata(self)
+ |      return the metadata included at creation time.
+ |          Represented as a python dict
  |  
  |  getname(self)
  |      Get the name of this GCL, returns a GDP_NAME object
@@ -155,6 +158,11 @@ gdp.GDP_GCL = class GDP_GCL
  |      Multiread. Refer to the C-API for details.
  |      For now, callbacks are not exposed to end-user. Events are
  |          generated instead.
+ |  
+ |  multiread_ts(self, startdict, numrecs)
+ |      Same as multiread, except that the starting point of multiread
+ |          is a timestamp dictionary rather than a record number.
+ |          (See also: 'read_ts')
  |  
  |  print_to_file(self, fh, detail, indent)
  |      Print this GDP object to a file. Could be sys.stdout
@@ -167,16 +175,30 @@ gdp.GDP_GCL = class GDP_GCL
  |                      being tv_sec, tv_nsec, tv_accuracy
  |          - data : the actual data associated with this datum.
  |  
+ |  read_ts(self, tsdict)
+ |      Same as 'read', but takes a time-stamp dictionary instead of
+ |      a record number. The time-stamp dictionary has the following
+ |      fields:
+ |          - tv_sec: seconds since epoch (an integer)
+ |          - tv_nsec: nano seconds (an integer)
+ |          - tv_accuracy: accuracy (a float)
+ |  
  |  subscribe(self, start, numrecs, timeout)
  |      Subscriptions. Refer to the C-API for more details
  |      For now, callbacks are not exposed to end-user. Events are 
  |          generated instead.
  |  
+ |  subscribe_ts(self, startdict, numrecs, timeout)
+ |      Same as subscribe, except that the starting point of subscription
+ |          is a timestamp dictionary rather than a record number.
+ |          (See also: 'read_ts')
+ |  
  |  ----------------------------------------------------------------------
  |  Class methods defined here:
  |  
- |  create(cls, name, logd_name) from __builtin__.classobj
- |      create a new GCL with 'name' on 'logdname'
+ |  create(cls, name, logd_name, metadata) from __builtin__.classobj
+ |      create a new GCL with 'name' on 'logd_name'
+ |      metadata is a dictionary with keys as 32-bit unsigned integers
  |  
  |  get_next_event(cls, timeout) from __builtin__.classobj
  |      Get events for ANY open gcl

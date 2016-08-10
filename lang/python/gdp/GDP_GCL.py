@@ -209,6 +209,51 @@ class GDP_GCL:
         return metadata
             
 
+    def __read(self, query_param):
+        """
+        An internal helper function for read. Either read by record number
+            or read by timestamp. If query_param is 'int', we assume it is
+            query by record number. If query_param is 'dict', we assume it
+            is query by timestamp
+        """
+
+        datum = GDP_DATUM()
+
+        if isinstance(query_param, int):
+            __query_param = gdp_recno_t(query_param)
+
+            __func = gdp.gdp_gcl_read
+            __func.argtypes = [POINTER(self.gdp_gcl_t), gdp_recno_t,
+                                    POINTER(GDP_DATUM.gdp_datum_t)]
+            __func.restype = EP_STAT
+
+        elif isinstance(query_param, dict):
+
+            __query_param = GDP_DATUM.EP_TIME_SPEC()
+            __query_param.tv_sec = c_int64(query_param['tv_sec'])
+            __query_param.tv_nsec = c_uint32(query_param['tv_nsec'])
+            __query_param.tv_accuracy = c_float(query_param['tv_accuracy'])
+
+            __func = gdp.gdp_gcl_read_ts
+            __func.argtypes = [POINTER(self.gdp_gcl_t),
+                                    POINTER(GDP_DATUM.EP_TIME_SPEC),
+                                    POINTER(GDP_DATUM.gdp_datum_t)]
+            __func.restype = EP_STAT
+
+        else:   # should never reach here
+            assert False
+
+        estat = __func(self.ptr, __query_param, datum.gdp_datum)
+        check_EP_STAT(estat)
+
+        datum_dict = {}
+        datum_dict["recno"] = datum.getrecno()
+        datum_dict["ts"] = datum.getts()
+        datum_dict["data"] = datum.getbuf()
+        datum_dict["sig"] = datum.getsig()
+        datum_dict["sigalg"] = datum.getsigmdalg()
+
+        return datum_dict
 
 
     def read(self, recno):
@@ -220,25 +265,27 @@ class GDP_GCL:
             - data : the actual data associated with this datum.
         """
 
-        datum = GDP_DATUM()
-        __recno = gdp_recno_t(recno)
+        return self.__read(recno)
 
-        __func = gdp.gdp_gcl_read
-        __func.argtypes = [POINTER(self.gdp_gcl_t), gdp_recno_t,
-                                POINTER(GDP_DATUM.gdp_datum_t)]
-        __func.restype = EP_STAT
 
-        estat = __func(self.ptr, __recno, datum.gdp_datum)
-        check_EP_STAT(estat)
+    def read_ts(self, tsdict):
+        """
+        Same as 'read', but takes a time-stamp dictionary instead of
+        a record number. The time-stamp dictionary has the following
+        fields:
+            - tv_sec: seconds since epoch (an integer)
+            - tv_nsec: nano seconds (an integer)
+            - tv_accuracy: accuracy (a float)
+        """
 
-        datum_dict = {}
-        datum_dict["recno"] = datum.getrecno()
-        datum_dict["ts"] = datum.getts()
-        datum_dict["data"] = datum.getbuf()
-        datum_dict["sig"] = datum.getsig()
-        datum_dict["sigalg"] = datum.getsigmdalg()
+        # the internal implementation is the same, we don't really
+        #   need two different functions. The only reason is to make
+        #   it clear to the user that reading by record number has
+        #   a different meaning than reading by timestamp (especially
+        #   when we don't trust the log-server to provide correct
+        #   timestamps.
+        return self.__read(tsdict)
 
-        return datum_dict
 
     def append(self, datum_dict):
         """
@@ -293,10 +340,29 @@ class GDP_GCL:
         """
         This works somewhat similar to the subscribe in GDP C api.
         callback functions is experimental. Events are better for now.
+
+        'start' could either be an 'int' (to represent record number),
+            or a 'dict' (to represent a timestamp)
         """
 
-        # casting start to ctypes
-        __start = gdp_recno_t(start)
+        if isinstance(start, int):
+            # casting start to ctypes
+            __start = gdp_recno_t(start)
+
+            __start_type = gdp_recno_t
+            __func = gdp.gdp_gcl_subscribe
+
+        elif isinstance(start, dict):
+            __start = GDP_DATUM.EP_TIME_SPEC()
+            __start.tv_sec = c_int64(start['tv_sec'])
+            __start.tv_nsec = c_uint32(start['tv_nsec'])
+            __start.tv_accuracy = c_float(start['tv_accuracy'])
+
+            __start_type = POINTER(GDP_DATUM.EP_TIME_SPEC)
+            __func = gdp.gdp_gcl_subscribe_ts
+
+        else:   # should never reach here
+            assert False
 
         # casting numrecs to ctypes
         __numrecs = c_int32(numrecs)
@@ -316,13 +382,12 @@ class GDP_GCL:
         else:
             __cbfunc = self.gdp_gcl_sub_cbfunc_t(cbfunc)
 
-        __func = gdp.gdp_gcl_subscribe
         if cbfunc == None:
-            __func.argtypes = [POINTER(self.gdp_gcl_t), gdp_recno_t,
+            __func.argtypes = [POINTER(self.gdp_gcl_t), __start_type,
                                 c_int32, POINTER(GDP_DATUM.EP_TIME_SPEC),
                                 c_void_p, c_void_p]
         else:
-            __func.argtypes = [POINTER(self.gdp_gcl_t), gdp_recno_t,
+            __func.argtypes = [POINTER(self.gdp_gcl_t), __start_type,
                                 c_int32, POINTER(GDP_DATUM.EP_TIME_SPEC),
                                 self.gdp_gcl_sub_cbfunc_t, c_void_p]
 
@@ -333,6 +398,7 @@ class GDP_GCL:
         check_EP_STAT(estat)
         return estat
 
+
     def subscribe(self, start, numrecs, timeout):
         """
         Subscriptions. Refer to the C-API for more details
@@ -341,13 +407,39 @@ class GDP_GCL:
         """
         return self.__subscribe(start, numrecs, timeout, None, None)
 
+
+    def subscribe_ts(self, startdict, numrecs, timeout):
+        """
+        Same as subscribe, except that the starting point of subscription
+            is a timestamp dictionary rather than a record number.
+            (See also: 'read_ts')
+        """
+        return self.__subscribe(startdict, numrecs, timeout, None, None)
+
+
     def __multiread(self, start, numrecs, cbfunc, cbarg):
         """
         similar to multiread in the GDP C API
         """
 
-        # casting start to ctypes
-        __start = gdp_recno_t(start)
+        if isinstance(start, int):
+            # casting start to ctypes
+            __start = gdp_recno_t(start)
+
+            __start_type = gdp_recno_t
+            __func = gdp.gdp_gcl_multiread
+
+        elif isinstance(start, dict):
+            __start = GDP_DATUM.EP_TIME_SPEC()
+            __start.tv_sec = c_int64(start['tv_sec'])
+            __start.tv_nsec = c_uint32(start['tv_nsec'])
+            __start.tv_accuracy = c_float(start['tv_accuracy'])
+
+            __start_type = POINTER(GDP_DATUM.EP_TIME_SPEC)
+            __func = gdp.gdp_gcl_multiread_ts
+
+        else:
+            assert False
 
         # casting numrecs to ctypes
         __numrecs = c_int32(numrecs)
@@ -358,18 +450,18 @@ class GDP_GCL:
         else:
             __cbfunc = self.gdp_gcl_sub_cbfunc_t(cbfunc)
 
-        __func = gdp.gdp_gcl_multiread
         if cbfunc == None:
-            __func.argtypes = [POINTER(self.gdp_gcl_t), gdp_recno_t, c_int32,
-                               c_void_p, c_void_p]
+            __func.argtypes = [POINTER(self.gdp_gcl_t), __start_type,
+                                c_int32, c_void_p, c_void_p]
         else:
-            __func.argtypes = [POINTER(self.gdp_gcl_t), gdp_recno_t, c_int32,
-                               self.gdp_gcl_sub_cbfunc_t, c_void_p]
+            __func.argtypes = [POINTER(self.gdp_gcl_t), __start_type,
+                                c_int32, self.gdp_gcl_sub_cbfunc_t, c_void_p]
         __func.restype = EP_STAT
 
         estat = __func(self.ptr, __start, __numrecs, __cbfunc, cbarg)
         check_EP_STAT(estat)
         return estat
+
 
     def multiread(self, start, numrecs):
         """
@@ -379,6 +471,18 @@ class GDP_GCL:
         """
 
         return self.__multiread(start, numrecs, None, None)
+
+
+    def multiread_ts(self, startdict, numrecs):
+        """
+        Same as multiread, except that the starting point of multiread
+            is a timestamp dictionary rather than a record number.
+            (See also: 'read_ts')
+        """
+
+        return self.__multiread(startdict, numrecs, None, None)
+
+
 
     def print_to_file(self, fh, detail, indent):
         """
