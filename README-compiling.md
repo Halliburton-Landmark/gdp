@@ -93,29 +93,44 @@ build tools you will need.
 
 Other packages are installed by `adm/gdp-setup.sh`.  Note that
 this script will try to determine if you are using `brew` or
-`macports`.  Of the two, `macports` is better understood.
+`macports. ` Of the two, `macports` is better understood.
+
+To install macports, see https://www.macports.org/install.php
+
+To install brew, see http://brew.sh/ and run
+   /usr/bin/ruby -e \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)\""
+
+Then run `adm/gdp-setup.sh`.
+
 Unfortunately there are some reports that neither of them has
 all the modules you may need if you are compiling everything,
 so you may have to download other packages from source code.
 
 It's been reported that brew doesn't include Avahi at all, so
 if you are using that package manager you'll probably have to
-compile Avahi for yourself.  As an alternative, you can
-remove Zeroconf from the compilation entirely using
-`-DGDP_OSCF_USE_ZEROCONF=0`.  The easiest way to do this is
-to build using:
+compile Avahi for yourself. 
 
-    make STD='-DGDP_OSCF_USER_ZEROCONF=0'
+As an alternative, you can remove Zeroconf from the compilation
+entirely using:
 
-(Using the STD variable is a hack, but it should work.)
-You'll also have to remove references to `gdp_zc_*` from
-`gdp/Makefile`, and `gdp-zc*` from `apps/Makefile`.
+    make all_no_avahi
+
+If you really want to attempt to build avahi:
+
+    wget https://github.com/lathiat/avahi/releases/download/v0.6.32/avahi-0.6.32.tar.gz
+    tar -zxf avahi-0.6.32.tar.gz
+    cd avahi-0.6.32
+   ./configure --disable-qt4 --disable-qt3 --disable-gtk --disable-gtk3 --disable-gdbm --disable-pygtk --disable-python-dbus --disable-mono 
+    make -k
+
+Then, as root, cd to the avahi-0.6.32 directory and run:
+
+    make -k install
 
 ### Red Hat
 
-Red Hat is not well supported, although some people have been
-able to make it work.  Christopher Brooks is the best contact for
-this platform.
+Debian is the preferred Linux distribution for the GDP, though
+a nightly build uses Red Hat.
 
 ### FreeBSD
 
