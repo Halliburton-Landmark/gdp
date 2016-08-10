@@ -51,12 +51,18 @@ clean:
 	(cd examples;	make clean)
 	rm -f gdp-client*.deb gdp-server*.deb python-gdp*.deb README*.html
 
-install:
+install-client:
 	(cd ep;		make install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
 	(cd gdp;	make install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
-	(cd gdplogd;	make install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
 	(cd apps;	make install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
+
+install-gdplogd:
+	(cd gdplogd;	make install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
+
+install-doc:
 	(cd doc;	make install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
+
+install: install-client install-gdplogd install-doc
 	mkdir -p ${DOCDIR}
 	cp -rp examples ${DOCDIR}
 
@@ -115,7 +121,7 @@ clean_JavaScript:
 VER=		XX
 debian-package:
 	@[ "${VER}" != "XX" ] || ( echo "Must include VER=<version>"; exit 1 )
-	deb-pkg/package-client.sh $(VER)
+	deb-pkg/client/package.sh $(VER)
 	deb-pkg/package-server.sh $(VER)
 	lang/python/deb-pkg/package.sh $(VER)
 
