@@ -255,7 +255,7 @@ clean:
 install:	${ALLDIRS} ${PUBALL}
 	${CP} ${INCALL} ${INCDIR}/ep
 	${INSTALL} ${LIBALL} ${LIBDIR}
-	sh ${LOCALLIBSDIR}/makelinks.sh ep ${EPLIBMAJVER} ${EPLIBMINVER}) ${LIBDIR}
+	sh ${LOCALLIBSDIR}/makelinks.sh ep ${EPLIBMAJVER} ${EPLIBMINVER} ${LIBDIR}
 
 ${ALLDIRS}:
 	${MKDIR} $@
