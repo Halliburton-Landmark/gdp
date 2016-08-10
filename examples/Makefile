@@ -56,6 +56,11 @@ MKDIR=		mkdir -p
 
 all:	${ALL}
 
+# Build without avahi, the zero-conf facility that
+# can be tricky to compile under Mac OS X.
+all_noavahi:
+	${MAKE}	STD=-DGDP_OSCF_USE_ZEROCONF=0 LIBAVAHI=  all
+
 machine-mon:	machine-mon.o
 	${CC} -o $@ machine-mon.o ${LDFLAGS}
 

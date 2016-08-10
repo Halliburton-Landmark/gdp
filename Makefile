@@ -32,6 +32,7 @@ LOCALROOT=	/usr
 INSTALLROOT=	${DESTDIR}${LOCALROOT}
 DOCDIR=		${INSTALLROOT}/share/doc/gdp
 
+
 all:
 	#(cd doc;	make all)	# needs pandoc
 	(cd ep;		make all)
@@ -40,6 +41,16 @@ all:
 	(cd gdplogd;	make all)
 	(cd apps;	make all)
 	(cd examples;	make all)
+
+# Build without avahi, the zero-conf facility that
+# can be tricky to compile under Mac OS X.
+all_noavahi:
+	(cd ep;		make all)
+	(cd gdp;	make all_noavahi)
+	(cd scgilib;	make all)
+	(cd gdplogd;	make all_noavahi)
+	(cd apps;	make all_noavahi)
+	(cd examples;	make all_noavahi)
 
 clean:
 	(cd doc;	make clean)

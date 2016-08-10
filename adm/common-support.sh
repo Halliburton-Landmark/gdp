@@ -63,9 +63,19 @@ package() {
 	    ;;
 	"darwin")
 	    if [ -z "$pkgmgr" ]; then
-		if type brew > /dev/null 2>&1 && [ ! -z "`brew list`" ]; then
+		if type brew > /dev/null 2>&1 && [ ! -z "`brew config`" ]; then
 		    pkgmgr=brew
-		    sudo brew update
+		    brew=`which brew`
+		    if [ -f $brew ]; then
+			brewUser=`ls -l $brew | awk '{print $3}'`
+			# Only use sudo to update brew if the brew binary is owned by root.
+			# This avoids "Cowardly refusing to 'sudo brew update'"
+			if [ "$brewUser" = "root" ]; then
+			    sudo brew update
+			else
+			    brew update
+			fi
+		    fi
 		fi
 		if type port > /dev/null 2>&1 && port installed | grep -q .; then
 		    if [ "$pkgmgr" = "brew" ]; then
@@ -77,7 +87,7 @@ package() {
 		    fi
 		fi
 		if [ -z "$pkgmgr" ]; then
-		    fatal "you must install macports or homebrew"
+		    fatal "you must install macports or homebrew.  To install homebrew: /usr/bin/ruby -e \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)\""
 		fi
 	    fi
 	    if [ "$pkgmgr" = "brew" ]; then
