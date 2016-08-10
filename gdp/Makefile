@@ -70,6 +70,10 @@ MAN8ALL=
 
 MANALL=		${MAN1ALL} ${MAN3ALL} ${MAN5ALL} ${MAN7ALL} ${MAN8ALL}
 
+OBJS_ZC = \
+	gdp_zc_client.o \
+	gdp_zc_server.o
+
 OBJS_MOST=	\
 	gdp_api.o \
 	gdp_buf.o \
@@ -87,8 +91,7 @@ OBJS_MOST=	\
 	gdp_stat.o \
 	gdp_subscr.o \
 	gdp_util.o \
-	gdp_zc_client.o \
-	gdp_zc_server.o \
+	$(OBJS_ZC)
 
 OBJS=	\
 	${OBJS_MOST} \
@@ -159,6 +162,11 @@ SHARED=		-shared ${CRYPTOLFLAGS}
 INSTALL=	install
 
 all: ${ALL}
+
+# Build without avahi, the zero-conf facility that
+# can be tricky to compile under Mac OS X.
+all_noavahi:
+	${MAKE}	STD=-DGDP_OSCF_USE_ZEROCONF=0 LIBAVAHI= OBJS_ZC= all
 
 ${LIBNAME}.a: ${OBJS}
 	${AR} -r $@ ${OBJS}

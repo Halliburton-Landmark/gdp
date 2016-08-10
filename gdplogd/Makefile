@@ -123,6 +123,11 @@ LIBDEPS= \
 
 all: ${CLEANALL}
 
+# Build without avahi, the zero-conf facility that
+# can be tricky to compile under Mac OS X.
+all_noavahi:
+	${MAKE}	STD=-DGDP_OSCF_USE_ZEROCONF=0 LIBAVAHI= OBJS_ZC= all
+
 logd_version.o: logd_version.c ${OBJS_MOST} Makefile
 	${CC} ${CFLAGS} \
 		-D_VERSION_INFO_="\"`sh ../adm/get-version-info.sh`\"" \

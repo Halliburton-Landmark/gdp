@@ -26,18 +26,20 @@
 #  ----- END LICENSE BLOCK -----
 #
 
+BINALL_ZC=	gdp-zcbrowse
 #ALL=	gcl-create gdp-writer gdp-reader gdp-rest rw-bench log-view
 BINALL=		gcl-create \
 		log-mirror \
 		gdp-reader \
 		gdp-writer \
-		gdp-zcbrowse \
+		$(BINALL_ZC) \
 
+SBINALL_ZC= 	gdp-zcpublish
 SBINALL=	gdp-rest \
 		log-view \
 		gdp-name-xlate \
 		gdp-newsegment \
-		gdp-zcpublish \
+		$(SBINALL_ZC) \
 
 MAN1ALL=	gdp-reader.1 \
 		gdp-writer.1 \
@@ -109,6 +111,11 @@ CFLAGS=		${COPTS} ${INCS}
 MKDIR=		mkdir -p
 
 all:	${ALL}
+
+# Build without avahi, the zero-conf facility that
+# can be tricky to compile under Mac OS X.
+all_noavahi:
+	${MAKE}	STD=-DGDP_OSCF_USE_ZEROCONF=0 LIBAVAHI= BINALL_ZC= SBINALL_ZC= all
 
 gcl-create:	gcl-create.o
 	${CC} -o $@ gcl-create.o ${LDFLAGS}
