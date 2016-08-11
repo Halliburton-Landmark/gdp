@@ -33,13 +33,10 @@
 # If you change the GDP version, then also update $PTII/configure.in and
 # https://www.terraswarm.org/swarmos/wiki/Main/GDPJavaInterface
 GDPLIBMAJVER=	0
-GDPLIBMINVER=	6
-GDP_PATCH_VERSION=1
+GDPLIBMINVER=	7
+GDP_PATCH_VERSION=0
 
 GDP_MAJOR_MINOR_VERSION=$(GDPLIBMAJVER).$(GDPLIBMINVER)
-
-
-
 
 all: jclass
 
@@ -145,7 +142,7 @@ jna: $(JNAERATOR_JAR) $(JNAERATOR_RUNTIME_JAR) $(GDP_H_FILES) $(LIBEVENT_H_FILES
 	# Fix up NativeSize. We want our included version of NativeSize be used, instead of JNAerator's version:
 	for file in org/terraswarm/gdp/*.java org/terraswarm/gdp/*/*.java; do \
 	echo "Fixing $$file"; \
-	sed -i -e 's@com.ochafik.lang.jnaerator.runtime.NativeSize@org.terraswarm.gdp.NativeSize@' $$file; \
+	sed -i "" -e "s@Gdp[0-9]*Library@Gdp${GDPLIBMAJVER}${GDPLIBMINVER}Library@" -e 's@com.ochafik.lang.jnaerator.runtime.NativeSize@org.terraswarm.gdp.NativeSize@' $$file; \
 	done
 	# Empty target. See https://www.gnu.org/software/make/manual/html_node/Empty-Targets.html
 	touch jna
