@@ -1,6 +1,36 @@
+/* Global Data Plane Utility functions.
+   Copyright (c) 2015-2016 The Regents of the University of California.
+   All rights reserved.
+   Permission is hereby granted, without written agreement and without
+   license or royalty fees, to use, copy, modify, and distribute this
+   software and its documentation for any purpose, provided that the above
+   copyright notice and the following two paragraphs appear in all copies
+   of this software.
+
+   IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY
+   FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+   ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+   THE UNIVERSITY OF CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF
+   SUCH DAMAGE.
+
+   THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+   INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+   MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE SOFTWARE
+   PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE UNIVERSITY OF
+   CALIFORNIA HAS NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES,
+   ENHANCEMENTS, OR MODIFICATIONS.
+
+   PT_COPYRIGHT_VERSION_2
+   COPYRIGHTENDKEY
+
+ */
+
+
 package org.terraswarm.gdp; 
+
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.Map;
 import java.awt.PointerInfo;
@@ -14,30 +44,23 @@ import com.sun.jna.ptr.PointerByReference;
 import org.terraswarm.gdp.NativeSize; // Fixed by cxh in makefile.
 
 /**
- * A class to hold utility functions for the GDP. For the lack of a 
- * better name and to keep things concise, we just call it GDP.
- * Most (if not all) members of this class should be static. The 
- * auto-generated constants in Gdp05Library.java that should be made
- * available to the users should also ideally be copied here.
+ * Utility functions for the GDP. For the lack of a better name and to
+ * keep things concise, we just call it GDP.  Most (if not all)
+ * members of this class should be static. The auto-generated
+ * constants in Gdp07Library.java that should be made available to the
+ * users should also ideally be copied here.
  *  
- * @author nitesh mor
- *
+ * @author Nitesh Mor, Christopher Brooks
  */
 public class GDP {
 
-    // some constants
-    public static final int GDP_GCLMD_XID     = 0x00584944; 
-    public static final int GDP_GCLMD_PUBKEY  = 0x00505542;
-    public static final int GDP_GCLMD_CTIME   = 0x0043544D;      
-    public static final int GDP_GCLMD_CID     = 0x00434944;
-       
     /**
      * Initialize GDP library, with any parameters specified
      * in configuration files.
      */
     public static void gdp_init() {
         EP_STAT estat;
-        estat = Gdp06Library.INSTANCE.gdp_init((Pointer)null);        
+        estat = Gdp07Library.INSTANCE.gdp_init((Pointer)null);        
         check_EP_STAT(estat);        
        
     }
@@ -49,7 +72,7 @@ public class GDP {
      */
     public static void gdp_init(String gdpRouter) {
         EP_STAT estat;
-        estat = Gdp06Library.INSTANCE.gdp_init(gdpRouter);
+        estat = Gdp07Library.INSTANCE.gdp_init(gdpRouter);
         check_EP_STAT(estat);
         
     }
@@ -60,24 +83,40 @@ public class GDP {
      */
     public static void dbg_set(String debug_level) {
 
-        Gdp06Library.INSTANCE.ep_dbg_set(debug_level);
+        Gdp07Library.INSTANCE.ep_dbg_set(debug_level);
     }
-
 
     /** 
      * Error checking. For any GDP call that returns an EP_STAT 
      * structure, this is where we decode the integer return code.
-     * <p>
-     * TODO ideally should throw exceptions that ought to be caught
+     * @param estat The EP_STAT structure that contains the error code.
      */
     public static boolean check_EP_STAT(EP_STAT estat){
 
         int code = estat.code;
-        int EP_STAT_SEVERITY = (code >>> Gdp06Library._EP_STAT_SEVSHIFT)
-                & ((1 << Gdp06Library._EP_STAT_SEVBITS) - 1);
-
-        return (EP_STAT_SEVERITY < Gdp06Library.EP_STAT_SEV_WARN);
+        int EP_STAT_SEVERITY = (code >>> Gdp07Library._EP_STAT_SEVSHIFT)
+                & ((1 << Gdp07Library._EP_STAT_SEVBITS) - 1);
+        return (EP_STAT_SEVERITY < Gdp07Library.EP_STAT_SEV_WARN);
     }
 
-    
+    /** 
+     * Error checking. For any GDP call that returns an EP_STAT 
+     * structure, this is where we decode the integer return code.
+     * @param estat The EP_STAT structure that contains the error code.
+     * @param message The message to be used if an exception is thrown.
+     * @exception GDPException If {@link #check_EP_STAT(EP_STAT)} returns false.
+     */
+    public static void check_EP_STAT(EP_STAT estat, String message)
+	throws GDPException {
+	if (!check_EP_STAT(estat)) {
+	    throw new GDPException(message + " (code was " + estat.code + ")");
+	}
+    }
+
+    public static final int GDP_GCLMD_XID     = 0x00584944; 
+    public static final int GDP_GCLMD_PUBKEY  = 0x00505542;
+    public static final int GDP_GCLMD_CTIME   = 0x0043544D;      
+    public static final int GDP_GCLMD_CID     = 0x00434944;
+       
+
 }

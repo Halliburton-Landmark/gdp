@@ -1,4 +1,33 @@
+/* A Global Data Plane (GDP) Channel Log (GCL).
+
+   Copyright (c) 2015-2016 The Regents of the University of California.
+   All rights reserved.
+   Permission is hereby granted, without written agreement and without
+   license or royalty fees, to use, copy, modify, and distribute this
+   software and its documentation for any purpose, provided that the above
+   copyright notice and the following two paragraphs appear in all copies
+   of this software.
+
+   IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY
+   FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+   ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+   THE UNIVERSITY OF CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF
+   SUCH DAMAGE.
+
+   THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+   INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+   MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE SOFTWARE
+   PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE UNIVERSITY OF
+   CALIFORNIA HAS NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES,
+   ENHANCEMENTS, OR MODIFICATIONS.
+
+   PT_COPYRIGHT_VERSION_2
+   COPYRIGHTENDKEY
+
+ */
+
 package org.terraswarm.gdp; 
+
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.util.Date;
@@ -15,12 +44,12 @@ import com.sun.jna.ptr.PointerByReference;
 import org.terraswarm.gdp.NativeSize; // Fixed by cxh in makefile.
 
 /**
- * A representation of a Global Data Plane (GDP) Channel Log (GCL).
+ * A Global Data Plane (GDP) Channel Log (GCL).
  *
  * <p>This Java wrapper may not have the latest features in the
  * underlying C implementation.</p>
  * 
- * @author Nitesh Mor, based on Christopher Brooks' early implementation.
+ * @author Nitesh Mor, Christopher Brooks
  */
 public class GDP_GCL {
     
@@ -32,13 +61,21 @@ public class GDP_GCL {
      *
      * Signatures are not yet supported. 
      *
-     * @param name   Name of the log, which should already exist.
+     * @param name   Name of the log, which will be created if necessary.
      * @param iomode Should this be opened read only, read-append,
      * append-only.  See {@link #GDP_MODE}.
+     * @param logdName  Name of the log server where this should be 
+     *                  placed if it does not yet exist.
+     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp07Library.EP_STAT_SEV_WARN.
      */
-    public GDP_GCL(GDP_NAME name, GDP_MODE iomode) {
+    public GDP_GCL(GDP_NAME name, GDP_MODE iomode, GDP_NAME logdName) throws GDPException {
         // FIXME: No signatures support.
 
+	System.out.println("GDP_GCL.java: GDP_GCL(" + name +
+			   "(" + new String(name.printable_name()) +
+			   "), " + iomode + ", " + logdName +
+			   "(" + new String(logdName.printable_name()) +
+			   ")");
         EP_STAT estat;
         
         PointerByReference gclhByReference = new PointerByReference();
@@ -46,10 +83,21 @@ public class GDP_GCL {
         this.gclName = name.internal_name();
         
         // Open the GCL.
-        estat = Gdp06Library.INSTANCE.gdp_gcl_open(ByteBuffer.wrap(this.gclName), 
+	GDP.dbg_set("*=20");
+        estat = Gdp07Library.INSTANCE.gdp_gcl_open(ByteBuffer.wrap(this.gclName), 
                             iomode.ordinal(), (PointerByReference) null, 
                             gclhByReference);
-        GDP.check_EP_STAT(estat);
+	if (!GDP.check_EP_STAT(estat)) {
+	    System.out.println("GDP_GCL: gdp_gcl_open() failed, trying to create the log and call gdp_gcl_open() again.");
+	    GDP_GCL.create(name, logdName);
+	    estat = Gdp07Library.INSTANCE.gdp_gcl_open(ByteBuffer.wrap(this.gclName), 
+						       iomode.ordinal(), (PointerByReference) null, 
+						       gclhByReference);
+	}
+        GDP.check_EP_STAT(estat, "gdp_gcl_open(" +
+			  gclName + "(" + new String(name.printable_name(),0) + "), " +
+			  iomode.ordinal() + ", null, " +
+			  gclhByReference + ") failed.");
 
         // Associate the C pointer to this object.
         this.gclh = gclhByReference.getValue();
@@ -100,8 +148,9 @@ public class GDP_GCL {
      * @param datum_dict    A dictionary containing the key "data". The value
      *                      associated should be a byte[] containing the data
      *                      to be appended.
+     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp07Library.EP_STAT_SEV_WARN.
      */
-    public void append(Map<String, Object>datum_dict) {
+    public void append(Map<String, Object>datum_dict) throws GDPException {
 
         EP_STAT estat;
         GDP_DATUM datum = new GDP_DATUM();
@@ -109,9 +158,9 @@ public class GDP_GCL {
         Object data = datum_dict.get("data");
         datum.setbuf((byte[]) data);
         
-        estat = Gdp06Library.INSTANCE.gdp_gcl_append(this.gclh,
+        estat = Gdp07Library.INSTANCE.gdp_gcl_append(this.gclh,
                                 datum.gdp_datum_ptr);
-        GDP.check_EP_STAT(estat);
+        GDP.check_EP_STAT(estat, "gdp_gcl_append(" + gclh + ", " + datum.gdp_datum_ptr + ") failed.");
 
         return;
     }
@@ -120,8 +169,9 @@ public class GDP_GCL {
      * Append data to a log. This will create a new record in the log.
      * 
      * @param data  Data that should be appended
+     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp07Library.EP_STAT_SEV_WARN.
      */
-    public void append(byte[] data) {
+    public void append(byte[] data)  throws GDPException {
         
         HashMap<String, Object> datum = new HashMap<String, Object>();
         datum.put("data", data);
@@ -135,8 +185,9 @@ public class GDP_GCL {
      * @param datum_dict    A dictionary containing the key "data". The value
      *                      associated should be a byte[] containing the data
      *                      to be appended.
+     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp07Library.EP_STAT_SEV_WARN.
      */
-    public void append_async(Map<String, Object>datum_dict) {
+    public void append_async(Map<String, Object>datum_dict) throws GDPException {
 
         EP_STAT estat;
         GDP_DATUM datum = new GDP_DATUM();
@@ -144,9 +195,9 @@ public class GDP_GCL {
         Object data = datum_dict.get("data");
         datum.setbuf((byte[]) data);
         
-        estat = Gdp06Library.INSTANCE.gdp_gcl_append_async(this.gclh, 
+        estat = Gdp07Library.INSTANCE.gdp_gcl_append_async(this.gclh, 
                                 datum.gdp_datum_ptr, null, null);
-        GDP.check_EP_STAT(estat);
+        GDP.check_EP_STAT(estat, "gdp_gcl_append_async(" + gclh + ", " + datum.gdp_datum_ptr + "null, null) failed.");
 
         return;
     }
@@ -155,8 +206,9 @@ public class GDP_GCL {
      * Append data to a log, asynchronously. This will create a new record in the log.
      * 
      * @param data  Data that should be appended
+     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp07Library.EP_STAT_SEV_WARN.
      */
-    public void append_async(byte[] data) {
+    public void append_async(byte[] data) throws GDPException {
         
         HashMap<String, Object> datum = new HashMap<String, Object>();
         datum.put("data", data);
@@ -171,31 +223,33 @@ public class GDP_GCL {
      * @param logdName  Name of the log server where this should be 
      *                  placed.
      * @param metadata  Metadata to be added to the log. 
+     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp07Library.EP_STAT_SEV_WARN.
      */
-    
     public static void create(GDP_NAME logName, GDP_NAME logdName, 
-                    Map<Integer, byte[]> metadata) {
-        
+                    Map<Integer, byte[]> metadata) throws GDPException {
+	System.out.println("GDP_GCL.java: create(" + logName + ", " + ", " + logdName + ", " + metadata + ")");
         EP_STAT estat;
         
-        // Get the 256-bit internal names for logd and log
-        ByteBuffer logdNameInternal = ByteBuffer.wrap(logdName.internal_name());
+        // Get the 256-bit internal names for log and logd
         ByteBuffer logNameInternal = ByteBuffer.wrap(logName.internal_name());
+        ByteBuffer logdNameInternal = ByteBuffer.wrap(logdName.internal_name());
         
         // Just create a throwaway pointer.
         Pointer tmpPtr = null;
         
-        // metadata processing
-        
+        // Metadata processing.
         GDP_GCLMD m = new GDP_GCLMD();
         for (int k: metadata.keySet()) {
             m.add(k, metadata.get(k));
         }
         
-        estat = Gdp06Library.INSTANCE.gdp_gcl_create(logNameInternal, logdNameInternal,
+        estat = Gdp07Library.INSTANCE.gdp_gcl_create(logNameInternal, logdNameInternal,
                         m.gdp_gclmd_ptr, new PointerByReference(tmpPtr));
         
-        GDP.check_EP_STAT(estat);
+        GDP.check_EP_STAT(estat, "gdp_gcl_create(" + 
+			  logNameInternal + ", " +
+			  logdNameInternal + ", " +
+			  m.gdp_gclmd_ptr + " new PointerByReference(" + tmpPtr + ")) failed.");
         
         return;
     }
@@ -204,17 +258,19 @@ public class GDP_GCL {
      * Create a GCL (with empty metadata).
      * @param logName   Name of the log
      * @param logdName  Name of the logserver that should host this log
+     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp07Library.EP_STAT_SEV_WARN.
      */
-    public static void create(String logName, String logdName) {
-        GDP_GCL.create(new GDP_NAME(logdName), new GDP_NAME(logName));
+    public static void create(String logName, String logdName) throws GDPException {
+        GDP_GCL.create(new GDP_NAME(logName), new GDP_NAME(logdName));
     }
     /**
      * Create a GCL (with empty metadata).
      * @param logName   Name of the log
      * @param logdName  Name of the logserver that should host this log
+     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp07Library.EP_STAT_SEV_WARN.
      */
-    public static void create(GDP_NAME logName, GDP_NAME logdName) {
-        GDP_GCL.create(logdName, logName, new HashMap<Integer, byte[]>());
+    public static void create(GDP_NAME logName, GDP_NAME logdName) throws GDPException {
+        GDP_GCL.create(logName, logdName, new HashMap<Integer, byte[]>());
     }
 
     /** Remove the gcl from the global list and 
@@ -231,7 +287,7 @@ public class GDP_GCL {
         _allGclhs.remove(this.gclh);
         
         // free the associated gdp_gcl_t
-        Gdp06Library.INSTANCE.gdp_gcl_close(this.gclh);
+        Gdp07Library.INSTANCE.gdp_gcl_close(this.gclh);
     }
 
     /** 
@@ -241,15 +297,16 @@ public class GDP_GCL {
      * 
      * @param firstrec  The record num to start reading from
      * @param numrecs   Max number of records to be returned. 
+     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp07Library.EP_STAT_SEV_WARN.
      */
-    public void multiread(long firstrec, int numrecs) {
+    public void multiread(long firstrec, int numrecs) throws GDPException {
 
         EP_STAT estat;
-        estat = Gdp06Library.INSTANCE
+        estat = Gdp07Library.INSTANCE
                     .gdp_gcl_multiread(this.gclh, firstrec, numrecs,
                                         null, null);
 
-        GDP.check_EP_STAT(estat);
+        GDP.check_EP_STAT(estat, "gdp_gcl_multiread() failed.");
 
         return;
     }
@@ -262,8 +319,12 @@ public class GDP_GCL {
      *
      * @param name   Name of the log.
      * @param iomode Opening mode (0: for internal use only, 1: read-only, 2: read-append, 3: append-only)
+     * @param logdName  Name of the log server where this should be 
+     *                  placed if it does not yet exist.
+     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp07Library.EP_STAT_SEV_WARN.
      */
-    public static GDP_GCL newGCL(GDP_NAME name, int iomode) {
+    public static GDP_GCL newGCL(GDP_NAME name, int iomode, GDP_NAME logdName) throws GDPException {
+	System.out.println("GDP_GCL.java: newGCL(" + name + ", " + iomode + ", " + logdName + ")");
         // The GDP Accessor uses this method
         GDP_MODE gdp_mode = GDP_MODE.ANY;
         switch (iomode) {
@@ -282,7 +343,7 @@ public class GDP_GCL {
         default:
             throw new IllegalArgumentException("Mode must be 0-3, instead it was: " + iomode);
         }
-        return new GDP_GCL(name, gdp_mode);
+        return new GDP_GCL(name, gdp_mode, logdName);
     }
 
     /**
@@ -290,15 +351,16 @@ public class GDP_GCL {
      * 
      * @param recno Record number to be read
      * @return A hashmap containing the data just read
+     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp07Library.EP_STAT_SEV_WARN.
      */
-    public HashMap<String, Object> read(long recno) {
+    public HashMap<String, Object> read(long recno) throws GDPException {
         EP_STAT estat;
         GDP_DATUM datum = new GDP_DATUM();
                 
         // get the datum populated
-        estat = Gdp06Library.INSTANCE.gdp_gcl_read(this.gclh, recno, 
+        estat = Gdp07Library.INSTANCE.gdp_gcl_read(this.gclh, recno, 
                                 datum.gdp_datum_ptr);
-        GDP.check_EP_STAT(estat);
+        GDP.check_EP_STAT(estat, "gdp_gcl_read() failed.");
 
         HashMap<String, Object> datum_dict = new HashMap<String, Object>();
         if (datum != null) {
@@ -324,15 +386,16 @@ public class GDP_GCL {
      * @param firstrec  The record num to start the subscription from
      * @param numrecs   Max number of records to be returned. 0 => infinite
      * @param timeout   Timeout for this subscription
+     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp07Library.EP_STAT_SEV_WARN.
      */
-    public void subscribe(long firstrec, int numrecs, EP_TIME_SPEC timeout) {
+    public void subscribe(long firstrec, int numrecs, EP_TIME_SPEC timeout) throws GDPException {
 
         EP_STAT estat;
-        estat = Gdp06Library.INSTANCE
+        estat = Gdp07Library.INSTANCE
                     .gdp_gcl_subscribe(this.gclh, firstrec, numrecs,
                                         timeout, null, null);
 
-        GDP.check_EP_STAT(estat);
+        GDP.check_EP_STAT(estat, "gdp_gcl_subscribe() failed.");
 
         return;
     }
@@ -393,7 +456,7 @@ public class GDP_GCL {
     //     // Returns next data item from subcription or multiread.
     //     // Returns null if the subscription has ended.
     //     GDP_EVENT ev = get_next_event(timeout_msec, time_spec);;
-    //     if (ev.type == Gdp06Library.INSTANCE.GDP_EVENT_DATA) {
+    //     if (ev.type == Gdp07Library.INSTANCE.GDP_EVENT_DATA) {
     //         return ev.datum.data;
     //     } else {
     //         return null;
@@ -405,7 +468,7 @@ public class GDP_GCL {
                             Pointer gclh, EP_TIME_SPEC timeout) {
         
         // Get the event pointer. gclh can be null.
-        PointerByReference gdp_event_ptr = Gdp06Library.INSTANCE
+        PointerByReference gdp_event_ptr = Gdp07Library.INSTANCE
                             .gdp_event_next(gclh, timeout);
 
         if (gdp_event_ptr == null) {
@@ -416,12 +479,12 @@ public class GDP_GCL {
         // Get the data associated with this event.
         // If gdp_event_gettype() is passed a NULL, then an assertion is thrown
         // and process exits.
-        int type = Gdp06Library.INSTANCE.gdp_event_gettype(gdp_event_ptr);
-        PointerByReference datum_ptr = Gdp06Library.INSTANCE
+        int type = Gdp07Library.INSTANCE.gdp_event_gettype(gdp_event_ptr);
+        PointerByReference datum_ptr = Gdp07Library.INSTANCE
                             .gdp_event_getdatum(gdp_event_ptr);
-        EP_STAT event_ep_stat = Gdp06Library.INSTANCE
+        EP_STAT event_ep_stat = Gdp07Library.INSTANCE
                             .gdp_event_getstat(gdp_event_ptr);
-        PointerByReference _gclhByReference = Gdp06Library.INSTANCE
+        PointerByReference _gclhByReference = Gdp07Library.INSTANCE
                             .gdp_event_getgcl(gdp_event_ptr);
         Pointer _gclh = _gclhByReference.getValue();
                             
@@ -441,7 +504,7 @@ public class GDP_GCL {
         gdp_event.put("stat", event_ep_stat);
         
         // free the event structure
-        Gdp06Library.INSTANCE.gdp_event_free(gdp_event_ptr);
+        Gdp07Library.INSTANCE.gdp_event_free(gdp_event_ptr);
         
         return gdp_event;
     }
@@ -474,18 +537,18 @@ public class GDP_GCL {
     //     }
 
     //     // Get the C pointer to next event. This blocks till timeout
-    //     PointerByReference gev = Gdp06Library.INSTANCE
+    //     PointerByReference gev = Gdp07Library.INSTANCE
     //                                 .gdp_event_next(this.gclh, timeout);
 
     //     // Get the data associated with this event
-    //     int type = Gdp06Library.INSTANCE.gdp_event_gettype(gev);
-    //     PointerByReference datum = Gdp06Library.INSTANCE.gdp_event_getdatum(gev);
+    //     int type = Gdp07Library.INSTANCE.gdp_event_gettype(gev);
+    //     PointerByReference datum = Gdp07Library.INSTANCE.gdp_event_getdatum(gev);
 
     //     // Create an object of type GDP_EVENT that we'll return
     //     GDP_EVENT ev = new GDP_EVENT(this.gclh, datum, type);
 
     //     // Free the C data-structure
-    //     Gdp06Library.INSTANCE.gdp_event_free(gev);
+    //     Gdp07Library.INSTANCE.gdp_event_free(gev);
 
     //     return ev;
     // }

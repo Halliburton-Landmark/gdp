@@ -1,4 +1,33 @@
+/* Global Data Plane Utility Datum
+
+   Copyright (c) 2015-2016 The Regents of the University of California.
+   All rights reserved.
+   Permission is hereby granted, without written agreement and without
+   license or royalty fees, to use, copy, modify, and distribute this
+   software and its documentation for any purpose, provided that the above
+   copyright notice and the following two paragraphs appear in all copies
+   of this software.
+
+   IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY
+   FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+   ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+   THE UNIVERSITY OF CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF
+   SUCH DAMAGE.
+
+   THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+   INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+   MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE SOFTWARE
+   PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE UNIVERSITY OF
+   CALIFORNIA HAS NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES,
+   ENHANCEMENTS, OR MODIFICATIONS.
+
+   PT_COPYRIGHT_VERSION_2
+   COPYRIGHTENDKEY
+
+ */
+
 package org.terraswarm.gdp; 
+
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.util.Date;
@@ -14,31 +43,25 @@ import com.sun.jna.ptr.PointerByReference;
 import org.terraswarm.gdp.NativeSize; // Fixed by cxh in makefile.
 
 /**
- * A class that represents a GDP Datum. The original C GDP Datum
- * may create confusion since data is stored in a buffer (which
- * unsurprisingly acts like a buffer).
- * <p>
- * This is for internal use only, for users the GDP DATUM is more
- * like a dictionary, represented with a HashMap.
- * <p>
- * TODO Make sure there are no memory leaks. Implement a destructor.
+ * A GDP Datum. The original C GDP Datum may create confusion since
+ * data is stored in a buffer (which unsurprisingly acts like a
+ * buffer).
+ *
+ * <p> This is for internal use only, for users the GDP DATUM is more
+ * like a dictionary, represented with a HashMap.</p>
+ *
  * @author nitesh mor
  *
  */
 class GDP_DATUM {
-        
-    // The associated C data structure.
-    public PointerByReference gdp_datum_ptr = null;
+    // TODO: Make sure there are no memory leaks. Implement a destructor.</p>
 
-    // to keep track of whether we need to free the associated C memory.
-    private boolean did_i_create_it = false;
-    
     /**
      * Create a new dataum.
      */
     public GDP_DATUM() {
-        this.gdp_datum_ptr = Gdp06Library.INSTANCE.gdp_datum_new();
-        did_i_create_it = true;
+        this.gdp_datum_ptr = Gdp07Library.INSTANCE.gdp_datum_new();
+        _did_i_create_it = true;
         return;
     }
     
@@ -48,7 +71,7 @@ class GDP_DATUM {
      */    
     public GDP_DATUM(PointerByReference d) {
         this.gdp_datum_ptr = d;
-        did_i_create_it = false;
+        _did_i_create_it = false;
         return;
     }
     
@@ -56,8 +79,8 @@ class GDP_DATUM {
      * If we allocated memory ourselves, free it.
      */
     public void finalize() { 
-        if (did_i_create_it == true) {
-            Gdp06Library.INSTANCE.gdp_datum_free(this.gdp_datum_ptr);
+        if (_did_i_create_it == true) {
+            Gdp07Library.INSTANCE.gdp_datum_free(this.gdp_datum_ptr);
         }
     }
     
@@ -66,7 +89,7 @@ class GDP_DATUM {
      * @return Record number
      */
     public long getrecno() {
-        long recno = Gdp06Library.INSTANCE.gdp_datum_getrecno(
+        long recno = Gdp07Library.INSTANCE.gdp_datum_getrecno(
                                         this.gdp_datum_ptr);
         return recno;
     }
@@ -77,7 +100,7 @@ class GDP_DATUM {
      */
     public EP_TIME_SPEC getts() {
         EP_TIME_SPEC ts = new EP_TIME_SPEC();
-        Gdp06Library.INSTANCE.gdp_datum_getts(this.gdp_datum_ptr, ts);
+        Gdp07Library.INSTANCE.gdp_datum_getts(this.gdp_datum_ptr, ts);
         return ts;
     }
     
@@ -86,9 +109,9 @@ class GDP_DATUM {
      * @return Length of buffer
      */
     public NativeSize getdlen() {
-        PointerByReference buf = Gdp06Library.INSTANCE.gdp_datum_getbuf(
+        PointerByReference buf = Gdp07Library.INSTANCE.gdp_datum_getbuf(
                                         this.gdp_datum_ptr);
-        NativeSize len = Gdp06Library.INSTANCE.gdp_buf_getlength(buf);
+        NativeSize len = Gdp07Library.INSTANCE.gdp_buf_getlength(buf);
         return len;
     }
     
@@ -99,10 +122,10 @@ class GDP_DATUM {
      * buffer is null.
      */
     public byte[] getbuf(){
-        PointerByReference buf = Gdp06Library.INSTANCE.gdp_datum_getbuf(
+        PointerByReference buf = Gdp07Library.INSTANCE.gdp_datum_getbuf(
                 this.gdp_datum_ptr);
-        NativeSize len = Gdp06Library.INSTANCE.gdp_buf_getlength(buf);
-        Pointer bufptr = Gdp06Library.INSTANCE.gdp_buf_getptr(buf, len);
+        NativeSize len = Gdp07Library.INSTANCE.gdp_buf_getlength(buf);
+        Pointer bufptr = Gdp07Library.INSTANCE.gdp_buf_getptr(buf, len);
         if (bufptr == null) {
             return null;
         }
@@ -129,9 +152,17 @@ class GDP_DATUM {
         }
 
         // Now feed this data into the gdp buffer
-        PointerByReference dbuf = Gdp06Library.INSTANCE.gdp_datum_getbuf(
+        PointerByReference dbuf = Gdp07Library.INSTANCE.gdp_datum_getbuf(
                                     this.gdp_datum_ptr);
-        Gdp06Library.INSTANCE.gdp_buf_write(dbuf, pointer, 
+        Gdp07Library.INSTANCE.gdp_buf_write(dbuf, pointer, 
                                 new NativeSize(data.length));
     }
+
+    // The associated C data structure.
+    public PointerByReference gdp_datum_ptr = null;
+
+    // To keep track of whether we need to free the associated C memory.
+    private boolean _did_i_create_it = false;
+    
+
 }

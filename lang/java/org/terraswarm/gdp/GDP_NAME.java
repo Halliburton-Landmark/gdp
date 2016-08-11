@@ -1,4 +1,34 @@
+/* Names inside the Global Data Plane.
+
+   Copyright (c) 2015-2016 The Regents of the University of California.
+
+   All rights reserved.
+   Permission is hereby granted, without written agreement and without
+   license or royalty fees, to use, copy, modify, and distribute this
+   software and its documentation for any purpose, provided that the above
+   copyright notice and the following two paragraphs appear in all copies
+   of this software.
+
+   IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY
+   FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+   ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+   THE UNIVERSITY OF CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF
+   SUCH DAMAGE.
+
+   THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+   INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+   MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE SOFTWARE
+   PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE UNIVERSITY OF
+   CALIFORNIA HAS NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES,
+   ENHANCEMENTS, OR MODIFICATIONS.
+
+   PT_COPYRIGHT_VERSION_2
+   COPYRIGHTENDKEY
+
+ */
+
 package org.terraswarm.gdp; 
+
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.util.Date;
@@ -14,8 +44,9 @@ import com.sun.jna.ptr.PointerByReference;
 import org.terraswarm.gdp.NativeSize; // Fixed by cxh in makefile.
 
 /**
- * A class to represent names inside GDP. This works for GCL's, log-servers
+ * Names inside the GDP. This works for GCL's, log-servers
  * and any other entities. An entity can have up to three kind of names:
+ *
  * <ul>
  * <li> A 256 bit binary name </li>
  * <li> A base-64 (-ish) representation </li>
@@ -23,17 +54,17 @@ import org.terraswarm.gdp.NativeSize; // Fixed by cxh in makefile.
  * generate the 256-bit binary name </li>
  * </ul>
  * 
- * @author nitesh mor
+ * @author Nitesh Mor
  */
-
 public class GDP_NAME {
     
     /**
      * Pass a string that could be either a human readable name, or a
      * printable name.
      * @param name A version of the name
+     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp07Library.EP_STAT_SEV_WARN.
      */
-    public GDP_NAME(String name) {
+    public GDP_NAME(String name) throws GDPException {
         this.name = this.__parse_name(name);
         this.pname = this.__get_printable_name(this.name);
     }
@@ -53,7 +84,7 @@ public class GDP_NAME {
      * @return printable name as a byte array
      */
     public byte[] printable_name() {
-        // we need to make a copy.
+        // We need to make a copy.
         return this.pname.clone();
     }
 
@@ -62,7 +93,7 @@ public class GDP_NAME {
      * @return internal name as a byte array. length: 32 bytes
      */
     public byte[] internal_name() {
-        // we need to make a copy
+        // We need to make a copy.
         return this.name.clone();
     }
 
@@ -73,10 +104,10 @@ public class GDP_NAME {
     public boolean is_valid() {
         ByteBuffer tmp = ByteBuffer.allocate(32);
 
-        // copy to newly created bytebuffer
+        // Copy to newly created bytebuffer.
         tmp.put(this.name);
 
-        byte ret = Gdp06Library.INSTANCE.gdp_name_is_valid(tmp);
+        byte ret = Gdp07Library.INSTANCE.gdp_name_is_valid(tmp);
         if (ret == 0x00) {
             return false;
         } else {
@@ -118,12 +149,13 @@ public class GDP_NAME {
      * Parse the (presumably) printable name to return an internal name
      * @param s A potential printable name
      * @return A 32-byte long internal name
+     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp07Library.EP_STAT_SEV_WARN.     
      */
-    private byte[] __parse_name(String s) {
+    private byte[] __parse_name(String s) throws GDPException {
         ByteBuffer dst = ByteBuffer.allocate(32); // FIXME
         
-        EP_STAT estat = Gdp06Library.INSTANCE.gdp_parse_name(s, dst);
-        GDP.check_EP_STAT(estat);
+        EP_STAT estat = Gdp07Library.INSTANCE.gdp_parse_name(s, dst);
+        GDP.check_EP_STAT(estat, "Failed to parse " + s);
 
         // we don't care if the bytebuffer gets modified. We aren't using
         // it elsewhere anyways.
@@ -144,7 +176,7 @@ public class GDP_NAME {
         ByteBuffer printable = ByteBuffer.allocate(this.PNAME_LEN+1);
         
                 
-        Gdp06Library.INSTANCE.gdp_printable_name(internal, printable);
+        Gdp07Library.INSTANCE.gdp_printable_name(internal, printable);
         // no problem, since we don't need bytebuffer interface to this
         // memory anymore.
         
