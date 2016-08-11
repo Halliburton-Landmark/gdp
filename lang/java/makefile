@@ -140,9 +140,11 @@ jna: $(JNAERATOR_JAR) $(JNAERATOR_RUNTIME_JAR) $(GDP_H_FILES) $(LIBEVENT_H_FILES
 		-o . -library event2 -I/usr/include -I/usr/local/include \
                 -package org.terraswarm.gdp  -v  -noJar -noComp
 	# Fix up NativeSize. We want our included version of NativeSize be used, instead of JNAerator's version:
+	# We use sed -i here, which varies between Mac OS X and RHEL.  However calling sed twice like this works.
 	for file in org/terraswarm/gdp/*.java org/terraswarm/gdp/*/*.java; do \
-	echo "Fixing $$file"; \
-	sed -i "" -e "s@Gdp[0-9]*Library@Gdp${GDPLIBMAJVER}${GDPLIBMINVER}Library@" -e 's@com.ochafik.lang.jnaerator.runtime.NativeSize@org.terraswarm.gdp.NativeSize@' $$file; \
+		echo "Fixing $$file"; \
+		sed -i -e "s@Gdp[0-9]*Library@Gdp${GDPLIBMAJVER}${GDPLIBMINVER}Library@" $$file; \
+		sed -i -e 's@com.ochafik.lang.jnaerator.runtime.NativeSize@org.terraswarm.gdp.NativeSize@' $$file; \
 	done
 	# Empty target. See https://www.gnu.org/software/make/manual/html_node/Empty-Targets.html
 	touch jna
