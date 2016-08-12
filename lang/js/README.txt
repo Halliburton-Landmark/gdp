@@ -84,13 +84,13 @@ var libgdp = ffi.Library(GDP_DIR + '/libs/libgdp.0.6', {
 3) Update package.json:
     "version": "0.6.1",
 
-4) Run make
+4) Run make all_noavahi
 
 
 Testing using Ptolemy II
 Update $PTII/lib:
 
-  cp libgdpjs.1.0.dylib $PTII/lib
+  cp libs/libgdpjs.1.0.dylib $PTII/lib
   svn commit -m "Updated to gdp0.6-1." $PTII/lib/libgdpjs.1.0.dylib
 
 See https://www.terraswarm.org/accessors/wiki/Main/GDPJS for how to
