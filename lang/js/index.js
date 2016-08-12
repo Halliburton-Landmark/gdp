@@ -25,7 +25,7 @@
  *
  * @module gdp
  * @author Christopher Brooks
- * @version $$Id: gdp.js 838 2016-06-23 22:08:30Z cxh $$
+ * @version $$Id: index.js 838 2016-06-23 22:08:30Z cxh $$
  */
 
 var fs = require('fs');
@@ -49,33 +49,34 @@ exports.gclPrintableNameType = gdpjsSupport.gcl_pname_t;
  * @param mode The mode (0: read only, 1: write only, 2: read/write)
  * @return the GCL handle;
  */
-exports.gdp_gcl_open = function (name, iomode) {
-    console.log("gdpjs/index.js: gdp_gcl_open(" + name + ", " + iomode + ")");
-
-    console.log("gdpjs/index.js: gdp_gcl_open(" + name + ", " + iomode + "): calling gdp_init_js()");
+exports.gdp_gcl_open = function (name, iomode, gdpdAddress) {
+    console.log("gdpjs/index.js: gdp_gcl_open(" + name + ", " + iomode + ", " + gdpdAddress + ")");
 
     // FIXME: Need to figure out how to allocate ebuf.
     // One issue is that we don't want this to go out of scope.
 
     var ebuf = ref.allocCString('123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890');
 
-    var gdpdAddress = null;
-    estat = gdpjsSupport.gdp_init_js( /* String */ gdpdAddress);
-    if ( ! gdpjsSupport.ep_stat_isok(estat) ) {
-        var message = "gdpjs/index.js: gdp_gcl_open_js(): " +
-            " Failed to initialize with address " + gdpdAddress +
-            " " + gdpjsSupport.ep_stat_tostr(estat, ebuf, ebuf.length);
-        console.log(message);
-        // FIXME: Need an error output
-        throw new Error(message);
-    }
+    // gdp_gcl_open() calls gdp_init for us.
+//    console.log("gdpjs/index.js: gdp_gcl_open(" + name + ", " + iomode + ", " + gdpdAddress + "): calling gdp_init_js()");
+//     // FIXME: Ignoring the gdpdAddress here.
+//     //gdpdAddress = null;
+//     estat = gdpjsSupport.gdp_init_js( /* String */ gdpdAddress);
+//     if ( ! gdpjsSupport.ep_stat_isok(estat) ) {
+//         var message = "gdpjs/index.js: gdp_gcl_open_js(): " +
+//             " Failed to initialize with address " + gdpdAddress +
+//             " " + gdpjsSupport.ep_stat_tostr(estat, ebuf, ebuf.length);
+//         console.log(message);
+//         // FIXME: Need an error output
+//         throw new Error(message);
+//     }
 
-    console.log("gdpjs/index.js: gdp_gcl_open(" + name + ", " + iomode + "): calling gdp_gcl_open()");
-    var rv = gdpjsSupport.gdpGclOpen(name, iomode);
+    console.log("gdpjs/index.js: gdp_gcl_open(" + name + ", " + iomode + "): calling gdpGclOpen()");
+    var rv = gdpjsSupport.gdpGclOpen(name, iomode, gdpdAddress);
     var estat = rv.error_code;
     gclH = rv.gclH;
     if ( ! gdpjsSupport.ep_stat_isok(estat) ) {
-        var message = "gdp.js: GDP(" + name + ", " + iomode + "): gdp_init_js() returned not ok: "
+        var message = "index.js: GDP(" + name + ", " + iomode + ", " + gdpdAddress + "): gdpGclOpen() returned not ok: "
             + gdpjsSupport.ep_stat_tostr(estat, ebuf, ebuf.length);
         console.log(message);
         // FIXME: Need an error output

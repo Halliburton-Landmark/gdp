@@ -466,7 +466,7 @@ var GDP_EVENT_DATA = 1 // returned data
 var GDP_EVENT_EOS = 2 // end of subscription
 
 
-var libgdp = ffi.Library(GDP_DIR + '/libs/libgdp.0.6', {
+var libgdp = ffi.Library(GDP_DIR + '/libs/libgdp.0.7', {
 
     // From gdp/gdp.h
     //CJS // free an event (required after gdp_event_next)
@@ -803,6 +803,8 @@ function read_gcl_records(gdpd_addr, gcl_name,
         console.log("gdpjs.js: read_gcl_records");
     }
 
+    ep_dbg_init_js();
+    ep_dbg_set_js('*=40');
     estat = gdp_init_js( /* String */ gdpd_addr);
     if ( ! ep_stat_isok_js(estat) ) {
         var emsg = "gdpjs.js: read_gcl_records(): gdp_init_js() is not ok";
@@ -1271,7 +1273,7 @@ function gdp_init_js( /* String */ gdpd_addr) {
     // null string but an undefined argument works OK to start the
     // library on the default gdpd host:port .
     // So we protect this call from incoming JS null strings.
-    var debug = false;
+    var debug = true;
     if (debug) {
         console.log("gdpjs.js: gdp_init_js(" + gdpd_addr + ")");
     }
@@ -1316,13 +1318,14 @@ function ep_stat_is_same_js(estat_a, estat_b) {
 
 /* { error_code: EP_STAT, gclH: gclHandle_t }; */
 function gdp_gcl_create_js( /* gcl_name_t */ gclxname,
-    logdxname,
-    gclPtrPtr) {
+			    logdxname) {
     var gcl_Ptr; // gclHandle_t 
-    //var gclPtrPtr = ref.alloc(gdp_gcl_tPtrPtr); // gclHandle_t *
+    var gclPtrPtr = ref.alloc(gdp_gcl_tPtrPtr); // gclHandle_t *
 
-    var gcliname = ref.alloc(gcl_name_t);
-    var logdiname = ref.alloc(gcl_name_t);
+    var gcliname = new gcl_name_t(32);
+    //var gcliname = ref.alloc(gcl_name_t);
+    var logdiname = new gcl_name_t(32);
+    //var logdiname = ref.alloc(gcl_name_t);
 
     console.log("gdpjs.js: gdp_gcl_create_js(): gclxname: " + gclxname + ", logdxname: " + logdxname);
     gdp_parse_name_js(gclxname, gcliname);
@@ -1335,6 +1338,12 @@ function gdp_gcl_create_js( /* gcl_name_t */ gclxname,
 
     var estat = libgdp.gdp_gcl_create(gcliname, logdiname, gmd, gclPtrPtr);
     console.log("gdpjs.js: gdp_gcl_create_js(): gdp_gcl_create() returned");
+    if ( ! ep_stat_isok_js(estat) ) {
+	var ebuf = ref.allocCString('123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890');
+	var emsg = "gdpjs.js: gdp_gcl_create_js(): gdp_gcl_create() is not ok.";
+	console.log(emsg);
+	console.log(ep_stat_tostr_js(estat, ebuf, ebuf.length));
+    }
     gcl_Ptr = gclPtrPtr.deref();
     return {
         error_code: estat,
@@ -1344,7 +1353,7 @@ function gdp_gcl_create_js( /* gcl_name_t */ gclxname,
 
 /* EP_STAT */
 function gdp_parse_name_js( /* String */ xname, /* gcl_name_t */ gcliname) {
-    console.log("gdpjs.js: gdp_parse_name_js(): " + xname + ", " + " " + array_to_String(gcliname));
+    console.log("gdpjs.js: gdp_parse_name_js(): " + xname + ", ...");
     var estat = libgdp.gdp_parse_name(xname, gcliname);
     console.log("gdpjs.js: gdp_parse_name_js(): " + xname + ", ");
     for (i=0; i<gcliname.length; i++) {
@@ -1354,34 +1363,78 @@ function gdp_parse_name_js( /* String */ xname, /* gcl_name_t */ gcliname) {
     return estat
 };
 
-exports.gdpGclOpen = function(name, iomode) {
 
+function gdpGclOpen(name, iomode, logdname) {
+    var debug = true;
+    if (debug) {
+	console.log("gdpjs.js: 0 gdpGclOpen(" + name + ", " + iomode + ", " + logdname + "): setting debugging (dbg_set_js)"); 
+	ep_dbg_set_js("*=900");
+
+    }
     var gcliname = new gcl_name_t(32);
+    //var gcliname = ref.alloc(gcl_name_t);
 
     estat = gdp_parse_name_js(name, gcliname);
-    console.log("gdpjs.js: gdpGclOpen gcliname: " + gcliname.length);
-    for (i=0; i<gcliname.length; i++) {
-        process.stdout.write(gcliname[i].toString(16));
+    if (debug) {
+	console.log("gdpjs.js: 10 gdpGclOpen gcliname: " + gcliname.length);
+	for (i=0; i<gcliname.length; i++) {
+	    process.stdout.write(gcliname[i].toString(16));
+	}
+	console.log("\n");
     }
-    console.log("\n");
 
     if ( ! ep_stat_isok_js(estat) ) {
-        var emsg = "gdpjs.js: read_gcl_records(): gdp_parse_name_js() is not ok";
-        console.log(emsg);
-        console.log(ep_stat_tostr_js(estat, ebuf, ebuf.length));
-        rv = {
+	var ebuf = ref.allocCString('123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890');
+	var emsg = "gdpjs.js: gdpGclOpen(): gdp_parse_name_js() is not ok";
+	console.log(emsg);
+	console.log(ep_stat_tostr_js(estat, ebuf, ebuf.length));
+        var rv = {
             err: {
                 error_isok: ((ep_stat_isok_js(estat) == 0) ? false : true),
                 error_code: ("0x" + estat.toString(16)),
                 error_msg: emsg,
-            },
-            records: recarray_out
+            }
         };
         return rv;
     }
+ 
+    if (debug) {
+	console.log("gdpjs.js: gdpGclOpen(): calling gdp_gcl_open_js(), which may fail, but if it does, we will create the log.");
+    }
+    var rv = gdp_gcl_open_js(gcliname, iomode);
+    if (debug) {
+	console.log("gdpjs.js: gdpGclOpen(): gdp_gcl_open_js() returned.");
+    }
+    if ( ! ep_stat_isok_js(rv.error_code) ) {    
+	if (debug) {
+	    console.log("gdpjs.js: gdpGclOpen(): gdp_gcl_open() failed, trying to create the log and call gdp_gcl_open() again.");
+	}
+	rv = gdp_gcl_create_js(name, logdname);
+	if ( ! ep_stat_isok_js(rv.error_code) ) {
+	    var ebuf = ref.allocCString('123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890');
+	    var emsg = "gdpjs.js: gdpGclOpen(): gdp_gcl_create_js() is not ok";
+	    console.log(emsg);
+	    console.log(ep_stat_tostr_js(estat, ebuf, ebuf.length));
+	    rv = {
+		err: {
+		    error_isok: ((ep_stat_isok_js(estat) == 0) ? false : true),
+		    error_code: ("0x" + estat.toString(16)),
+		    error_msg: emsg,
+		}
+	    };
+	    return rv;
+	}
+	if (debug) {
+	    console.log("gdpjs.js: almost done, about to call gdp_gcl_open_js() again.");
+	}
+	rv = gdp_gcl_open_js(gcliname, iomode);
+    }
 
-    return gdp_gcl_open_js(gcliname, iomode);
+    return rv;
 }
+
+exports.gdpGclOpen = gdpGclOpen;
+
 /* { error_code: EP_STAT, gclH: gclHandle_t }; */
 function gdp_gcl_open_js( /* gcl_name_t */ gcliname,
     /* gdp_iomode_t */
@@ -2067,7 +2120,7 @@ function write_gcl_records(gdpd_addr, gcl_name, logdxname, gcl_append,
 // TBD: We could also return recarray_out[] for recsrc > 0. And, even
 // augmented with the manually entered record content, for recsrc = -1.
 {
-    var debug = false;
+    var debug = true;
     if (debug) {
         console.log("gdpjs.js: write_gcl_records() start");
     }
