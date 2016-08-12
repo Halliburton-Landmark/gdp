@@ -67,21 +67,23 @@ O=	-O
 WALL=	-Wall
 STD=
 COPTS=	${PG} -g ${WALL} $O ${STD}
+
+LOCAL1=	/usr/local
+LOCAL2=	/opt/local
 # /opt/local/include is for Mac OS X.
-CFLAGS=	${COPTS} ${INCLS} -I${CURDIR} -I.. -I../.. -I../../.. -I/opt/local/include -fPIC
+CFLAGS=	${COPTS} ${INCLS} -I${CURDIR} -I.. -I../.. -I../../.. -I${LOCAL1}/include -I${LOCAL2}/include -fPIC
 RM=	rm
 LD=	ld
 GDPROOT= ../../..
-LOCAL1=	/usr/local
-LOCAL2=	/opt/local
 LIBROOT= ${GDPROOT}
 # /opt/local/lib is for Mac OS X.
-LDCRYPTO= -L/opt/local/lib -lcrypto -lavahi-common -lavahi-client
+LDCRYPTO= -L/opt/local/lib -lcrypto 
+LIBAVAHI= -lavahi-common -lavahi-client
 LDEVENT2= -levent -levent_pthreads
 LDEP=   -L${LIBROOT}/ep -lep
 LDGDP=  -L${LIBROOT}/gdp -lgdp
 #LDFLAGS=-L.
-LDFLAGS= ${LDGDP} ${LDEP} ${LDEVENT2} ${LDCRYPTO} -L${LOCAL1}/lib -L${LOCAL2}/lib
+LDFLAGS= ${LDGDP} ${LDEP} ${LDEVENT2} ${LDCRYPTO} ${LIBAVAHI} -L${LOCAL1}/lib -L${LOCAL2}/lib
 LDLIBS=	libgdpjs.a
 LIBDIR= ../libs
 LN=	ln
@@ -99,7 +101,7 @@ GDPJSLIBVER=	${GDPJSLIBMAJVER}.${GDPJSLIBMINVER}
 
 # Version of the GDP Library, should match ../../../gdp/Makefile
 GDPLIBMAJVER=	0
-GDPLIBMINVER=	6
+GDPLIBMINVER=	7
 
 GDPLIBVER= 	${GDPLIBMAJVER}.${GDPLIBMINVER}
 # The name of the library in ../../../gdp
@@ -116,6 +118,9 @@ LIBEP=		libep-${EPLIBVER}
 ALL=		libgdpjs.a libgdpjs.so.${GDPJSLIBVER}
 
 all: ${ALL}
+
+all_noavahi:
+	${MAKE}	STD=-DGDP_OSCF_USE_ZEROCONF=0 LIBAVAHI= OBJS_ZC= all
 
 libgdpjs.a: ${OBJS}
 	${AR} -r $@ ${OBJS}
