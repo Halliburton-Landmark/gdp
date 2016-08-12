@@ -146,6 +146,7 @@ libgdpjs.a: ${OBJS}
 #
 libgdpjs.so.${GDPJSLIBVER}: ${OBJS}
 	${CC} ${SHARED} -o $@ ${OBJS} ${LDFLAGS}
+	@echo "gdpjs.js expects to load 'libgdp.${GDPLIBVER}' etc., so use that style versioning in libs/."
 	if [ "`uname -s`" = "Darwin" ]; then \
 		cp libgdpjs.so.${GDPJSLIBVER} ${LIBDIR}/libgdpjs.${GDPJSLIBVER}.dylib; \
 		if [ -f ../../../libs/libgdp.${GDPLIBVER}.dylib ]; then \
@@ -156,24 +157,26 @@ libgdpjs.so.${GDPJSLIBVER}: ${OBJS}
 			echo "Copying ../../../libs/libep.${EPLIBVER}.dylib to ${LIBDIR}/"; \
 			cp ../../../libs/libep.${EPLIBVER}.dylib ${LIBDIR}/; \
 		fi; \
+		if [ -f $(PTII)/lib/libgdpjs.${GDPJSLIBVER}..so ]; then \
+			echo "Copying Linux shared libraries from $(PTII)"; \
+			cp $(PTII)/lib/libgdpjs.${GDPJSLIBVER}..so ${LIBDIR}; \
+			cp $(PTII)/lib/libgdp.${GDPLIBVER}..so ${LIBDIR}; \
+			cp $(PTII)/lib/libep.${EPLIBVER}..so ${LIBDIR}; \
+		fi; \
 	else \
 		echo "Setting up libgdpjs"; \
-		cp libgdpjs.so.${GDPJSLIBVER} ${LIBDIR}/; \
-		(cd ${LIBDIR}; rm -f libgdpjs.${GDPJSLIBVER}.so; ln -s libgdpjs.so.${GDPJSLIBVER} libgdpjs.${GDPJSLIBVER}.so); \
-		(cd ${LIBDIR}; rm -f libgdpjs.so; ln -s libgdpjs.so.${GDPJSLIBVER} libgdp.so); \
+		cp libgdpjs.so.${GDPJSLIBVER} ${LIBDIR}/libgdpjs.${GDPJSLIBVER}.so; \
 		echo "Setting up libgdp"; \
-		cp ../../../libs/${LIBGDP}.so ${LIBDIR}/; \
-		(cd ${LIBDIR}; rm -f libgdp.so.${GDPLIBVER}; ln -s ${LIBGDP}.so libgdp.so.${GDPLIBVER}); \
-		(cd ${LIBDIR}; rm -f libgdp.so.${GDPLIBMAJVER}; ln -s ${LIBGDP}.so libgdp.so.${GDPLIBMAJVER}); \
-		(cd ${LIBDIR}; rm -f libgdp.so; ln -s libgdp.so.${GDPLIBMAJVER} libgdp.so); \
-		(cd ${LIBDIR}; rm -f libgdp.${GDPLIBVER}.so; ln -s ${LIBGDP}.so libgdp.${GDPLIBVER}.so); \
+		cp ../../../libs/${LIBGDP}.so ${LIBDIR}/libgdp.${GDPLIBVER}.so; \
 		echo "Setting up libep"; \
-		cp ../../../libs/${LIBEP}.so ${LIBDIR}/; \
-		(cd ${LIBDIR}; rm -f libep.so.${EPLIBVER}; ln -s ${LIBEP}.so libep.so.${EPLIBVER}); \
-		(cd ${LIBDIR}; rm -f libep.so.${EPLIBMAJVER}; ln -s ${LIBEP}.so libep.so.${EPLIBMAJVER}); \
-		(cd ${LIBDIR}; rm -f libep.so; ln -s libep.so.${EPLIBMAJVER} libep.so); \
-		(cd ${LIBDIR}; rm -f libep.${EPLIBVER}.so; ln -s ${LIBEP}.so libep.${EPLIBVER}.so); \
+		cp ../../../libs/${LIBEP}.so ${LIBDIR}/libep.${EPLIBVER}.so; \
 		echo "Created links in ${LIBDIR}/"; \
+		if [ -f $(PTII)/lib/libgdpjs.${GDPJSLIBVER}.dylib ]; then \
+			echo "Copying Darwin shared libraries from $(PTII)"; \
+			cp $(PTII)/lib/libgdpjs.${GDPJSLIBVER}.dylib ${LIBDIR}; \
+			cp $(PTII)/lib/libgdp.${GDPLIBVER}.dylib ${LIBDIR}; \
+			cp $(PTII)/lib/libep.${EPLIBVER}.dylib ${LIBDIR}; \
+		fi; \
 	fi \
 
 gdpjs_version.o: gdpjs_version.c FORCE
