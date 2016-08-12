@@ -51,6 +51,7 @@ all_noavahi:
 	(cd gdplogd;	make all_noavahi)
 	(cd apps;	make all_noavahi)
 	(cd examples;	make all_noavahi)
+	(cd lang/js;	make all_noavahi)
 
 clean:
 	(cd doc;	make clean)
