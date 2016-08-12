@@ -79,6 +79,12 @@ all: $(NODE_MODULES)
 	(cd apps;  make clean all)
 	(cd tests; make clean all)
 
+all_noavahi: $(NODE_MODULES)
+	-rm libs/*
+	(cd gdpjs; make clean all_noavahi)
+	(cd apps;  make clean all)
+	(cd tests; make clean all)
+
 clean:
 	-rm libs/*
 	-rm -fr -- $(NMOD)
