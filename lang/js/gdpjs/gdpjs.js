@@ -137,7 +137,7 @@ try {
 //    sed  -e '/^\/\/C/d' liggdp_h.js
 
 
-var debug = false;
+var debug = true;
 
 ////////////////////////////////////
 // Load Node.js modules for calling foreign functions; C functions here.
@@ -474,8 +474,8 @@ var libgdp = ffi.Library(GDP_DIR + '/libs/libgdp.0.7', {
     'gdp_event_free': [EP_STAT, [gdp_event_tPtr]],
 
     //CJS // get next event (fills in gev structure)
-    //CJS extern gdp_event_t              *gdp_event_next(bool wait);
-    'gdp_event_next': [gdp_event_tPtr, [bool_t]],
+    //CJS extern gdp_event_t              *gdp_event_next(bool wait, EP_TIME_SPEC *timeout);
+    'gdp_event_next': [gdp_event_tPtr, [bool_t, EP_TIME_SPEC_struct_Ptr]],
 
     //CJS // get next event (fills in gev structure)
     //CJS extern gdp_event_t              *gdp_event_next(bool wait);
@@ -893,7 +893,11 @@ function read_gcl_records(gdpd_addr, gcl_name,
     }
 
     if ( ! ep_stat_isok_js(estat) ) {
-        var emsg = "gdpjs.js: read_gcl_records(): do_multiread() or do_simpleread() is not ok";
+	var called = "do_simpleread()";
+	if (gcl_subscribe || gcl_multiread) {
+	    called = "do_multiread()";
+	}
+        var emsg = "gdpjs.js: read_gcl_records(): " + called + " is not ok";
         console.log(emsg);
         console.log(ep_stat_tostr_js(estat, ebuf, ebuf.length));
         rv = {
@@ -929,6 +933,9 @@ function read_gcl_records(gdpd_addr, gcl_name,
         },
         records: recarray_out
     };
+    if (debug) {
+	console.log("gdpjs.js: read_gcl_records(): done");
+    }
     return rv;
 } /* end read_gcl_records( ) */
 
@@ -1072,6 +1079,9 @@ function do_multiread(gclh, firstrec, numrecs, subscribe,
     wait_for_events,
     recarray_out, conout, gdp_event_cbfunc
 ) {
+    if (debug) {
+	console.log("gdpjs.js: do_multiread(" + gclh + ", " + firstrec + ", " + numrecs + ", subscribe: " + subscribe + ", wait_for_events: " + wait_for_events + ", recarray_out: " + recarray_out + ", conout: " + conout + ", " + gdp_event_cbfunc + ")");
+    }
     //C  	EP_STAT estat;
     var estat; //?? make sure this can hold & allow access to gdp EP_STAT's
     //C  
@@ -1118,6 +1128,11 @@ function do_multiread(gclh, firstrec, numrecs, subscribe,
     // console.log( 'In rw_supt.js: do_multiread() At C' );
     var crec = 0; // counts records read - an index into recarray_out[]
     //C  	// now start reading the events that will be generated
+
+    if (debug) {
+	console.log("gdpjs.js: do_multiread(): about to loop");
+    }
+
     for (;;) {
         //C  		// get the next incoming event
         //C         gdp_event_t *gev = gdp_event_next(true);
@@ -1130,20 +1145,27 @@ function do_multiread(gclh, firstrec, numrecs, subscribe,
         // event, return immediately with a null
         // if wait_for_events == true, wait (indefinitely)
         // for a next gdp event
-        gev_Ptr = gdp_event_next_js(wait_for_events);
+
+	// FIXME: passing null as a timeout for now.
+
+        gev_Ptr = gdp_event_next_js(wait_for_events, null);
         // TBD: what if gev_Ptr is null; happens on gdp_event_next_js(false)
         //      with no event available.
-        // DEBUG
-        // console.log( 'In rw_supt.js: do_multiread() At D; gev_Ptr = ', gev_Ptr );
+	if (debug) {
+	    console.log( 'gdpjs.js: do_multiread() At D; gev_Ptr = ', gev_Ptr );
+	}
+
         // if ( gev_Ptr == null )
         if (gev_Ptr.isNull()) { // no next event found - just return with no side-effects
             // on recarray_out, or call of gdp_event_cbfunc.
-            // DEBUG
-            // console.log( 'In rw_supt.js: do_multiread() At E' );
+	    if (debug) {        
+		console.log( 'gdpjs.js: do_multiread() At E' );
+	    }
             return estat;
         } else { // we have seen an event - process it based on its type
-            // DEBUG
-            // console.log( 'In rw_supt.js: do_multiread() At F' );
+	    if (debug) {
+		console.log( 'gdpjs.js: do_multiread() At F' );
+	    }
             evtype_int = gdp_event_gettype_js(gev_Ptr);
             //C  
             //C  		// decode it
@@ -1175,8 +1197,9 @@ function do_multiread(gclh, firstrec, numrecs, subscribe,
                         value: val
                     };
                     crec++;
-                    // DEBUG
-                    // console.log( 'In rw_supt.js: do_multiread() At G' );
+		    if (debug) {        
+			console.log( 'gdpjs.js: do_multiread() At G' );
+		    }
                     // TBD1 - cleanup here
                     gdp_event_cbfunc(evtype_int, datum, recarray_out);
                 }
@@ -1192,8 +1215,9 @@ function do_multiread(gclh, firstrec, numrecs, subscribe,
                     console.log("End of %s", subscribe ? "Subscription" : "Multiread");
                 }
                 if (gdp_event_cbfunc) {
-                    // DEBUG
-                    // console.log( 'In rw_supt.js: do_multiread() At G' );
+		    if (debug) {        
+			console.log( 'gdpjs.js: do_multiread() At G' );
+		    }
                     gdp_event_cbfunc(evtype_int, null, estat);
 
                 }
@@ -1226,6 +1250,9 @@ function do_multiread(gclh, firstrec, numrecs, subscribe,
     } /* for (;;) */
     //C  	
     //C  	// should never get here
+    if (debug) {        
+	console.log("gdpjs.js: do_multiread() done.");
+    }
     return estat;
 } /* end do_multiread() */
 //C  }
@@ -1573,6 +1600,10 @@ function gdp_gcl_subscribe_no_callback_js(gclh, firstrec, numrecs,
 // This smaller issue is also TBD.
 {
     var rv_estat;
+    if (debug) {
+	console.log("gdpjs.js: gdp_gcl_subscribe_no_callback_js(" + gclh + ", " + firstrec + ", " + numrecs + ", "+ _timeout + ")");
+    }
+
     // EP_TIME_SPEC *timeout, gdp_gcl_sub_cbfunc_t cbfunc, void *cbarg 
     // are all null here for a simpler subscribe variant.  See gdp/gdp-api.[ch]
     // gdp_gcl_subscribe() for details.
@@ -1580,6 +1611,9 @@ function gdp_gcl_subscribe_no_callback_js(gclh, firstrec, numrecs,
     //      bullet and use ref-struct ?
     rv_estat = libgdp.gdp_gcl_subscribe(gclh, firstrec, numrecs,
                                         timeout, null, null);
+    if (debug) {
+	console.log("gdpjs.js: gdp_gcl_subscribe_no_callback_js() done: " + rv_estat);
+    }
     return rv_estat;
 };
 
@@ -1595,11 +1629,20 @@ function gdp_gcl_subscribe_no_timeout_no_callback_js(gclh, firstrec, numrecs)
 // This smaller issue is also TBD.
 {
     var rv_estat;
+
+    if (debug) {
+	console.log("gdpjs.js: gdp_gcl_subscribe_no_timeout_no_callback_js(" + gclh + ", " + firstrec + ", " + numrecs + ")");
+    }
+
     // EP_TIME_SPEC *timeout, gdp_gcl_sub_cbfunc_t cbfunc, void *cbarg 
     // are all null here for a simpler subscribe variant.  See gdp/gdp-api.[ch]
     // gdp_gcl_subscribe() for details.
     rv_estat = libgdp.gdp_gcl_subscribe(gclh, firstrec, numrecs,
                                         null, null, null);
+    if (debug) {
+	console.log("gdpjs.js: gdp_gcl_subscribe_no_timeout_no_callback_js(): done: " + rv_estat);
+    }
+
     return rv_estat;
 };
 
@@ -1620,12 +1663,16 @@ function gdp_gcl_multiread_no_callback_js(gclh, firstrec, numrecs)
 }
 
 /* C: gdp_event_t *  <==>  node-ffi: gdp_event_tPtr  <==>  JS: Object */
-function gdp_event_next_js( /* Boolean */ wait)
+function gdp_event_next_js( /* Boolean */ wait, /* EP_TIME_SPEC */ timeout)
 // Return value can be viewed by JS as an opaque handle for a gdp_event.
 // Returns null iff there is no event pending when wait == true.
 {
     var gev_Ptr;
-    gev_Ptr = libgdp.gdp_event_next(wait);
+    if (debug) {
+	console.log("gdpjs.js: gdp_event_next_js(" + wait + ", " + timeout + ")");
+    }
+
+    gev_Ptr = libgdp.gdp_event_next(wait, timeout);
     return gev_Ptr;
 }
 
