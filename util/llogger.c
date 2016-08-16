@@ -20,6 +20,8 @@
 #include <sys/stat.h>
 
 
+const char		*OpenMode = "w";
+
 void
 reopen(const char *fname, FILE **fpp, ino_t *inop)
 {
@@ -29,7 +31,7 @@ reopen(const char *fname, FILE **fpp, ino_t *inop)
 	if (fp != NULL)
 		fclose(fp);
 
-	fp = fopen(fname, "a");
+	fp = fopen(fname, OpenMode);
 	if (fp == NULL)
 	{
 		fprintf(stderr, "Cannot open output file \"%s\": %s\n",
@@ -54,10 +56,13 @@ main(int argc, char **argv)
 	ino_t prev_ino = -1;
 	bool tee = false;
 
-	while ((opt = getopt(argc, argv, "t")) > 0)
+	while ((opt = getopt(argc, argv, "at")) > 0)
 	{
 		switch (opt)
 		{
+		case 'a':
+			OpenMode = "a";
+			break;
 		case 't':
 			tee = true;
 			break;

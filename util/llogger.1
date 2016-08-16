@@ -6,6 +6,7 @@
 .Nd timestamp output lines for local log files
 .Sh SYNOPSIS
 .Nm
+.Op Fl a
 .Op Fl t
 .Ar file-name
 .Sh DESCRIPTION
@@ -23,6 +24,10 @@ It is similar to a non-syslog version of
 .Xr logger 1 .
 .Sh OPTIONS
 .Bl -tag
+.It Fl a
+Append to output
+.Ar file-name .
+Normally the output is overwritten.
 .It Fl t
 In addition to logging,
 .Dq tee
