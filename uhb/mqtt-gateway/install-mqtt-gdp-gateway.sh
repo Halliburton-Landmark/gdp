@@ -76,6 +76,9 @@ info "Installing MQTT gateway configuration"
 sudo cp -iv mqtt-gateway.*.conf $GDP_ETC
 sudo chown ${GDP_USER}:${GDP_GROUP} $GDP_ETC/mqtt-gateway.*.conf
 
+info "Installing MQTT gateway log rotation configuration"
+sudo cp mqtt-gdp-gateway-logrotate.conf /etc/logrotate.d/mqtt-gdp-gateway
+
 if [ "$INITSYS" = "upstart" ]
 then
 	info "Installing Upstart system startup configuration"
