@@ -295,7 +295,7 @@ bdb_put(DB *db,
 #endif
 	estat = ep_stat_from_dbstat(dbstat);
 	if (!EP_STAT_ISOK(estat))
-		ep_log(estat, "bdb_put");
+		ep_log(estat, "bdb_put: dbstat %d", dbstat);
 	return estat;
 }
 
@@ -628,10 +628,11 @@ segment_close(gdp_gcl_t *gcl, uint32_t segno)
 	}
 	if (seg->fp != NULL)
 	{
-		ep_dbg_cprintf(Dbg, 39, "segment_close: closing segment fp %p\n",
-				seg->fp);
+		ep_dbg_cprintf(Dbg, 39, "segment_close(%s): closing segment fp %p\n",
+				gcl->pname, seg->fp);
 		if (fclose(seg->fp) != 0)
-			(void) posix_error(errno, "segment_close: cannot fclose");
+			(void) posix_error(errno, "segment_close(%s): cannot fclose",
+					gcl->pname);
 		seg->fp = NULL;
 	}
 	ep_mem_free(seg);
@@ -732,7 +733,7 @@ segment_create(gdp_gcl_t *gcl,
 
 			estat = ep_stat_from_errno(errno);
 			strerror_r(errno, nbuf, sizeof nbuf);
-			ep_log(estat, "segment_create: cannot create %s: %s",
+			ep_log(estat, "segment_create(%s): %s",
 					data_pbuf, nbuf);
 			if (data_fd >= 0)
 				close(data_fd);
@@ -745,7 +746,7 @@ segment_create(gdp_gcl_t *gcl,
 
 			estat = ep_stat_from_errno(errno);
 			strerror_r(errno, nbuf, sizeof nbuf);
-			ep_log(estat, "segment_create: cannot fdopen %s: %s",
+			ep_log(estat, "segment_create: fdopen(%s): %s",
 					data_pbuf, nbuf);
 			(void) close(data_fd);
 			goto fail1;
@@ -1035,7 +1036,7 @@ disk_create(gdp_gcl_t *gcl, gdp_gclmd_t *gmd)
 
 			estat = ep_stat_from_errno(errno);
 			strerror_r(errno, nbuf, sizeof nbuf);
-			ep_log(estat, "disk_create: cannot create %s: %s",
+			ep_log(estat, "disk_create: create(%s): %s",
 				index_pbuf, nbuf);
 			goto fail0;
 		}
@@ -1046,7 +1047,7 @@ disk_create(gdp_gcl_t *gcl, gdp_gclmd_t *gmd)
 
 			estat = ep_stat_from_errno(errno);
 			strerror_r(errno, nbuf, sizeof nbuf);
-			ep_log(estat, "disk_create: cannot fdopen %s: %s",
+			ep_log(estat, "disk_create: fdopen(%s): %s",
 				index_pbuf, nbuf);
 			(void) close(ridx_fd);
 			goto fail0;
@@ -1065,7 +1066,8 @@ disk_create(gdp_gcl_t *gcl, gdp_gclmd_t *gmd)
 
 		if (fwrite(&ridx_header, sizeof ridx_header, 1, phys->ridx.fp) != 1)
 		{
-			estat = posix_error(errno, "disk_create: cannot write header");
+			estat = posix_error(errno, "disk_create(%s): write ridx header",
+					gcl->pname);
 			goto fail0;
 		}
 	}
@@ -1087,7 +1089,7 @@ disk_create(gdp_gcl_t *gcl, gdp_gclmd_t *gmd)
 							DB_BTREE, &phys->tidx.db);
 		if (!EP_STAT_ISOK(estat))
 		{
-			ep_log(estat, "disk_create: cannot create %s", tidx_pbuf);
+			ep_log(estat, "disk_create: create(%s)", tidx_pbuf);
 			goto fail0;
 		}
 	}
@@ -1418,7 +1420,8 @@ fseek_to_index_recno(
 
 	if (fseek(phys->ridx.fp, xoff, SEEK_SET) < 0)
 	{
-		return posix_error(errno, "fseek_to_index_recno: fseek failed");
+		return posix_error(errno, "fseek_to_index_recno(%s): fseek failed",
+				gclpname);
 	}
 
 	return EP_STAT_OK;
@@ -1482,7 +1485,8 @@ disk_read_by_recno(gdp_gcl_t *gcl,
 		EP_STAT_CHECK(estat, goto fail3);
 		if (fread(xent, SIZEOF_RIDX_RECORD, 1, phys->ridx.fp) < 1)
 		{
-			estat = posix_error(errno, "disk_read_by_recno: fread failed");
+			estat = posix_error(errno, "disk_read_by_recno(%s): fread failed",
+						gcl->pname);
 			goto fail3;
 		}
 		xent->recno = ep_net_ntoh64(xent->recno);
@@ -1757,14 +1761,15 @@ disk_append(gdp_gcl_t *gcl,
 	else if (datum->siglen > 0)
 	{
 		// "can't happen"
-		ep_app_abort("disk_append: siglen = %d but no signature",
-				datum->siglen);
+		ep_app_abort("disk_append(%s): siglen = %d but no signature",
+				gcl->pname, datum->siglen);
 	}
 
 	// commit data portion (everything else can be rebuilt)
 	if (fflush(seg->fp) < 0 || ferror(seg->fp))
 	{
-		estat = posix_error(errno, "disk_append: cannot flush data");
+		estat = posix_error(errno, "disk_append(%s): cannot flush data",
+					gcl->pname);
 		goto fail0;
 	}
 
@@ -1782,10 +1787,12 @@ disk_append(gdp_gcl_t *gcl,
 		EP_STAT_CHECK(estat, goto fail0);
 		if (fwrite(&ridx_entry, sizeof ridx_entry, 1, phys->ridx.fp) != 1)
 		{
-			estat = posix_error(errno, "disk_append: cannot write ridx entry");
+			estat = posix_error(errno, "disk_append(%s): cannot write ridx entry",
+						gcl->pname);
 		}
 		else if (fflush(phys->ridx.fp) < 0 || ferror(seg->fp))
-			estat = posix_error(errno, "disk_append: cannot flush ridx");
+			estat = posix_error(errno, "disk_append(%s): cannot flush ridx",
+						gcl->pname);
 		else
 		{
 			xcache_put(phys, ridx_entry.recno, ridx_entry.offset);
@@ -1820,7 +1827,8 @@ disk_append(gdp_gcl_t *gcl,
 
 		estat = bdb_put(phys->tidx.db, &tkey_dbt, &tval_dbt);
 		if (!EP_STAT_ISOK(estat))
-			ep_log(estat, "disk_append: cannot put tidx value");
+			ep_log(estat, "disk_append(%s): cannot put tidx value",
+					gcl->pname);
 		//EP_STAT_CHECK(estat, goto fail0);
 	}
 
