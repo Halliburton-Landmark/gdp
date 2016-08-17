@@ -140,9 +140,6 @@ dump_state(int plev)
 	ep_app_dumpfds(stderr);
 }
 
-#ifndef SIGINFO
-# define SIGINFO	SIGUSR1
-#endif
 
 static void
 siginfo(int sig, short what, void *arg)
@@ -374,7 +371,10 @@ main(int argc, char **argv)
 	ep_thr_pool_init(nworkers, nworkers, 0);
 
 	// add a debugging signal to print out some internal data structures
+#ifdef SIGINFO
 	event_add(evsignal_new(GdpIoEventBase, SIGINFO, siginfo, NULL), NULL);
+#endif
+	event_add(evsignal_new(GdpIoEventBase, SIGUSR1, siginfo, NULL), NULL);
 
 	// do cleanup on termination
 	signal(SIGINT, sigterm);
