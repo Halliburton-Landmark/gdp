@@ -36,7 +36,7 @@
   <body>
     <h1>Global Data Plane Programmatic API </h1>
     <h4>Editor: Eric Allman, U.C. Berkeley Swarm Lab, eric@cs.berkeley.edu<br>
-      Version 0.75, 2016-06-21</h4>
+      Version 0.7.1, 2016-08-18</h4>
     <p>This document describes the procedural programmatic interface to the
       Global Data Plane.&nbsp; The native code is written in C for maximum
       flexibility and performance, but it is expected that most applications
@@ -893,12 +893,12 @@ class="manifest">GDP_DATUM_PRSIG</span> bit is set, signature
     </ul>
     <hr size="2" width="100%">
     <h4>Name</h4>
-    gdp_buf_copy &mdash; copy data from one buffer into another
+    gdp_buf_move &mdash; move data from one buffer into another
     <h4>Synopsis</h4>
-    <pre>int gdp_buf_copy(gdp_buf_t *ib, gdp_buf_t *ob)</pre>
+    <pre>int gdp_buf_move(gdp_buf_t *ob, gdp_buf_t *ib, size_t sz)</pre>
     <h4>Notes</h4>
     <ul>
-      <li>Appends the entire contents of <code>ib</code> to the end of <code>ob</code>.</li>
+      <li>Appends the first <code>sz</code> bytes of <code>ib</code> to the end of <code>ob</code>.</li>
       <li>This is more efficient than using <code>gdp_buf_read</code> and <code>gdp_buf_write</code>.</li>
     </ul>
     <hr size="2" width="100%">
@@ -1142,7 +1142,4 @@ class="filename">/etc/swarm/gdp/keys</span>".</p>
         </tr>
       </tbody>
     </table>
-
-
-
 </body></html>
