@@ -661,9 +661,14 @@ cmd_append(gdp_req_t *req)
 	// create the message
 	estat = req->gcl->x->physimpl->append(req->gcl, req->pdu->datum);
 
-	// send the new data to any subscribers
 	if (EP_STAT_ISOK(estat))
+	{
+		// send the new data to any subscribers
 		sub_notify_all_subscribers(req, GDP_ACK_CONTENT);
+
+		// update the server's view of the number of records
+		req->gcl->nrecs++;
+	}
 
 	if (false)
 	{

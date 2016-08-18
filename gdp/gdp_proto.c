@@ -248,7 +248,7 @@ acknak(gdp_req_t *req, const char *where, bool reuse_pdu)
 			// copy the contents of the new message over the old
 			memcpy(req->pdu->datum, req->rpdu->datum, sizeof *req->pdu->datum);
 
-			// we no longer need the new message
+			// old datum now points to new dbuf; eliminate from new pdu
 			req->rpdu->datum->dbuf = NULL;
 			gdp_datum_free(req->rpdu->datum);
 
@@ -389,6 +389,20 @@ nak_router(gdp_req_t *req)
 {
 	acknak(req, "nak_router", false);
 	return GDP_STAT_FROM_R_NAK(req->rpdu->cmd);
+}
+
+
+// called when a record number has been repeated
+static EP_STAT
+nak_conflict(gdp_req_t *req)
+{
+	EP_STAT estat = nak_client(req);
+
+	// adjust nrecs to match the server's view
+	if (req->gcl != NULL && req->pdu->datum != NULL)
+		req->gcl->nrecs = req->pdu->datum->recno;
+
+	return estat;
 }
 
 
@@ -608,7 +622,7 @@ static dispatch_ent_t	DispatchTable[256] =
 	{ nak_client,		"NAK_C_NOTACCEPTABLE"	},			// 198
 	NOENT,				// 199
 	NOENT,				// 200
-	{ nak_client,		"NAK_C_CONFLICT"		},			// 201
+	{ nak_conflict,		"NAK_C_CONFLICT"		},			// 201
 	{ nak_client,		"NAK_C_GONE"			},			// 202
 	NOENT,				// 203
 	{ nak_client,		"NAK_C_PRECONFAILED"	},			// 204

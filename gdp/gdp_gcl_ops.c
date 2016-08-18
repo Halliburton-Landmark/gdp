@@ -551,7 +551,7 @@ _gdp_gcl_append(gdp_gcl_t *gcl,
 	// send the request to the log server
 	estat = _gdp_invoke(req);
 	if (EP_STAT_ISOK(estat))
-		gcl->nrecs++;
+		gcl->nrecs = datum->recno;
 
 	req->pdu->datum = NULL;			// owned by caller
 	_gdp_req_free(&req);
