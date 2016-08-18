@@ -52,6 +52,7 @@
 bool	AsyncIo = false;		// use asynchronous I/O
 bool	Quiet = false;			// be silent (no chatty messages)
 bool	Hexdump = false;		// echo input in hex instead of ASCII
+bool	KeepGoing = false;		// keep going on append errors
 
 /*
 **  DO_LOG --- log a timestamp (for performance checking).
@@ -143,11 +144,19 @@ write_record(gdp_datum_t *datum, gdp_gcl_t *gcl)
 	else
 	{
 		estat = gdp_gcl_append(gcl, datum);
-		EP_STAT_CHECK(estat, return estat);
 
-		// print the return value (shows the record number assigned)
-		if (!Quiet)
-			gdp_datum_print(datum, stdout, 0);
+		if (EP_STAT_ISOK(estat))
+		{
+			// print the return value (shows the record number assigned)
+			if (!Quiet)
+				gdp_datum_print(datum, stdout, 0);
+		}
+		else if (!Quiet)
+		{
+			char ebuf[100];
+			ep_app_error("Append error: %s",
+						ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		}
 	}
 	return estat;
 }
@@ -163,6 +172,7 @@ usage(void)
 			"    -a  use asynchronous I/O\n"
 			"    -D  set debugging flags\n"
 			"    -G  IP host to contact for gdp_router\n"
+			"    -i  ignore append errors\n"
 			"    -K  signing key file\n"
 			"    -L  set logging file name (for debugging)\n"
 			"    -q  run quietly (no non-error output)\n",
@@ -186,7 +196,7 @@ main(int argc, char **argv)
 	gdp_gcl_open_info_t *info;
 
 	// collect command-line arguments
-	while ((opt = getopt(argc, argv, "1aD:G:K:L:q")) > 0)
+	while ((opt = getopt(argc, argv, "1aD:G:iK:L:q")) > 0)
 	{
 		switch (opt)
 		{
@@ -205,6 +215,10 @@ main(int argc, char **argv)
 
 		 case 'G':
 			gdpd_addr = optarg;
+			break;
+
+		 case 'i':
+			KeepGoing = true;
 			break;
 
 		 case 'K':
@@ -328,7 +342,8 @@ main(int argc, char **argv)
 
 			// write the record to the log
 			estat = write_record(datum, gcl);
-			EP_STAT_CHECK(estat, break);
+			if (!EP_STAT_ISOK(estat) && !KeepGoing)
+				break;
 		}
 	}
 

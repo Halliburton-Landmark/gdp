@@ -10,7 +10,8 @@
 .Op Fl a
 .Op Fl D Ar debug-spec
 .Op Fl G Ar router-ip
-.Op Fl F Ar key-file
+.Op Fl i
+.Op Fl K Ar key-file
 .Op Fl L Ar log-file
 .Op Fl q
 .Ar log-name
@@ -73,18 +74,21 @@ the names listed in the
 .Va swarm.gdp.routers
 runtime administrative parameter
 are searched.
-.It Fl L Ar log-file
-If set, write a very simplistic performance log to the given
-.Ar log-file .
-This can be used together with the companion flag on
-.Xr gdp-reader 1
-to produce crude round-trip performance numbers.
+.It Fl i
+Print errors on append, but continue to accept input.
+This is mostly useful for debugging.
 .It Fl K Ar key-file
 Names the file containing the secret key to be used for signing.
 This must be a
 .Sy \&.pem
 format file.
 This overrides the default search path.
+.It Fl L Ar log-file
+If set, write a very simplistic performance log to the given
+.Ar log-file .
+This can be used together with the companion flag on
+.Xr gdp-reader 1
+to produce crude round-trip performance numbers.
 .It Fl q
 Run quietly, suppressing all output that isn't error text.
 .El
