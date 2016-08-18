@@ -202,7 +202,7 @@ gdp_pdu_proc_cmd(void *pdu_)
 	{
 		ep_dbg_cprintf(Dbg, 47,
 				"gdp_pdu_proc_cmd: sending %zd bytes\n",
-				evbuffer_get_length(req->pdu->datum->dbuf));
+				gdp_buf_getlength(req->pdu->datum->dbuf));
 		req->pdu->cmd = resp;
 		req->stat = _gdp_pdu_out(req->pdu, req->chan, NULL);
 		//XXX anything to do with estat here?

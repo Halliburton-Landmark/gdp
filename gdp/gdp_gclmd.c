@@ -253,7 +253,7 @@ fail0:
 */
 
 size_t
-_gdp_gclmd_serialize(gdp_gclmd_t *gmd, struct evbuffer *evb)
+_gdp_gclmd_serialize(gdp_gclmd_t *gmd, gdp_buf_t *evb)
 {
 	int i;
 	size_t slen = 0;
@@ -264,7 +264,7 @@ _gdp_gclmd_serialize(gdp_gclmd_t *gmd, struct evbuffer *evb)
 	// write the number of entries
 	{
 		uint16_t t16 = htons(gmd->nused);
-		evbuffer_add(evb, &t16, sizeof t16);
+		gdp_buf_write(evb, &t16, sizeof t16);
 		slen += sizeof t16;
 	}
 
@@ -274,9 +274,9 @@ _gdp_gclmd_serialize(gdp_gclmd_t *gmd, struct evbuffer *evb)
 		uint32_t t32;
 
 		t32 = htonl(gmd->mds[i].md_id);
-		evbuffer_add(evb, &t32, sizeof t32);
+		gdp_buf_write(evb, &t32, sizeof t32);
 		t32 = htonl(gmd->mds[i].md_len);
-		evbuffer_add(evb, &t32, sizeof t32);
+		gdp_buf_write(evb, &t32, sizeof t32);
 		slen = 2 * sizeof t32;
 	}
 
@@ -285,7 +285,7 @@ _gdp_gclmd_serialize(gdp_gclmd_t *gmd, struct evbuffer *evb)
 	{
 		if (gmd->mds[i].md_len > 0)
 		{
-			evbuffer_add(evb, gmd->mds[i].md_data, gmd->mds[i].md_len);
+			gdp_buf_write(evb, gmd->mds[i].md_data, gmd->mds[i].md_len);
 			slen += gmd->mds[i].md_len;
 		}
 	}
@@ -294,7 +294,7 @@ _gdp_gclmd_serialize(gdp_gclmd_t *gmd, struct evbuffer *evb)
 
 
 /*
-**  _GDP_GCLMD_DESERIALIZE --- crack open an evbuffer and store the metadata
+**  _GDP_GCLMD_DESERIALIZE --- crack open a gdp_buf_t and store the metadata
 **
 **		The data is serialized as a count of entries, that number
 **		of metadata headers (contains the id and data length),
@@ -303,7 +303,7 @@ _gdp_gclmd_serialize(gdp_gclmd_t *gmd, struct evbuffer *evb)
 */
 
 gdp_gclmd_t *
-_gdp_gclmd_deserialize(struct evbuffer *evb)
+_gdp_gclmd_deserialize(gdp_buf_t *evb)
 {
 	int nmd = 0;		// number of metadata entries
 	int tlen = 0;		// total data length
@@ -314,16 +314,16 @@ _gdp_gclmd_deserialize(struct evbuffer *evb)
 	{
 		uint16_t t16;
 
-		if (evbuffer_get_length(evb) < sizeof t16)
+		if (gdp_buf_getlength(evb) < sizeof t16)
 			return NULL;
-		evbuffer_remove(evb, &t16, sizeof t16);
+		gdp_buf_read(evb, &t16, sizeof t16);
 		nmd = ntohs(t16);
 		if (nmd == 0)
 			return NULL;
 	}
 
 	// make sure we have at least all the headers
-	if (evbuffer_get_length(evb) < (2 * sizeof (uint32_t)))
+	if (gdp_buf_getlength(evb) < (2 * sizeof (uint32_t)))
 		return NULL;
 
 	// allocate and populate the header
@@ -337,16 +337,16 @@ _gdp_gclmd_deserialize(struct evbuffer *evb)
 	{
 		uint32_t t32;
 
-		evbuffer_remove(evb, &t32, sizeof t32);
+		gdp_buf_read(evb, &t32, sizeof t32);
 		gmd->mds[i].md_id = ntohl(t32);
-		evbuffer_remove(evb, &t32, sizeof t32);
+		gdp_buf_read(evb, &t32, sizeof t32);
 		tlen += gmd->mds[i].md_len = ntohl(t32);
 		gmd->mds[i].md_flags = 0;
 	}
 
 	// and now for the data....
 	gmd->databuf = ep_mem_malloc(tlen);
-	if (evbuffer_remove(evb, gmd->databuf, tlen) != tlen)
+	if (gdp_buf_read(evb, gmd->databuf, tlen) != tlen)
 	{
 		// bad news
 		ep_mem_free(gmd->databuf);

@@ -93,10 +93,10 @@ gdp_datum_free(gdp_datum_t *datum)
 	datum->inuse = false;
 	if (datum->dbuf != NULL)
 	{
-		size_t ndrain = evbuffer_get_length(datum->dbuf);
+		size_t ndrain = gdp_buf_getlength(datum->dbuf);
 		ep_dbg_cprintf(Dbg, 50, "  ... draining %zd bytes\n", ndrain);
 		if (ndrain > 0)
-			evbuffer_drain(datum->dbuf, ndrain);
+			gdp_buf_drain(datum->dbuf, ndrain);
 	}
 	ep_thr_mutex_lock(&DatumFreeListMutex);
 	datum->next = DatumFreeList;

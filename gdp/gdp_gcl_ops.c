@@ -379,12 +379,15 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 	ep_crypto_sign_update(gcl->digest, gcl->name, sizeof gcl->name);
 
 	// re-serialize the metadata and include it
-	struct evbuffer *evb = evbuffer_new();
-	_gdp_gclmd_serialize(gcl->gclmd, evb);
-	size_t evblen = evbuffer_get_length(evb);
-	ep_crypto_sign_update(gcl->digest, evbuffer_pullup(evb, evblen), evblen);
-	//evbuffer_drain(evb, evblen);
-	evbuffer_free(evb);
+	{
+		gdp_buf_t *mdbuf = gdp_buf_new();
+		_gdp_gclmd_serialize(gcl->gclmd, mdbuf);
+		size_t mdbuflen = gdp_buf_getlength(mdbuf);
+		ep_crypto_sign_update(gcl->digest, gdp_buf_getptr(mdbuf, mdbuflen),
+						mdbuflen);
+		//gdp_buf_drain(mdbuf, mdbuflen);
+		gdp_buf_free(mdbuf);
+	}
 
 	// the GCL hash structure now has the fixed part of the hash
 

@@ -120,7 +120,7 @@ done:
 */
 
 static EP_STAT
-send_data(struct evbuffer *obuf,
+send_data(gdp_buf_t *obuf,
 		void *data, size_t len,
 		const char *where, int offset, int dbgmode)
 {
@@ -140,7 +140,7 @@ send_data(struct evbuffer *obuf,
 		ep_dbg_cprintf(Dbg, 1, "_gdp_pdu_out: %s: empty data (%zd)\n",
 				where, len);
 	}
-	else if (evbuffer_add(obuf, data, len) < 0)
+	else if (gdp_buf_write(obuf, data, len) < 0)
 	{
 		char nbuf[40];
 
@@ -211,7 +211,7 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 	size_t dlen;
 	size_t hdrlen;
 	size_t offset;
-	struct evbuffer *obuf;
+	gdp_buf_t *obuf;
 	uint8_t sigbuf[EP_CRYPTO_MAX_SIG];
 	bool use_sigbuf = false;
 
@@ -264,7 +264,7 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 		datum->siglen = siglen;
 		datum->sigmdalg = ep_crypto_md_type(md);
 		if (datum->sig != NULL)
-			evbuffer_drain(datum->sig, evbuffer_get_length(datum->sig));
+			gdp_buf_drain(datum->sig, gdp_buf_getlength(datum->sig));
 		ep_crypto_sign_free(md);
 		use_sigbuf = true;
 	}
@@ -322,7 +322,7 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 
 	// data length
 	if (pdu->datum != NULL)
-		dlen = evbuffer_get_length(pdu->datum->dbuf);
+		dlen = gdp_buf_getlength(pdu->datum->dbuf);
 	else
 		dlen = 0;
 	PUT32(dlen);
@@ -362,7 +362,7 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 	ep_dbg_cprintf(Dbg, 32, "_gdp_pdu_out: sending PDU:\n");
 
 	// send header
-	evbuffer_lock(obuf);
+	gdp_buf_lock(obuf);
 	estat = send_data(obuf, pbuf, hdrlen,
 					"header", offset, EP_HEXDUMP_HEX);
 	offset += pbp - pbuf;
@@ -373,7 +373,7 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 	{
 		uint8_t *bp;
 
-		bp = evbuffer_pullup(pdu->datum->dbuf, dlen);
+		bp = gdp_buf_getptr(pdu->datum->dbuf, dlen);
 		estat = send_data(obuf, bp, dlen,
 						"data", offset, EP_HEXDUMP_ASCII);
 		offset += dlen;
@@ -389,13 +389,13 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 			sigp = sigbuf;
 		else if (pdu->datum->sig != NULL)
 		{
-			sigp = evbuffer_pullup(pdu->datum->sig, pdu->datum->siglen);
+			sigp = gdp_buf_getptr(pdu->datum->sig, pdu->datum->siglen);
 			if (sigp == NULL && ep_dbg_test(Dbg, 1))
 			{
 				ep_dbg_printf("_gdp_pdu_out(%s): siglen = %d"
 						" but only %zd available\n",
 						_gdp_proto_cmd_name(pdu->cmd), pdu->datum->siglen,
-						evbuffer_get_length(pdu->datum->sig));
+						gdp_buf_getlength(pdu->datum->sig));
 				ep_dbg_printf("    basemd = %p\n",
 						basemd);
 			}
@@ -418,9 +418,9 @@ fail0:
 	if (!EP_STAT_ISOK(estat))
 	{
 		// flush buffer so we send nothing once the buffer is unlocked
-		evbuffer_drain(obuf, evbuffer_get_length(obuf));
+		gdp_buf_drain(obuf, gdp_buf_getlength(obuf));
 	}
-	evbuffer_unlock(obuf);
+	gdp_buf_unlock(obuf);
 
 	return estat;
 }
@@ -449,7 +449,7 @@ _gdp_pdu_out_hard(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *md)
 **		GDP_STAT_KEEP_READING, which means that some required data
 **		isn't present yet.
 **
-**	XXX This can probably done more efficiently using evbuffer_peek.
+**	XXX This can probably done more efficiently using gdp_buf_peek.
 */
 
 #define GET16(v) \
@@ -683,11 +683,11 @@ _gdp_pdu_in(gdp_pdu_t *pdu, gdp_chan_t *chan)
 
 		ep_dbg_cprintf(Dbg, 38,
 				"_gdp_pdu_in: reading %zd data bytes (%zd available)\n",
-				dlen, evbuffer_get_length(ibuf));
-		l = evbuffer_remove_buffer(ibuf, pdu->datum->dbuf, dlen);
+				dlen, gdp_buf_getlength(ibuf));
+		l = gdp_buf_move(pdu->datum->dbuf, ibuf, dlen);
 		if (ep_dbg_test(Dbg, 39))
 		{
-			ep_hexdump(evbuffer_pullup(pdu->datum->dbuf, l), l,
+			ep_hexdump(gdp_buf_getptr(pdu->datum->dbuf, l), l,
 					ep_dbg_getfile(), EP_HEXDUMP_ASCII, sz);
 		}
 		if (l < dlen)
@@ -709,14 +709,14 @@ _gdp_pdu_in(gdp_pdu_t *pdu, gdp_chan_t *chan)
 
 		ep_dbg_cprintf(Dbg, 38,
 				"_gdp_pdu_in: reading %zd signature bytes (%zd available)\n",
-				pdu->datum->siglen, evbuffer_get_length(ibuf));
+				pdu->datum->siglen, gdp_buf_getlength(ibuf));
 		if (pdu->datum->sig == NULL)
 			pdu->datum->sig = gdp_buf_new();
 
-		l = evbuffer_remove_buffer(ibuf, pdu->datum->sig, pdu->datum->siglen);
+		l = gdp_buf_move(pdu->datum->sig, ibuf, pdu->datum->siglen);
 		if (ep_dbg_test(Dbg, 39))
 		{
-			ep_hexdump(evbuffer_pullup(pdu->datum->sig, l), l,
+			ep_hexdump(gdp_buf_getptr(pdu->datum->sig, l), l,
 					ep_dbg_getfile(), EP_HEXDUMP_HEX, sz);
 		}
 		if (l < pdu->datum->siglen)

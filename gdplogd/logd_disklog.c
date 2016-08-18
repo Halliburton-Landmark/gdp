@@ -1560,7 +1560,7 @@ fail3:
 	datum->siglen = log_record.sigmeta & 0x0fff;
 
 
-	// read data in chunks and add it to the evbuffer
+	// read data in chunks and add it to the buffer
 	char read_buffer[GCL_READ_BUFFER_SIZE];
 	int64_t data_length = log_record.data_length;
 
@@ -1710,7 +1710,7 @@ disk_append(gdp_gcl_t *gcl,
 	phys = GETPHYS(gcl);
 	EP_ASSERT_POINTER_VALID(phys);
 	EP_ASSERT_POINTER_VALID(datum);
-	dlen = evbuffer_get_length(datum->dbuf);
+	dlen = gdp_buf_getlength(datum->dbuf);
 
 	ep_thr_rwlock_wrlock(&phys->lock);
 
@@ -1734,7 +1734,7 @@ disk_append(gdp_gcl_t *gcl,
 	// write log record data
 	if (dlen > 0)
 	{
-		unsigned char *p = evbuffer_pullup(datum->dbuf, dlen);
+		unsigned char *p = gdp_buf_getptr(datum->dbuf, dlen);
 		if (p != NULL)
 			fwrite(p, dlen, 1, seg->fp);
 		record_size += dlen;
@@ -1743,8 +1743,8 @@ disk_append(gdp_gcl_t *gcl,
 	// write signature
 	if (datum->sig != NULL)
 	{
-		size_t slen = evbuffer_get_length(datum->sig);
-		unsigned char *p = evbuffer_pullup(datum->sig, slen);
+		size_t slen = gdp_buf_getlength(datum->sig);
+		unsigned char *p = gdp_buf_getptr(datum->sig, slen);
 
 		if (datum->siglen != slen && ep_dbg_test(Dbg, 1))
 		{

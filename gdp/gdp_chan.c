@@ -65,9 +65,9 @@ gdp_read_cb(struct bufferevent *bev, void *ctx)
 	gdp_chan_t *chan = *pchan;
 
 	ep_dbg_cprintf(Dbg, 50, "gdp_read_cb: fd %d, %zd bytes\n",
-			bufferevent_getfd(bev), evbuffer_get_length(ievb));
+			bufferevent_getfd(bev), gdp_buf_getlength(ievb));
 
-	while (evbuffer_get_length(ievb) > 0)
+	while (gdp_buf_getlength(ievb) > 0)
 	{
 		pdu = _gdp_pdu_new();
 		estat = _gdp_pdu_in(pdu, chan);
