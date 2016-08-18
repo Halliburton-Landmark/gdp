@@ -374,6 +374,17 @@ have to change any of these.
 	GCL has a public key), and/or `pubkeyreq` (public
 	key is required).  For now, defaults to `verify`.
 
+* `swarm.gdplogd.sequencing.allowdups` &mdash;
+	allows records with record numbers that already exist to be
+	written.  This effectively erases the previous value.
+	**Use of this option is strongly discouraged.**
+	Defaults to `false`.
+
+* `swarm.gdplogd.sequencing.allowgaps` &mdash;
+	allows gaps in record numbers.  Readers will probably get
+	confused when they try to read records that do not exist.
+	Defaults to `false`.
+
 * `swarm.gdplogd.subscr.timeout` &mdash; how long a subscription will
 	be kept active without being refreshed (essentially,
 	the length of a "lease" on the subscription).  Defaults
@@ -386,7 +397,7 @@ have to change any of these.
 * `swarm.rest.prefix` &mdash; the REST prefix (e.g., `/gdp/v1/`).
 
 * `swarm.rest.scgi.port` &mdash; the port number for the SCGI server to
-	listen on.  If you change this you'll also have to
+	listen on.  If you change this you will also have to
 	change the lighttpd configuration.  Defaults to 8001.
 
 * `swarm.rest.scgi.pollinterval` &mdash; how often to poll for SCGI
@@ -427,8 +438,8 @@ Each debug flag has a hierarchical name with (by convention)
 "." as the separator, for example, "`gdp.proto`" to indicate
 the protocol processing of the GDP.  The "what(1)" program on
 a binary will show you which debug flags are available
-including a short description.  (The `what` program isn't available
-on Linux; it can be simulated using `strings | grep '@(#)'`).
+including a short description.  (The `what` program is not
+available on Linux; it can be simulated using `strings | grep '@(#)'`).
 
 To enable debugging for all patterns, use "`*=`_level_", for
 example "`*=18`".

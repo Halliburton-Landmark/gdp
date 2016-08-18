@@ -317,6 +317,23 @@ fail0:
 	return estat;
 }
 
+// response to append command
+static EP_STAT
+ack_data_changed(gdp_req_t *req)
+{
+	EP_STAT estat;
+
+	estat = ack_success(req);
+	EP_STAT_CHECK(estat, return estat);
+
+	// keep track of number of records (in case we lose sync)
+	if (req->gcl != NULL && req->pdu->datum != NULL)
+		req->gcl->nrecs = req->pdu->datum->recno;
+
+	return estat;
+}
+
+// response to read command
 static EP_STAT
 ack_data_content(gdp_req_t *req)
 {
@@ -522,7 +539,7 @@ static dispatch_ent_t	DispatchTable[256] =
 	{ ack_success,		"ACK_DATA_CREATED"		},			// 129
 	{ ack_success,		"ACK_DATA_DEL"			},			// 130
 	{ ack_success,		"ACK_DATA_VALID"		},			// 131
-	{ ack_success,		"ACK_DATA_CHANGED"		},			// 132
+	{ ack_data_changed,	"ACK_DATA_CHANGED"		},			// 132
 	{ ack_data_content,	"ACK_DATA_CONTENT"		},			// 133
 	NOENT,				// 134
 	NOENT,				// 135

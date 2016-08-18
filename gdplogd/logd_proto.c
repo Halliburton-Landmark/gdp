@@ -563,28 +563,36 @@ cmd_append(gdp_req_t *req)
 	{
 		// replay or missing a record
 		ep_dbg_cprintf(Dbg, 1, "cmd_append: record sequence error: got %"
-						PRIgdp_recno ", wanted %" PRIgdp_recno "\n",
-						req->pdu->datum->recno, req->gcl->nrecs + 1);
+						PRIgdp_recno ", wanted %" PRIgdp_recno "\n"
+						"\t%s\n",
+						req->pdu->datum->recno, req->gcl->nrecs + 1,
+						req->gcl->pname);
 
 		// XXX TEMPORARY: if no key, allow any record number XXX
 		// (for compatibility with older clients) [delete if condition]
 		if (GDP_PROTO_MIN_VERSION > 2 || req->pdu->ver > 2)
 		{
-			if (req->pdu->datum->recno <= req->gcl->nrecs)
+			if (req->pdu->datum->recno <= req->gcl->nrecs &&
+					!ep_adm_getboolparam("swarm.gdplogd.sequencing.allowdups",
+										false))
 			{
 				// may be a duplicate append
 				// XXX check that records match?
 				estat = gdpd_gcl_error(req->pdu->dst,
-						"cmd_append: writing duplicate record",
+						"cmd_append: record duplicate record",
 						GDP_STAT_RECORD_DUPLICATED, GDP_STAT_NAK_CONFLICT);
+				goto fail0;
 			}
-			else
+			else if (req->pdu->datum->recno > req->gcl->nrecs + 1 &&
+					!ep_adm_getboolparam("swarm.gdplogd.sequencing.allowgaps",
+										false))
 			{
+				// gap in record numbers
 				estat = gdpd_gcl_error(req->pdu->dst,
-						"cmd_append: record sequence error",
+						"cmd_append: record gap error",
 						GDP_STAT_RECNO_SEQ_ERROR, GDP_STAT_NAK_FORBIDDEN);
+				goto fail0;
 			}
-			goto fail0;
 		}
 	}
 
@@ -665,9 +673,9 @@ fail1:
 
 fail0:
 	// return the actual last record number (even on error)
-	req->gcl->nrecs = req->pdu->datum->recno;
+	req->pdu->datum->recno = req->gcl->nrecs;
 
-	// we can now let the data in the request go
+	// we can now drop the data and signature in the request
 	gdp_buf_reset(req->pdu->datum->dbuf);
 	if (req->pdu->datum->sig != NULL)
 		gdp_buf_reset(req->pdu->datum->sig);
