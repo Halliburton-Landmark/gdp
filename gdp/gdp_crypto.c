@@ -51,11 +51,13 @@ EP_CRYPTO_KEY *
 _gdp_crypto_skey_read(const char *basename, const char *ext)
 {
 	const char *path = ep_adm_getstrparam("swarm.gdp.crypto.key.path",
-			".:"
-			"KEYS:"
-			"~/.swarm/gdp/keys:"
-			"/usr/local/etc/swarm/gdp/keys:"
-			"/etc/swarm/gdp/keys");
+			"."
+			":KEYS"
+			":~/.swarm/gdp/keys"
+			":/usr/local/etc/gdp/keys"
+			":/usr/local/etc/swarm/gdp/keys"
+			":/etc/gdp/keys"
+			":/etc/swarm/gdp/keys");
 	char pbuf[1024];
 	char *p = NULL;
 	char *dir;
