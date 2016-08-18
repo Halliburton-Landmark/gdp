@@ -1,4 +1,5 @@
 gcl-create
+gdp-find-xname
 gdp-name-xlate
 gdp-newsegment
 gdp-rest

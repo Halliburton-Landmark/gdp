@@ -37,6 +37,7 @@ BINALL=		gcl-create \
 SBINALL_ZC= 	gdp-zcpublish
 SBINALL=	gdp-rest \
 		log-view \
+		gdp-find-xname \
 		gdp-name-xlate \
 		gdp-newsegment \
 		$(SBINALL_ZC) \
@@ -119,6 +120,9 @@ all_noavahi:
 
 gcl-create:	gcl-create.o
 	${CC} -o $@ gcl-create.o ${LDFLAGS}
+
+gdp-find-xname:	gdp-find-xname.o
+	${CC} -o $@ gdp-find-xname.o ${LDFLAGS}
 
 gdp-writer:	gdp-writer.o
 	${CC} -o $@ gdp-writer.o ${LDFLAGS}
