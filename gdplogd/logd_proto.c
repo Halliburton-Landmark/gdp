@@ -66,19 +66,47 @@ gdpd_gcl_error(gdp_name_t gcl_name, char *msg, EP_STAT logstat, EP_STAT estat)
 	return logstat;
 }
 
+
+/*
+**  Flush information from an incoming datum
+**
+**		All commands should do this /before/ they write any return
+**		values into the datum.  If where == NULL then data was expected
+**		and will not be flagged.
+*/
+
 void
 flush_input_data(gdp_req_t *req, char *where)
 {
 	int i;
+	gdp_datum_t *datum = req->pdu->datum;
 
-	if (req->pdu->datum != NULL &&
-			(i = evbuffer_get_length(req->pdu->datum->dbuf)) > 0)
+	if (datum == NULL)
+		return;
+	if (datum->dbuf != NULL && (i = gdp_buf_getlength(datum->dbuf)) > 0)
 	{
-		ep_dbg_cprintf(Dbg, 4,
-				"flush_input_data: %s: flushing %d bytes of unexpected input\n",
-				where, i);
-		gdp_buf_reset(req->pdu->datum->dbuf);
+		if (where != NULL)
+			ep_dbg_cprintf(Dbg, 4,
+					"flush_input_data: %s: flushing %d bytes of unexpected input\n",
+					where, i);
+		gdp_buf_reset(datum->dbuf);
 	}
+	if (datum->sig != NULL)
+	{
+		i = gdp_buf_getlength(datum->sig);
+		if (i > 0 && ep_dbg_test(Dbg, 4) && where != NULL)
+			ep_dbg_printf(
+					"flush_input_data: %s: flushing %d bytes of unexpected signature\n",
+					where, i);
+		if (datum->siglen != i)
+				ep_dbg_cprintf(Dbg, 4, "    Warning: siglen = %d\n",
+						datum->siglen);
+		gdp_buf_reset(datum->sig);
+	}
+	else if (datum->siglen > 0)
+		ep_dbg_cprintf(Dbg, 4, "flush_input_datum: no sig, but siglen = %d\n",
+				datum->siglen);
+	datum->siglen = 0;
 }
 
 
@@ -470,11 +498,11 @@ init_sig_digest(gdp_gcl_t *gcl)
 	ep_crypto_vrfy_update(gcl->digest, gcl->name, sizeof gcl->name);
 
 	// and the metadata (re-serialized)
-	struct evbuffer *evb = evbuffer_new();
+	gdp_buf_t *evb = gdp_buf_new();
 	_gdp_gclmd_serialize(gcl->gclmd, evb);
-	size_t evblen = evbuffer_get_length(evb);
-	ep_crypto_vrfy_update(gcl->digest, evbuffer_pullup(evb, evblen), evblen);
-	evbuffer_free(evb);
+	size_t evblen = gdp_buf_getlength(evb);
+	ep_crypto_vrfy_update(gcl->digest, gdp_buf_getptr(evb, evblen), evblen);
+	gdp_buf_free(evb);
 
 	if (false)
 	{
@@ -601,8 +629,7 @@ cmd_append(gdp_req_t *req)
 		len = gdp_buf_getlength(datum->dbuf);
 		ep_crypto_vrfy_update(md, gdp_buf_getptr(datum->dbuf, len), len);
 		len = gdp_buf_getlength(datum->sig);
-		estat = ep_crypto_vrfy_final(md,
-						gdp_buf_getptr(datum->sig, len), len);
+		estat = ep_crypto_vrfy_final(md, gdp_buf_getptr(datum->sig, len), len);
 		ep_crypto_md_free(md);
 		if (!EP_STAT_ISOK(estat))
 		{
@@ -641,8 +668,10 @@ fail0:
 	req->gcl->nrecs = req->pdu->datum->recno;
 
 	// we can now let the data in the request go
-	evbuffer_drain(req->pdu->datum->dbuf,
-			evbuffer_get_length(req->pdu->datum->dbuf));
+	gdp_buf_reset(req->pdu->datum->dbuf);
+	if (req->pdu->datum->sig != NULL)
+		gdp_buf_reset(req->pdu->datum->sig);
+	req->pdu->datum->siglen = 0;
 
 	// we're no longer using this handle
 	_gdp_gcl_decref(&req->gcl);
@@ -695,8 +724,7 @@ post_subscribe(gdp_req_t *req)
 			req->stat = estat = _gdp_pdu_out(req->pdu, req->chan, NULL);
 
 			// have to clear the old data
-			evbuffer_drain(req->pdu->datum->dbuf,
-					evbuffer_get_length(req->pdu->datum->dbuf));
+			gdp_buf_reset(req->pdu->datum->dbuf);
 
 			// advance to the next record
 			if (req->numrecs > 0 && --req->numrecs == 0)
@@ -1069,6 +1097,9 @@ cmd_fwd_append(gdp_req_t *req)
 
 	// actually do the append
 	estat = cmd_append(req);
+
+	// remove excess datum content to avoid returning it on ACK
+	flush_input_data(req, NULL);
 
 	// make response seem to come from log
 	memcpy(req->pdu->dst, gclname, sizeof req->pdu->dst);

@@ -388,12 +388,29 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 		if (use_sigbuf)
 			sigp = sigbuf;
 		else if (pdu->datum->sig != NULL)
+		{
 			sigp = evbuffer_pullup(pdu->datum->sig, pdu->datum->siglen);
+			if (sigp == NULL && ep_dbg_test(Dbg, 1))
+			{
+				ep_dbg_printf("_gdp_pdu_out(%s): siglen = %d"
+						" but only %zd available\n",
+						_gdp_proto_cmd_name(pdu->cmd), pdu->datum->siglen,
+						evbuffer_get_length(pdu->datum->sig));
+				ep_dbg_printf("    basemd = %p\n",
+						basemd);
+			}
+		}
 		else
-			EP_ASSERT_INSIST(pdu->datum->sig != NULL);
-		estat = send_data(obuf, sigp, pdu->datum->siglen,
-						"signature", offset, EP_HEXDUMP_HEX);
-		offset += pdu->datum->siglen;
+		{
+			ep_dbg_cprintf(Dbg, 1, "_gdp_pdu_out: siglen = %d but no data",
+					pdu->datum->siglen);
+		}
+		if (sigp != NULL)
+		{
+			estat = send_data(obuf, sigp, pdu->datum->siglen,
+							"signature", offset, EP_HEXDUMP_HEX);
+			offset += pdu->datum->siglen;
+		}
 		//EP_STAT_CHECK(estat, goto fail0);
 	}
 

@@ -180,6 +180,23 @@ gdp_pdu_proc_cmd(void *pdu_)
 		memcpy(req->pdu->dst, temp, sizeof req->pdu->dst);
 	}
 
+	// do sanity checks on signature
+	if (req->pdu->datum != NULL)
+	{
+		gdp_datum_t *datum = req->pdu->datum;
+		int siglen = 0;
+
+		if (datum->sig != NULL)
+			siglen = gdp_buf_getlength(datum->sig);
+		if (siglen != datum->siglen)
+		{
+			ep_dbg_cprintf(Dbg, 1, "gdp_pdu_proc_cmd(%s): datum->siglen = %d, actual = %d\n",
+					_gdp_proto_cmd_name(cmd),
+					datum->siglen, siglen);
+			datum->siglen = siglen;
+		}
+	}
+
 	// send response PDU if appropriate
 	if (GDP_CMD_NEEDS_ACK(cmd))
 	{
