@@ -82,8 +82,10 @@ sudo cp mqtt-gdp-gateway-logrotate.conf /etc/logrotate.d/mqtt-gdp-gateway
 if [ "$INITSYS" = "upstart" ]
 then
 	info "Installing Upstart system startup configuration"
-	sudo sh $GDP_SRC_ROOT/adm/customize.sh mqtt-gdp-gateway.conf /etc/init
-	sudo sh $GDP_SRC_ROOT/adm/customize.sh mqtt-gdp-gateways.conf /etc/init
+	sudo sh $GDP_SRC_ROOT/adm/customize.sh mqtt-gdp-gateway.conf.template \
+		/etc/init
+	sudo sh $GDP_SRC_ROOT/adm/customize.sh mqtt-gdp-gateways.conf.template \
+		/etc/init
 	sudo initctl check-config --system mqtt-gdp-gateway
 	sudo initctl check-config --system mqtt-gdp-gateways
 	if [ ! -e /etc/default/mqtt-gdp-gateway ]
