@@ -51,6 +51,12 @@ extern void			gdp_buf_setlock(
 						gdp_buf_t *buf,
 						EP_THR_MUTEX *m);
 
+extern void			gdp_buf_lock(
+						gdp_buf_t *buf);
+
+extern void			gdp_buf_unlock(
+						gdp_buf_t *buf);
+
 extern size_t		gdp_buf_getlength(
 						gdp_buf_t *buf);
 
@@ -79,8 +85,9 @@ extern int			gdp_buf_write(
 						size_t sz);
 
 extern int			gdp_buf_move(
+						gdp_buf_t *obuf,
 						gdp_buf_t *ibuf,
-						gdp_buf_t *obuf);
+						size_t sz);
 
 extern int			gdp_buf_printf(
 						gdp_buf_t *buf,

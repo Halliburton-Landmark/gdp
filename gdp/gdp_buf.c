@@ -79,6 +79,22 @@ gdp_buf_setlock(gdp_buf_t *buf, EP_THR_MUTEX *m)
 }
 
 /*
+**  Lock/unlock a buffer
+*/
+
+void
+gdp_buf_lock(gdp_buf_t *buf)
+{
+	evbuffer_lock(buf);
+}
+
+void
+gdp_buf_unlock(gdp_buf_t *buf)
+{
+	evbuffer_unlock(buf);
+}
+
+/*
 **  Get the amount of data in a buffer.
 */
 
@@ -169,9 +185,9 @@ gdp_buf_printf(gdp_buf_t *buf, const char *fmt, ...)
 */
 
 int
-gdp_buf_move(gdp_buf_t *ibuf, gdp_buf_t *obuf)
+gdp_buf_move(gdp_buf_t *obuf, gdp_buf_t *ibuf, size_t sz)
 {
-	return evbuffer_add_buffer(obuf, ibuf);
+	return evbuffer_remove_buffer(ibuf, obuf, sz);
 }
 
 /*
