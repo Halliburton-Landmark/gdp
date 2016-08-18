@@ -25,31 +25,34 @@ then
 else
 	: ${GDP_ETC:=$GDP_ROOT/etc}
 fi
-: ${GDP_VAR_RUN:=/var/run/gdp}
 : ${GDP_LOG_DIR:=/var/log/gdp}
 : ${GDP_SYSLOG_FACILITY:=local4}
 : ${GDP_SYSLOG_LEVEL:=notice}
 : ${GDP_USER:=gdp}
 : ${GDP_VAR:=/var/swarm/gdp}
+: ${GDP_VAR_RUN:=/var/run}
 : ${GDP_KEYS_DIR:=$GDP_ETC/keys}
-: ${GDP_ROUTER_CONF:=$GDP_VAR_RUN/gdp-router-click.conf}
 : ${GDPLOGD_ARGS:=}
 : ${GDPLOGD_DATADIR:=}
+: ${GDPLOGD_PIDFILE:=$GDP_VAR_RUN/gdplogd.pid}
+: ${GDP_ROUTER_CONF:=$GDP_VAR_RUN/gdp-router-click.conf}
 
 (
 	echo "# Generated" `date +"%F %T %z"` from $source_file
 	sed \
-		-e "s;@GDP_LOG_DIR@;$GDP_LOG_DIR;g" \
 		-e "s;@GDP_ROOT@;$GDP_ROOT;g" \
 		-e "s;@GDP_ETC@;$GDP_ETC;g" \
+		-e "s;@GDP_KEYS_DIR@;$GDP_KEYS_DIR;g" \
+		-e "s;@GDP_LOG_DIR@;$GDP_LOG_DIR;g" \
 		-e "s;@GDP_SYSLOG_FACILITY@;$GDP_SYSLOG_FACILITY;g" \
 		-e "s;@GDP_SYSLOG_LEVEL@;$GDP_SYSLOG_LEVEL;g" \
 		-e "s;@GDP_USER@;$GDP_USER;g" \
 		-e "s;@GDP_VAR@;$GDP_VAR;g" \
-		-e "s;@GDP_KEYS_DIR@;$GDP_KEYS_DIR;g" \
-		-e "s;@GDP_ROUTER_CONF@;$GDP_ROUTER_CONF;g" \
+		-e "s;@GDP_VAR_RUN@;$GDP_VAR_RUN;g" \
 		-e "s;@GDPLOGD_ARGS@;$GDPLOGD_ARGS;g" \
 		-e "s;@GDPLOGD_DATADIR@;$GDPLOGD_DATADIR;g" \
+		-e "s;@GDPLOGD_PIDFILE@;$GDPLOGD_PIDFILE;g" \
+		-e "s;@GDP_ROUTER_CONF@;$GDP_ROUTER_CONF;g" \
 
 	echo "# End of generated text" $1
 ) < $source_file > $target_dir/$source_root
