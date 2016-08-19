@@ -267,8 +267,12 @@ gdp_pdu_proc_resp(void *_rpdu)
 	{
 		if (ep_dbg_test(Dbg, 1))
 		{
+			gdp_pname_t pname;
 			ep_dbg_printf("gdp_pdu_proc_resp: discarding PDU for unknown GCL\n");
-			_gdp_pdu_dump(rpdu, ep_dbg_getfile());
+			if (ep_dbg_test(Dbg, 24))
+				_gdp_pdu_dump(rpdu, ep_dbg_getfile());
+			else
+				ep_dbg_printf("    %s\n", gdp_printable_name(rpdu->src, pname));
 		}
 		_gdp_pdu_free(rpdu);
 		return;
