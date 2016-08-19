@@ -127,10 +127,10 @@ ep_stat_tostr(EP_STAT stat,
 		size_t blen)
 {
 	int reg = EP_STAT_REGISTRY(stat);
-	char *pfx;
-	char *detail = NULL;
-	char *module = NULL;
-	char *rname;
+	const char *pfx;
+	const char *detail = NULL;
+	const char *module = NULL;
+	const char *rname;
 	char rbuf[50];
 	char mbuf[30];
 
@@ -202,22 +202,27 @@ ep_stat_tostr(EP_STAT stat,
 	if (module == NULL && EpStatStrings != NULL && !EP_STAT_ISOK(stat))
 	{
 		EP_STAT xstat;
-		char *s;
 
 		xstat = EP_STAT_NEW(EP_STAT_SEV_OK,
 				EP_STAT_REGISTRY(stat),
 				EP_STAT_MODULE(stat),
 				0);
 		module = ep_hash_search(EpStatStrings, sizeof xstat, &xstat);
-
-		s = ep_hash_search(EpStatStrings, sizeof stat, &stat);
-		if (s != NULL)
-			detail = s;
 	}
 	if (module == NULL)
 	{
 		snprintf(mbuf, sizeof mbuf, "%d", EP_STAT_MODULE(stat));
 		module = mbuf;
+	}
+
+	// check for detail in hash table
+	if (EpStatStrings != NULL)
+	{
+		const char *s;
+
+		s = ep_hash_search(EpStatStrings, sizeof stat, &stat);
+		if (s != NULL)
+			detail = s;
 	}
 
 	if (detail != NULL)
