@@ -334,7 +334,24 @@ _gdp_chan_open(const char *gdp_addr,
 		if (r != 0)
 		{
 			// address resolution failed; try the next one
-			ep_dbg_cprintf(Dbg, 1, "_gdp_chan_open: getaddrinfo(%s, %s) => %s\n",
+			switch (r)
+			{
+			case EAI_SYSTEM:
+				estat = ep_stat_from_errno(errno);
+				if (!EP_STAT_ISOK(estat))
+					break;
+				// ... fall through
+
+			case EAI_NONAME:
+				estat = EP_STAT_DNS_NOTFOUND;
+				break;
+
+			default:
+				estat = EP_STAT_DNS_FAILURE;
+			}
+			ep_dbg_cprintf(Dbg, 1,
+					"_gdp_chan_open: getaddrinfo(%s, %s) =>\n"
+					"    %s\n",
 					host, port, gai_strerror(r));
 			continue;
 		}
@@ -346,10 +363,10 @@ _gdp_chan_open(const char *gdp_addr,
 			// make the actual connection
 			// it would be nice to have a private timeout here...
 			evutil_socket_t sock = socket(a->ai_family, SOCK_STREAM, 0);
-			estat = ep_stat_from_errno(errno);
 			if (sock < 0)
 			{
 				// bad news, but keep trying
+				estat = ep_stat_from_errno(errno);
 				ep_log(estat, "_gdp_chan_open: cannot create socket");
 				continue;
 			}
@@ -385,11 +402,11 @@ _gdp_chan_open(const char *gdp_addr,
 	// error cleanup and return
 	if (!EP_STAT_ISOK(estat))
 	{
-		estat = ep_stat_from_errno(errno);
+		char ebuf[80];
 fail0:
 		ep_dbg_cprintf(Dbg, 2,
 				"_gdp_chan_open: could not open channel: %s\n",
-				strerror(errno));
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		//ep_log(estat, "_gdp_chan_open: could not open channel");
 		if (chan != NULL && newchan)
 		{
@@ -399,18 +416,10 @@ fail0:
 			ep_mem_free(chan);
 			*pchan = NULL;
 		}
+		return estat;
 	}
-	else
-	{
-		ep_dbg_cprintf(Dbg, 1, "Talking to router at %s:%s\n", host, port);
-	}
-
-	{
-		char ebuf[80];
-
-		ep_dbg_cprintf(Dbg, 20, "_gdp_chan_open => %s\n",
-				ep_stat_tostr(estat, ebuf, sizeof ebuf));
-	}
+	ep_dbg_cprintf(Dbg, 1, "_gdp_chan_open: talking to router at %s:%s\n",
+				host, port);
 	return estat;
 }
 
