@@ -73,6 +73,7 @@ exports.gdp_gcl_open = function (name, iomode, gdpdAddress) {
 
     console.log("gdpjs/index.js: gdp_gcl_open(" + name + ", " + iomode + "): calling gdpGclOpen()");
     var rv = gdpjsSupport.gdpGclOpen(name, iomode, gdpdAddress);
+    console.log("gdpjs/index.js: gdp_gcl_open(" + name + ", " + iomode + "): done calling gdpGclOpen()");
     var estat = rv.error_code;
     gclH = rv.gclH;
     if ( ! gdpjsSupport.ep_stat_isok(estat) ) {
@@ -94,19 +95,22 @@ exports.gdp_gcl_open = function (name, iomode, gdpdAddress) {
  * @param numberOfRecords The number of records to read.
  * @param consoleOut   Iff recdest == 0 and consoleOut == true; the Array entries written to the gcl will also be echoed to console.log().  The other recdest destinations will
  * ALL result in console.log() output; conout is ignored. Note, there still may be undesired output via console.log() and console.error().
+
+ * @param gclGetNextEvent True if we should get the next event.  For reading, this parameter is typically false.
+
  * @return  error_isok: false|true, error_code: EP_STAT, error_msg: String,  records: Array of records, each element with record data  where an element of the Array is: recno:     <integer record number>, timestamp: <String timestamp of record>, value:     <String contents of record>}
  */
 exports.read_gcl_records = function (gdpdAddress, gclName,
                                      firstRecord, numberOfRecords,
                                      subscribe, multiread,
                                      consoleOut, eventCallBackFunction,
-                                     waitForEvents) {
+                                     waitForEvents, gclGetNextEvent) {
 
     return gdpjsSupport.read_gcl_records(gdpdAddress, gclName,
                          firstRecord, numberOfRecords,
                          subscribe, multiread,
                          consoleOut, eventCallBackFunction,
-                         waitForEvents);
+					 waitForEvents, gclGetNextEvent);
 }
 
 /** Write to a Global Data Plane log.
