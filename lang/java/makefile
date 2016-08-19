@@ -54,6 +54,7 @@ GDP_JAR=gdp-$(GDP_MAJOR_MINOR_VERSION)-$(GDP_PATCH_VERSION).jar
 # version number.
 DARWIN_LIB=libgdp.$(GDP_MAJOR_MINOR_VERSION).dylib
 LINUX_LIB=libgdp.$(GDP_MAJOR_MINOR_VERSION).so
+LINUX_DASH_LIB=libgdp-$(GDP_MAJOR_MINOR_VERSION).so
 install: all darwin/$(DARWIN_LIB) linux-amd64/$(LINUX_LIB)
 	jar cf $(GDP_JAR) org/terraswarm/gdp/*.class darwin linux-amd64
 
@@ -73,9 +74,9 @@ darwin/$(DARWIN_LIB):
 
 linux-amd64/$(LINUX_LIB):
 	if [ ! -d linux-amd64 ]; then mkdir linux-amd64; fi
-	if [ -f ../../libs/$(LINUX_LIB) ]; then \
-		echo "Copying ../../libs/$(LINUX_LIB) to $@"; \
-		cp ../../libs/$(LINUX_LIB) $@; \
+	if [ -f ../../libs/$(LINUX_DASH_LIB) ]; then \
+		echo "Copying ../../libs/$(LINUX_DASH_LIB) to $@"; \
+		cp ../../libs/$(LINUX_DASH_LIB) $@; \
 	else \
 		if [ -f $(PTII)/lib/$(LINUX_LIB) ]; then \
 			echo "Copying $(PTII)/lib/$(LINUX_LIB) to $@"; \
