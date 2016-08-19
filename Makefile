@@ -40,6 +40,7 @@ all:
 	(cd scgilib;	make all)
 	(cd gdplogd;	make all)
 	(cd apps;	make all)
+	(cd util;	make all)
 	(cd examples;	make all)
 
 # Build without avahi, the zero-conf facility that
@@ -50,6 +51,7 @@ all_noavahi:
 	(cd scgilib;	make all)
 	(cd gdplogd;	make all_noavahi)
 	(cd apps;	make all_noavahi)
+	(cd util;	make all)
 	(cd examples;	make all_noavahi)
 	(cd lang/js;	make all_noavahi)
 
@@ -60,6 +62,7 @@ clean:
 	(cd scgilib;	make clean)
 	(cd gdplogd;	make clean)
 	(cd apps;	make clean)
+	(cd util;	make clean)
 	(cd examples;	make clean)
 	rm -f gdp-client*.deb gdp-server*.deb python-gdp*.deb README*.html
 
@@ -68,12 +71,17 @@ install-client:
 	(cd gdp;	make install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
 	(cd apps;	make install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
 
+# Should util be part of this subtarget?
 install-gdplogd:
 	(cd gdplogd;	make install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
+	(cd util;	make install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
 
 install-doc:
 	(cd doc;	make install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
 
+# Split it into sub-targets to mimic our distribution, also
+#   used by the debian packaging scripts. So if you change it here,
+#   make sure you don't break the packaging.
 install: install-client install-gdplogd install-doc
 	mkdir -p ${DOCDIR}
 	cp -rp examples ${DOCDIR}

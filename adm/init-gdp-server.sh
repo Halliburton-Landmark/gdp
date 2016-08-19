@@ -132,13 +132,6 @@ else
 	warn "$EP_PARAMS/gdplogd already exists; check consistency" 1>&2
 fi
 
-if ! type llogger > /dev/null 2>&1
-then
-	info "Installing llogger"
-	cd $GDP_SRC_ROOT/util
-	make install
-fi
-
 info "Installing gdplogd wrapper script"
 cd $GDP_SRC_ROOT
 install -o ${GDP_USER} adm/gdplogd-wrapper.sh $GDP_ROOT/sbin
