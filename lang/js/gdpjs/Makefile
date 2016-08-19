@@ -157,11 +157,11 @@ libgdpjs.so.${GDPJSLIBVER}: ${OBJS}
 			echo "Copying ../../../libs/libep.${EPLIBVER}.dylib to ${LIBDIR}/"; \
 			cp ../../../libs/libep.${EPLIBVER}.dylib ${LIBDIR}/; \
 		fi; \
-		if [ -f $(PTII)/lib/libgdpjs.${GDPJSLIBVER}..so ]; then \
+		if [ -f $(PTII)/lib/libgdpjs.${GDPJSLIBVER}.so ]; then \
 			echo "Copying Linux shared libraries from $(PTII)"; \
-			cp $(PTII)/lib/libgdpjs.${GDPJSLIBVER}..so ${LIBDIR}; \
-			cp $(PTII)/lib/libgdp.${GDPLIBVER}..so ${LIBDIR}; \
-			cp $(PTII)/lib/libep.${EPLIBVER}..so ${LIBDIR}; \
+			cp $(PTII)/lib/libgdpjs.${GDPJSLIBVER}.so ${LIBDIR}; \
+			cp $(PTII)/lib/libgdp.${GDPLIBVER}.so ${LIBDIR}; \
+			cp $(PTII)/lib/libep.${EPLIBVER}.so ${LIBDIR}; \
 		fi; \
 	else \
 		echo "Setting up libgdpjs"; \
