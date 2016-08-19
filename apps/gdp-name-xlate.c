@@ -38,8 +38,40 @@
 #include <ep/ep_app.h>
 #include <ep/ep_dbg.h>
 
+#include <ctype.h>
 #include <getopt.h>
+#include <string.h>
 #include <sysexits.h>
+
+uint8_t	Xlations[] =
+	{
+		0,	1,	2,	3,	4,	5,	6,	7,
+		8,	9,	0,	0,	0,	0,	0,	0,
+		0,	10, 11, 12, 13, 14, 15, 0,
+		0,	0,	0,	0,	0,	0,	0,	0,
+		0,	0,	0,	0,	0,	0,	0,	0,
+		0,	0,	0,	0,	0,	0,	0,	0,
+		0,	10, 11, 12, 13, 14, 15, 0,
+	};
+
+int
+parse_hex(const char *s, gdp_name_t gdpiname)
+{
+	int i;
+
+	if (strlen(s) != 64)
+		return 1;
+
+	for (i = 0; i < 32; i++)
+	{
+		if (!isxdigit(s[0]) || !isxdigit(s[1]))
+			return 1;
+		gdpiname[i] = (Xlations[s[0] - 0x30]) << 4 | (Xlations[s[1] - 0x30]);
+		s += 2;
+	}
+
+	return 0;
+}
 
 void
 usage(void)
@@ -80,13 +112,13 @@ main(int argc, char **argv)
 		usage();
 
 	// don't really need to initialize the GDP library for this
-	gdp_parse_name(argv[0], gdpiname);
+	if (parse_hex(argv[0], gdpiname) != 0)
+		gdp_parse_name(argv[0], gdpiname);
 	gdp_printable_name(gdpiname, gdppname);
 	fprintf(stdout,
-			"external:  %s\n"
 			"printable: %s\n"
 			"hex:       ",
-			argv[0], gdppname);
+			gdppname);
 	for (i = 0; i < sizeof gdpiname; i++)
 		fprintf(stdout, "%02x", gdpiname[i]);
 	fprintf(stdout, "\n");
