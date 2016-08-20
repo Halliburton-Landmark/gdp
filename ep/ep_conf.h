@@ -101,6 +101,7 @@
 # define EP_OSCF_HAS_STRPTIME		1	// does strptime(3) exist?
 
 # ifdef __FreeBSD__
+#  include <sys/param.h>
 #  define EP_OSCF_HAS_UCHAR_T		0	// does uchar_t exist?
 #  define EP_OSCF_HAS_SYS_CDEFS_H	1	// does <sys/cdefs.h> exist?
 #  define EP_OSCF_HAS_STRLCPY		1	// does strlcat(3) exist?
