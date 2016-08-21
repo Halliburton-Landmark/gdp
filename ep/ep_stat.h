@@ -133,8 +133,10 @@ typedef struct _ep_stat
 #define EP_STAT_ISWARN(c)	(EP_STAT_SEVERITY(c) == EP_STAT_SEV_WARN)
 #define EP_STAT_ISERROR(c)	(EP_STAT_SEVERITY(c) == EP_STAT_SEV_ERROR)
 #define EP_STAT_ISSEVERE(c)	(EP_STAT_SEVERITY(c) == EP_STAT_SEV_SEVERE)
+#define EP_STAT_ISABORT(c)	(EP_STAT_SEVERITY(c) == EP_STAT_SEV_ABORT)
 #define EP_STAT_ISFAIL(c)	(EP_STAT_SEVERITY(c) >= EP_STAT_SEV_WARN)
 #define EP_STAT_ISPFAIL(c)	(EP_STAT_SEVERITY(c) >= EP_STAT_SEV_ERROR)
+#define EP_STAT_ISSFAIL(c)	(EP_STAT_SEVERITY(c) >= EP_STAT_SEV_SEVERE)
 
 // compare two status codes for equality
 #define EP_STAT_IS_SAME(a, b)	((a).code == (b).code)
