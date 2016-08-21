@@ -63,10 +63,11 @@
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.physlog", "GDP Log Daemon Physical Log");
 
-#define GCL_PATH_MAX		200		// max length of pathname
+#define GCL_PATH_MAX		200			// max length of pathname
 
-static const char	*GCLDir;		// the gcl data directory
-static int			GCLfilemode;	// the file mode on create
+static const char	*GCLDir;			// the gcl data directory
+static int			GCLfilemode;		// the file mode on create
+static uint32_t		DefaultLogFlags;	// as indicated
 
 #define GETPHYS(gcl)	((gcl)->x->physinfo)
 
@@ -317,6 +318,13 @@ disk_init()
 
 	// find the file creation mode
 	GCLfilemode = ep_adm_getintparam("swarm.gdplogd.gcl.mode", 0600);
+
+	// find default log flags
+	// Setting HIDEFAILURE moves corrupt tidx databases out of the way.
+	// This reduces errors, but makes disk_ts_to_recno fail, which may
+	// not be a good idea.
+	if (ep_adm_getboolparam("swarm.gdplogd.gcl.abandon_corrupt_tidx", true))
+		DefaultLogFlags |= LOG_TIDX_HIDEFAILURE;
 
 	ep_dbg_cprintf(Dbg, 8, "disk_init: log dir = %s, mode = 0%o\n",
 			GCLDir, GCLfilemode);
@@ -1100,7 +1108,7 @@ disk_create(gdp_gcl_t *gcl, gdp_gclmd_t *gmd)
 	phys->ridx.max_offset = phys->ridx.header_size = SIZEOF_RIDX_HEADER;
 	phys->ridx.min_recno = phys->min_recno = 1;
 	phys->max_recno = 0;
-	phys->flags |= LOG_TIDX_HIDEFAILURE;
+	phys->flags |= DefaultLogFlags;
 	ep_dbg_cprintf(Dbg, 10, "Created new GCL %s\n", gcl->pname);
 	return estat;
 
@@ -1329,10 +1337,7 @@ disk_open(gdp_gcl_t *gcl)
 	**  Set per-log flags
 	*/
 
-	// Setting HIDEFAILURE moves corrupt tidx databases out of the way.
-	// This reduces errors, but makes disk_ts_to_recno fail, which may
-	// not be a good idea.
-	phys->flags |= LOG_TIDX_HIDEFAILURE;
+	phys->flags |= DefaultLogFlags;
 
 	if (ep_dbg_test(Dbg, 20))
 	{
