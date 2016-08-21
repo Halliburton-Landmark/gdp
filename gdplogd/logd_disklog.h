@@ -299,6 +299,7 @@ struct physinfo
 	// info regarding the entire log (not segment)
 	gdp_recno_t			min_recno;				// first recno in log
 	gdp_recno_t			max_recno;				// last recno in log (dynamic)
+	uint32_t			flags;					// see below
 
 	// info regarding the segment files
 	uint32_t			nsegments;				// number of segments
@@ -310,5 +311,7 @@ struct physinfo
 	struct recno_index	ridx;					// index by recno
 	struct ts_index		tidx;					// index by timestamp
 };
+
+#define LOG_TIDX_HIDEFAILURE	0x00000001	// abandon a corrupt tidx database
 
 #endif //_GDPLOGD_DISKLOG_H_

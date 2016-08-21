@@ -1100,6 +1100,7 @@ disk_create(gdp_gcl_t *gcl, gdp_gclmd_t *gmd)
 	phys->ridx.max_offset = phys->ridx.header_size = SIZEOF_RIDX_HEADER;
 	phys->ridx.min_recno = phys->min_recno = 1;
 	phys->max_recno = 0;
+	phys->flags |= LOG_TIDX_HIDEFAILURE;
 	ep_dbg_cprintf(Dbg, 10, "Created new GCL %s\n", gcl->pname);
 	return estat;
 
@@ -1323,6 +1324,15 @@ disk_open(gdp_gcl_t *gcl)
 		}
 		EP_STAT_CHECK(estat, goto fail0);
 	}
+
+	/*
+	**  Set per-log flags
+	*/
+
+	// Setting HIDEFAILURE moves corrupt tidx databases out of the way.
+	// This reduces errors, but makes disk_ts_to_recno fail, which may
+	// not be a good idea.
+	phys->flags |= LOG_TIDX_HIDEFAILURE;
 
 	if (ep_dbg_test(Dbg, 20))
 	{
@@ -1830,8 +1840,9 @@ disk_append(gdp_gcl_t *gcl,
 		estat = bdb_put(phys->tidx.db, &tkey_dbt, &tval_dbt);
 
 		// if this is severe, we want to abandon the database
-		// XXX is this the correct heuristic?
-		if (EP_STAT_ISSFAIL(estat))
+		// XXX is ISSFAIL the correct heuristic?
+		if (EP_STAT_ISSFAIL(estat) &&
+				EP_UT_BITSET(LOG_TIDX_HIDEFAILURE, phys->flags))
 		{
 			// give up on this index entirely
 			bdb_close(phys->tidx.db);
