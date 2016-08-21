@@ -147,6 +147,8 @@ ep_stat_from_dbstat(int dbstat)
 				dbstat, db_strerror(dbstat));
 		if (dbstat == DB_NOTFOUND || dbstat == DB_KEYEMPTY)
 			estat = GDP_STAT_NAK_NOTFOUND;
+		else if (dbstat == DB_KEYEXIST)
+			estat = GDP_STAT_NAK_CONFLICT;
 		else if (dbstat > 0)
 			estat = ep_stat_from_errno(dbstat);
 		else
@@ -1826,9 +1828,42 @@ disk_append(gdp_gcl_t *gcl,
 		tval_dbt.size = sizeof tvalue;
 
 		estat = bdb_put(phys->tidx.db, &tkey_dbt, &tval_dbt);
-		if (!EP_STAT_ISOK(estat))
+
+		// if this is severe, we want to abandon the database
+		// XXX is this the correct heuristic?
+		if (EP_STAT_ISSFAIL(estat))
+		{
+			// give up on this index entirely
+			bdb_close(phys->tidx.db);
+			phys->tidx.db = NULL;
+
+			EP_STAT tstat;
+			char oldname[GCL_PATH_MAX];
+			char newname[GCL_PATH_MAX];
+
+			tstat = get_gcl_path(gcl, -1, GCL_TIDX_SUFFIX,
+								oldname, sizeof oldname);
+			EP_STAT_CHECK(tstat, goto fail0);
+
+			tstat = get_gcl_path(gcl, -1, GCL_TIDX_SUFFIX "XX",
+								newname, sizeof newname);
+			EP_STAT_CHECK(tstat, goto fail0);
+
+			(void) unlink(newname);			// failure is not an error
+			if (link(oldname, newname) < 0)
+				(void) posix_error(errno, "disk_append(%s): link", gcl->pname);
+			else if (unlink(oldname) < 0)
+				(void) posix_error(errno, "disk_append(%s): unlink", gcl->pname);
+
+			ep_log(estat, "disk_append(%s): bdb failure: moved %s to %s",
+					gcl->pname, oldname, newname);
+		}
+		else if (!EP_STAT_ISOK(estat))
+		{
 			ep_log(estat, "disk_append(%s): cannot put tidx value",
 					gcl->pname);
+		}
+
 		//EP_STAT_CHECK(estat, goto fail0);
 	}
 
