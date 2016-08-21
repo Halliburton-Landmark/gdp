@@ -160,7 +160,10 @@ main(int argc, char **argv)
 		if (opt == 'D')
 			ep_dbg_set(optarg);
 	}
-	optreset = optind = 1;
+	optind = 1;
+#if EP_OSCF_NEED_OPTRESET
+	optreset = 1;
+#endif
 
 	// preinit library (must be early due to crypto code in arg processing)
 	gdp_lib_init(NULL);

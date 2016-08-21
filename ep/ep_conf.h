@@ -112,6 +112,7 @@
 #  ifndef EP_OSCF_USE_GETDATE
 #   define EP_OSCF_USE_GETDATE		0	// does getdate(3) exist?
 #  endif
+#  define EP_OSCF_NEED_OPTRESET		1	// optreset needed in getopt(3)
 # endif // __FreeBSD__
 
 # ifdef __APPLE__
@@ -124,6 +125,7 @@
 #  ifndef EP_OSCF_USE_GETDATE
 #   define EP_OSCF_USE_GETDATE		1	// does getdate(3) exist?
 #  endif
+#  define EP_OSCF_NEED_OPTRESET		1	// optreset needed in getopt(3)
 # endif // __APPLE__
 
 #ifdef __linux__
