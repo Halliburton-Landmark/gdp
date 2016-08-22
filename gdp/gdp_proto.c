@@ -242,14 +242,24 @@ acknak(gdp_req_t *req, const char *where, bool reuse_pdu)
 				_gdp_datum_dump(req->pdu->datum, ep_dbg_getfile());
 			}
 
-			// don't need the old dbuf
-			gdp_buf_free(req->pdu->datum->dbuf);
+			// save the dbuf that the user may already hold a pointer to
+			gdp_buf_t *user_dbuf = req->pdu->datum->dbuf;
 
-			// copy the contents of the new message over the old
+			// move the contents of the response dbuf into the user dbuf
+			gdp_buf_reset(user_dbuf);
+			gdp_buf_move(user_dbuf, req->rpdu->datum->dbuf,
+					gdp_buf_getlength(req->rpdu->datum->dbuf));
+
+			// we can now discard the response dbuf entirely and replace it
+			gdp_buf_free(req->rpdu->datum->dbuf);
+			req->rpdu->datum->dbuf = user_dbuf;
+
+			// copy the contents of the response datum over the user datum
+			// (this has the pointer to user dbuf with response contents)
 			memcpy(req->pdu->datum, req->rpdu->datum, sizeof *req->pdu->datum);
 
-			// old datum now points to new dbuf; eliminate from new pdu
-			req->rpdu->datum->dbuf = NULL;
+			// user datum now complete; can remove the response datum
+			req->rpdu->datum->dbuf = NULL;		// but not the user dbuf!
 			gdp_datum_free(req->rpdu->datum);
 
 			// point the new PDU at the old datum
