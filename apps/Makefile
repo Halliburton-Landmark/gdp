@@ -29,6 +29,7 @@
 BINALL_ZC=	gdp-zcbrowse
 #ALL=	gcl-create gdp-writer gdp-reader gdp-rest rw-bench log-view
 BINALL=		gcl-create \
+		log-exists \
 		log-mirror \
 		gdp-reader \
 		gdp-writer \
@@ -44,6 +45,7 @@ SBINALL=	gdp-rest \
 
 MAN1ALL=	gdp-reader.1 \
 		gdp-writer.1 \
+		log-exists.1 \
 		log-mirror.1 \
 
 MAN3ALL=
@@ -99,8 +101,13 @@ LIBCRYPTO=	-lcrypto
 LIBAVAHI=	-lavahi-client -lavahi-common
 LIBADD=		`sh ../adm/add-libs.sh`
 INCS=		${INCSEARCH} ${INCGDP} ${INCEP}
-LDFLAGS=	${LIBSEARCH} ${LIBGDP} ${LIBEP} \
-		${LIBJANSSON} ${LIBEVENT2} ${LIBCRYPTO} ${LIBAVAHI} \
+LDFLAGS=	${LIBSEARCH}
+LDLIBS=		${LIBGDP} \
+		${LIBEP} \
+		${LIBJANSSON} \
+		${LIBEVENT2} \
+		${LIBCRYPTO} \
+		${LIBAVAHI} \
 		${LIBADD}
 PG=
 WALL=		-Wall
@@ -118,41 +125,8 @@ all:	${ALL}
 all_noavahi:
 	${MAKE}	STD=-DGDP_OSCF_USE_ZEROCONF=0 LIBAVAHI= BINALL_ZC= SBINALL_ZC= all
 
-gcl-create:	gcl-create.o
-	${CC} -o $@ gcl-create.o ${LDFLAGS}
-
-gdp-find-xname:	gdp-find-xname.o
-	${CC} -o $@ gdp-find-xname.o ${LDFLAGS}
-
-gdp-writer:	gdp-writer.o
-	${CC} -o $@ gdp-writer.o ${LDFLAGS}
-
-gdp-reader:	gdp-reader.o
-	${CC} -o $@ gdp-reader.o ${LDFLAGS}
-
 gdp-rest:	gdp-rest.o ../scgilib/scgilib.o
-	${CC} -o $@ gdp-rest.o ${LDFLAGS} ../scgilib/scgilib.o
-
-rw-bench:	rw-bench.o
-	$(CC) -o $@ rw-bench.o $(LDFLAGS)
-
-log-mirror:	log-mirror.o
-	$(CC) -o $@ log-mirror.o $(LDFLAGS)
-
-log-view:	log-view.o
-	$(CC) -o $@ log-view.o $(LDFLAGS)
-
-gdp-name-xlate:	gdp-name-xlate.o
-	$(CC) -o $@ gdp-name-xlate.o $(LDFLAGS)
-
-gdp-newsegment:	gdp-newsegment.o
-	$(CC) -o $@ gdp-newsegment.o $(LDFLAGS)
-
-gdp-zcpublish:	gdp-zcpublish.o
-	$(CC) -o $@ gdp-zcpublish.o $(LDFLAGS)
-
-gdp-zcbrowse:	gdp-zcbrowse.o
-	$(CC) -o $@ gdp-zcbrowse.o $(LDFLAGS)
+	${CC} -o $@ ${LDFLAGS} gdp-rest.o ${LDLIBS} ../scgilib/scgilib.o
 
 ${CLEANALL}:	${LIBROOT}/gdp/libgdp.a ${LIBROOT}/ep/libep.a
 

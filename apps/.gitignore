@@ -6,6 +6,7 @@ gdp-newsegment
 gdp-rest
 gdp-reader
 gdp-writer
+log-exists
 log-mirror
 log-view
 rw-bench
