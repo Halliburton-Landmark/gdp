@@ -184,8 +184,15 @@ show_metadata(int nmds, FILE *dfp, size_t *foffp, int plev)
 		}
 		else if (mdhdrs[i].md_id == GDP_GCLMD_XID)
 		{
-			fprintf(stdout,
-					"\tExternal name: %s\n", mdata);
+			fprintf(stdout, "\tExternal name: %s\n", mdata);
+		}
+		else if (mdhdrs[i].md_id == GDP_GCLMD_CID)
+		{
+			fprintf(stdout, "\tCreator:       %s\n", mdata);
+		}
+		else if (mdhdrs[i].md_id == GDP_GCLMD_CTIME)
+		{
+			fprintf(stdout, "\tCreation Time: %s\n", mdata);
 		}
 
 		if (plev >= 4)

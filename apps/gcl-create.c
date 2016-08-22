@@ -92,6 +92,9 @@ select_logd_name(void)
 	return p;
 }
 
+// command line options
+#define OPTIONS		"b:c:C:D:e:G:h:k:K:qs:"
+
 void
 usage(void)
 {
@@ -151,11 +154,22 @@ main(int argc, char **argv)
 	EP_CRYPTO_KEY *key = NULL;
 	char *p;
 
+	// quick pass so debugging is on for initialization
+	while ((opt = getopt(argc, argv, OPTIONS)) > 0)
+	{
+		if (opt == 'D')
+			ep_dbg_set(optarg);
+	}
+	optind = 1;
+#if EP_OSCF_NEED_OPTRESET
+	optreset = 1;
+#endif
+
 	// preinit library (must be early due to crypto code in arg processing)
 	gdp_lib_init(NULL);
 
 	// collect command-line arguments
-	while ((opt = getopt(argc, argv, "b:c:C:D:e:G:h:k:K:qs:")) > 0)
+	while ((opt = getopt(argc, argv, OPTIONS)) > 0)
 	{
 		switch (opt)
 		{
@@ -172,7 +186,7 @@ main(int argc, char **argv)
 			break;
 
 		 case 'D':
-			ep_dbg_set(optarg);
+			// already done
 			break;
 
 		 case 'e':

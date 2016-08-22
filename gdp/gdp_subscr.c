@@ -202,6 +202,7 @@ _gdp_gcl_subscribe(gdp_req_t *req,
 		void *cbarg)
 {
 	EP_STAT estat = EP_STAT_OK;
+	int orig_cmd = req->pdu->cmd;
 
 	errno = 0;				// avoid spurious messages
 
@@ -232,7 +233,7 @@ _gdp_gcl_subscribe(gdp_req_t *req,
 		// the req is still on the channel list
 
 		// start a subscription poker thread if needed
-		if (req->pdu->cmd == GDP_CMD_SUBSCRIBE)
+		if (orig_cmd == GDP_CMD_SUBSCRIBE)
 		{
 			long poke = ep_adm_getlongparam("swarm.gdp.subscr.pokeintvl", 60L);
 			if (poke > 0 && !EP_UT_BITSET(GDP_CHAN_HAS_SUB_THR, req->chan->flags))

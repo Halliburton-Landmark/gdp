@@ -192,10 +192,13 @@ fi
 OS=`echo $OS | tr '[A-Z]' '[a-z]'`
 if [ "$OS" = "linux" ]; then
     OS=`head -1 /etc/issue | sed 's/ .*//' | tr '[A-Z]' '[a-z]'`
-fi
-if [ "$OS" = "darwin" ]; then
+elif [ "$OS" = "darwin" ]; then
 	OSVER=`sw_vers |
 		sed -e '/ProductVersion:/!d' -e 's/^.*[ 	][ 	]*//'`
+elif [ "$OS" = "freebsd" ]; then
+	_major=`uname -r | sed -e 's/\..*//'`
+	_minor=`uname -r | sed -e 's/[0-9]*\.//' -e 's/-.*//'`
+	OSVER=`printf "%02d%02d00" "$_major" "$_minor"`
 fi
 
 if [ -z "$OSVER" ]; then

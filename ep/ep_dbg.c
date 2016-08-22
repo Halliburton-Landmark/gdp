@@ -33,6 +33,8 @@
 #include <ep_dbg.h>
 #include <ep_string.h>
 #include <ep_assert.h>
+
+#include <ctype.h>
 #include <fnmatch.h>
 #include <pthread.h>
 
@@ -98,16 +100,30 @@ ep_dbg_set(const char *fspec)
 			continue;
 		}
 
-		while (*f != '\0' && *f != '=')
+		while (*f != '\0' && strchr("=,; ", *f) == NULL)
 		{
 			if (i <= sizeof pbuf - 1)
 				pbuf[i++] = *f;
 			f++;
 		}
 		pbuf[i] = '\0';
-		if (*f == '=')
+		while (*f == ' ')
 			f++;
-		ep_dbg_setto(pbuf, strtol(f, NULL, 10));
+		if (isdigit(pbuf[0]) && *f != '=')
+		{
+			// -D999, with no "flag=" part
+			ep_dbg_setto("*", strtol(pbuf, NULL, 10));
+		}
+		else if (*f != '=')
+		{
+			// -Dflag, with no level indicator: default to 1
+			ep_dbg_setto(pbuf, 1);
+		}
+		else
+		{
+			// -Dflag=999
+			ep_dbg_setto(pbuf, strtol(++f, NULL, 10));
+		}
 		f += strcspn(f, ",;");
 	}
 }

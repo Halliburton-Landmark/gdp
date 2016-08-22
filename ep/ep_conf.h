@@ -101,6 +101,7 @@
 # define EP_OSCF_HAS_STRPTIME		1	// does strptime(3) exist?
 
 # ifdef __FreeBSD__
+#  include <sys/param.h>
 #  define EP_OSCF_HAS_UCHAR_T		0	// does uchar_t exist?
 #  define EP_OSCF_HAS_SYS_CDEFS_H	1	// does <sys/cdefs.h> exist?
 #  define EP_OSCF_HAS_STRLCPY		1	// does strlcat(3) exist?
@@ -111,6 +112,7 @@
 #  ifndef EP_OSCF_USE_GETDATE
 #   define EP_OSCF_USE_GETDATE		0	// does getdate(3) exist?
 #  endif
+#  define EP_OSCF_NEED_OPTRESET		1	// optreset needed in getopt(3)
 # endif // __FreeBSD__
 
 # ifdef __APPLE__
@@ -123,6 +125,7 @@
 #  ifndef EP_OSCF_USE_GETDATE
 #   define EP_OSCF_USE_GETDATE		1	// does getdate(3) exist?
 #  endif
+#  define EP_OSCF_NEED_OPTRESET		1	// optreset needed in getopt(3)
 # endif // __APPLE__
 
 #ifdef __linux__

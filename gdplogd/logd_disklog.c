@@ -63,10 +63,11 @@
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.physlog", "GDP Log Daemon Physical Log");
 
-#define GCL_PATH_MAX		200		// max length of pathname
+#define GCL_PATH_MAX		200			// max length of pathname
 
-static const char	*GCLDir;		// the gcl data directory
-static int			GCLfilemode;	// the file mode on create
+static const char	*GCLDir;			// the gcl data directory
+static int			GCLfilemode;		// the file mode on create
+static uint32_t		DefaultLogFlags;	// as indicated
 
 #define GETPHYS(gcl)	((gcl)->x->physinfo)
 
@@ -147,6 +148,8 @@ ep_stat_from_dbstat(int dbstat)
 				dbstat, db_strerror(dbstat));
 		if (dbstat == DB_NOTFOUND || dbstat == DB_KEYEMPTY)
 			estat = GDP_STAT_NAK_NOTFOUND;
+		else if (dbstat == DB_KEYEXIST)
+			estat = GDP_STAT_NAK_CONFLICT;
 		else if (dbstat > 0)
 			estat = ep_stat_from_errno(dbstat);
 		else
@@ -315,6 +318,13 @@ disk_init()
 
 	// find the file creation mode
 	GCLfilemode = ep_adm_getintparam("swarm.gdplogd.gcl.mode", 0600);
+
+	// find default log flags
+	// Setting HIDEFAILURE moves corrupt tidx databases out of the way.
+	// This reduces errors, but makes disk_ts_to_recno fail, which may
+	// not be a good idea.
+	if (ep_adm_getboolparam("swarm.gdplogd.gcl.abandon_corrupt_tidx", true))
+		DefaultLogFlags |= LOG_TIDX_HIDEFAILURE;
 
 	ep_dbg_cprintf(Dbg, 8, "disk_init: log dir = %s, mode = 0%o\n",
 			GCLDir, GCLfilemode);
@@ -1098,6 +1108,7 @@ disk_create(gdp_gcl_t *gcl, gdp_gclmd_t *gmd)
 	phys->ridx.max_offset = phys->ridx.header_size = SIZEOF_RIDX_HEADER;
 	phys->ridx.min_recno = phys->min_recno = 1;
 	phys->max_recno = 0;
+	phys->flags |= DefaultLogFlags;
 	ep_dbg_cprintf(Dbg, 10, "Created new GCL %s\n", gcl->pname);
 	return estat;
 
@@ -1321,6 +1332,12 @@ disk_open(gdp_gcl_t *gcl)
 		}
 		EP_STAT_CHECK(estat, goto fail0);
 	}
+
+	/*
+	**  Set per-log flags
+	*/
+
+	phys->flags |= DefaultLogFlags;
 
 	if (ep_dbg_test(Dbg, 20))
 	{
@@ -1826,9 +1843,43 @@ disk_append(gdp_gcl_t *gcl,
 		tval_dbt.size = sizeof tvalue;
 
 		estat = bdb_put(phys->tidx.db, &tkey_dbt, &tval_dbt);
-		if (!EP_STAT_ISOK(estat))
+
+		// if this is severe, we want to abandon the database
+		// XXX is ISSFAIL the correct heuristic?
+		if (EP_STAT_ISSFAIL(estat) &&
+				EP_UT_BITSET(LOG_TIDX_HIDEFAILURE, phys->flags))
+		{
+			// give up on this index entirely
+			bdb_close(phys->tidx.db);
+			phys->tidx.db = NULL;
+
+			EP_STAT tstat;
+			char oldname[GCL_PATH_MAX];
+			char newname[GCL_PATH_MAX];
+
+			tstat = get_gcl_path(gcl, -1, GCL_TIDX_SUFFIX,
+								oldname, sizeof oldname);
+			EP_STAT_CHECK(tstat, goto fail0);
+
+			tstat = get_gcl_path(gcl, -1, GCL_TIDX_SUFFIX "XX",
+								newname, sizeof newname);
+			EP_STAT_CHECK(tstat, goto fail0);
+
+			(void) unlink(newname);			// failure is not an error
+			if (link(oldname, newname) < 0)
+				(void) posix_error(errno, "disk_append(%s): link", gcl->pname);
+			else if (unlink(oldname) < 0)
+				(void) posix_error(errno, "disk_append(%s): unlink", gcl->pname);
+
+			ep_log(estat, "disk_append(%s): bdb failure: moved %s to %s",
+					gcl->pname, oldname, newname);
+		}
+		else if (!EP_STAT_ISOK(estat))
+		{
 			ep_log(estat, "disk_append(%s): cannot put tidx value",
 					gcl->pname);
+		}
+
 		//EP_STAT_CHECK(estat, goto fail0);
 	}
 
