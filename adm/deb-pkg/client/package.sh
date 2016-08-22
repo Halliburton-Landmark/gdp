@@ -20,8 +20,7 @@ PACKAGE="gdp-client"
 INSTALL_TARGET="install-client"
 
 curdir=`dirname $0`
-topdir="`( cd $curdir/../../ && pwd )`"
-tmpdir="/tmp/"$PACKAGE"_"$VER
+topdir="`( cd $curdir/../../../ && pwd )`"
 scriptdir=$topdir/$curdir
 
 # invoke 'make'

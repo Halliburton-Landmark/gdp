@@ -141,8 +141,8 @@ clean_JavaScript:
 VER=		XX
 debian-package:
 	@[ "${VER}" != "XX" ] || ( echo "Must include VER=<version>"; exit 1 )
-	deb-pkg/client/package.sh $(VER)
-	deb-pkg/server/package.sh $(VER)
+	adm/deb-pkg/client/package.sh $(VER)
+	adm/deb-pkg/server/package.sh $(VER)
 	lang/python/deb-pkg/package.sh $(VER)
 
 

@@ -15,7 +15,7 @@ PACKAGE="gdp-server"
 INSTALL_TARGET="install-gdplogd"
 
 curdir=`dirname $0`
-topdir="`( cd $curdir/../../ && pwd )`"
+topdir="`( cd $curdir/../../../ && pwd )`"
 tmpdir="/tmp/"$PACKAGE"_"$VER
 scriptdir=$topdir/$curdir
 
@@ -25,7 +25,7 @@ cd $topdir && make all
 # Create a postinstall-pak automatically.
 mkdir -p $tmpdir
 cp -a $topdir/adm $tmpdir/
-rm -rf $tmpdir/adm/docker-net
+rm -rf $tmpdir/adm/docker-net $tmpdir/adm/deb-pkg
 tar -C $tmpdir -cvzf $tmpdir/adm.tar.gz adm
 
 # from https://community.linuxmint.com/tutorial/view/1998
