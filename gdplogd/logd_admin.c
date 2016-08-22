@@ -45,6 +45,9 @@
 #include <string.h>
 #include <syslog.h>
 
+#include <sys/errno.h>
+#include <sys/stat.h>
+
 /*
 **	ADMIN_POST --- post statistics for system visualization
 **
@@ -52,12 +55,46 @@
 */
 
 
+static const char	*AdminStatsFileName = NULL;
+static ino_t		AdminStatsIno = -1;
 static FILE			*AdminStatsFp;
 static uint32_t		AdminRunMask = 0xffffffff;
 static char			*AdminPrefix = "";
 
 // a prefix to indicate that this is an admin message (stdout & stderr only)
 #define INDICATOR		">#<"
+
+
+/*
+**  (Re-)Open an output file
+*/
+
+static void
+reopen(const char *fname, FILE **fpp, ino_t *inop)
+{
+	FILE *fp;
+	struct stat st;
+
+	// open the new version of the file
+	fp = fopen(fname, "a");
+	if (fp == NULL)
+	{
+		fprintf(stderr, "Cannot open output file \"%s\": %s\n",
+				fname, strerror(errno));
+		return;
+	}
+	setlinebuf(fp);
+
+	// close the old file
+	if (*fpp != NULL)
+		fclose(*fpp);
+
+	// save info for new version of the file
+	*inop = -1;
+	if (fstat(fileno(fp), &st) == 0)
+		*inop = st.st_ino;
+	*fpp = fp;
+}
 
 
 /*
@@ -104,7 +141,8 @@ admin_init(void)
 	}
 	else
 	{
-		AdminStatsFp = fopen(logdest, "a");
+		reopen(logdest, &AdminStatsFp, &AdminStatsIno);
+		AdminStatsFileName = logdest;
 	}
 
 	// if we couldn't open the file, skip this output
@@ -168,10 +206,20 @@ admin_post_statsv(
 		admin_init();
 	if ((mask & AdminRunMask) == 0)
 		return;
-
-	fp = AdminStatsFp;
 	if (forbidchars == NULL)
 		forbidchars = ep_adm_getstrparam("gdplogd.admin.forbidchars", "=;");
+
+	// check to see if we need to re-open the output
+	if (AdminStatsFileName != NULL)
+	{
+		struct stat st;
+
+		if (stat(AdminStatsFileName, &st) != 0 && st.st_ino != AdminStatsIno)
+		{
+			reopen(AdminStatsFileName, &AdminStatsFp, &AdminStatsIno);
+		}
+	}
+	fp = AdminStatsFp;
 
 	// make sure this message is atomic
 	flockfile(fp);
