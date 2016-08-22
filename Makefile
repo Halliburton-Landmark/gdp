@@ -142,7 +142,7 @@ VER=		XX
 debian-package:
 	@[ "${VER}" != "XX" ] || ( echo "Must include VER=<version>"; exit 1 )
 	deb-pkg/client/package.sh $(VER)
-	deb-pkg/package-server.sh $(VER)
+	deb-pkg/server/package.sh $(VER)
 	lang/python/deb-pkg/package.sh $(VER)
 
 
