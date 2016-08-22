@@ -6,25 +6,17 @@
 # - Documentation
 # - GDP applications
 
-if [ $# -gt 0 ]; then
-    VER=$1
-    MAJVER=`echo $VER | cut -d '.' -f 1`
-    MINVER=`echo $VER | cut -d '.' -f 2`
-else
-    echo "Usage: $0 <version (format: X.Y)>"
-    exit 1
-fi
-
-
 PACKAGE="gdp-client"
 INSTALL_TARGET="install-client"
 
 curdir=`dirname $0`
 topdir="`( cd $curdir/../../../ && pwd )`"
 scriptdir=$topdir/$curdir
+versionfile=$topdir/adm/gdp-version.sh
 
-# invoke 'make'
-cd $topdir && make all
+# Get the version number
+. $versionfile
+VER=$GDP_VERSION_MAJOR.$GDP_VERSION_MINOR.$GDP_VERSION_PATCH
 
 # Setup the files that checkinstall needs. No way to specify
 #   the location. Sad.

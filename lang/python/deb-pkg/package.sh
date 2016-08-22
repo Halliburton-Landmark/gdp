@@ -32,20 +32,21 @@
 # - Ideal if installed in default python path
 # - depends on location of libgdp and libep etc
 
-if [ $# -gt 0 ]; then
-    VER=$1
-else
-    echo "Usage: $0 <version (format: X.Y)>"
-    exit 1
-fi
 
 PACKAGE="python-gdp"
 curdir=`dirname $0`
 topdir="`( cd $curdir/../ && pwd )`"
+srcdir="`( cd $curdir/../../../ && pwd)`"
+versionfile=$srcdir/adm/gdp-version.sh
+
 tmpdir="/tmp/"$PACKAGE"_"$VER
+
 pydir="/usr/lib/python2.7/dist-packages/"
 sharedir="/usr/share/doc/gdp/python-gdp"
 
+# Get the version number
+. $versionfile
+VER=$GDP_VERSION_MAJOR.$GDP_VERSION_MINOR.$GDP_VERSION_PATCH
 
 rm -rf $tmpdir
 mkdir $tmpdir

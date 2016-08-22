@@ -3,14 +3,6 @@
 # Create a debian package that includes:
 # - gdplogd
 
-if [ $# -gt 0 ]; then
-    VER=$1
-else
-    echo "Usage: $0 <version (format: X.Y)>"
-    exit 1
-fi
-
-
 PACKAGE="gdp-server"
 INSTALL_TARGET="install-gdplogd"
 
@@ -18,9 +10,12 @@ curdir=`dirname $0`
 topdir="`( cd $curdir/../../../ && pwd )`"
 tmpdir="/tmp/"$PACKAGE"_"$VER
 scriptdir=$topdir/$curdir
+versionfile=$topdir/adm/gdp-version.sh
 
-# invoke 'make'
-cd $topdir && make all 
+# Get the version number
+. $versionfile
+VER=$GDP_VERSION_MAJOR.$GDP_VERSION_MINOR.$GDP_VERSION_PATCH
+
 
 # Create a postinstall-pak automatically.
 mkdir -p $tmpdir

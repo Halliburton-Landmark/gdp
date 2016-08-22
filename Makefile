@@ -138,12 +138,10 @@ clean_JavaScript:
 # Build the debian-style package.  Must be done on the oldest system
 # around because of dependencies.
 
-VER=		XX
-debian-package:
-	@[ "${VER}" != "XX" ] || ( echo "Must include VER=<version>"; exit 1 )
-	adm/deb-pkg/client/package.sh $(VER)
-	adm/deb-pkg/server/package.sh $(VER)
-	lang/python/deb-pkg/package.sh $(VER)
+debian-package: all
+	adm/deb-pkg/client/package.sh
+	adm/deb-pkg/server/package.sh
+	lang/python/deb-pkg/package.sh
 
 
 ADM=		adm
