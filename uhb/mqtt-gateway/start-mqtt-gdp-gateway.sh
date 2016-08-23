@@ -4,6 +4,14 @@
 
 #
 #  Helper script for starting up an mqtt-gdp-gateway instance
+#	This is normally started by systemd as an instance.
+#
+#    Usage: $0 mqtt-broker-host
+#	mqtt-broker-host should be the full DNS name of the host
+#	running the MQTT broker.  The hostname part of that is used
+#	to look up a configuration file in $GDP_ETC that lists the
+#	sensors of interest connected to that broker.  Logs for all
+#	the sensors must be created in advance.
 #
 
 # configure defaults
@@ -66,8 +74,15 @@ test -f $MQTT_GATEWAY_LOG || cp /dev/null $MQTT_GATEWAY_LOG
 
 	for i
 	do
-		if $GDP_ROOT/bin/gcl-create \
-			-q -K$GDP_KEYS_DIR -e none $gcl_root.device.$i
+		if ! $GDP_ROOT/bin/log-exists $gcl_root.device.$i
+		then
+			echo "[ERROR] Log $gcl_root.device.$i does not exist!"
+			echo "[ERROR] This may be because a log server" \
+				" is down or inaccessible"
+			echo "[ERROR] If you are sure that is not the case," \
+				" create a new log using:"
+			echo "$GDP_ROOT/bin/log-create -q -K$GDP_KEYS_DIR" \
+				" -e none $gcl_root.device.$i"
 		then
 			echo "[INFO] Created GDP log $gcl_root.device.$i"
 		fi
