@@ -111,10 +111,6 @@ LIBGDP=		libgdp-${GDPLIBVER}
 EPLIBMAJVER=	3
 EPLIBMINVER=	0
 
-EPLIBVER=	${EPLIBMAJVER}.${EPLIBMINVER}
-# The name of the library in ../../../ep
-LIBEP=		libep-${EPLIBVER}
-
 ALL=		libgdpjs.a libgdpjs.so.${GDPJSLIBVER}
 
 all: ${ALL}
@@ -137,12 +133,15 @@ libgdpjs.a: ${OBJS}
 # both libxx-n.m.so and libxx.so.n-m.
 # Even more unfortunately, the way the Node ffi interface works, we have lines like
 
-#   var libep = ffi.Library(GDP_DIR + '/libs/libep.3.0', {
+#   var libgdp = ffi.Library(GDP_DIR + '/libs/libgdp.0.7', {
 
 # that need to work under RHEL, Ubuntu and Darwin.  So we default to
-# libep.n.m.so and libep.n.m.dylib.  We copy libep-n.m.so so as to
-# preserve the choices made in ../../../libep.  We do something
-# similar with libgdp-x.y.so.
+# libgdp.n.m.so and libgdp.n.m.dylib.  We copy libgdp-n.m.so so as to
+# preserve the choices made in ../../../libs.
+#
+# There is no need to ship the libep shared library with the GDP/JS
+# interface because libgdp and libgdpjs have linked with the libep
+# static library.
 #
 libgdpjs.so.${GDPJSLIBVER}: ${OBJS}
 	${CC} ${SHARED} -o $@ ${OBJS} ${LDFLAGS}
@@ -153,29 +152,21 @@ libgdpjs.so.${GDPJSLIBVER}: ${OBJS}
 			echo "Copying ../../../libs/libgdp.${GDPLIBVER}.dylib to ${LIBDIR}"; \
 			cp ../../../libs/libgdp.${GDPLIBVER}.dylib ${LIBDIR}/; \
 		fi; \
-		if [ -f ../../../libs/libep.${EPLIBVER}.dylib ]; then \
-			echo "Copying ../../../libs/libep.${EPLIBVER}.dylib to ${LIBDIR}/"; \
-			cp ../../../libs/libep.${EPLIBVER}.dylib ${LIBDIR}/; \
-		fi; \
 		if [ -f $(PTII)/lib/libgdpjs.${GDPJSLIBVER}.so ]; then \
 			echo "Copying Linux shared libraries from $(PTII)"; \
 			cp $(PTII)/lib/libgdpjs.${GDPJSLIBVER}.so ${LIBDIR}; \
 			cp $(PTII)/lib/libgdp.${GDPLIBVER}.so ${LIBDIR}; \
-			cp $(PTII)/lib/libep.${EPLIBVER}.so ${LIBDIR}; \
 		fi; \
 	else \
 		echo "Setting up libgdpjs"; \
 		cp libgdpjs.so.${GDPJSLIBVER} ${LIBDIR}/libgdpjs.${GDPJSLIBVER}.so; \
 		echo "Setting up libgdp"; \
 		cp ../../../libs/${LIBGDP}.so ${LIBDIR}/libgdp.${GDPLIBVER}.so; \
-		echo "Setting up libep"; \
-		cp ../../../libs/${LIBEP}.so ${LIBDIR}/libep.${EPLIBVER}.so; \
 		echo "Created links in ${LIBDIR}/"; \
 		if [ -f $(PTII)/lib/libgdpjs.${GDPJSLIBVER}.dylib ]; then \
 			echo "Copying Darwin shared libraries from $(PTII)"; \
 			cp $(PTII)/lib/libgdpjs.${GDPJSLIBVER}.dylib ${LIBDIR}; \
 			cp $(PTII)/lib/libgdp.${GDPLIBVER}.dylib ${LIBDIR}; \
-			cp $(PTII)/lib/libep.${EPLIBVER}.dylib ${LIBDIR}; \
 		fi; \
 	fi \
 
@@ -195,13 +186,6 @@ FORCE:
 # If we are running under Linux, then copy the .dylib files from $PTII/lib.
 
 # Darwin shared libraries.
-LIBEPDYLIB=libep.${EPLIBVER}.dylib
-../libs/${LIBEPDYLIB}:
-	@echo "Creating $@"
-	if [ ! -f ../libs/${LIBEPDYLIB} ]; then \
-		cp ${PTII}/lib/${LIBEPDYLIB} $@; \
-	fi
-
 LIBGDPDYLIB=libgdp.${GDPLIBVER}.dylib
 ../libs/${LIBGDPDYLIB}:
 	if [ ! -f ../libs/${LIBGDPDYLIB} ]; then \
@@ -216,12 +200,6 @@ LIBGDPJSDYLIB=libgdpjs.${GDPJSLIBVER}.dylib
 
 
 # Linux shared libraries
-LIBEPSO=libep.${EPLIBVER}.so
-../libs/${LIBEPSO}:
-	if [ ! -f ../libs/${LIBEPSO} ]; then \
-		cp ${PTII}/lib/${LIBEPSO} $@; \
-	fi
-
 LIBGDPSO=libgdp.${GDPLIBVER}.so
 ../libs/${LIBGDPSO}:
 	if [ ! -f ../libs/${LIBGDPSO} ]; then \
@@ -235,7 +213,7 @@ LIBGDPJSSO=libgdpjs.${GDPJSLIBVER}.so
 	fi
 
 # All the shared libraries necessary  for npm.
-NPMLIBS=../libs/${LIBEPDYLIB} ../libs/${LIBGDPDYLIB} ../libs/${LIBGDPJSDYLIB} ../libs/${LIBEPSO} ../libs/${LIBGDPSO} ../libs/${LIBGDPJSSO}
+NPMLIBS=../libs/${LIBGDPDYLIB} ../libs/${LIBGDPJSDYLIB} ../libs/${LIBGDPSO} ../libs/${LIBGDPJSSO}
 
 # Copy the libraries for the other platform from $PTII.
 copyNpmLibs: $(NPMLIBS)
