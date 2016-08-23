@@ -484,7 +484,7 @@ main(int argc, char **argv)
 			// no existing key file; OK if we are creating it
 			if (!make_new_key)
 			{
-				ep_app_error("Could not read secret key file %s", keyfile);
+				ep_app_error("Could not open secret key %s", keyfile);
 				exit(EX_NOINPUT);
 			}
 		}
@@ -640,8 +640,11 @@ main(int argc, char **argv)
 			ep_app_abort("Cannot rename %s to %s", tempkeyfile, finalkeyfile);
 		}
 
-		printf("New secret key file is in %s\n", finalkeyfile);
-		printf("Save this file!  You'll need it to write the new log\n");
+		if (!quiet)
+		{
+			ep_app_info("New secret key is in %s\n", finalkeyfile);
+			ep_app_info("Save this file!  You'll need it to write the new log\n");
+		}
 
 		ep_mem_free(finalkeyfile);
 		ep_mem_free(tempkeyfile);
