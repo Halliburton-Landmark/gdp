@@ -1865,11 +1865,9 @@ disk_append(gdp_gcl_t *gcl,
 								newname, sizeof newname);
 			EP_STAT_CHECK(tstat, goto fail0);
 
-			(void) unlink(newname);			// failure is not an error
-			if (link(oldname, newname) < 0)
-				(void) posix_error(errno, "disk_append(%s): link", gcl->pname);
-			else if (unlink(oldname) < 0)
-				(void) posix_error(errno, "disk_append(%s): unlink", gcl->pname);
+			if (rename(oldname, newname) < 0)
+				(void) posix_error(errno, "disk_append(%s): rename %s => %s",
+						gcl->pname, oldname, newname);
 
 			ep_log(estat, "disk_append(%s): bdb failure: moved %s to %s",
 					gcl->pname, oldname, newname);
