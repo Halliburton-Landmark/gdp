@@ -640,6 +640,9 @@ main(int argc, char **argv)
 			ep_app_abort("Cannot rename %s to %s", tempkeyfile, finalkeyfile);
 		}
 
+		printf("New secret key file is in %s\n", finalkeyfile);
+		printf("Save this file!  You'll need it to write the new log\n");
+
 		ep_mem_free(finalkeyfile);
 		ep_mem_free(tempkeyfile);
 		tempkeyfile = NULL;
