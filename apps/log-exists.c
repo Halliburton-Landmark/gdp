@@ -60,7 +60,6 @@ main(int argc, char **argv)
 	EP_STAT estat;
 	gdp_gcl_t *gcl;
 	char *gdpd_addr = NULL;
-	char buf[200];
 	gdp_name_t gcliname;
 
 	while ((opt = getopt(argc, argv, "D:G:")) > 0)
@@ -100,8 +99,6 @@ main(int argc, char **argv)
 	// open GCL to be tested
 	gdp_parse_name(argv[0], gcliname);
 	estat = gdp_gcl_open(gcliname, GDP_MODE_RO, NULL, &gcl);
-	fprintf(stderr, "exiting with status %s\n",
-			ep_stat_tostr(estat, buf, sizeof buf));
 	if (EP_STAT_ISOK(estat))
 		exit(EX_OK);
 	else
