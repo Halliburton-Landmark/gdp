@@ -26,7 +26,6 @@ GDP_BASEIMAGE_DOCKERFILE = Dockerfile.baseimage
 
 GDP_ROOT = ../../
 GDP_LOGD_DOCKERFILE = Dockerfile.gdplogd
-GDP_LOGD_VERSION = 0.3-1
 
 GDP_ROUTER_ROOT = ./gdp_router
 GDP_ROUTER_DOCKERFILE = Dockerfile.gdp-router
@@ -71,8 +70,8 @@ $(GDP_ROUTER_ROOT):
 	touch $@
 
 .gdp-logd-docker-image: $(GDP_ROOT) $(GDP_LOGD_DOCKERFILE) .gdp-docker-baseimage
-	$(GDP_ROOT)/deb-pkg/package-server.sh $(GDP_LOGD_VERSION)
-	mv $(GDP_ROOT)/gdp-server_$(GDP_LOGD_VERSION)_amd64.deb .
+	make -C $(GDP_ROOT) debian-package
+	cp $(GDP_ROOT)/gdp-server_*_amd64.deb .
 	cp $(GDP_LOGD_DOCKERFILE) Dockerfile
 	docker build -t gdplogd .
 	rm -f Dockerfile

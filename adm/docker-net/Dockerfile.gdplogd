@@ -18,7 +18,7 @@ RUN dpkg -i /gdp-server*.deb || true
 RUN chmod -R a+w /etc/ep_adm_params
 
 # This uses /bin/sh's echo, that doesn't take '-e' and interprets backlash by default
-RUN echo '#!/bin/bash\necho "Replacing gdpname with $1"\n/bin/sed -i "s/swarm.gdplogd.gdpname=.*/swarm.gdplogd.gdpname=$1/g" /etc/ep_adm_params/gdplogd\necho "swarm.gdp.zeroconf.enable = false" >> /etc/ep_adm_params/gdplogd\n/bin/sleep 10\n/usr/bin/gdplogd ${*:2}' > /wrapper.sh && chmod a+x /wrapper.sh
+RUN echo '#!/bin/bash\necho "Replacing gdpname with $1"\n/bin/sed -i "s/swarm.gdplogd.gdpname=.*/swarm.gdplogd.gdpname=$1/g" /etc/ep_adm_params/gdplogd\necho "swarm.gdp.zeroconf.enable = false" >> /etc/ep_adm_params/gdplogd\n/bin/sleep 10\n/usr/sbin/gdplogd ${*:2}' > /wrapper.sh && chmod a+x /wrapper.sh
 
 USER gdp
 
