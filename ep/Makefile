@@ -201,8 +201,8 @@ CFLAGS=		${COPTS} ${INCS} -I${CURDIR} -I.. -fPIC
 RM=		rm
 LD=		ld
 LIBCRYPTO=	-lcrypto
-LDFLAGS=	-L. ${LIBSEARCH} ${LIBCRYPTO}
-LDLIBS=		${LIBNAME}.a -pthread
+LDFLAGS=	-L. ${LIBSEARCH}
+LDLIBS=		${LIBCRYPTO} ${LIBNAME}.a -pthread
 LN=		ln
 MV=		mv
 CP=		cp
@@ -232,7 +232,7 @@ ${LIBNAME}.a: ${OBJS}
 	${INSTALL} $@ ${LOCALLIBSDIR}
 
 ${LIBNAME}.so.${EPLIBVER}: ${OBJS}
-	${CC} ${SHARED} -o $@ ${OBJS} ${LDFLAGS}
+	${CC} ${SHARED} -o $@ ${LDFLAGS} ${OBJS} ${LDLIBS}
 	${INSTALL} $@ ${LOCALLIBSDIR}
 	sh ${LOCALLIBSDIR}/makelinks.sh ep ${EPLIBMAJVER} ${EPLIBMINVER} ${LOCALLIBSDIR}
 

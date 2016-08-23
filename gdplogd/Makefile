@@ -86,8 +86,12 @@ LIBCRYPTO=	-lcrypto
 LIBAVAHI=	-lavahi-client -lavahi-common
 LIBADD=		`sh ../adm/add-libs.sh gdplogd`
 INCS=		${INCSEARCH} ${INCGDP} ${INCEP}
-LDFLAGS=	${LIBSEARCH} ${LIBGDP} ${LIBEP} \
-		${LIBEVENT2} ${LIBCRYPTO} ${LIBAVAHI} \
+LDFLAGS=	${LIBSEARCH}
+LDLIBS=		${LIBGDP} \
+		${LIBEP} \
+		${LIBEVENT2} \
+		${LIBCRYPTO} \
+		${LIBAVAHI} \
 		${LIBADD}
 CC=		cc
 PG=
@@ -134,7 +138,7 @@ logd_version.o: logd_version.c ${OBJS_MOST} Makefile
 		-c logd_version.c
 
 gdplogd: ${OBJS} ${LIBDEPS}
-	${CC} -o $@ ${OBJS} ${LDFLAGS}
+	${CC} -o $@ ${LDFLAGS} ${OBJS} ${LDLIBS}
 
 clean:
 	-rm -f ${CLEANALL} *.o *.core
@@ -152,6 +156,8 @@ ${ALLDIRS}:
 	${MKDIR} $@
 
 ${OBJS}: ${HDEPS}
+
+${ALL}: ${LIBDEPS}
 
 ADM=		../adm
 UPDATE_LICENSE=	${ADM}/update-license.sh

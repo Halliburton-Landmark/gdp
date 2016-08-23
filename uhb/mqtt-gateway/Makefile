@@ -88,8 +88,13 @@ LIBMOSQ=	-lmosquitto
 INCS=		${INCSEARCH} ${INCGDP} ${INCEP} \
 		${INCJANSSON} ${INCEVENT2} ${INCCRYPTO} ${INCAVAHI} \
 		${INCMOSQ}
-LDFLAGS=	${LIBSEARCH} ${LIBGDP} ${LIBEP} \
-		${LIBJANSSON} ${LIBEVENT2} ${LIBCRYPTO} ${LIBAVAHI} \
+LDFLAGS=	${LIBSEARCH}
+LDLIBS=		${LIBGDP} \
+		${LIBEP} \
+		${LIBJANSSON} \
+		${LIBEVENT2} \
+		${LIBCRYPTO} \
+		${LIBAVAHI} \
 		${LIBMOSQ}
 PG=
 O=		-O
@@ -100,9 +105,6 @@ CFLAGS=		${COPTS} ${INCS}
 MKDIR=		mkdir -p
 
 all:	${ALL}
-
-mqtt-gdp-gateway:	mqtt-gdp-gateway.o
-	${CC} -o $@ mqtt-gdp-gateway.o ${LDFLAGS}
 
 clean:
 	-rm -f ${CLEANALL} *.o *.core
