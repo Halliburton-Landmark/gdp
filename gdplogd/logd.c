@@ -113,7 +113,7 @@ shutdown_req(gdp_req_t *req)
 void
 logd_shutdown(void)
 {
-	if (ep_adm_getboolparam("gdplogd.shutdown.flushcache", false))
+	if (ep_adm_getboolparam("gdplogd.shutdown.flushcache", true))
 	{
 		ep_dbg_cprintf(Dbg, 1, "\n\n*** Shutting down GCL cache ***\n");
 		_gdp_gcl_cache_shutdown(&shutdown_req);

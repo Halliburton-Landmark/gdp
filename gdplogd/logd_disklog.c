@@ -231,6 +231,7 @@ bdb_close(DB *db)
 {
 	int dbstat;
 
+	(void) db->sync(db, 0);
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
 	dbstat = db->close(db, 0);
 #else
@@ -447,10 +448,16 @@ segment_free(segment_t *seg)
 		return;
 	ep_dbg_cprintf(Dbg, 41, "segment_free: closing fp @ %p (segment %d)\n",
 			seg->fp, seg->segno);
-	if (seg->fp != NULL && fclose(seg->fp) < 0)
-		(void) posix_error(errno, "segment_free: fclose (segment %d)",
-						seg->segno);
-	seg->fp = NULL;
+	if (seg->fp != NULL)
+	{
+		if (fsync(fileno(seg->fp)) < 0)
+			(void) posix_error(errno, "segment_free: fsync (segment %d)",
+							seg->segno);
+		if (fclose(seg->fp) < 0)
+			(void) posix_error(errno, "segment_free: fclose (segment %d)",
+							seg->segno);
+		seg->fp = NULL;
+	}
 	ep_mem_free(seg);
 }
 
@@ -834,7 +841,6 @@ segment_create(gdp_gcl_t *gcl,
 		goto fail2;
 
 	// success!
-	fflush(data_fp);
 	seg->fp = data_fp;
 	flock(fileno(data_fp), LOCK_UN);
 	ep_dbg_cprintf(Dbg, 10, "Created GCL Segment %s-%06d\n",
@@ -910,6 +916,8 @@ physinfo_free(gcl_physinfo_t *phys)
 	{
 		ep_dbg_cprintf(Dbg, 41, "physinfo_free: closing ridx fp @ %p\n",
 				phys->ridx.fp);
+		if (fsync(fileno(phys->ridx.fp)) < 0)
+			(void) posix_error(errno, "physinfo_free: cannot fsync ridx");
 		if (fclose(phys->ridx.fp) != 0)
 			(void) posix_error(errno, "physinfo_free: cannot close ridx fp");
 		phys->ridx.fp = NULL;
