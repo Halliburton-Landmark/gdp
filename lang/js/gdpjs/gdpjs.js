@@ -800,8 +800,7 @@ function read_gcl_records(gdpd_addr, gcl_name,
     var gclpname = new gcl_pname_t(GDP_GCL_PNAME_LEN);
     var recarray_out = []; // will hold contents of records read
 
-    // FIXME: Need a way to allocate a C string of a certain size.
-    var ebuf = ref.allocCString('123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890');
+    var ebuf = new Array(200 + 1).join(" "); // long enough??
 
     if (debug) {
         console.log("gdpjs.js: read_gcl_records");
@@ -882,36 +881,42 @@ function read_gcl_records(gdpd_addr, gcl_name,
         return rv;
     }
 
+    var called = "";
     if (gcl_subscribe || gcl_multiread) {
-        // DEBUG TBD1
-        // true for reader-test.js; false for gdpREST_server.js
-	if (!gcl_get_next_event) {
-	    // gcl_get_next_event is false, so we have not yet subscribed to the log.
-	    console.log('gdpjs.js: read_gcl_records(): before do_multiread()' );
-	    estat = do_multiread(gcl_Ptr, gcl_firstrec, gcl_numrecs, gcl_subscribe,
-				 wait_for_events,
-				 recarray_out, conout, gdp_event_cbfunc
-				 );
+	if (gdp_event_cbfunc !== null) {
+	    console.log('gdpjs.js: read_gcl_records(): before do_multiread_subscribe()' );
+	    estat = libgdp.gdp_gcl_subscribe(gcl_Ptr, gcl_firstrec, gcl_numrecs,
+					     null, gdp_event_cbfunc, null);
+	    called = "gdp_gcl_subscribe()";
 	} else {
-	    // gcl_get_next_event is true, so we have already subscribed to the log.
-	    console.log('gdpjs.js: read_gcl_records(): before do_multiread_inner()' );
-	    estat = do_multiread_inner(gcl_Ptr, gcl_firstrec, gcl_numrecs, gcl_subscribe,
-				 wait_for_events,
-				       recarray_out, conout, gdp_event_cbfunc,
-				       /* Timeout in seconds */ 1
-				 );
+	    // true for reader-test.js; false for gdpREST_server.js
+	    if (!gcl_get_next_event) {
+		// gcl_get_next_event is false, so we have not yet subscribed to the log.
+		console.log('gdpjs.js: read_gcl_records(): before do_multiread()' );
+		estat = do_multiread(gcl_Ptr, gcl_firstrec, gcl_numrecs, gcl_subscribe,
+				     wait_for_events,
+				     recarray_out, conout, gdp_event_cbfunc
+				     );
+		called = "do_multiread()";
+	    } else {
+		// gcl_get_next_event is true, so we have already subscribed to the log.
+		console.log('gdpjs.js: read_gcl_records(): before do_multiread_inner()' );
+		estat = do_multiread_inner(gcl_Ptr, gcl_firstrec, gcl_numrecs, gcl_subscribe,
+					   wait_for_events,
+					   recarray_out, conout, gdp_event_cbfunc,
+					   /* Timeout in seconds */ 1
+					   );
+		called = "do_multiread_inner()";
+	    }
 	}
     } else {
         estat = do_simpleread(gcl_Ptr, gcl_firstrec, gcl_numrecs,
             recarray_out, conout
         );
+	called = "do_simplread()";
     }
 
     if ( ! ep_stat_isok_js(estat) ) {
-	var called = "do_simpleread()";
-	if (gcl_subscribe || gcl_multiread) {
-	    called = "do_multiread()";
-	}
         var emsg = "gdpjs.js: read_gcl_records(): " + called + " is not ok";
         console.log(emsg);
         console.log(ep_stat_tostr_js(estat, ebuf, ebuf.length));
@@ -1156,6 +1161,17 @@ function do_multiread(gclh, firstrec, numrecs, subscribe,
 
 }
 
+/** Subscribe.
+ *  Based on do_multiread() as defined in gdp-reader.c.  Modified to only handle subscription
+ *  @param gclh The handle to the gcl (gdp_gcl_t)
+ *  @param firstrec The first record to be returned  (gdp_recno_t)
+ *  @param numrecs The number of records to be read (int_32t)
+ *  @param cbfunc The callback function that takes a gdp_event_t * as an argument and returns void
+ */
+function do_multiread_subscribe(gclh, firstrec, numrecs, cbfunc) {
+
+    return estat;
+}
 /** Get the next event and update recarray_out. 
  *  @param recarray_out Updated with the output
  *  @return estat
@@ -1164,6 +1180,11 @@ function do_multiread_inner(gclh, firstrec, numrecs, subscribe,
     /* Boolean */  wait_for_events,
 			    recarray_out, conout, gdp_event_cbfunc, timeoutSeconds
 ) {
+    // FIXME: This code is based on an old version of do_multiread() from
+    // gdp-reader.c.  The version of do_multiread() in gdp-reader.c has changed
+    // significantly since this version was created.  See do_multiread_subscribe()
+    // for a more up to date version.
+
     // This function used to be inside the for (;;) loop in do_multiread(),
     // but instead we want getNextEvent(timeout) to call it.
     if (debug) {
@@ -1246,6 +1267,8 @@ function do_multiread_inner(gclh, firstrec, numrecs, subscribe,
 		}
                 if (gdp_event_cbfunc) {
                     // TBD1 - cleanup here
+		    // FIXME: This gdp_event_cbfunc() has a different call signature
+		    // that what is currently in gdp.h
                     gdp_event_cbfunc(evtype_int, datum, recarray_out);
 		}
 
@@ -1263,6 +1286,8 @@ function do_multiread_inner(gclh, firstrec, numrecs, subscribe,
 		    if (debug) {        
 			console.log( 'gdpjs.js: do_multiread_inner() GDP_EVENT_EOS (end of subscription)' );
 		    }
+		    // FIXME: This gdp_event_cbfunc() has a different call signature
+		    // that what is currently in gdp.h
                     gdp_event_cbfunc(evtype_int, null, estat);
 
                 }
@@ -1406,7 +1431,7 @@ function gdp_gcl_create_js( /* gcl_name_t */ gclxname,
     var estat = libgdp.gdp_gcl_create(gcliname, logdiname, gmd, gclPtrPtr);
     console.log("gdpjs.js: gdp_gcl_create_js(): gdp_gcl_create() returned");
     if ( ! ep_stat_isok_js(estat) ) {
-	var ebuf = ref.allocCString('123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890');
+	var ebuf = new Array(200 + 1).join(" "); // long enough??
 	var emsg = "gdpjs.js: gdp_gcl_create_js(): gdp_gcl_create() is not ok.";
 	console.log(emsg);
 	console.log(ep_stat_tostr_js(estat, ebuf, ebuf.length));
@@ -1451,7 +1476,7 @@ function gdpGclOpen(name, iomode, logdname) {
     }
 
     if ( ! ep_stat_isok_js(estat) ) {
-	var ebuf = ref.allocCString('123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890');
+	var ebuf = new Array(200 + 1).join(" "); // long enough??
 	var emsg = "gdpjs.js: gdpGclOpen(): gdp_parse_name_js() is not ok";
 	console.log(emsg);
 	console.log(ep_stat_tostr_js(estat, ebuf, ebuf.length));
@@ -1478,7 +1503,7 @@ function gdpGclOpen(name, iomode, logdname) {
 	}
 	rv = gdp_gcl_create_js(name, logdname);
 	if ( ! ep_stat_isok_js(rv.error_code) ) {
-	    var ebuf = ref.allocCString('123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890');
+	    var ebuf = new Array(200 + 1).join(" "); // long enough??
 	    var emsg = "gdpjs.js: gdpGclOpen(): gdp_gcl_create_js() is not ok";
 	    console.log(emsg);
 	    console.log(ep_stat_tostr_js(estat, ebuf, ebuf.length));
@@ -2216,7 +2241,7 @@ function write_gcl_records(gdpd_addr, gcl_name, logdxname, gcl_append,
     var append = gcl_append;
     var numrecs = recsrc;
 
-    var ebuf = ref.allocCString('123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890');
+    var ebuf = new Array(200 + 1).join(" "); // long enough??
 
     // Local working variables
     var gcl_Ptr; // gclh

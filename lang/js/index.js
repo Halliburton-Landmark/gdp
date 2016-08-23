@@ -55,7 +55,7 @@ exports.gdp_gcl_open = function (name, iomode, gdpdAddress) {
     // FIXME: Need to figure out how to allocate ebuf.
     // One issue is that we don't want this to go out of scope.
 
-    var ebuf = ref.allocCString('123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890');
+    var ebuf = new Array(200 + 1).join(" "); // long enough??
 
     // gdp_gcl_open() calls gdp_init for us.
 //    console.log("gdpjs/index.js: gdp_gcl_open(" + name + ", " + iomode + ", " + gdpdAddress + "): calling gdp_init_js()");
