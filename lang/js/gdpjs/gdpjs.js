@@ -285,7 +285,15 @@ var EP_TIME_SPEC_struct_Ptr = ref.refType(EP_TIME_SPEC_struct);
 //?? just below is not used yet
 var EP_TIME_SPEC_struct_PtrPtr = ref.refType(EP_TIME_SPEC_struct_Ptr);
 
-var libep = ffi.Library(GDP_DIR + '/libs/libep.3.0', {
+// The libgdp shared library is linked statically to libep.a, so
+// instead of looking for the ep_* symbols in libep, we look in
+// libgdp.  If we get the ep_* symbols from the libep shared library,
+// then they will be different than the ep_* symbols that are used by
+// calls in the libgdp shared library, which means that debugging will
+// appear not to work.
+
+//var libep = ffi.Library(GDP_DIR + '/libs/libep.3.0', {
+var libep = ffi.Library(GDP_DIR + '/libs/libgdp.0.7', {
 
     // From ep/ep_dbg.h
     //CJS // initialization
@@ -807,7 +815,7 @@ function read_gcl_records(gdpd_addr, gcl_name,
     }
 
     ep_dbg_init_js();
-    ep_dbg_set_js('*=40');
+    //ep_dbg_set_js('*=40');
     estat = gdp_init_js( /* String */ gdpd_addr);
     if ( ! ep_stat_isok_js(estat) ) {
         var emsg = "gdpjs.js: read_gcl_records(): gdp_init_js() is not ok";
@@ -1460,7 +1468,7 @@ function gdpGclOpen(name, iomode, logdname) {
     var debug = true;
     if (debug) {
 	console.log("gdpjs.js: 0 gdpGclOpen(" + name + ", " + iomode + ", " + logdname + "): setting debugging (dbg_set_js)"); 
-	ep_dbg_set_js("*=900");
+	ep_dbg_set_js("*=8");
 
     }
     var gcliname = new gcl_name_t(32);
