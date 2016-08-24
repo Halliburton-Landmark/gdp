@@ -27,19 +27,19 @@ cd $dir
 
 info "Creating library links"
 case "$OS" in
-    "ubuntu" | "debian" | "freebsd" | "centos")
+  "ubuntu" | "debian" | "freebsd" | "centos")
     	rm -f lib$lib.so.$major lib$lib.so
 	ln -s lib$lib.so.$major.$minor lib$lib.so.$major
 	ln -s lib$lib.so.$major lib$lib.so
 	;;
 
-"darwin")
+  "darwin")
 	rm -f lib$lib.$major.$minor.dylib lib$lib.dylib
-	mv lib$lib.so.$major.$minor lib$lib.$major.$minor.dylib
+	ln lib$lib.so.$major.$minor lib$lib.$major.$minor.dylib
 	ln -s lib$lib.$major.$minor.dylib lib$lib.dylib
 	;;
 
-"redhat")
+  "redhat")
 	rm -f lib$lib-$major.$minor.so lib$lib.so.$major lib$lib.so
 	mv lib$lib.so.$major.$minor lib$lib-$major.$minor.so
 	ln -s lib$lib-$major.$minor.so lib$lib.so.$major
