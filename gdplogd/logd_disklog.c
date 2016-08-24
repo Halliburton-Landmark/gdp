@@ -61,7 +61,7 @@
 #define PRE_SEGMENT_BACK_COMPAT		1	// handle pre-segment on disk format
 
 
-static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.physlog", "GDP Log Daemon Physical Log");
+static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.disklog", "GDP Log Daemon Physical Log");
 
 #define GCL_PATH_MAX		200			// max length of pathname
 
