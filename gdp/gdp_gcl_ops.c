@@ -783,7 +783,9 @@ _gdp_gcl_fwd_append(
 	req->pdu->datum->ts = datum->ts;
 	req->pdu->datum->sigmdalg = datum->sigmdalg;
 	req->pdu->datum->siglen = datum->siglen;
-	EP_ASSERT_INSIST(req->pdu->datum->sig == NULL);
+	if (req->pdu->datum->sig != NULL)
+		gdp_buf_free(req->pdu->datum->sig);
+	req->pdu->datum->sig = NULL;
 	if (datum->sig != NULL)
 	{
 		l = gdp_buf_getlength(datum->sig);

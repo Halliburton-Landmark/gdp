@@ -75,10 +75,10 @@ gdp_datum_new(void)
 	// initialize metadata
 	datum->recno = GDP_PDU_NO_RECNO;
 	EP_TIME_INVALIDATE(&datum->ts);
+	datum->siglen = 0;
+	datum->sigmdalg = 0;
 	if (datum->dbuf == NULL)
-	{
 		datum->dbuf = gdp_buf_new();
-	}
 	ep_dbg_cprintf(Dbg, 48, "gdp_datum_new => %p\n", datum);
 	datum->inuse = true;
 	return datum;
@@ -97,6 +97,12 @@ gdp_datum_free(gdp_datum_t *datum)
 		ep_dbg_cprintf(Dbg, 50, "  ... draining %zd bytes\n", ndrain);
 		if (ndrain > 0)
 			gdp_buf_drain(datum->dbuf, ndrain);
+	}
+	if (datum->sig != NULL)
+	{
+		//XXX retain this buffer?
+		gdp_buf_free(datum->sig);
+		datum->sig = NULL;
 	}
 	ep_thr_mutex_lock(&DatumFreeListMutex);
 	datum->next = DatumFreeList;
