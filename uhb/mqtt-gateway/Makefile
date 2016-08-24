@@ -109,8 +109,7 @@ all:	${ALL}
 clean:
 	-rm -f ${CLEANALL} *.o *.core
 
-install:	${BINDIR} ${SBINDIR} ${ALL} \
-		${SCRIPTS} ${MANALL} FORCE
+install:	${BINDIR} ${SBINDIR} ${ALL} ${SCRIPTS} ${MANALL} FORCE
 	test -z "${BINALL}"  || ${INSTALL} ${BINALL}  ${BINDIR}
 	test -z "${SBINALL}" || ${INSTALL} ${SBINALL} ${SBINDIR}
 	test -z "${MAN1ALL}" || ${INSTALL} ${MAN1ALL} ${MANDIR}/man1
@@ -118,6 +117,7 @@ install:	${BINDIR} ${SBINDIR} ${ALL} \
 	test -z "${MAN5ALL}" || ${INSTALL} ${MAN5ALL} ${MANDIR}/man5
 	test -z "${MAN7ALL}" || ${INSTALL} ${MAN7ALL} ${MANDIR}/man7
 	test -z "${MAN8ALL}" || ${INSTALL} ${MAN8ALL} ${MANDIR}/man8
+	${INSTALL} gdp-provision-sensor.sh ${SBINDIR}/gdp-provision-sensor
 	INSTALLROOT=${INSTALLROOT} sh install-mqtt-gdp-gateway.sh
 
 ${BINDIR} ${SBINDIR}:
