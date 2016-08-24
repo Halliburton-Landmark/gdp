@@ -129,7 +129,8 @@ _gdp_invoke(gdp_req_t *req)
 
 			char ebuf[100];
 			ep_dbg_cprintf(Dbg, 52,
-					"_gdp_invoke wait: got %d, done=%d, state=%d, stat=%s\n",
+					"_gdp_invoke wait: got %d, done=%d, state=%d,\n"
+					"    stat=%s\n",
 					e, EP_UT_BITSET(GDP_REQ_DONE, req->flags), req->state,
 					ep_stat_tostr(req->stat, ebuf, sizeof ebuf));
 			if (e != 0)
@@ -146,7 +147,8 @@ _gdp_invoke(gdp_req_t *req)
 			estat = req->stat;
 
 			// if we succeeded or it's our fault, don't try again
-			if (EP_STAT_ISOK(estat) || GDP_STAT_IS_C_NAK(estat))
+			if (EP_STAT_ISOK(estat) || GDP_STAT_IS_C_NAK(estat) ||
+					GDP_STAT_IS_S_NAK(estat))
 			{
 				break;				// we're done, don't retry
 			}
