@@ -1576,9 +1576,14 @@ fail3:
 				xent->offset);
 
 	if (log_record.recno != datum->recno)
-		EP_ASSERT_FAILURE("disk_read_by_recno: recno mismatch: wanted %" PRIgdp_recno
+	{
+		ep_dbg_cprintf(Dbg, 1,
+				"disk_read_by_recno: recno mismatch: wanted %" PRIgdp_recno
 				", got %" PRIgdp_recno,
 				datum->recno, log_record.recno);
+		estat = GDP_STAT_CORRUPT_INDEX;
+		goto fail1;
+	}
 
 	datum->recno = log_record.recno;
 	memcpy(&datum->ts, &log_record.timestamp, sizeof datum->ts);
