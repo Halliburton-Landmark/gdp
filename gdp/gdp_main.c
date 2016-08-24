@@ -353,9 +353,12 @@ gdp_pdu_proc_resp(void *_rpdu)
 
 	if (resp >= GDP_NAK_S_MIN && resp <= GDP_NAK_S_MAX)
 	{
-		ep_log(estat, "gdp_pdu_proc_response(%s for %s): server error",
+		char ebuf[100];
+
+		ep_dbg_cprintf(Dbg, 1, "gdp_pdu_proc_resp(%s for %s): %s\n",
 				_gdp_proto_cmd_name(cmd),
-				_gdp_proto_cmd_name(ocmd));
+				_gdp_proto_cmd_name(ocmd),
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 
 	// ASSERT(all data from chan has been consumed);

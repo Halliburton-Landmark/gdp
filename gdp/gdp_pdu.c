@@ -741,18 +741,11 @@ _gdp_pdu_in(gdp_pdu_t *pdu, gdp_chan_t *chan)
 		char ebuf[200];
 
 		flockfile(ep_dbg_getfile());
+		ep_dbg_printf("_gdp_pdu_in(%s) => %s\n",
+				_gdp_proto_cmd_name(pdu->cmd),
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		if (ep_dbg_test(Dbg, 22))
-		{
-			ep_dbg_printf("_gdp_pdu_in => %s\n    ",
-					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 			_gdp_pdu_dump(pdu, ep_dbg_getfile());
-		}
-		else
-		{
-			ep_dbg_printf("_gdp_pdu_in(%s) => %s\n",
-					_gdp_proto_cmd_name(pdu->cmd),
-					ep_stat_tostr(estat, ebuf, sizeof ebuf));
-		}
 		funlockfile(ep_dbg_getfile());
 	}
 
