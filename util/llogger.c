@@ -55,14 +55,20 @@ main(int argc, char **argv)
 	const char *out_fname;
 	ino_t prev_ino = -1;
 	bool tee = false;
+	int sigfigs = 6;
 
-	while ((opt = getopt(argc, argv, "at")) > 0)
+	while ((opt = getopt(argc, argv, "as:t")) > 0)
 	{
 		switch (opt)
 		{
 		case 'a':
 			OpenMode = "a";
 			break;
+
+		case 's':
+			sigfigs = atoi(optarg);
+			break;
+
 		case 't':
 			tee = true;
 			break;
@@ -71,6 +77,11 @@ main(int argc, char **argv)
 
 	argc -= optind;
 	argv += optind;
+
+	if (sigfigs < 0)
+		sigfigs = 0;
+	else if (sigfigs > 6)
+		sigfigs = 6;
 
 	if (argc < 1)
 	{
@@ -107,25 +118,35 @@ main(int argc, char **argv)
 		gettimeofday(&tv, NULL);
 		tm = gmtime(&tv.tv_sec);
 		long usec = tv.tv_usec;
-		fprintf(out_fp, "%04d-%02d-%02d %02d:%02d:%02d.%06ldZ %s",
+		char fractional_seconds[10];
+
+		if (sigfigs <= 0)
+			fractional_seconds[0] = '\0';
+		else
+			snprintf(fractional_seconds, sizeof fractional_seconds,
+					".%06ld", usec);
+
+		fprintf(out_fp, "%04d-%02d-%02d %02d:%02d:%02d%.*s %s",
 				tm->tm_year + 1900,
 				tm->tm_mon + 1,
 				tm->tm_mday,
 				tm->tm_hour,
 				tm->tm_min,
 				tm->tm_sec,
-				usec,
+				sigfigs + 1,
+				fractional_seconds,
 				in_buf);
 
 		if (tee)
-			printf("%04d-%02d-%02d %02d:%02d:%02d.%06ldZ %s",
+			printf("%04d-%02d-%02d %02d:%02d:%02d%.*s %s",
 					tm->tm_year + 1900,
 					tm->tm_mon + 1,
 					tm->tm_mday,
 					tm->tm_hour,
 					tm->tm_min,
 					tm->tm_sec,
-					usec,
+					sigfigs + 1,
+					fractional_seconds,
 					in_buf);
 	}
 }

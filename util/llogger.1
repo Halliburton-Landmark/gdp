@@ -7,6 +7,7 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl a
+.Op Fl s Ar sigfigs
 .Op Fl t
 .Ar file-name
 .Sh DESCRIPTION
@@ -28,6 +29,9 @@ It is similar to a non-syslog version of
 Append to output
 .Ar file-name .
 Normally the output is overwritten.
+.It Fl s Ar sigfigs
+Output the indicated number of digits of fractional seconds.
+The default is 6.
 .It Fl t
 In addition to logging,
 .Dq tee
