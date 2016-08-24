@@ -411,7 +411,6 @@ _gdp_req_unsend(gdp_req_t *req)
 		ep_thr_mutex_unlock(&gcl->mutex);
 	}
 
-	_gdp_gcl_decref(&req->gcl);
 	return EP_STAT_OK;
 }
 

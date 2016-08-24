@@ -162,15 +162,14 @@ _gdp_invoke(gdp_req_t *req)
 				ep_time_nanosleep(retry_delay MILLISECONDS);
 			}
 		}
-		else
+		else if (retries > 0)
 		{
 			// if the cond_wait failed, we have to pull the req off the gcl list
 			_gdp_req_unsend(req);
 
 			// if ETIMEDOUT, maybe the router had a glitch:
 			//   wait and try again
-			if (retries > 0)
-				ep_time_nanosleep(retry_delay MILLISECONDS);
+			ep_time_nanosleep(retry_delay MILLISECONDS);
 		}
 	}
 
