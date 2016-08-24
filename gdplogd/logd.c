@@ -47,17 +47,6 @@
 static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.main", "GDP Log Daemon");
 
 
-#if _GDPLOGD_FORGIVING
-
-// how much should we forgive?
-
-struct gdplogd_forgive	GdplogdForgive =
-{
-	.ridx_short_max_offset		= true,		// fix recno index offset inconstencies
-};
-
-#endif //_GDPLOGD_FORGIVING
-
 
 
 /*
@@ -360,6 +349,13 @@ main(int argc, char **argv)
 	ep_dbg_cprintf(Dbg, 8, "Signature strictness = 0x%x\n",
 			GdpSignatureStrictness);
 
+	// check for some options
+#if _GDPLOGD_FORGIVING
+	GdplogdForgive.allow_log_gaps =
+		ep_adm_getboolparam("swarm.gdplogd.sequencing.allowgaps", false);
+	GdplogdForgive.allow_log_dups =
+		ep_adm_getboolparam("swarm.gdplogd.sequencing.allowdups", false);
+#endif
 
 	// go into background mode (before creating any threads!)
 	if (!run_in_foreground)

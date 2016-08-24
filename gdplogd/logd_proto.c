@@ -573,8 +573,7 @@ cmd_append(gdp_req_t *req)
 		if (GDP_PROTO_MIN_VERSION > 2 || req->pdu->ver > 2)
 		{
 			if (req->pdu->datum->recno <= req->gcl->nrecs &&
-					!ep_adm_getboolparam("swarm.gdplogd.sequencing.allowdups",
-										false))
+					!GdplogdForgive.allow_log_dups)
 			{
 				// may be a duplicate append
 				// XXX check that records match?
@@ -584,8 +583,7 @@ cmd_append(gdp_req_t *req)
 				goto fail0;
 			}
 			else if (req->pdu->datum->recno > req->gcl->nrecs + 1 &&
-					!ep_adm_getboolparam("swarm.gdplogd.sequencing.allowgaps",
-										false))
+					!GdplogdForgive.allow_log_gaps)
 			{
 				// gap in record numbers
 				estat = gdpd_gcl_error(req->pdu->dst,

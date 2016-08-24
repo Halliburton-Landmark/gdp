@@ -1428,16 +1428,17 @@ fseek_to_index_recno(
 				(intmax_t) phys->ridx.max_offset,
 				(intmax_t) actual_size);
 
+		// under no circumstances can we clobber the header
+		if (xoff < phys->ridx.header_size)
+			return GDP_STAT_CORRUPT_INDEX;
+
 #if _GDPLOGD_FORGIVING
-		// XXX could adjust max_offset to fsizeof value here, but
-		// XXX we might miss problems hidden in unread logs.
-		if (GdplogdForgive.ridx_short_max_offset)
-		{
-			if (xoff < phys->ridx.header_size || xoff > actual_size)
-				return GDP_STAT_CORRUPT_INDEX;
-			if (actual_size > phys->ridx.max_offset)
-				phys->ridx.max_offset = actual_size;
-		}
+		if (xoff > actual_size && !GdplogdForgive.allow_log_gaps)
+			return GDP_STAT_NAK_NOTFOUND;
+		if (xoff < actual_size && !GdplogdForgive.allow_log_dups)
+			return GDP_STAT_RECORD_DUPLICATED;
+		if (actual_size > phys->ridx.max_offset)
+			phys->ridx.max_offset = actual_size;
 #else
 		return GDP_STAT_CORRUPT_INDEX;
 #endif

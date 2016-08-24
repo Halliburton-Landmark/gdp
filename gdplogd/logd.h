@@ -195,7 +195,8 @@ extern struct gcl_phys_impl		GdpDiskImpl;
 #if _GDPLOGD_FORGIVING
 struct gdplogd_forgive
 {
-	bool		ridx_short_max_offset;
+	bool		allow_log_gaps		:1;		// allow records that don't exist
+	bool		allow_log_dups		:1;		// allow overwrites of records
 }	GdplogdForgive;
 #endif //_GDPLOGD_FORGIVING
 
