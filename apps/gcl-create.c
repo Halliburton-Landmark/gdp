@@ -642,8 +642,8 @@ main(int argc, char **argv)
 
 		if (!quiet)
 		{
-			ep_app_info("New secret key is in %s\n", finalkeyfile);
-			ep_app_info("Save this file!  You'll need it to write the new log\n");
+			ep_app_info("New secret key is in %s", finalkeyfile);
+			ep_app_info("Save this file!  You'll need it to write the new log");
 		}
 
 		ep_mem_free(finalkeyfile);
