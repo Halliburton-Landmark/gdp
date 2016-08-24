@@ -1822,8 +1822,12 @@ disk_append(gdp_gcl_t *gcl,
 		else
 		{
 			xcache_put(phys, ridx_entry.recno, ridx_entry.offset);
-			++phys->max_recno;
-			phys->ridx.max_offset += sizeof ridx_entry;
+			if (datum->recno > phys->max_recno)
+			{
+				phys->ridx.max_offset +=
+					sizeof ridx_entry * (datum->recno - phys->max_recno);
+				phys->max_recno = datum->recno;
+			}
 			seg->max_offset += record_size;
 		}
 		EP_STAT_CHECK(estat, goto fail0);
