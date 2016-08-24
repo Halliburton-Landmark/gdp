@@ -256,17 +256,25 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 		gdp_datum_t *datum = pdu->datum;
 		size_t siglen = sizeof sigbuf;
 
-		PUT64(pdu->datum->recno);
-		ep_crypto_sign_update(md, &recnobuf, sizeof recnobuf);
-		reclen = gdp_buf_getlength(datum->dbuf);
-		ep_crypto_sign_update(md, gdp_buf_getptr(datum->dbuf, reclen), reclen);
-		ep_crypto_sign_final(md, &sigbuf, &siglen);
-		datum->siglen = siglen;
-		datum->sigmdalg = ep_crypto_md_type(md);
-		if (datum->sig != NULL)
-			gdp_buf_drain(datum->sig, gdp_buf_getlength(datum->sig));
-		ep_crypto_sign_free(md);
-		use_sigbuf = true;
+		if (md != NULL)
+		{
+			PUT64(pdu->datum->recno);
+			ep_crypto_sign_update(md, &recnobuf, sizeof recnobuf);
+			reclen = gdp_buf_getlength(datum->dbuf);
+			ep_crypto_sign_update(md, gdp_buf_getptr(datum->dbuf, reclen),
+					reclen);
+			ep_crypto_sign_final(md, &sigbuf, &siglen);
+			datum->siglen = siglen;
+			datum->sigmdalg = ep_crypto_md_type(md);
+			if (datum->sig != NULL)
+				gdp_buf_drain(datum->sig, gdp_buf_getlength(datum->sig));
+			ep_crypto_sign_free(md);
+			use_sigbuf = true;
+		}
+		else
+		{
+			ep_dbg_cprintf(Dbg, 1, "_gdp_pdu_out: cannot clone message digest");
+		}
 	}
 
 	if (ep_dbg_test(Dbg, 22))
