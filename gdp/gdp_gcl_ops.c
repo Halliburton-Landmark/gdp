@@ -790,7 +790,7 @@ _gdp_gcl_fwd_append(
 	{
 		l = gdp_buf_getlength(datum->sig);
 		req->pdu->datum->sig = gdp_buf_new();
-		gdp_buf_write(req->pdu->datum->sig, gdp_buf_getptr(datum->sig, l), l);
+		gdp_buf_move(req->pdu->datum->sig, datum->sig, l);
 	}
 
 	// XXX should we take a callback function?
