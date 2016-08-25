@@ -73,16 +73,18 @@ created and the name of the new log and pass them to `apps/gcl-create`. For
 example,
 
 ```
-gcl-create -k none edu.berkeley.eecs.gdp-01.gdplogd org.example.project.log17a
+gcl-create -k none org.example.project.log17a
 ```
 
-will create a log named `org.example.project.log17a` on the machine `gdp-01` at
-Berkeley. Although you can create logs with any name, please stick to this
-convention (with "project" being the project name or the user name, as
-appropriate) so we can avoid name collisions. `-k none` means that `gcl-create`
-will not attempt to create a new signature key for signing appended data.
-Although crucial to the operation, key-management is better deferred to a stage
-when you are familiar with the basic operations of the GDP.
+will create a log named `org.example.project.log17a` on one of the default
+log-servers at Berkeley. Although you can create logs with any name, please
+stick to this convention (with "project" being the project name or the user
+name, as appropriate) so we can avoid name collisions. `-k none` means that
+`gcl-create` will not attempt to create a new signature key for signing
+appended data.  Although crucial to the operation, key-management is better
+deferred to a stage when you are familiar with the basic operations of the GDP.
+Also, note that `gcl-create` has several other command-line options that will
+be useful later on.
 
 ---
 
