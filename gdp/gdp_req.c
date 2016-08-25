@@ -267,6 +267,10 @@ _gdp_req_free(gdp_req_t **reqp)
 
 	req->state = GDP_REQ_FREE;
 
+    // initialize parameters for replication service
+    req->fwdcnt = 0;
+    req->acksnt = 0;
+
 	// add the empty request to the free list
 	ep_thr_mutex_lock(&ReqFreeListMutex);
 	LIST_INSERT_HEAD(&ReqFreeList, req, gcllist);

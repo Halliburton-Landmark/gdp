@@ -90,6 +90,7 @@ OBJS_MOST=	\
 	gdp_req.o \
 	gdp_stat.o \
 	gdp_subscr.o \
+	gdp_rpl.o \
 	gdp_util.o \
 	$(OBJS_ZC)
 

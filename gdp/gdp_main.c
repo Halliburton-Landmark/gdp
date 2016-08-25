@@ -201,12 +201,17 @@ gdp_pdu_proc_cmd(void *pdu_)
 	// send response PDU if appropriate
 	if (GDP_CMD_NEEDS_ACK(cmd))
 	{
-		ep_dbg_cprintf(Dbg, 47,
-				"gdp_pdu_proc_cmd: sending %zd bytes\n",
-				gdp_buf_getlength(req->pdu->datum->dbuf));
-		req->pdu->cmd = resp;
-		req->stat = _gdp_pdu_out(req->pdu, req->chan, NULL);
-		//XXX anything to do with estat here?
+        if (cmd == GDP_CMD_APPEND && (req->ackcnt >= 2) ) {
+            //Ack is not replied here.
+        }
+        else {
+            ep_dbg_cprintf(Dbg, 41,
+					"gdp_pdu_proc_cmd: sending %zd bytes\n",
+				    evbuffer_get_length(req->pdu->datum->dbuf));
+            req->pdu->cmd = resp;
+            req->stat = _gdp_pdu_out(req->pdu, req->chan, NULL);
+            //XXX anything to do with estat here?
+        }
 	}
 
 	// do command post processing
@@ -291,6 +296,7 @@ static void
 gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 {
 	int cmd = rpdu->cmd;
+    int fwdcmd;
 	EP_STAT estat;
 	gdp_gcl_t *gcl;
 	gdp_req_t *req = NULL;
@@ -397,6 +403,9 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
+    //remember cmd for post-processing of foward append before deleted.
+    fwdcmd = req->pdu->cmd;
+
 	// request is locked
 
 	// mark this request as active (for subscriptions)
@@ -467,7 +476,12 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 	}
 	else
 	{
-		_gdp_req_unlock(req);
+        if ( (fwdcmd == GDP_CMD_FWD_APPEND)
+            && (EP_UT_BITSET(GDP_REQ_PERSIST, req->flags)) )
+            _gdp_req_free(&req); // free up even if it is GDP_REQ_PERSISTENT
+
+        else
+            _gdp_req_unlock(req);
 	}
 
 	ep_dbg_cprintf(DbgProcResp, 40, "gdp_pdu_proc_resp <<< done\n");

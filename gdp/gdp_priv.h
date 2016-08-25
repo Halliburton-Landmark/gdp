@@ -49,6 +49,8 @@
 typedef struct gdp_chan		gdp_chan_t;
 typedef struct gdp_req		gdp_req_t;
 STAILQ_HEAD(gev_list, gdp_event);
+typedef struct gdp_rplsvr   gdp_rplsvr_t;
+typedef struct gdp_rplcb   gdp_rplcb_t;
 
 extern EP_THR		_GdpIoEventLoopThread;
 extern gdp_chan_t	*_GdpChannel;		// our primary app-level protocol port
@@ -148,7 +150,29 @@ extern void		_gdp_datum_dump(
 					const gdp_datum_t *datum,	// message to print
 					FILE *fp);					// file to print it to
 
+/*
+** GDP Replication
+*/
 
+LIST_HEAD(rplsvr_head, gdp_rplsvr);
+LIST_HEAD(rplcb_head, gdp_rplcb);
+
+struct gdp_rplsvr
+{
+    LIST_ENTRY(gdp_rplsvr) svrlist;
+    LIST_ENTRY(gdp_rplsvr) acklist;
+    gdp_name_t             svrname;
+    gdp_pname_t            svrpname;
+};
+
+
+
+struct gdp_rplcb
+{
+    LIST_ENTRY(gdp_rplcb)  cblist;
+    gdp_req_t              *req;
+    gdp_name_t             svrname;
+};
 
 /*
 **  GDP Channel/Logs
@@ -160,6 +184,7 @@ struct gdp_gcl
 	time_t				utime;			// last time used (seconds only)
 	LIST_ENTRY(gdp_gcl)	ulist;			// list sorted by use time
 	struct req_head		reqs;			// list of outstanding requests
+    struct rplsvr_head  rplsvr;         // replica server information
 	gdp_name_t			name;			// the internal name
 	gdp_pname_t			pname;			// printable name (for debugging)
 	gdp_iomode_t		iomode;			// read only or append only
@@ -451,6 +476,12 @@ struct gdp_req
 	uint16_t			state;		// see below
 	uint32_t			flags;		// see below
 	EP_TIME_SPEC		act_ts;		// timestamp of last successful activity
+    struct rplsvr_head  acksvr;     // acked server list for this request
+    struct rplcb_head   rplcb;      // arg for callback function in replication service
+    uint16_t            fwdcnt;     // the number of forwarded reqs to other log servers
+    uint16_t            ackcnt;    // the number of acks from log servers required for replying ack to a writer
+    uint16_t            fwdflag;    // to distinguish whether a req is a forwarded one or not.
+    uint16_t            acksnt;     // to distinguish whether an ack against the req is already sent.
 	void				(*postproc)(struct gdp_req *);
 									// do post processing after ack sent
 	gdp_event_cbfunc_t	sub_cb;		// callback function (subscribe & async I/O)
@@ -616,6 +647,24 @@ EP_STAT			_gdp_evloop_init(void);		// start event loop
 #define MICROSECONDS	* INT64_C(1000)
 #define MILLISECONDS	* INT64_C(1000000)
 #define SECONDS			* INT64_C(1000000000)
+
+/*
+**  Replication Services
+*/
+
+extern void     _rpl_init(gdp_gcl_t *pgcl);
+extern EP_STAT  _rpl_fwd_append(gdp_req_t *req);
+extern void     _rpl_resp_cb(gdp_event_t *gev);
+extern void     _rpl_resp_proc(gdp_event_t *gev);
+extern void     _rpl_reply_ack(gdp_req_t *t, EP_STAT estat);
+extern void     _rpl_add_ackedsvr(
+                    gdp_req_t *req,
+                    const gdp_name_t svrname);
+extern void     _rpl_rplsvr_freeall(struct rplsvr_head *rplsvr);
+extern void     _rpl_ackedsvr_freeall(struct rplsvr_head *acksvr);
+extern void     _rpl_rplcbarg_free(gdp_rplcb_t *rplcbarg);
+extern uint16_t _rpl_get_number_ackedsvr(
+                    const gdp_req_t *req);
 
 
 #endif // _GDP_PRIV_H_

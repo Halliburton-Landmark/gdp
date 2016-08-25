@@ -660,6 +660,13 @@ cmd_append(gdp_req_t *req)
 	// create the message
 	estat = req->gcl->x->physimpl->append(req->gcl, req->pdu->datum);
 
+    //replication service start here.--->
+    if (req->fwdflag != 1)
+    {
+        estat = _rpl_fwd_append(req);
+    }
+    //<---
+
 	if (EP_STAT_ISOK(estat))
 	{
 		// send the new data to any subscribers
@@ -1110,8 +1117,11 @@ cmd_fwd_append(gdp_req_t *req)
 				gdp_printable_name(req->pdu->dst, pbuf));
 	}
 
+    req->fwdflag = 1; //to distinguish this req is forwarded
 	// actually do the append
 	estat = cmd_append(req);
+
+    req->fwdflag = 0; //fwdflag should be always reset to distinguish whether gdp_req is a forwarded or sent from a writer.
 
 	// remove excess datum content to avoid returning it on ACK
 	flush_input_data(req, NULL);
