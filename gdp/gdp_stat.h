@@ -137,6 +137,7 @@ extern void		_gdp_stat_init(void);
 #define _GDP_CCODE_GWTIMEOUT		504		// HTTP/CoAP Gateway Timeout
 #define _GDP_CCODE_PROXYNOTSUP		505		// CoAP Proxying Not Supported
 											// (HTTP 505 HTTP Version Not Supported)
+#define _GDP_CCODE_REPLICATE_FAIL	514		// couldn't replicate
 #define _GDP_CCODE_LOST_SUBSCR		515		// GDP Lost Subscription
 
 #define _GDP_CCODE_NOROUTE			600		// no advertisement found for name
@@ -170,6 +171,7 @@ extern void		_gdp_stat_init(void);
 #define GDP_STAT_NAK_SVCUNAVAIL		GDP_STAT_NEW(SEVERE, _GDP_CCODE_SVCUNAVAIL)
 #define GDP_STAT_NAK_GWTIMEOUT		GDP_STAT_NEW(SEVERE, _GDP_CCODE_GWTIMEOUT)
 #define GDP_STAT_NAK_PROXYNOTSUP	GDP_STAT_NEW(SEVERE, _GDP_CCODE_PROXYNOTSUP)
+#define GDP_STAT_NAK_REPLICATE_FAIL	GDP_STAT_NEW(ERROR, _GDP_CCODE_REPLICATE_FAIL)
 #define GDP_STAT_NAK_LOST_SUBSCR	GDP_STAT_NEW(WARN, _GDP_CCODE_LOST_SUBSCR)
 
 #define GDP_STAT_NAK_NOROUTE		GDP_STAT_NEW(ERROR, _GDP_CCODE_NOROUTE)
