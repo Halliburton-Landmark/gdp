@@ -97,6 +97,7 @@ _rpl_fwd_append(gdp_req_t *req)
     }
 
     //No dbuf flush here because it is delivered to subscribers later. Timing to flush is obscure.
+    //gd_buf_drain(datum, gdp_buf_getlength(datum));
 
     if (req->ackcnt == 1) {
         //Reply an ack in gdp_main.c later.
@@ -144,6 +145,7 @@ _rpl_resp_proc(gdp_event_t *gev)
     //Check whether timing is to reply an ack to a client or not//--->
     uint16_t ackcnt = _rpl_get_number_ackedsvr(cbarg->req) + 1;
 
+
     if ( (ackcnt >= cbarg->req->ackcnt) && (cbarg->req->acksnt != 1) )
     {
         _rpl_reply_ack(cbarg->req, EP_STAT_OK);
@@ -182,9 +184,23 @@ _rpl_add_ackedsvr(gdp_req_t *req, const gdp_name_t svrname)
 
     memcpy(svr->svrname, svrname, sizeof svr->svrname);
     gdp_printable_name(svr->svrname, svr->svrpname);
-    //Need to check duplication here//
+
     _gdp_req_lock(req);
-    LIST_INSERT_HEAD(&req->acksvr, svr, acklist);
+    //Need to check duplication here//--->
+    gdp_rplsvr_t *current;
+    gdp_rplsvr_t *next;
+    int flag = 0;
+    for (current = LIST_FIRST(&req->acksvr); current != NULL; current = next)
+    {
+        if (GDP_NAME_SAME(svr->svrname,current->svrname)) {
+            flag = 1;
+        }
+        next = LIST_NEXT(current, acklist);
+    }
+    //<---
+    if (flag == 0)
+        LIST_INSERT_HEAD(&req->acksvr, svr, acklist);
+    _gdp_req_unlock(req);
 }
 
 uint16_t
