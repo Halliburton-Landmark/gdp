@@ -255,12 +255,24 @@ acknak(gdp_req_t *req, const char *where, bool reuse_pdu)
 			gdp_buf_free(req->rpdu->datum->dbuf);
 			req->rpdu->datum->dbuf = user_dbuf;
 
+			// same for signature
+			if (req->pdu->datum->sig != NULL)
+			{
+				gdp_buf_t *user_sig = req->pdu->datum->sig;
+				gdp_buf_reset(user_sig);
+				gdp_buf_move(user_sig, req->rpdu->datum->sig,
+						gdp_buf_getlength(req->rpdu->datum->sig));
+				gdp_buf_free(req->rpdu->datum->sig);
+				req->rpdu->datum->sig = user_sig;
+			}
+
 			// copy the contents of the response datum over the user datum
 			// (this has the pointer to user dbuf with response contents)
 			memcpy(req->pdu->datum, req->rpdu->datum, sizeof *req->pdu->datum);
 
 			// user datum now complete; can remove the response datum
 			req->rpdu->datum->dbuf = NULL;		// but not the user dbuf!
+			req->rpdu->datum->sig = NULL;		// or the signature!
 			gdp_datum_free(req->rpdu->datum);
 
 			// point the new PDU at the old datum
