@@ -238,15 +238,6 @@
         </varlistentry>
 
         <varlistentry>
-          <term><function>EP_STAT_SEV_ISFAIL</function>(st)</term>
-
-          <listitem>
-            <para>Returns true if this message is a "failure" severity status
-            code: <errortype>EP_STAT_SEV_WARN</errortype> or higher.</para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
           <term><function>EP_STAT_SEV_ISERROR</function>(st)</term>
 
           <listitem>
@@ -256,12 +247,11 @@
         </varlistentry>
 
         <varlistentry>
-          <term><function>EP_STAT_SEV_ISPERM</function>(st)</term>
+          <term><function>EP_STAT_SEV_ISFAIL</function>(st)</term>
 
           <listitem>
-            <para>Returns true if this message is a "permanent failure"
-            severity status code: <errortype>EP_STAT_SEV_ERROR</errortype> or
-            higher</para>
+            <para>Returns true if this message is a "failure" severity status
+            code: <errortype>EP_STAT_SEV_ERROR</errortype> or higher.</para>
           </listitem>
         </varlistentry>
 
@@ -275,7 +265,7 @@
         </varlistentry>
 
         <varlistentry>
-          <term><function>EP_STAT_SEV_ISMAJOR</function>(st)</term>
+          <term><function>EP_STAT_SEV_ISSFAIL</function>(st)</term>
 
           <listitem>
             <para>Returns true if this message is a "major" severity status
