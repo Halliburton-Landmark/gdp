@@ -221,7 +221,9 @@ acknak(gdp_req_t *req, const char *where, bool reuse_pdu)
 		return GDP_STAT_PROTOCOL_FAIL;
 	}
 
-	ep_dbg_cprintf(Dbg, 20, "%s: received %d\n", where, req->pdu->cmd);
+	ep_dbg_cprintf(Dbg, 20, "%s: received %s for %s\n", where,
+			req->rpdu == NULL ? "???" : _gdp_proto_cmd_name(req->rpdu->cmd),
+			req->pdu == NULL ? "???" : _gdp_proto_cmd_name(req->pdu->cmd));
 
 	// we want to re-use caller's datum for (e.g.) read commands
 	if (req->rpdu == NULL)
@@ -232,9 +234,9 @@ acknak(gdp_req_t *req, const char *where, bool reuse_pdu)
 			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 		}
 	}
-	else if (req->rpdu != req->pdu && reuse_pdu)
+	else if (req->rpdu != req->pdu)
 	{
-		if (req->pdu->datum != NULL)
+		if (req->pdu->datum != NULL && reuse_pdu)
 		{
 			if (ep_dbg_test(Dbg, 43))
 			{
@@ -411,7 +413,7 @@ static EP_STAT
 nak_router(gdp_req_t *req)
 {
 	acknak(req, "nak_router", false);
-	return GDP_STAT_FROM_R_NAK(req->rpdu->cmd);
+	return GDP_STAT_FROM_R_NAK(req->pdu->cmd);
 }
 
 
