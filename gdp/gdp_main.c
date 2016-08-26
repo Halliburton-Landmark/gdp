@@ -322,12 +322,12 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 
 	if (req->pdu == NULL)
 	{
-		ep_dbg_cprintf(Dbg, 3,
+		ep_dbg_cprintf(Dbg, 1,
 				"gdp_pdu_proc_resp(%d): no corresponding command PDU\n",
 				rpdu->cmd);
 		ocmd = rpdu->cmd;
-		// return here?  with req->pdu == NULL, _gdp_req_dispatch
-		// will probably die
+		//XXX return here?  with req->pdu == NULL, _gdp_req_dispatch
+		//XXX will probably die
 	}
 	else
 	{
@@ -357,8 +357,6 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 	// mark this request as active (for subscriptions)
 	ep_time_now(&req->act_ts);
 
-	ep_dbg_cprintf(Dbg, 40, "gdp_pdu_proc_resp >>> req=%p\n", req);
-
 	// do ack/nak specific processing
 	estat = _gdp_req_dispatch(req);
 
@@ -368,14 +366,17 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 	// we compute even if unused so we can log server errors
 	resp = acknak_from_estat(estat, req->pdu->cmd);
 
-	if (resp >= GDP_NAK_S_MIN && resp <= GDP_NAK_S_MAX)
+	if (ep_dbg_test(Dbg,
+				(resp >= GDP_NAK_S_MIN && resp <= GDP_NAK_S_MAX) ? 1 : 44))
 	{
 		char ebuf[100];
 
-		ep_dbg_cprintf(Dbg, 1, "gdp_pdu_proc_resp(%s for %s): %s\n",
+		ep_dbg_printf("gdp_pdu_proc_resp(%s for %s): %s\n",
 				_gdp_proto_cmd_name(cmd),
 				_gdp_proto_cmd_name(ocmd),
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		if (ep_dbg_test(Dbg, 55))
+			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
 	// ASSERT(all data from chan has been consumed);
