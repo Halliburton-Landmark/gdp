@@ -86,6 +86,11 @@ function drawChart(logname, startTime, endTime) {
 
 function handleQueryResponse(response) {
 
+    if (response.isError()==true) {
+        document.getElementById('request_status').innerHTML = response.getMessage();
+        return;
+    }
+
     data = response.getDataTable();
     if (data.getNumberOfRows() == 0) {
         document.getElementById('request_status').innerHTML = "<p>Sorry, no data for the time-range specified. Please pick a different time range.</p>";

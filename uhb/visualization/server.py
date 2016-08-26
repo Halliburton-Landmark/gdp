@@ -106,7 +106,7 @@ class DataResource(Resource):
             print e
             request.setResponseCode(500)
             respCode = 500
-            resp = "500: internal server error"
+            resp = str(e)
 
         return resp
 
