@@ -1069,6 +1069,9 @@ fail0:
 **		Used for replication.  This is identical to an APPEND,
 **		except it is addressed to an individual gdplogd rather
 **		than to a GCL.  The actual name is in the payload.
+**		On return, the message will have a source address of the
+**		GCL, not the gdplogd instance (i.e., we don't just do
+**		the default swap of src and dst addresses).
 */
 
 EP_STAT

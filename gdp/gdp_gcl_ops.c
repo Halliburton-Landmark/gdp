@@ -735,6 +735,9 @@ fail0:
 **
 **		Forwards an APPEND command to a different server.  This is one
 **		of the few commands that is directed directly to a gdplogd instance.
+**		However, the response is going to come back from the original
+**		GCL, not the gdplogd instance, so we arrange for the request to
+**		be linked on that GCL's chain.
 **
 **		Note: Unlike other calls, the datum is not cleared.  This is
 **		because we expect this to be used multiple times on a single
@@ -790,7 +793,7 @@ _gdp_gcl_fwd_append(
 	{
 		l = gdp_buf_getlength(datum->sig);
 		req->pdu->datum->sig = gdp_buf_new();
-		gdp_buf_move(req->pdu->datum->sig, datum->sig, l);
+		gdp_buf_write(req->pdu->datum->sig, gdp_buf_getptr(datum->sig, l), l);
 	}
 
 	// XXX should we take a callback function?

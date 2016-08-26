@@ -249,9 +249,8 @@ fail0:
 */
 
 static void
-gdp_pdu_proc_resp(void *_rpdu)
+gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 {
-	gdp_pdu_t *rpdu = _rpdu;
 	int cmd = rpdu->cmd;
 	EP_STAT estat;
 	gdp_gcl_t *gcl;
@@ -265,42 +264,60 @@ gdp_pdu_proc_resp(void *_rpdu)
 	gcl = _gdp_gcl_cache_get(rpdu->src, 0);
 	if (gcl == NULL)
 	{
-		if (ep_dbg_test(Dbg, 1))
+		// "No Route" is problematic for FWD_APPEND.  Scan the channel
+		// list for a request matching on RID
+		ep_dbg_cprintf(Dbg, 14, "gdp_pdu_proc_resp: searching channel list\n");
+		ep_thr_mutex_lock(&chan->mutex);
+		LIST_FOREACH(req, &chan->reqs, chanlist)
 		{
-			gdp_pname_t pname;
-			ep_dbg_printf("gdp_pdu_proc_resp: discarding PDU for unknown GCL\n");
-			if (ep_dbg_test(Dbg, 24))
+			if (req->pdu != NULL &&
+					req->pdu->rid == rpdu->rid &&
+					GDP_NAME_SAME(req->pdu->src, rpdu->dst) &&
+					GDP_NAME_SAME(req->pdu->dst, rpdu->src))
+				break;
+		}
+		ep_thr_mutex_unlock(&chan->mutex);
+		if (req == NULL)
+		{
+			if (ep_dbg_test(Dbg, 1))
+			{
+				gdp_pname_t pname;
+				ep_dbg_printf("gdp_pdu_proc_resp: discarding PDU for unknown GCL\n");
+				if (ep_dbg_test(Dbg, 24))
+					_gdp_pdu_dump(rpdu, ep_dbg_getfile());
+				else
+					ep_dbg_printf("    %s\n", gdp_printable_name(rpdu->src, pname));
+			}
+			_gdp_pdu_free(rpdu);
+			return;
+		}
+	}
+	else
+	{
+		// find the corresponding request
+		req = _gdp_req_find(gcl, rpdu->rid);
+		if (req == NULL)
+		{
+			// no req for incoming response --- "can't happen"
+			if (ep_dbg_test(Dbg, 1))
+			{
+				ep_dbg_printf("gdp_pdu_proc_resp: no req for incoming response\n");
 				_gdp_pdu_dump(rpdu, ep_dbg_getfile());
-			else
-				ep_dbg_printf("    %s\n", gdp_printable_name(rpdu->src, pname));
+				_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
+			}
+			_gdp_pdu_free(rpdu);
+			return;
 		}
-		_gdp_pdu_free(rpdu);
-		return;
-	}
-
-	// find the corresponding request
-	req = _gdp_req_find(gcl, rpdu->rid);
-	if (req == NULL)
-	{
-		// no req for incoming response --- "can't happen"
-		if (ep_dbg_test(Dbg, 1))
+		else if (rpdu == req->pdu)
 		{
-			ep_dbg_printf("gdp_pdu_proc_resp: no req for incoming response\n");
-			_gdp_pdu_dump(rpdu, ep_dbg_getfile());
-			_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
+			// this could be an assertion
+			if (ep_dbg_test(Dbg, 1))
+			{
+				ep_dbg_printf("gdp_pdu_proc_resp(%d): pdu == rpdu\n", rpdu->cmd);
+				_gdp_pdu_dump(rpdu, ep_dbg_getfile());
+			}
+			// _gdp_pdu_free(rpdu); return; XXX
 		}
-		_gdp_pdu_free(rpdu);
-		return;
-	}
-	else if (rpdu == req->pdu)
-	{
-		// this could be an assertion
-		if (ep_dbg_test(Dbg, 1))
-		{
-			ep_dbg_printf("gdp_pdu_proc_resp(%d): pdu == rpdu\n", rpdu->cmd);
-			_gdp_pdu_dump(rpdu, ep_dbg_getfile());
-		}
-		// _gdp_pdu_free(rpdu); return; XXX
 	}
 
 	if (req->pdu == NULL)
@@ -426,7 +443,7 @@ _gdp_pdu_process(gdp_pdu_t *pdu, gdp_chan_t *chan)
 	if (pdu_is_command)
 		ep_thr_pool_run(&gdp_pdu_proc_cmd, pdu);
 	else
-		gdp_pdu_proc_resp(pdu);
+		gdp_pdu_proc_resp(pdu, chan);
 }
 
 
