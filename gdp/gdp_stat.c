@@ -102,6 +102,7 @@ static struct ep_stat_to_string Stats[] =
 	{ GDP_STAT_NAK_SVCUNAVAIL,			"503 service unavailable",			},
 	{ GDP_STAT_NAK_GWTIMEOUT,			"504 gateway timeout",				},
 	{ GDP_STAT_NAK_PROXYNOTSUP,			"505 proxying not supported",		},
+	{ GDP_STAT_NAK_REPLICATE_FAIL,		"514 couldn't write W replicas",	},
 	{ GDP_STAT_NAK_LOST_SUBSCR,			"515 lost subscription",			},
 
 	{ GDP_STAT_NAK_NOROUTE,				"600 no route available",			},

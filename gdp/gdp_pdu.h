@@ -227,6 +227,8 @@ typedef struct gdp_pdu
 #define GDP_NAK_S_SVCUNAVAIL	_GDP_NAK_S_FROM_CODE(SVCUNAVAIL)		// 227
 #define GDP_NAK_S_GWTIMEOUT		_GDP_NAK_S_FROM_CODE(GWTIMEOUT)			// 228
 #define GDP_NAK_S_PROXYNOTSUP	_GDP_NAK_S_FROM_CODE(PROXYNOTSUP)		// 229
+
+#define GDP_NAK_S_REPLICATE_FAIL _GDP_NAK_S_FROM_CODE(REPLICATE_FAIL)	// 238
 #define GDP_NAK_S_LOSTSUB		_GDP_NAK_S_FROM_CODE(LOST_SUBSCR)		// 239
 #define GDP_NAK_S_MAX		239			// maximum server-side nak code
 //		240-254			Negative acks, routing layer
