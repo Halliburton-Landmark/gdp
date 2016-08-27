@@ -264,7 +264,7 @@ EP_STAT		_gdp_pdu_in(				// read a PDU from a network buffer
 				gdp_chan_t *);			// the network channel
 
 void		_gdp_pdu_dump(
-				gdp_pdu_t *pdu,
+				const gdp_pdu_t *pdu,
 				FILE *fp);
 
 void		_gdp_pdu_process(

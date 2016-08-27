@@ -510,7 +510,7 @@ void			_gdp_req_freeall(			// free all requests in list
 						void (*shutdownfunc)(gdp_req_t *));
 
 void			_gdp_req_dump(				// print (debug) request
-						gdp_req_t *req,
+						const gdp_req_t *req,
 						FILE *fp,
 						int detail,
 						int indent);

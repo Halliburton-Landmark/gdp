@@ -99,7 +99,7 @@ gdp_buf_unlock(gdp_buf_t *buf)
 */
 
 size_t
-gdp_buf_getlength(gdp_buf_t *buf)
+gdp_buf_getlength(const gdp_buf_t *buf)
 {
 	return evbuffer_get_length(buf);
 }

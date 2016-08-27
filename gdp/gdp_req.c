@@ -61,7 +61,7 @@ static const char *ReqStates[] =
 */
 
 static const char *
-statestr(gdp_req_t *req)
+statestr(const gdp_req_t *req)
 {
 	static char sbuf[20];
 	int state;
@@ -518,7 +518,7 @@ static EP_PRFLAGS_DESC	ReqFlags[] =
 };
 
 void
-_gdp_req_dump(gdp_req_t *req, FILE *fp, int detail, int indent)
+_gdp_req_dump(const gdp_req_t *req, FILE *fp, int detail, int indent)
 {
 	char ebuf[200];
 

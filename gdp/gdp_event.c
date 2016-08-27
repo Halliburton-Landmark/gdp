@@ -358,7 +358,7 @@ _gdp_event_add_from_req(gdp_req_t *req)
 */
 
 void
-gdp_event_print(gdp_event_t *gev, FILE *fp, int detail)
+gdp_event_print(const gdp_event_t *gev, FILE *fp, int detail)
 {
 	char ebuf[100];
 

@@ -66,7 +66,7 @@ static EP_PRFLAGS_DESC	PduFlags[] =
 };
 
 void
-_gdp_pdu_dump(gdp_pdu_t *pdu, FILE *fp)
+_gdp_pdu_dump(const gdp_pdu_t *pdu, FILE *fp)
 {
 	flockfile(fp);
 	fprintf(fp, "PDU@%p: ", pdu);

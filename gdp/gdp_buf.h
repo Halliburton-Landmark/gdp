@@ -58,7 +58,7 @@ extern void			gdp_buf_unlock(
 						gdp_buf_t *buf);
 
 extern size_t		gdp_buf_getlength(
-						gdp_buf_t *buf);
+						const gdp_buf_t *buf);
 
 extern size_t		gdp_buf_read(
 						gdp_buf_t *buf,

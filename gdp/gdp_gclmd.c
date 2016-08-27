@@ -386,7 +386,7 @@ static EP_PRFLAGS_DESC	MdatumFlags[] =
 };
 
 void
-gdp_gclmd_print(gdp_gclmd_t *gmd, FILE *fp, int detail)
+gdp_gclmd_print(const gdp_gclmd_t *gmd, FILE *fp, int detail)
 {
 	if (detail > 1)
 		fprintf(fp, "GCLMD@%p: ", gmd);

@@ -147,7 +147,7 @@ extern EP_STAT			gdp_event_free(			// free event from gdp_event_next
 							gdp_event_t *gev);		// event to free
 
 extern void				gdp_event_print(		// print event (for debugging)
-							gdp_event_t *gev,		// event in question
+							const gdp_event_t *gev,	// event in question
 							FILE *fp,				// output file
 							int detail);			// how detailed?
 
@@ -380,7 +380,7 @@ EP_STAT			gdp_gclmd_find(
 
 // print metadata set (for debugging)
 void			gdp_gclmd_print(
-					gdp_gclmd_t *gmd,
+					const gdp_gclmd_t *gmd,
 					FILE *fp,
 					int detail);
 
