@@ -240,6 +240,44 @@ fail0:
 
 
 /*
+**  Search for a request in a channel list.
+**
+**		This is a fall-back that should be used only for finding requests
+**		sent by FWD_APPEND to a server that isn't accessible.  Since that
+**		command links the request to a different GCL than the destination
+**		address in the PDU, a NOROUTE response won't find it.
+*/
+
+static EP_STAT
+find_req_in_channel_list(
+				const gdp_pdu_t *rpdu,
+				gdp_chan_t *chan,
+				gdp_req_t **reqp)
+{
+	EP_STAT estat = EP_STAT_OK;
+	gdp_req_t *req;
+
+	ep_dbg_cprintf(Dbg, 14, "find_req_in_channel_list: searching\n");
+	ep_thr_mutex_lock(&chan->mutex);
+	LIST_FOREACH(req, &chan->reqs, chanlist)
+	{
+		if (req->pdu != NULL &&
+				req->pdu->rid == rpdu->rid &&
+				GDP_NAME_SAME(req->pdu->src, rpdu->dst) &&
+				GDP_NAME_SAME(req->pdu->dst, rpdu->src))
+			break;
+	}
+	ep_thr_mutex_unlock(&chan->mutex);
+
+	// request should be locked for symmetry with _gdp_req_find
+	if (req != NULL)
+		estat = _gdp_req_lock(req);
+	*reqp = req;
+	return estat;
+}
+
+
+/*
 **  GDP_PDU_PROC_RESP --- process response (ack/nak) PDU
 **
 **		When this is called, the rpdu passed in will be the actual
@@ -264,19 +302,11 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 	gcl = _gdp_gcl_cache_get(rpdu->src, 0);
 	if (gcl == NULL)
 	{
-		// "No Route" is problematic for FWD_APPEND.  Scan the channel
-		// list for a request matching on RID
-		ep_dbg_cprintf(Dbg, 14, "gdp_pdu_proc_resp: searching channel list\n");
-		ep_thr_mutex_lock(&chan->mutex);
-		LIST_FOREACH(req, &chan->reqs, chanlist)
+		do
 		{
-			if (req->pdu != NULL &&
-					req->pdu->rid == rpdu->rid &&
-					GDP_NAME_SAME(req->pdu->src, rpdu->dst) &&
-					GDP_NAME_SAME(req->pdu->dst, rpdu->src))
-				break;
-		}
-		ep_thr_mutex_unlock(&chan->mutex);
+			estat = find_req_in_channel_list(rpdu, chan, &req);
+		} while (!EP_STAT_ISOK(estat));
+
 		if (req == NULL)
 		{
 			if (ep_dbg_test(Dbg, 1))
@@ -291,6 +321,17 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 			_gdp_pdu_free(rpdu);
 			return;
 		}
+
+		// remove the request from the GCL list it is already on
+		if (EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
+		{
+			estat = _gdp_req_lock(req);
+			LIST_REMOVE(req, gcllist);
+			req->flags &= ~GDP_REQ_ON_GCL_LIST;
+
+			// code below expects request to remain locked
+		}
+
 	}
 	else
 	{
