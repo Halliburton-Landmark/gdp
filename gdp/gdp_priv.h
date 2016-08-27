@@ -163,8 +163,12 @@ struct gdp_rplsvr
     LIST_ENTRY(gdp_rplsvr) acklist;
     gdp_name_t             svrname;
     gdp_pname_t            svrpname;
+    uint16_t               stat;
 };
 
+#define GDP_RPL_INIT    0  // used for replica set
+#define GDP_RPL_SUCCESS 1  // used if ack is replied successfully from a rplsvr
+#define GDP_RPL_FAILURE 2  // used if nak is replied from a rplsvr
 
 
 struct gdp_rplcb
@@ -656,14 +660,17 @@ extern void     _rpl_init(gdp_gcl_t *pgcl);
 extern EP_STAT  _rpl_fwd_append(gdp_req_t *req);
 extern void     _rpl_resp_cb(gdp_event_t *gev);
 extern void     _rpl_resp_proc(gdp_event_t *gev);
-extern void     _rpl_reply_ack(gdp_req_t *t, EP_STAT estat);
+extern void     _rpl_reply_ack(gdp_req_t *t, uint8_t cmd);
 extern void     _rpl_add_ackedsvr(
                     gdp_req_t *req,
-                    const gdp_name_t svrname);
+                    const gdp_name_t svrname,
+                    const int type);
 extern void     _rpl_rplsvr_freeall(struct rplsvr_head *rplsvr);
 extern void     _rpl_ackedsvr_freeall(struct rplsvr_head *acksvr);
 extern void     _rpl_rplcbarg_free(gdp_rplcb_t *rplcbarg);
 extern uint16_t _rpl_get_number_ackedsvr(
+                    const gdp_req_t *req);
+extern uint16_t _rpl_get_number_acksuccess(
                     const gdp_req_t *req);
 
 

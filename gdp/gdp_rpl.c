@@ -42,6 +42,7 @@ _rpl_init(gdp_gcl_t *gcl) //This function is tentatively prepared to set a set o
             //Add log server names without myself.
             gdp_printable_name(svr->svrname, svr->svrpname);
             ep_thr_mutex_lock(&gcl->mutex);
+            svr->stat = GDP_RPL_INIT;
             LIST_INSERT_HEAD(&gcl->rplsvr, svr, svrlist);
             ep_thr_mutex_unlock(&gcl->mutex);
         }
@@ -84,7 +85,6 @@ _rpl_fwd_append(gdp_req_t *req)
             estat = _gdp_gcl_fwd_append(req->gcl, req->pdu->datum, currentsvr->svrname, cbfunc, cbarg, NULL, reqflags);
             if (!EP_STAT_ISOK(estat))
             {
-
                 ep_app_fatal("Cannot rpl_fwd_append:\n\t%s",
                         ep_stat_tostr(estat, ebuf, sizeof ebuf));
             }
@@ -118,7 +118,7 @@ _rpl_resp_cb(gdp_event_t *gev)
 {
     gdp_event_print(gev, stdout, 3);
 
-    if (gdp_event_gettype(gev) == GDP_EVENT_CREATED)
+    if (gdp_event_gettype(gev) == GDP_EVENT_CREATED || gdp_event_gettype(gev) == GDP_EVENT_FAILURE)
     {
         gdp_gcl_t *gcl = gdp_event_getgcl(gev);
         if (gcl != NULL) {
@@ -139,20 +139,31 @@ _rpl_resp_proc(gdp_event_t *gev)
     gdp_rplcb_t *cbarg = gdp_event_getudata(gev);
 
     //Add a log server into acksvr//--->
-    _rpl_add_ackedsvr(cbarg->req, cbarg->svrname);
+    _rpl_add_ackedsvr(cbarg->req, cbarg->svrname, gdp_event_gettype(gev));
     //<---
 
     //Check whether timing is to reply an ack to a client or not//--->
-    uint16_t ackcnt = _rpl_get_number_ackedsvr(cbarg->req) + 1;
+    uint16_t acktotal = _rpl_get_number_ackedsvr(cbarg->req) + 1;
+    uint16_t acksuccess = _rpl_get_number_acksuccess(cbarg->req) + 1;
+    uint16_t ackfail = acktotal - acksuccess;
+    uint16_t svrtotal = cbarg->req->fwdcnt + 1;
+    uint16_t quorumwrite = cbarg->req->ackcnt;
 
-
-    if ( (ackcnt >= cbarg->req->ackcnt) && (cbarg->req->acksnt != 1) )
-    {
-        _rpl_reply_ack(cbarg->req, EP_STAT_OK);
-        cbarg->req->acksnt = 1;
+    if (cbarg->req->acksnt != 1) {
+        if (acksuccess >= quorumwrite) {
+            _rpl_reply_ack(cbarg->req, GDP_ACK_CREATED);
+            cbarg->req->acksnt = 1;
+        }
+        else if (ackfail > (svrtotal - quorumwrite)) {
+            _rpl_reply_ack(cbarg->req, GDP_NAK_S_REPLICATE_FAIL);
+            cbarg->req->acksnt = 1;
+        }
+        else {
+            //Do not send anything. Keep going.
+        }
     }
 
-    if (ackcnt == cbarg->req->fwdcnt + 1)
+    if (acktotal == svrtotal)
     {
         _rpl_ackedsvr_freeall(&cbarg->req->acksvr);
         _gdp_req_free(&cbarg->req);
@@ -163,20 +174,20 @@ _rpl_resp_proc(gdp_event_t *gev)
 }
 
 void
-_rpl_reply_ack(gdp_req_t *req, EP_STAT estat)
+_rpl_reply_ack(gdp_req_t *req, uint8_t cmd)
 {
-    req->pdu->cmd = GDP_ACK_SUCCESS;
+    req->pdu->cmd = cmd;
     req->stat = _gdp_pdu_out(req->pdu, req->chan, NULL);
 }
 
 void
-_rpl_add_ackedsvr(gdp_req_t *req, const gdp_name_t svrname)
+_rpl_add_ackedsvr(gdp_req_t *req, const gdp_name_t svrname, int type)
 {
     //stop-gap implementation. This should check whether incoming ack is corresponding to a sent pdu.
 
     if (!gdp_name_is_valid(svrname))
     {
-        printf("_rpl_add_ackedsvr. Error. unexpected svrname is chosen.\n");
+        printf("_rpl_add_ackedsvr. Error. Unexpected svrname is chosen.\n");
         exit(1);
     }
     gdp_rplsvr_t *svr;
@@ -192,14 +203,35 @@ _rpl_add_ackedsvr(gdp_req_t *req, const gdp_name_t svrname)
     int flag = 0;
     for (current = LIST_FIRST(&req->acksvr); current != NULL; current = next)
     {
-        if (GDP_NAME_SAME(svr->svrname,current->svrname)) {
+        if (GDP_NAME_SAME(svr->svrname, current->svrname)) {
             flag = 1;
         }
         next = LIST_NEXT(current, acklist);
     }
     //<---
-    if (flag == 0)
+    if (flag == 0) {
+        if (type == GDP_EVENT_CREATED) {
+            svr->stat = GDP_RPL_SUCCESS;
+        }
+        else if (type == GDP_EVENT_FAILURE) {
+            svr->stat = GDP_RPL_FAILURE;
+        }
+        else {
+            if (ep_dbg_test(Dbg, 1))
+            {
+                ep_dbg_printf("_rpl_add_ackedsvr. Error. Unknown event type is detect.\n", svr->svrpname);
+            }
+            exit(1);
+        }
         LIST_INSERT_HEAD(&req->acksvr, svr, acklist);
+    }
+    else {
+        //Do nothing.
+        if (ep_dbg_test(Dbg, 1))
+		{
+            ep_dbg_printf("_rpl_add_ackedsvr: duplicated ack from %s server is detected.\n", svr->svrpname);
+        }
+    }
     _gdp_req_unlock(req);
 }
 
@@ -214,6 +246,21 @@ _rpl_get_number_ackedsvr(const gdp_req_t *req)
     {
         next = LIST_NEXT(current, acklist);
         count++;
+    }
+    return count;
+}
+
+uint16_t
+_rpl_get_number_acksuccess(const gdp_req_t *req)
+{
+    uint16_t count = 0;
+    gdp_rplsvr_t *current;
+    gdp_rplsvr_t *next;
+    for (current = LIST_FIRST(&req->acksvr); current != NULL; current = next)
+    {
+        next = LIST_NEXT(current, acklist);
+        if (current->stat == GDP_RPL_SUCCESS)
+            count++;
     }
     return count;
 }
