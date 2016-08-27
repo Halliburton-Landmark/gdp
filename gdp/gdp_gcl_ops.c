@@ -64,6 +64,12 @@ _gdp_gcl_newname(gdp_gcl_t *gcl)
 
 /*
 **	_GDP_GCL_NEWHANDLE --- create a new gcl_handle & initialize
+**
+**		Only initialization done is the mutex and the name.
+**
+**	Parameters:
+**		gcl_name --- internal (256-bit) name of the GCL
+**		pgcl --- location to store the resulting GCL handle
 */
 
 EP_STAT

@@ -112,7 +112,7 @@
 **		so this ensures that the disk layout won't change.
 */
 
-// a data segment file header
+// a data segment file header (on disk)
 typedef struct
 {
 	uint32_t	magic;			// GCL_LDF_MAGIC
@@ -128,7 +128,7 @@ typedef struct
 	gdp_recno_t	recno_offset;	// first recno stored in this segment - 1
 } segment_header_t;
 
-// an individual record header in a segment
+// an individual record header in a segment (on disk)
 typedef struct
 {
 	gdp_recno_t		recno;

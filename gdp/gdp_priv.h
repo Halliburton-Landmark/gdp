@@ -177,7 +177,7 @@ struct gdp_gcl
 							gdp_datum_t *,
 							void *);
 	void				*readfpriv;		// private data for readfilter
-	struct gdp_gcl_xtra	*x;				// for use by gdpd, gdp-rest
+	struct gdp_gcl_xtra	*x;				// for use by gdplogd, gdp-rest
 };
 
 /* flags for GCL handles */
