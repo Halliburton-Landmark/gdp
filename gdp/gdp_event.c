@@ -363,41 +363,48 @@ gdp_event_print(gdp_event_t *gev, FILE *fp, int detail)
 	char ebuf[100];
 
 	if (detail > GDP_PR_BASIC + 1)
-		fprintf(fp, "Event type %d, udata %p, stat %s\n    ",
+		fprintf(fp, "Event type %d, udata %p, stat %s\n",
 				gev->type, gev->udata,
 				ep_stat_tostr(gev->stat, ebuf, sizeof ebuf));
 
 	switch (gev->type)
 	{
 	  case GDP_EVENT_DATA:
+		fprintf(fp, "    ");
 		gdp_datum_print(gev->datum, fp, GDP_DATUM_PRTEXT);
 		break;
 
 	  case GDP_EVENT_CREATED:
-		fprintf(fp, "Data created\n");
+		fprintf(fp, "    Data created\n");
 		break;
 
 	  case GDP_EVENT_EOS:
-		fprintf(fp, "End of data\n");
+		fprintf(fp, "    End of data\n");
 		break;
 
 	  case GDP_EVENT_SHUTDOWN:
-		fprintf(fp, "Log daemon shutdown\n");
+		fprintf(fp, "    Log daemon shutdown\n");
 		break;
 
 	  case GDP_EVENT_SUCCESS:
-		fprintf(fp, "Success: %s\n",
-				ep_stat_tostr(gev->stat, ebuf, sizeof ebuf));
+		if (detail > GDP_PR_BASIC + 1)
+			fprintf(fp, "    Generic success\n");
+		else
+			fprintf(fp, "    Success: %s\n",
+					ep_stat_tostr(gev->stat, ebuf, sizeof ebuf));
 		break;
 
 	  case GDP_EVENT_FAILURE:
-		fprintf(fp, "Failure: %s\n",
-				ep_stat_tostr(gev->stat, ebuf, sizeof ebuf));
+		if (detail > GDP_PR_BASIC + 1)
+			fprintf(fp, "    Generic failure\n");
+		else
+			fprintf(fp, "    Failure: %s\n",
+					ep_stat_tostr(gev->stat, ebuf, sizeof ebuf));
 		break;
 
 	  default:
 		if (detail > 0)
-			fprintf(fp, "Unknown event type %d\n", gev->type);
+			fprintf(fp, "    Unknown event type %d\n", gev->type);
 		break;
 	}
 }
