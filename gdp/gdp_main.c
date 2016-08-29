@@ -644,6 +644,8 @@ run_as(const char *runasuser)
 **		Start the event loop.
 */
 
+static EP_THR_MUTEX		GdpInitMutex	EP_THR_MUTEX_INITIALIZER;
+
 EP_STAT
 gdp_lib_init(const char *myname)
 {
@@ -651,9 +653,9 @@ gdp_lib_init(const char *myname)
 	const char *progname;
 	static bool initialized = false;
 
+	ep_thr_mutex_lock(&GdpInitMutex);
 	if (initialized)
-		return estat;
-	initialized = true;
+		goto done;
 
 	ep_dbg_cprintf(Dbg, 4, "_gdp_lib_init(%s)\n\t%s\n",
 			myname == NULL ? "NULL" : myname,
@@ -772,6 +774,7 @@ gdp_lib_init(const char *myname)
 		EP_STAT_CHECK(estat, goto fail0);
 	}
 
+done:
 	{
 		char ebuf[200];
 
@@ -780,6 +783,8 @@ gdp_lib_init(const char *myname)
 	}
 
 fail0:
+	initialized = true;
+	ep_thr_mutex_unlock(&GdpInitMutex);
 	return estat;
 }
 
