@@ -77,6 +77,22 @@ lower case.
 This is just a matter of adding a new line to the corresponding
 configuration file.  The mqtt-gdp-gateway service for that gateway
 will need to be restarted.  New logs should be created as needed.
+The `gdp-provision-sensor.sh` script will help with this.  The
+command:
+
+	sh gdp-provision-sensor.sh config-name sensor ...
+
+takes the host name of an existing MQTT broker and adds the
+indicated sensor names.  `config-name` identifies the configuration
+file to be modified and the sensor names are the MAC addresses of
+the new sensors.  Appropriate logs are created as needed.  The
+script should be run as root (it will change to `gdp`).
+
+When starting with a new installation, you must create the
+configuration file containing the root name of the log and then
+use `gdp-provision-sensor.sh` one or more times to add sensors.
+Create `/etc/gdp/mqtt-gateway.$host.conf`, where $host is the short
+host name of the broker.
 
 ### Adding a new BBB gateway
 
