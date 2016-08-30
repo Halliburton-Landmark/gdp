@@ -34,7 +34,7 @@ from GDP_GCLMD import *
 from GDP_GCL_OPEN_INFO import *
 
 
-class GDP_GCL:
+class GDP_GCL(object):
 
     """
     A class that represents a GCL handle. A GCL handle resembles an open
@@ -67,11 +67,14 @@ class GDP_GCL:
         "Corresponds to gdp_event_t structure exported by C library"
         pass
 
-
-    def __init__(self, name, iomode, open_info={}):
+    def __new__(cls, name, iomode, open_info={}):
         """
-        Open a GCL with given name and io-mode
-        Creating new GCL's is no longer supported.
+        Open a GCL with given name and io-mode. The reason to do custom
+            initialization in __new__ (rather than __init__) is because
+            we'd like a one-to-one correspondence between the underlying
+            C pointer for an open GCL and Python objects representing
+            a GCL. However, the C library can return an existing pointer
+            when an already open GCL is opened again.
 
         name=<name-of-gcl>, iomode=<mode>
         name is a GDP_NAME object
@@ -85,6 +88,48 @@ class GDP_GCL:
             'skey': an instance of EP_CRYPTO_KEY containing the signature key
         """
 
+        # __ptr is just a C style pointer, that we will assign to something
+        __ptr = POINTER(cls.gdp_gcl_t)()
+
+        # we do need an internal represenation of the name.
+        gcl_name_python = name.internal_name()
+        # convert this to a string that ctypes understands. Some ctypes magic
+        # ahead
+        buf = create_string_buffer(gcl_name_python, 32+1)
+        gcl_name_ctypes_ptr = cast(byref(buf), POINTER(GDP_NAME.name_t))
+        gcl_name_ctypes = gcl_name_ctypes_ptr.contents
+
+        # (optional) Do a quick sanity checking on open_info
+        #   use it to get a GDP_GCL_OPEN_INFO structure
+        __gdp_gcl_open_info = GDP_GCL_OPEN_INFO(open_info)
+
+        # open an existing gcl
+        __func = gdp.gdp_gcl_open
+        __func.argtypes = [GDP_NAME.name_t, c_int,
+                           POINTER(GDP_GCL_OPEN_INFO.gdp_gcl_open_info_t),
+                           POINTER(POINTER(cls.gdp_gcl_t))]
+        __func.restype = EP_STAT
+
+        estat = __func(gcl_name_ctypes, iomode,
+                            __gdp_gcl_open_info.gdp_gcl_open_info_ptr,
+                            pointer(__ptr))
+        check_EP_STAT(estat)
+
+        if addressof(__ptr.contents) in cls.object_dir.keys():
+            newobj = cls.object_dir[addressof(__ptr.contents)]
+            return newobj
+        else:
+            # create a new instance
+            newobj = super(GDP_GCL, cls).__new__(cls)
+            newobj.ptr = __ptr
+            newobj.gdp_gcl_open_info = __gdp_gcl_open_info
+            newobj.get_next_event = newobj.__get_next_event
+            cls.object_dir[addressof(__ptr.contents)] = newobj
+            return newobj
+
+        assert False    # should never get here
+
+    def T__init__(self, name, iomode, open_info={}):
         # self.ptr is just a C style pointer, that we will assign to something
         self.ptr = POINTER(self.gdp_gcl_t)()
 

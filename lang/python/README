@@ -123,7 +123,7 @@ gdp.GDP_GCL = class GDP_GCL
  |  __del__(self)
  |      close this GCL handle, and free the allocated resources
  |  
- |  __init__(self, name, iomode, open_info={})
+ |  __new__(self, name, iomode, open_info={})
  |      Open a GCL with given name and io-mode
  |      Creating new GCL's is no longer supported.
  |      
