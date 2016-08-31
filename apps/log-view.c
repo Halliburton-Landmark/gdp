@@ -141,11 +141,15 @@ show_metadata(int nmds, FILE *dfp, size_t *foffp, int plev)
 			switch (mdhdrs[i].md_id)
 			{
 				case GDP_GCLMD_XID:
-					printf(" (external id)\n");
+					printf(" (external id)\n    %s\n", mdata);
 					break;
 
 				case GDP_GCLMD_CTIME:
-					printf(" (creation time)\n");
+					printf(" (creation time)\n    %s\n", mdata);
+					break;
+
+				case GDP_GCLMD_CID:
+					printf(" (creator)\n    %s\n", mdata);
 					break;
 
 				case GDP_GCLMD_PUBKEY:
