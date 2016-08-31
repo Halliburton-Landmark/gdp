@@ -241,6 +241,13 @@ ep_mem_realloc_f(size_t nbytes,
 	return ep_mem_ialloc(nbytes, curmem, 0, NULL, 0);
 }
 
+void *
+ep_mem_zrealloc_f(size_t nbytes,
+	void *curmem)
+{
+	return ep_mem_ialloc(nbytes, curmem, EP_MEM_F_ZERO, NULL, 0);
+}
+
 
 /*
 **  EP_MEM_[MZR]ALLOC -- same thing, but just in the non-debugging case
@@ -284,6 +291,16 @@ ep_mem_realloc(
 	size_t nbytes)
 {
 	return ep_mem_ialloc(nbytes, curmem, 0, NULL, 0);
+}
+
+#undef ep_mem_zrealloc
+
+void *
+ep_mem_zrealloc(
+	void *curmem,
+	size_t nbytes)
+{
+	return ep_mem_ialloc(nbytes, curmem, EP_MEM_F_ZERO, NULL, 0);
 }
 
 

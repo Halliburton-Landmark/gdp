@@ -84,6 +84,9 @@ struct ep_malloc_functions
 # define ep_mem_realloc(curmem, size) \
 				ep_mem_ialloc((size), (curmem), 0, \
 					_EP_MEM_FILE_LINE_)
+# define ep_mem_zrealloc(curmem, size) \
+				ep_mem_ialloc((size), (curmem), \
+					EP_MEM_F_ZERO, _EP_MEM_FILE_LINE_)
 # define ep_mem_strdup(s)	ep_mem_istrdup(s, -1, 0, \
 					_EP_MEM_FILE_LINE_)
 # define ep_mem_fstrdup(s, flags) \
