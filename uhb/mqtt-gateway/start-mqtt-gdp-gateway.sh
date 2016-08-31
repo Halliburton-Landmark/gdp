@@ -74,8 +74,10 @@ test -f $MQTT_GATEWAY_LOG || cp /dev/null $MQTT_GATEWAY_LOG
 
 	for i
 	do
-		if ! $GDP_ROOT/bin/log-exists $gcl_root.device.$i
+		if $GDP_ROOT/bin/log-exists $gcl_root.device.$i
 		then
+			args="$args device/+/$i $gcl_root.device.$i"
+		else
 			echo "[ERROR] Log $gcl_root.device.$i does not exist!"
 			echo "[ERROR] This may be because a log server" \
 				" is down or inaccessible"
@@ -83,10 +85,7 @@ test -f $MQTT_GATEWAY_LOG || cp /dev/null $MQTT_GATEWAY_LOG
 				" create a new log using:"
 			echo "$GDP_ROOT/bin/log-create -q -K$GDP_KEYS_DIR" \
 				" -e none $gcl_root.device.$i"
-		then
-			echo "[INFO] Created GDP log $gcl_root.device.$i"
 		fi
-		args="$args device/+/$i $gcl_root.device.$i"
 	done
 
 	echo "[INFO] Running $gw_prog $args"
