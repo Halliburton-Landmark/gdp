@@ -578,7 +578,7 @@ cmd_append(gdp_req_t *req)
 				// may be a duplicate append
 				// XXX check that records match?
 				estat = gdpd_gcl_error(req->pdu->dst,
-						"cmd_append: record duplicate record",
+						"cmd_append: record number duplicated",
 						GDP_STAT_RECORD_DUPLICATED, GDP_STAT_NAK_CONFLICT);
 				goto fail0;
 			}
@@ -587,7 +587,7 @@ cmd_append(gdp_req_t *req)
 			{
 				// gap in record numbers
 				estat = gdpd_gcl_error(req->pdu->dst,
-						"cmd_append: record gap error",
+						"cmd_append: record number missing",
 						GDP_STAT_RECNO_SEQ_ERROR, GDP_STAT_NAK_FORBIDDEN);
 				goto fail0;
 			}
