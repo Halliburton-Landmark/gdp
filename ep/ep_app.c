@@ -80,7 +80,7 @@ static struct msginfo	MsgInfo[9] =
 	MSGINFO("OK",		"ck",		INFO	),
 	MSGINFO("WARN",		"yk",		WARNING	),
 	MSGINFO("ERROR",	"ry",		ERROR	),
-	MSGINFO("SEVERE",	"rb",		SEVERE	),
+	MSGINFO("SEVERE",	"yr",		SEVERE	),
 	MSGINFO("ABORT",	"wr",		ABORT	),
 	MSGINFO("FATAL",	"wr",		FATAL	),
 };
