@@ -142,9 +142,6 @@ typedef struct
 	int32_t			data_length;		// in bytes
 } segment_record_t;
 
-// flag bits in record headers
-#define REC_HAS_SIGNATURE		0x0001	// signature is stored on disk
-
 
 /*
 **  In-Memory representation of per-segment info

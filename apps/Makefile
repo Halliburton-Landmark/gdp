@@ -39,6 +39,7 @@ SBINALL_ZC= 	gdp-zcpublish
 SBINALL=	gdp-rest \
 		log-view \
 		gdp-find-xname \
+		gdp-log-check \
 		gdp-name-xlate \
 		gdp-newsegment \
 		$(SBINALL_ZC) \
@@ -124,6 +125,8 @@ all:	${ALL}
 # can be tricky to compile under Mac OS X.
 all_noavahi:
 	${MAKE}	STD=-DGDP_OSCF_USE_ZEROCONF=0 LIBAVAHI= BINALL_ZC= SBINALL_ZC= all
+
+gdp-log-check.o: ../gdplogd/logd_disklog.c ../gdplogd/logd_gcl.c
 
 gdp-rest:	gdp-rest.o ../scgilib/scgilib.o
 	${CC} -o $@ ${LDFLAGS} gdp-rest.o ${LDLIBS} ../scgilib/scgilib.o

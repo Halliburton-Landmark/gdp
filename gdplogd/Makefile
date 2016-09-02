@@ -125,7 +125,7 @@ LIBDEPS= \
 		${LIBROOT}/gdp/libgdp.a \
 		${LIBROOT}/ep/libep.a \
 
-all: ${CLEANALL}
+all: ${ALL}
 
 # Build without avahi, the zero-conf facility that
 # can be tricky to compile under Mac OS X.

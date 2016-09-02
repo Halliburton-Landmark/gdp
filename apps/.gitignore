@@ -1,6 +1,7 @@
 gcl-clone
 gcl-create
 gdp-find-xname
+gdp-log-check
 gdp-name-xlate
 gdp-newsegment
 gdp-rest
@@ -12,4 +13,3 @@ log-view
 rw-bench
 gdp-zcbrowse
 gdp-zcpublish
-gdp-newextent
