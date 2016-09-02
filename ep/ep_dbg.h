@@ -31,6 +31,7 @@
 #ifndef _EP_DEBUG_H_
 #define _EP_DEBUG_H_
 
+# include <ep/ep.h>
 # include <stdarg.h>
 
 /**************************  BEGIN PRIVATE  **************************/

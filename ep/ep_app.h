@@ -30,6 +30,7 @@
 
 #ifndef _EP_APP_H_
 # define _EP_APP_H_
+# include <ep/ep.h>
 # include <ep/ep_conf.h>
 # include <stdlib.h>
 
