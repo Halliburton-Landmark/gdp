@@ -123,6 +123,8 @@ gdp_event_next(gdp_gcl_t *gcl, EP_TIME_SPEC *timeout)
 	EP_TIME_SPEC *abs_to = NULL;
 	EP_TIME_SPEC tv;
 
+	ep_dbg_cprintf(Dbg, 59, "gdp_event_next: gcl %p\n", gcl);
+
 	if (timeout != NULL)
 	{
 		ep_time_deltanow(timeout, &tv);
@@ -137,7 +139,10 @@ gdp_event_next(gdp_gcl_t *gcl, EP_TIME_SPEC *timeout)
 		while ((gev = STAILQ_FIRST(&ActiveList)) == NULL)
 		{
 			// wait until we have at least one thing to try
+			ep_dbg_cprintf(Dbg, 58, "gdp_event_next: empty ActiveList; waiting\n");
 			err = ep_thr_cond_wait(&ActiveListSig, &ActiveListMutex, abs_to);
+			ep_dbg_cprintf(Dbg, 58, "gdp_event_next: ep_thr_cond_wait => %d\n",
+					err);
 			if (err == ETIMEDOUT)
 				goto fail0;
 		}
@@ -158,7 +163,10 @@ gdp_event_next(gdp_gcl_t *gcl, EP_TIME_SPEC *timeout)
 		}
 
 		// if there is no match, wait until something is added and try again
+		ep_dbg_cprintf(Dbg, 58, "gdp_event_next: no match; waiting\n");
 		err = ep_thr_cond_wait(&ActiveListSig, &ActiveListMutex, abs_to);
+		ep_dbg_cprintf(Dbg, 58, "gdp_event_next: ep_thr_cond_wait => %d\n",
+					err);
 		if (err == ETIMEDOUT)
 			break;
 	}
@@ -169,6 +177,7 @@ fail0:
 	ep_thr_mutex_unlock(&ActiveListMutex);
 
 	// the callback must call gdp_event_free(gev)
+	ep_dbg_cprintf(Dbg, 52, "gdp_event_next => %p\n", gev);
 	return gev;
 }
 
@@ -193,7 +202,7 @@ _gdp_event_trigger(gdp_event_t *gev)
 		// signal the user thread (synchronous delivery)
 		ep_thr_mutex_lock(&ActiveListMutex);
 		STAILQ_INSERT_TAIL(&ActiveList, gev, queue);
-		ep_thr_cond_signal(&ActiveListSig);
+		ep_thr_cond_broadcast(&ActiveListSig);
 		ep_thr_mutex_unlock(&ActiveListMutex);
 	}
 	else
