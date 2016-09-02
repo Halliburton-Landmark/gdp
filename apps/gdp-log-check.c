@@ -42,7 +42,10 @@
 **
 **		* Don't start ridx from recno 1 if old segments have expired.
 **		* If duplicate records are found, discard them if they are
-**		  identical.
+**		  identical.  (This would require updating the data file
+**		  as well as the indices.)
+**		* Continue after duplicate records found, preferably
+**		  summarizing the range of dups.
 **		* Others as noted in the code.
 */
 
@@ -368,14 +371,26 @@ scan_recs(gdp_gcl_t *gcl,
 			// minor sanity check
 			if (log_record.recno != recno + 1)
 			{
-				// not so minor: serious failure: data file is corrupt
-				ep_app_error("%s\n"
-						"    recno mismatch, offset = %jd, got %" PRIgdp_recno
-						", expected %" PRIgdp_recno ")\n",
-						gcl->pname, (intmax_t) record_offset,
-						log_record.recno, recno + 1);
-				estat = GDP_STAT_CORRUPT_GCL;
-				break;
+				if (log_record.recno > recno + 1)
+				{
+					// gap in data
+					estat = GDP_STAT_RECORD_MISSING;
+					ep_app_message(estat, "%s\n"
+							"   data records missing, offset %jd,"
+							" records %" PRIgdp_recno "-%" PRIgdp_recno,
+							gcl->pname, (intmax_t) record_offset,
+							recno + 1, log_record.recno);
+				}
+				else
+				{
+					// duplicated record
+					estat = GDP_STAT_RECORD_DUPLICATED;
+					ep_app_message(estat, "%s\n"
+							"    data records duplicated, offset = %jd,"
+							" got %" PRIgdp_recno ", expected %" PRIgdp_recno,
+							gcl->pname, (intmax_t) record_offset,
+							log_record.recno, recno + 1);
+				}
 			}
 
 			// reset the expected recno to whatever we actually have
