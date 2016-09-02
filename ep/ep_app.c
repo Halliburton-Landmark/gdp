@@ -30,8 +30,8 @@
 
 #include <ep.h>
 #include <ep_app.h>
-#include <ep_string.h>
 #include <ep_log.h>
+#include <ep_string.h>
 
 #include <stdlib.h>
 #include <sys/errno.h>
@@ -62,6 +62,32 @@ ep_app_getprogname(void)
 }
 
 
+struct msginfo
+{
+	const char	*tag;		// message tag (e.g., "ERROR")
+	const char	*colors;	// colors (foreground, background)
+	uint32_t	flag;		// flag to test for logging
+};
+
+#define MSGINFO(tag, colors, logflag)	\
+		{ tag, colors, EP_APP_FLAG_LOG ## logflag ## S }
+
+static struct msginfo	MsgInfo[9] =
+{
+	MSGINFO("OK",		"ck",		INFO	),
+	MSGINFO("OK",		"ck",		INFO	),
+	MSGINFO("OK",		"ck",		INFO	),
+	MSGINFO("OK",		"ck",		INFO	),
+	MSGINFO("WARN",		"yk",		WARNING	),
+	MSGINFO("ERROR",	"ry",		ERROR	),
+	MSGINFO("SEVERE",	"rb",		SEVERE	),
+	MSGINFO("ABORT",	"wr",		ABORT	),
+	MSGINFO("FATAL",	"wr",		FATAL	),
+};
+
+#define EP_STAT_SEV_FATAL	8	// pseudo-value
+
+
 
 ////////////////////////////////////////////////////////////////////////
 //
@@ -69,27 +95,55 @@ ep_app_getprogname(void)
 //
 
 static void
-printmessage(const char *tag,
-		const char *bg,
-		const char *fg,
+printmessage(struct msginfo *mi,
+		const char *emsg,
 		const char *fmt,
 		va_list av)
 {
 	const char *progname;
+	const char *fg;
+	const char *bg;
+
+	switch (mi->colors[0])
+	{
+	  case 'b': fg = EpVid->vidfgblue;	break;
+	  case 'c': fg = EpVid->vidfgcyan;	break;
+	  case 'g': fg = EpVid->vidfggreen;	break;
+	  case 'k': fg = EpVid->vidfgblack;	break;
+	  case 'm': fg = EpVid->vidfgmagenta;	break;
+	  case 'r': fg = EpVid->vidfgred;	break;
+	  case 'w': fg = EpVid->vidfgwhite;	break;
+	  case 'y': fg = EpVid->vidfgyellow;	break;
+	  default:  fg = NULL;			break;
+	}
+	switch (mi->colors[1])
+	{
+	  case 'b': bg = EpVid->vidbgblue;	break;
+	  case 'c': bg = EpVid->vidbgcyan;	break;
+	  case 'g': bg = EpVid->vidbggreen;	break;
+	  case 'k': bg = EpVid->vidbgblack;	break;
+	  case 'm': bg = EpVid->vidbgmagenta;	break;
+	  case 'r': bg = EpVid->vidbgred;	break;
+	  case 'w': bg = EpVid->vidbgwhite;	break;
+	  case 'y': bg = EpVid->vidbgyellow;	break;
+	  default:  bg = NULL;			break;
+	}
 
 	if (fg == NULL)
 		fg = "";
 	if (bg == NULL)
 		bg = "";
 
-	fprintf(stderr, "%s%s%s[%s]%s%s%s ",
-			fg, bg, EpVid->vidinv, tag, EpVid->vidnorm, fg, bg);
+	fprintf(stderr, "[%s%s%s%s] ",
+			fg, bg, mi->tag, EpVid->vidnorm);
 	if ((progname = ep_app_getprogname()) != NULL)
 		fprintf(stderr, "%s: ", progname);
 	if (fmt != NULL)
 		vfprintf(stderr, fmt, av);
 	else
-		fprintf(stderr, "unknown %s", tag);
+		fprintf(stderr, "unknown %s", mi->tag);
+	if (emsg != NULL)
+		fprintf(stderr, ":\n\t%s", emsg);
 	if (errno != 0)
 	{
 		char nbuf[40];
@@ -97,7 +151,42 @@ printmessage(const char *tag,
 		strerror_r(errno, nbuf, sizeof nbuf);
 		fprintf(stderr, "\n\t(%s)", nbuf);
 	}
-	fprintf(stderr, "%s\n", EpVid->vidnorm);
+	fprintf(stderr, "\n");
+}
+
+
+////////////////////////////////////////////////////////////////////////
+//
+//  EP_APP_MESSAGE -- print a message (severity from EP_STAT)
+//
+//	Parameters:
+//		estat -- status code (printed)
+//		fmt -- format for a message
+//		... -- arguments
+//
+
+void
+ep_app_message(
+	EP_STAT estat,
+	const char *fmt,
+	...)
+{
+	va_list av;
+	struct msginfo *mi = &MsgInfo[EP_STAT_SEVERITY(estat)];
+	char ebuf[100];
+
+	ep_stat_tostr(estat, ebuf, sizeof ebuf);
+	errno = 0;
+	va_start(av, fmt);
+	printmessage(mi, ebuf, fmt, av);
+	va_end(av);
+
+	if (EP_UT_BITSET(mi->flag, OperationFlags))
+	{
+		va_start(av, fmt);
+		ep_logv(estat, fmt, av);
+		va_end(av);
+	}
 }
 
 
@@ -119,7 +208,7 @@ ep_app_info(
 
 	errno = 0;
 	va_start(av, fmt);
-	printmessage("INFO", EpVid->vidbgblack, EpVid->vidfgcyan, fmt, av);
+	printmessage(&MsgInfo[EP_STAT_SEV_OK], NULL, fmt, av);
 	va_end(av);
 
 	if (EP_UT_BITSET(EP_APP_FLAG_LOGINFOS, OperationFlags))
@@ -151,7 +240,7 @@ ep_app_warn(
 	va_list av;
 
 	va_start(av, fmt);
-	printmessage("WARNING", EpVid->vidbgblack, EpVid->vidfgyellow, fmt, av);
+	printmessage(&MsgInfo[EP_STAT_SEV_WARN], NULL, fmt, av);
 	va_end(av);
 
 	if (EP_UT_BITSET(EP_APP_FLAG_LOGWARNINGS, OperationFlags))
@@ -184,13 +273,46 @@ ep_app_error(
 	va_list av;
 
 	va_start(av, fmt);
-	printmessage("ERROR", EpVid->vidbgwhite, EpVid->vidfgred, fmt, av);
+	printmessage(&MsgInfo[EP_STAT_SEV_ERROR], NULL, fmt, av);
 	va_end(av);
 
 	if (EP_UT_BITSET(EP_APP_FLAG_LOGERRORS, OperationFlags))
 	{
 		va_start(av, fmt);
 		ep_logv(EP_STAT_ERROR, fmt, av);
+		va_end(av);
+	}
+}
+
+
+////////////////////////////////////////////////////////////////////////
+//
+//  EP_APP_SEVERE -- print a severe message
+//
+//	Parameters:
+//		fmt -- format for a message
+//			If NULL it prints errno.
+//		... -- arguments
+//
+//	Returns:
+//		never
+//
+
+void
+ep_app_severe(
+	const char *fmt,
+	...)
+{
+	va_list av;
+
+	va_start(av, fmt);
+	printmessage(&MsgInfo[EP_STAT_SEV_SEVERE], NULL, fmt, av);
+	va_end(av);
+
+	if (EP_UT_BITSET(EP_APP_FLAG_LOGSEVERES, OperationFlags))
+	{
+		va_start(av, fmt);
+		ep_logv(EP_STAT_SEVERE, fmt, av);
 		va_end(av);
 	}
 }
@@ -218,7 +340,7 @@ ep_app_fatal(
 	va_list av;
 
 	va_start(av, fmt);
-	printmessage("FATAL", EpVid->vidbgyellow, EpVid->vidfgred, fmt, av);
+	printmessage(&MsgInfo[EP_STAT_SEV_FATAL], NULL, fmt, av);
 	va_end(av);
 
 	if (EP_UT_BITSET(EP_APP_FLAG_LOGFATALS, OperationFlags))
@@ -254,7 +376,7 @@ ep_app_abort(
 	va_list av;
 
 	va_start(av, fmt);
-	printmessage("ABORT", EpVid->vidbgyellow, EpVid->vidfgred, fmt, av);
+	printmessage(&MsgInfo[EP_STAT_SEV_ABORT], NULL, fmt, av);
 	va_end(av);
 
 	if (EP_UT_BITSET(EP_APP_FLAG_LOGABORTS, OperationFlags))

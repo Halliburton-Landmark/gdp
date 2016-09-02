@@ -40,11 +40,15 @@ extern void EP_TYPE_PRINTFLIKE(1, 2)
 extern void EP_TYPE_PRINTFLIKE(1, 2)
 			ep_app_error(const char *fmt, ...);
 extern void EP_TYPE_PRINTFLIKE(1, 2)
+			ep_app_severe(const char *fmt, ...);
+extern void EP_TYPE_PRINTFLIKE(1, 2)
 			ep_app_fatal(const char *fmt, ...)
 				EP_ATTR_NORETURN;
 extern void EP_TYPE_PRINTFLIKE(1, 2)
 			ep_app_abort(const char *fmt, ...)
 				EP_ATTR_NORETURN;
+extern void EP_TYPE_PRINTFLIKE(2, 3)
+			ep_app_message(EP_STAT estat, const char *fmt, ...);
 
 extern const char	*ep_app_getprogname(void);
 
@@ -55,8 +59,9 @@ extern void		ep_app_setflags(uint32_t flags);
 
 #define EP_APP_FLAG_LOGABORTS		0x00000001	// log ep_app_abort
 #define EP_APP_FLAG_LOGFATALS		0x00000002	// log ep_app_fatal
-#define EP_APP_FLAG_LOGERRORS		0x00000004	// log ep_app_error
-#define EP_APP_FLAG_LOGWARNINGS		0x00000008	// log ep_app_warn
-#define EP_APP_FLAG_LOGINFOS		0x00000010	// log ep_app_info
+#define EP_APP_FLAG_LOGSEVERES		0x00000004	// log ep_app_severe
+#define EP_APP_FLAG_LOGERRORS		0x00000008	// log ep_app_error
+#define EP_APP_FLAG_LOGWARNINGS		0x00000010	// log ep_app_warn
+#define EP_APP_FLAG_LOGINFOS		0x00000020	// log ep_app_info
 
 #endif //_EP_APP_H_
