@@ -643,7 +643,7 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 	// close the temporary indices
 	fclose(phys->ridx.fp);
 	phys->ridx.fp = NULL;
-	phys->tidx.db->close(phys->tidx.db);
+	bdb_close(phys->tidx.db);
 	phys->tidx.db = NULL;
 
 	if (EP_STAT_ISWARN(estat))
