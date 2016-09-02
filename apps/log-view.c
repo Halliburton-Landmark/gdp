@@ -212,7 +212,6 @@ show_metadata(int nmds, FILE *dfp, size_t *foffp, int plev)
 
 EP_PRFLAGS_DESC	RecordFlags[] =
 {
-	{ REC_HAS_SIGNATURE,	REC_HAS_SIGNATURE,	"HAS_SIGNATURE"		},
 	{ 0,					0,					NULL				}
 };
 
