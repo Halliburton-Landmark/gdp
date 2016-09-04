@@ -63,7 +63,7 @@ Note: gcc on linux has a bug that causes it to complain about
 non-constant expressions in an initializer when the `-std=c99`
 flag is given.  Those same expressions are constant in Clang
 and even in gcc without the `-std=c99` flag.  As a result of
-this problem, we don't use the `-std=c99` flag by default, but
+this problem, we do not use the `-std=c99` flag by default, but
 this means that not all features of C99 are available.
 If you want full C99, use `STD=-std=c99` on the make command
 line.
@@ -87,45 +87,57 @@ Operating System Quirks
 
 ### MacOS
 
-If you are trying to compile on MacOS you'll need to install
+If you are trying to compile on MacOS you will need to install
 Xcode from the App Store to get the compilers, libraries, and
-build tools you will need.
+build tools you will need.  Instructions for doing this are
+available at https://www.macports.org/install.php.
 
 Other packages are installed by `adm/gdp-setup.sh`.  Note that
 this script will try to determine if you are using `brew` or
-`macports. ` Of the two, `macports` is better understood.
+`macports`.  Of the two, `macports` is better understood and
+supports more required packages.  If you use `homebrew` you will
+have to install some packages by hand.
 
-To install macports, see https://www.macports.org/install.php
+To install `macports`, see https://www.macports.org/install.php.
+It comes as standard binary packages for most versions: download
+the `.dmg` file, double click on the package, and proceed.
 
 To install brew, see http://brew.sh/ and run
-   /usr/bin/ruby -e \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)\""
+   /usr/bin/ruby -e \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)\"
 
-Then run `adm/gdp-setup.sh`.
+Unfortunately, neither of them has all the modules you may need
+if you are compiling everything, so you may have to download other
+packages from source code.  For example, `macports` does not
+support `mosquitto`, which is necessary if you are compiling the
+MQTT-GDP gateway code (which is not part of the default build).
+Conversely, `brew` does not support Avahi, which _is_ part of
+the default build.
 
-Unfortunately there are some reports that neither of them has
-all the modules you may need if you are compiling everything,
-so you may have to download other packages from source code.
+If you cannot use `macports` but you want Zeroconf, you can install
+Avahi by hand using:
 
-It's been reported that brew doesn't include Avahi at all, so
-if you are using that package manager you'll probably have to
-compile Avahi for yourself. 
+    wget https://github.com/lathiat/avahi/releases/download/v0.6.32/avahi-0.6.32.tar.gz
+    tar -zxf avahi-0.6.32.tar.gz
+    cd avahi-0.6.32
+   ./configure --disable-qt4 --disable-qt3 --disable-gtk \
+        --disable-gtk3 --disable-gdbm --disable-pygtk \
+		--disable-python-dbus --disable-mono 
+    make -k
+
+Then `cd` to the `avahi-0.6.32` directory and run:
+
+    sudo make -k install
+
+Note also that `0.6.32` is the current version as of this writing;
+you may need to find the latest version if that one becomes obsolete.
 
 As an alternative, you can remove Zeroconf from the compilation
 entirely using:
 
     make all_no_avahi
 
-If you really want to attempt to build avahi:
-
-    wget https://github.com/lathiat/avahi/releases/download/v0.6.32/avahi-0.6.32.tar.gz
-    tar -zxf avahi-0.6.32.tar.gz
-    cd avahi-0.6.32
-   ./configure --disable-qt4 --disable-qt3 --disable-gtk --disable-gtk3 --disable-gdbm --disable-pygtk --disable-python-dbus --disable-mono 
-    make -k
-
-Then, as root, cd to the avahi-0.6.32 directory and run:
-
-    make -k install
+Be aware that this will increase the need for manual configuration
+at all user sites.
 
 ### Red Hat
 
@@ -159,7 +171,7 @@ contained in this source tree.
 
 * ep &mdash; A library of C utility functions.  This is a stripped
 	down version of a library I wrote several years ago.
-	If you look at the code you'll see vestiges of some
+	If you look at the code you will see vestiges of some
 	of the stripped out functions.  I plan on cleaning
 	this version up and releasing it again.
 

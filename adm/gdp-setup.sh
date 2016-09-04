@@ -47,10 +47,15 @@ case "$OS" in
 	if [ "$pkgmgr" = "brew" ]
 	then
 		package mosquitto
-		warn "Homebrew doesn't support Avahi.  Avahi is used for zero configuration.  Under Darwin, Avahi and is difficult to build without editing files.  To build gdp without libavahi use 'make all_noavahi'"
+		warn "Homebrew doesn't support Avahi."
+		info "Avahi is used for Zeroconf (automatic client"
+		info "configuration.  Under Darwin, Avahi is difficult"
+		info "to build without editing files.  To build gdp without"
+		info "Zeroconf use 'make all_noavahi'"
 	else
 		package avahi
-		warn "Macports doesn't support Mosquitto: install by hand"
+		warn "Macports doesn't support Mosquitto: install by hand."
+		info "See https://mosquitto.org/ for instructions."
 	fi
 	;;
 

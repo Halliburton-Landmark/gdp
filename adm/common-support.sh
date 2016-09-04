@@ -87,7 +87,8 @@ package() {
 		    fi
 		fi
 		if [ -z "$pkgmgr" ]; then
-		    fatal "you must install macports or homebrew.  To install homebrew: /usr/bin/ruby -e \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)\""
+		    warn "You must install macports or homebrew."
+		    fatal "See README-compiling.md (Operating System Quirks) for details."
 		fi
 	    fi
 	    if [ "$pkgmgr" = "brew" ]; then
