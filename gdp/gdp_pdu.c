@@ -231,6 +231,8 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 		memcpy(pdu->src, _GdpMyRoutingName, sizeof pdu->src);
 	}
 
+	if (ep_dbg_test(Dbg, 1))
+		flockfile(ep_dbg_getfile());
 	if (ep_dbg_test(Dbg, 18))
 	{
 		ep_dbg_printf("_gdp_pdu_out, fd = %d, basemd = %p:",
@@ -419,10 +421,12 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 							"signature", offset, EP_HEXDUMP_HEX);
 			offset += pdu->datum->siglen;
 		}
-		//EP_STAT_CHECK(estat, goto fail0);
+		EP_STAT_CHECK(estat, goto fail0);
 	}
 
 fail0:
+	if (ep_dbg_test(Dbg, 1))
+		funlockfile(ep_dbg_getfile());
 	if (!EP_STAT_ISOK(estat))
 	{
 		// flush buffer so we send nothing once the buffer is unlocked

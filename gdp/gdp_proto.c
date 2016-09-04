@@ -79,14 +79,19 @@ _gdp_invoke(gdp_req_t *req)
 
 	EP_ASSERT_POINTER_VALID(req);
 	cmdname = _gdp_proto_cmd_name(req->pdu->cmd);
-	if (ep_dbg_test(Dbg, 11))
+	if (ep_dbg_test(Dbg, 10))
 	{
-		ep_dbg_printf("\n*** _gdp_invoke(%p): %s (%d), gcl@%p:\n\t",
+		ep_dbg_printf("\n>>> _gdp_invoke(req=%p rid=%" PRIgdp_rid "): %s (%d), gcl@%p\n",
 				req,
+				req->pdu->rid,
 				cmdname,
 				req->pdu->cmd,
 				req->gcl);
-		_gdp_datum_dump(req->pdu->datum, ep_dbg_getfile());
+		if (ep_dbg_test(Dbg, 11))
+		{
+			ep_dbg_printf("\t");
+			_gdp_datum_dump(req->pdu->datum, ep_dbg_getfile());
+		}
 	}
 	EP_ASSERT(req->state == GDP_REQ_ACTIVE);
 	//EP_ASSERT_REQUIRE(ep_thr_mutex_islocked(&req->mutex));
@@ -175,15 +180,20 @@ _gdp_invoke(gdp_req_t *req)
 		}
 	}
 
-	if (ep_dbg_test(Dbg, 22))
+	if (ep_dbg_test(Dbg, 10))
 	{
 		char ebuf[200];
 
 		flockfile(ep_dbg_getfile());
-		ep_dbg_printf("gdp_invoke(%s) <<< %s\n  ",
-				cmdname, ep_stat_tostr(estat, ebuf, sizeof ebuf));
-		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
-		ep_dbg_printf("\n");
+		ep_dbg_printf("<<< _gdp_invoke(%p rid=%" PRIgdp_rid ") %s: %s\n",
+				req, req->pdu->rid, cmdname,
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		if (ep_dbg_test(Dbg, 22))
+		{
+			ep_dbg_printf("  ");
+			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+			ep_dbg_printf("\n");
+		}
 		funlockfile(ep_dbg_getfile());
 	}
 	return estat;

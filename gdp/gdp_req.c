@@ -112,6 +112,10 @@ _gdp_req_new(int cmd,
 	gdp_req_t *req;
 	bool newpdu = pdu == NULL;
 
+#if ALWAYS_ALLOC_NEW_RID			//DEBUG
+	flags |= GDP_REQ_ALLOC_RID;		//DEBUG
+#endif								//DEBUG
+
 	EP_ASSERT_REQUIRE(gcl == NULL || EP_UT_BITSET(GCLF_INUSE, gcl->flags));
 
 	// simplify the simple case
@@ -487,7 +491,7 @@ _gdp_req_find(gdp_gcl_t *gcl, gdp_rid_t rid)
 	}
 
 	ep_dbg_cprintf(Dbg, 48,
-			"gdp_req_find(gcl=%p, rid=%" PRIgdp_rid ") => %p, state %s\n",
+			"_gdp_req_find(gcl=%p, rid=%" PRIgdp_rid ") => %p, state %s\n",
 			gcl, rid, req, statestr(req));
 	return req;
 }

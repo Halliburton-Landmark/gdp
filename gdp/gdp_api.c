@@ -58,6 +58,13 @@
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.api", "C API for GDP");
 
 
+/*
+**  Mutex around open operations
+*/
+
+static EP_THR_MUTEX		OpenMutex		EP_THR_MUTEX_INITIALIZER;
+
+
 
 /*
 **	GDP_GCL_GETNAME --- get the name of a GCL
@@ -361,6 +368,9 @@ gdp_gcl_open(gdp_name_t name,
 		return GDP_STAT_NULL_GCL;
 	}
 
+	// lock this operation to keep the GCL cache consistent
+	ep_thr_mutex_lock(&OpenMutex);
+
 	// see if we already have this open
 	gcl = _gdp_gcl_cache_get(name, mode);
 	if (gcl != NULL)
@@ -391,6 +401,7 @@ gdp_gcl_open(gdp_name_t name,
 	}
 
 fail0:
+	ep_thr_mutex_unlock(&OpenMutex);
 	return estat;
 }
 

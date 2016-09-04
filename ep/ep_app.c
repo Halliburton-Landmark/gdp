@@ -134,6 +134,7 @@ printmessage(struct msginfo *mi,
 	if (bg == NULL)
 		bg = "";
 
+	flockfile(stderr);
 	fprintf(stderr, "[%s%s%s%s] ",
 			fg, bg, mi->tag, EpVid->vidnorm);
 	if ((progname = ep_app_getprogname()) != NULL)
@@ -152,6 +153,7 @@ printmessage(struct msginfo *mi,
 		fprintf(stderr, "\n\t(%s)", nbuf);
 	}
 	fprintf(stderr, "\n");
+	funlockfile(stderr);
 }
 
 
