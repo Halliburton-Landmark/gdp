@@ -134,7 +134,7 @@ you may need to find the latest version if that one becomes obsolete.
 As an alternative, you can remove Zeroconf from the compilation
 entirely using:
 
-    make all_no_avahi
+    make all_noavahi
 
 Be aware that this will increase the need for manual configuration
 at all user sites.
