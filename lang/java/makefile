@@ -115,7 +115,7 @@ ROOT = ../..
 GDP_SRC = $(ROOT)
 EVENT_HDRS = $(shell if [ -e /usr/include/event2/buffer.h ]; then echo /usr/include; \
 		elif [ -e /usr/local/include/event2/buffer.h ]; then echo /usr/local/include; \
-		elif [-e /opt/local/include/event2/buffer.h ]; then echo /opt/local/include; \
+		elif [ -e /opt/local/include/event2/buffer.h ]; then echo /opt/local/include; \
 		else echo unknown; fi )
 PWD = $(ROOT)/lang/java/
 
