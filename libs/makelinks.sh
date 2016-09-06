@@ -26,23 +26,25 @@ info "Creating lib$lib links in $dir"
 cd $dir
 
 info "Creating library links"
+ver=$major.$minor
 case "$OS" in
   "ubuntu" | "debian" | "freebsd" | "centos")
     	rm -f lib$lib.so.$major lib$lib.so
-	ln -s lib$lib.so.$major.$minor lib$lib.so.$major
+	ln -s lib$lib.so.$ver lib$lib.so.$major
 	ln -s lib$lib.so.$major lib$lib.so
 	;;
 
   "darwin")
-	rm -f lib$lib.$major.$minor.dylib lib$lib.dylib
-	ln lib$lib.so.$major.$minor lib$lib.$major.$minor.dylib
-	ln -s lib$lib.$major.$minor.dylib lib$lib.dylib
+	rm -f lib$lib.$ver.dylib lib$lib.dylib
+	ln lib$lib.so.$ver lib$lib.$ver.dylib
+	ln -s lib$lib.$ver.dylib lib$lib.dylib
+	install_name_tool -id lib$lib.$ver.dylib lib$lib.$ver.dylib
 	;;
 
   "redhat")
-	rm -f lib$lib-$major.$minor.so lib$lib.so.$major lib$lib.so
-	mv lib$lib.so.$major.$minor lib$lib-$major.$minor.so
-	ln -s lib$lib-$major.$minor.so lib$lib.so.$major
+	rm -f lib$lib-$ver.so lib$lib.so.$major lib$lib.so
+	mv lib$lib.so.$ver lib$lib-$ver.so
+	ln -s lib$lib-$ver.so lib$lib.so.$major
 	ln -s lib$lib.so.$major lib$lib.so
 	;;
 esac
