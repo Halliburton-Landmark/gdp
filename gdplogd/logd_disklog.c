@@ -1058,6 +1058,9 @@ ridx_cache_free(gcl_physinfo_t *phys)
 **	RIDX_FSEEK_TO_RECNO --- seek to record number in record index
 **
 **		This does not read any of the data (or seek in the data file).
+**
+**		It's not actually an error for the fseek offset to be beyond
+**		the end of the file now that we allow holes in the data.
 */
 
 static EP_STAT
@@ -1080,10 +1083,10 @@ ridx_fseek_to_recno(
 		off_t actual_size = fsizeof(phys->ridx.fp);
 
 		// computed offset is out of range
-		ep_log(GDP_STAT_CORRUPT_INDEX,
+		ep_dbg_cprintf(Dbg, 8,
 				"ridx_fseek_to_recno(%s): recno %" PRIgdp_recno
 				" computed offset %jd out of range (%jd - %jd)"
-				" actual max %jd",
+				" actual max %jd\n",
 				gclpname,
 				recno,
 				(intmax_t) xoff,
@@ -1093,18 +1096,19 @@ ridx_fseek_to_recno(
 
 		// under no circumstances can we clobber the header
 		if (xoff < phys->ridx.header_size)
+		{
+			ep_log(GDP_STAT_CORRUPT_INDEX,
+					"ridx_fseek_to_recno(%" PRIgdp_recno "): xoff %jd",
+					recno, (intmax_t) xoff);
 			return GDP_STAT_CORRUPT_INDEX;
+		}
 
-#if _GDPLOGD_FORGIVING
 		if (xoff > actual_size && !GdplogdForgive.allow_log_gaps)
 			return GDP_STAT_NAK_NOTFOUND;
 		if (xoff < actual_size && !GdplogdForgive.allow_log_dups)
 			return GDP_STAT_RECORD_DUPLICATED;
 		if (actual_size > phys->ridx.max_offset)
 			phys->ridx.max_offset = actual_size;
-#else
-		return GDP_STAT_CORRUPT_INDEX;
-#endif
 	}
 
 	if (fseek(phys->ridx.fp, xoff, SEEK_SET) < 0)
