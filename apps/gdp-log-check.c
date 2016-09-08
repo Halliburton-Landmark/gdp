@@ -86,9 +86,14 @@ struct ctx
 void
 logv_override(EP_STAT estat, const char *fmt, va_list av)
 {
-	char ebuf[100];
-	vfprintf(stdout, fmt, av);
-	fprintf(stdout, ": %s", ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	if (ep_dbg_test(Dbg, 1))
+	{
+		char ebuf[100];
+		fprintf(stdout, "%s", EpVid->vidfgcyan);
+		vfprintf(stdout, fmt, av);
+		fprintf(stdout, ": %s%s\n", ep_stat_tostr(estat, ebuf, sizeof ebuf),
+				EpVid->vidnorm);
+	}
 }
 
 void
@@ -386,10 +391,12 @@ scan_recs(gdp_gcl_t *gcl,
 					// duplicated record
 					estat = GDP_STAT_RECORD_DUPLICATED;
 					ep_app_message(estat, "%s\n"
-							"    data records duplicated, offset = %jd,"
-							" got %" PRIgdp_recno ", expected %" PRIgdp_recno,
-							gcl->pname, (intmax_t) record_offset,
-							log_record.recno, recno + 1);
+							"    data records duplicated, got %" PRIgdp_recno
+								" expected %" PRIgdp_recno "\n"
+							"    (delta = %" PRIgdp_recno ", offset = %jd)",
+							gcl->pname, log_record.recno, recno + 1,
+							recno + 1 - log_record.recno,
+							(intmax_t) record_offset);
 				}
 			}
 
@@ -445,7 +452,7 @@ testfail(const char *fmt, ...)
 	va_start(ap, fmt);
 	vfprintf(stdout, fmt, ap);
 	va_end(ap);
-	return EP_STAT_ERROR;
+	return GDP_STAT_CORRUPT_INDEX;
 }
 
 // check a segment header
@@ -563,19 +570,18 @@ do_check(gdp_gcl_t *gcl, struct ctx *ctx)
 	estat = tidx_open(gcl, GCL_TIDX_SUFFIX, O_RDONLY);
 	EP_STAT_CHECK(estat, goto fail0);
 
-	phase = "scan_recs";
+	phase = NULL;
 	estat = scan_recs(gcl, check_segment, check_record, ctx);
 	EP_STAT_CHECK(estat, goto fail0);
 
 fail0:
-	if (!EP_STAT_ISOK(estat))
-	{
-		ep_app_message(estat, "do_check(%s):\n    %s", gcl->pname, phase);
-	}
-	else
-	{
+	if (EP_STAT_ISOK(estat))
 		ep_app_info("Log %s looks OK", gcl->pname);
-	}
+	else if (phase == NULL)
+		ep_app_message(estat, "%s", gcl->pname);
+	else
+		ep_app_message(estat, "%s:\n    error during during %s",
+					gcl->pname, phase);
 	return estat;
 }
 
