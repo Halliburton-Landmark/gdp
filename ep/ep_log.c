@@ -71,6 +71,7 @@ ep_log_file(void *_fp,
 	EP_TIME_SPEC tv;
 	FILE *fp = _fp;
 
+	flockfile(fp);
 	if (fp == stderr || fp == stdout)
 		fprintf(fp, "%s", EpVid->vidfgcyan);
 	ep_time_now(&tv);
@@ -98,7 +99,9 @@ ep_log_file(void *_fp,
 	}
 	fprintf(fp, "\n");
 	if (fp == stderr || fp == stdout)
-		fprintf(fp, "%s\n", EpVid->vidnorm);
+		fprintf(fp, "%s", EpVid->vidnorm);
+	fprintf(fp, "\n");
+	funlockfile(fp);
 }
 
 
