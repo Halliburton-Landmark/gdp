@@ -309,6 +309,8 @@ bdb_get_first_after_key(DB *db,
 }
 
 
+#if LOG_CHECK
+
 static EP_STAT
 bdb_cursor_open(DB *db, DBC **dbcp)
 {
@@ -341,6 +343,8 @@ bdb_cursor_next(DBC *dbc, DBT *key, DBT *val)
 	estat = ep_stat_from_dbstat(dbstat);
 	return estat;
 }
+
+#endif // LOG_CHECK
 
 
 static EP_STAT

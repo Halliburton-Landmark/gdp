@@ -406,22 +406,21 @@ recseq_process(struct ctx *ctx)
 	gdp_recno_t start, end;
 	int i;
 
-	while (EP_STAT_ISOK(recseq_db_getnext(ctx->recseqdb, &start, &end)))
+	while (EP_STAT_ISOK(recseq_db_getnext(ctx->recseqdbc, &start, &end)))
 	{
 		gdp_recno_t last_end = start;
 
-		if (false)
-		{
-			printf("XXX read start %lld, end %lld, rvstart %lld, nused %d\n",
-					start, end, rv->start, rv->nused);
-			if (rv->nused > 0)
-				printf("    last end %lld\n", rv->ends[rv->nused - 1]);
-			printf("    stack: "); 
-			int x = 0;
-			while ( x < rv->nused)
-				printf(" %lld", rv->ends[x++]);
-			printf("\n");
-		}
+//		{
+//			printf("XXX read start %lld, end %lld, rvstart %lld, nused %d\n",
+//					start, end, rv->start, rv->nused);
+//			if (rv->nused > 0)
+//				printf("    last end %lld\n", rv->ends[rv->nused - 1]);
+//			printf("    stack: "); 
+//			int x = 0;
+//			while ( x < rv->nused)
+//				printf(" %lld", rv->ends[x++]);
+//			printf("\n");
+//		}
 //		EP_ASSERT_INSIST(rv->nused <= 0 || end >= rv->ends[rv->nused - 1]);
 
 		// see if this just extends an existing entry
