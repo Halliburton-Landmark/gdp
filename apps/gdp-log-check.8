@@ -1,0 +1,83 @@
+.Dd September 18, 2015
+.Dt GDP-LOG-CHECK 8
+.Os Swarm-GDP
+.Sh NAME
+.Nm gdp-log-check
+.Nd check/repair an on-disk log
+.Sh SYNOPSIS
+.Nm
+.Op Fl D Ar debug-spec
+.Op Fl f
+.Op Fl q
+.Op Fl r
+.Op Fl v
+.Ar log-name ...
+.Sh DESCRIPTION
+.Nm
+checks on-disk logs for index consistency,
+or, with
+.Fl r ,
+repairs log indices.
+It
+.Em must not
+be run while
+.Xr gdplogd 8
+is running.
+.Pp
+.Nm
+.Fl r
+never changes the on-disk data file, only the index files.
+.Sh OPTIONS
+.
+.Bl -tag
+.It Fl D Ar debug-spec
+Turns on debugging flags using the libep-style format.
+Useful only with the code in hand.
+.It Fl f
+Force installation of new index files,
+even if they are the same as the old files.
+In some cases
+.Nm
+.Fl r
+may believe a log is in good shape when it is not.
+Using the
+.Fl f
+flag will force the fix.
+(This is a bug).
+.
+.It Fl q
+Run quietly (suppresses informational output).
+.
+.It Fl r
+Rebuild (rather than check) log indices.
+.
+.It Fl v
+Run verbosely.
+.El
+.Sh EXIT STATUS
+.Bl -tag
+.It Li EX_DATAERR
+One or more indices need repair (or were repaired).
+.It Li EX_OK
+No changes are needed.
+.It Li EX_UNAVAILABLE
+There was some failure during startup.
+.It Li EX_USAGE
+Command line parameters are incorrect.
+.El
+.\".Sh ADMINISTRATIVE PARAMETERS
+.\".Sh ENVIRONMENT
+.\".Sh FILES
+.\".Sh SEE ALSO
+.\".Xr gdp 7 ,
+.\".Xr gdplogd 8
+.\".Sh EXAMPLES
+.Sh BUGS
+In some cases
+.Nm
+.Fl r
+believes that the indices have not been changed
+even though they actually have been.
+The
+.Fl f
+flag will force installation of the new indices.
