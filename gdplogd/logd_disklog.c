@@ -132,6 +132,9 @@ bdb_error(const DB_ENV *dbenv, const char *errpfx, const char *msg)
 # define DB_EXCL		0x00000004
 # define DB_RDONLY		0x00000400
 
+// fake up a cursor
+typedef DB			DBC;
+
 #endif
 
 
@@ -178,7 +181,7 @@ bdb_open(const char *filename,
 	struct stat st;
 
 	// check file existence to avoid db->open complaints
-	if (stat(filename, &st) < 0)
+	if (filename != NULL && stat(filename, &st) < 0)
 	{
 		if (errno != ENOENT || !EP_UT_BITSET(DB_CREATE, dbflags))
 			return ep_stat_from_errno(errno);
@@ -302,6 +305,40 @@ bdb_get_first_after_key(DB *db,
 	estat = ep_stat_from_dbstat(dbstat);
 	if (!EP_STAT_ISOK(estat) && !EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOTFOUND))
 		ep_log(estat, "bdb_get_first_after_key");
+	return estat;
+}
+
+
+static EP_STAT
+bdb_cursor_open(DB *db, DBC **dbcp)
+{
+#if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
+	int dbstat;
+
+	// need cursor to get approximate keys (next entry >= key)
+	dbstat = db->cursor(db, NULL, dbcp, 0);
+	return ep_stat_from_dbstat(dbstat);
+#else
+	*dbcp = db;
+	return EP_STAT_OK;
+#endif
+}
+
+
+static EP_STAT
+bdb_cursor_next(DBC *dbc, DBT *key, DBT *val)
+{
+	EP_STAT estat;
+	int dbstat;
+
+#if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
+	// need cursor to get approximate keys (next entry >= key)
+	dbstat = dbc->c_get(dbc, key, val, DB_NEXT);
+#else
+	dbstat = dbc->seq(dbc, key, val, R_NEXT);
+#endif
+
+	estat = ep_stat_from_dbstat(dbstat);
 	return estat;
 }
 
@@ -1179,8 +1216,7 @@ ridx_create(gdp_gcl_t *gcl, const char *suffix, gdp_recno_t min_recno)
 	EP_STAT_CHECK(estat, goto fail0);
 
 	ep_dbg_cprintf(Dbg, 20, "ridx_create: creating %s\n", ridx_pbuf);
-	ridx_fd = open(ridx_pbuf, O_RDWR | O_CREAT | O_APPEND | O_EXCL,
-					GCLfilemode);
+	ridx_fd = open(ridx_pbuf, O_RDWR | O_CREAT | O_EXCL, GCLfilemode);
 	if (ridx_fd < 0)
 	{
 		char nbuf[40];
@@ -1191,7 +1227,7 @@ ridx_create(gdp_gcl_t *gcl, const char *suffix, gdp_recno_t min_recno)
 			ridx_pbuf, nbuf);
 		goto fail0;
 	}
-	phys->ridx.fp = fdopen(ridx_fd, "a+");
+	phys->ridx.fp = fdopen(ridx_fd, "w+");
 	if (phys->ridx.fp == NULL)
 	{
 		char nbuf[40];
@@ -1243,7 +1279,7 @@ ridx_open(gdp_gcl_t *gcl, const char *suffix, int openmode)
 	const char *phase;
 	int fd;
 	FILE *ridx_fp;
-	const char *fopenmode = openmode == O_RDONLY ? "r" : "a+";
+	const char *fopenmode = openmode == O_RDONLY ? "r" : "w+";
 	gcl_physinfo_t *phys = GETPHYS(gcl);
 	char index_pbuf[GCL_PATH_MAX];
 
@@ -1628,7 +1664,7 @@ disk_open(gdp_gcl_t *gcl)
 
 	// open the recno index file (ridx)
 	phase = "ridx_open";
-	estat = ridx_open(gcl, GCL_RIDX_SUFFIX, O_RDWR | O_APPEND);
+	estat = ridx_open(gcl, GCL_RIDX_SUFFIX, O_RDWR);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// create a cache for the ridx information

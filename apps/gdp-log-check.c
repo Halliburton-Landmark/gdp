@@ -65,6 +65,8 @@
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdp-log-rebuild", "GDP Log Rebuilder");
 
+bool	Verbose;
+
 struct ctx
 {
 	// info about the log we are working on
@@ -76,6 +78,12 @@ struct ctx
 
 	// info about the timestamp index
 	DB				*tidx;			// timestamp index (if it exists)
+
+	// data structures to track missing or duplicated record numbers
+	DB				*recseqdb;
+	DBC				*recseqdbc;
+	gdp_recno_t		begin;
+	gdp_recno_t		recno;
 };
 
 
@@ -144,6 +152,354 @@ fail0:
 	}
 	*pgcl = gcl;
 	return estat;
+}
+
+
+
+/*
+**  Scan data file to find recno use.
+**
+**  This is a two pass algorithm.  There's probably a clever way to
+**  do this in one pass.
+**
+**  Pass 1: Scan the data file looking for sequential blocks of record
+**				numbers.
+**	Pass 2: Read the database created in Pass 1 and output a list
+**				of missing or duplicated record numbers.
+*/
+
+
+
+/*
+**  Initialization
+*/
+
+EP_STAT
+recseq_init(struct ctx *ctx)
+{
+	EP_STAT estat;
+
+	// initialize context
+	ctx->begin = ctx->recno = 0;
+
+	// create temporary database
+	estat = bdb_open(NULL, DB_CREATE, 0666, DB_BTREE, &ctx->recseqdb);
+	if (!EP_STAT_ISOK(estat))
+		ep_app_message(estat, "Cannot open recno sequence temp db");
+	else
+	{
+		estat = bdb_cursor_open(ctx->recseqdb, &ctx->recseqdbc);
+		if (!EP_STAT_ISOK(estat))
+			ep_app_message(estat, "Cannot open recno sequence cursor");
+	}
+	return estat;
+}
+
+
+EP_STAT
+recseq_db_write(DB *db, gdp_recno_t start, gdp_recno_t end)
+{
+	DBT key_thang, val_thang;
+	gdp_recno_t key[2];
+	EP_STAT estat;
+
+	key[0] = start;
+	key[1] = end;
+	key_thang.data = key;
+	key_thang.size = 2 * sizeof *key;
+
+	val_thang.data = NULL;
+	val_thang.size = 0;
+
+	estat = bdb_put(db, &key_thang, &val_thang);
+	return estat;
+}
+
+
+EP_STAT
+recseq_db_getnext(DBC *dbc, gdp_recno_t *startp, gdp_recno_t *endp)
+{
+	DBT key_thang, val_thang;
+	gdp_recno_t *key;
+	EP_STAT estat;
+
+	memset(&key_thang, 0, sizeof key_thang);
+	memset(&val_thang, 0, sizeof val_thang);
+	estat = bdb_cursor_next(dbc, &key_thang, &val_thang);
+	EP_STAT_CHECK(estat, return estat);
+
+	EP_ASSERT(key_thang.size == 2 * sizeof *key);
+	key = key_thang.data;
+	*startp = key[0];
+	*endp = key[1];
+
+	return estat;
+}
+
+
+/*
+**  Pass 1.
+**		Write each sequential block (start and end recno) to a BTree
+**			database.  The key is the concatenation of the start recno
+**			and the end recno, and the value is empty.  For example,
+**			if the sequential blocks were {1,3}, {5,7}, {5,6}, {4,5},
+**			they would sort as {1,3}, {4,5}, {5,6}, {5,7}.
+*/
+
+void
+recseq_add_recno(gdp_recno_t recno, struct ctx *ctx)
+{
+	if (ctx->begin > 0)
+	{
+		// if this is the next record, just extend the sequence
+		if (recno == ctx->recno + 1)
+		{
+			ctx->recno = recno;
+			return;
+		}
+
+		// end of a sequential block: write to database
+//		printf("XXX db_write %lld .. %lld\n", ctx->begin, ctx->recno);
+		recseq_db_write(ctx->recseqdb, ctx->begin, ctx->recno);
+	}
+
+	// start a new sequential block
+	ctx->begin = ctx->recno = recno;
+}
+
+
+void
+recseq_last_recno(struct ctx *ctx)
+{
+//	printf("XXX db_write %lld .. %lld\n", ctx->begin, ctx->recno);
+	recseq_db_write(ctx->recseqdb, ctx->begin, ctx->recno);
+}
+
+
+
+/*
+**  Pass 2.
+**		Here we are trying to detect gaps and overlaps in the sequence
+**		of record numbers.  Since the database is ordered with the high
+**		order bits of the key being the starting record number, we know
+**		that there is a sliding window on the dataset; specifically,
+**		whenever we read recno N, we can be sure that all recnos < N
+**		are completed and we can discard them.  This allows us to use
+**		a data structure that stores the starting recno of interest
+**		and a list of ending recnos.  Note that this list will only
+**		have more than one entry if there are overlapping record
+**		numbers.
+**
+**		One exception to the "immediate discard" rule is if a new
+**		database entry is read that immediately follows an existing
+**		sequence in the list.  In this case the new sequence is simply
+**		coalesced with the existing one.  This might happen when
+**		records are out of order.  For example, if the input contains
+**		sequences 1..3, 6..8, 4..5, then three database entries will
+**		be written.  When read after sorting, these will be come in
+**		the order 1..3, 4..5, 6..8, which can be trivially coalesced
+**		into the sequence 1..8.
+**
+**		The output is a series of sequences with counts of the number
+**		of times that sequence appears.  For example, given the input
+**		1..3, 2..3, 5..7, the output would be {1..1: 1}, {2..3: 2},
+**		{4..4: 0}, {5..7: 1}.
+*/
+
+
+void
+recseq_output(gdp_recno_t start, gdp_recno_t end, int n)
+{
+	if (n == 0)
+		printf("Missing records   %" PRIgdp_recno " .. %" PRIgdp_recno "\n",
+			start, end);
+	else if (n != 1)
+		printf("Duplicate records %" PRIgdp_recno " .. %" PRIgdp_recno
+				" (%d copies)\n", start, end, n);
+}
+
+struct recno_vect
+{
+	int			nalloc;				// number of entries allocated
+	int			nused;				// number of entries in use
+	gdp_recno_t	start;				// all entries start here
+	gdp_recno_t	*ends;				// array of ending recnos
+};
+
+
+void
+recseq_sort(struct recno_vect *rv)
+{
+	int i;
+
+//	printf("XXX pre-sort:");
+//	for (i = 0; i < rv->nused; i++)
+//		printf(" %lld", rv->ends[i]);
+//	printf("\n");
+
+	for (i = 0; i < rv->nused - 1; i++)
+	{
+		int j;
+
+		for (j = i + 1; j < rv->nused; j++)
+		{
+			gdp_recno_t t;
+
+			if (rv->ends[i] <= rv->ends[j])
+				continue;
+			t = rv->ends[i];
+			memmove(&rv->ends[i], &rv->ends[i + 1],
+					(j - i) * sizeof rv->ends[0]);
+			rv->ends[j] = t;
+		}
+	}
+
+//	printf("XXX post-sort:");
+//	for (i = 0; i < rv->nused; i++)
+//		printf(" %lld", rv->ends[i]);
+//	printf("\n");
+}
+
+
+/*
+**  Flush everything that comes before the current starting recno.
+**
+**		Requires counting the number of overlaps.
+*/
+
+int
+recseq_flush(struct ctx *ctx,
+			struct recno_vect *rv,
+			int pos,
+			gdp_recno_t before)
+{
+	int j;
+
+//	printf("XXX recseq_flush stack:");
+//	for (j = 0; j < rv->nused; j++)
+//		printf(" %lld", rv->ends[j]);
+//	printf("\n");
+
+	// see if there are other entries that overlap
+	for (j = pos + 1; j < rv->nused && rv->ends[pos] == rv->ends[j]; j++)
+		continue;
+
+//	printf("XXX recseq_flush: pos %d, j %d, nused %d\n", pos, j, rv->nused);
+
+	// output starting recno, ending recno, and the number of dups
+	int n = rv->nused - pos;
+	before--;
+	if (rv->ends[pos] < before)
+	{
+		before = rv->ends[pos];
+	}
+	recseq_output(rv->start, before, n);
+	rv->start = before + 1;
+	return j;
+}
+
+
+void
+recseq_process(struct ctx *ctx)
+{
+	struct recno_vect *rv = ep_mem_zalloc(sizeof *rv);
+	gdp_recno_t start, end;
+	int i;
+
+	while (EP_STAT_ISOK(recseq_db_getnext(ctx->recseqdb, &start, &end)))
+	{
+		gdp_recno_t last_end = start;
+
+		if (false)
+		{
+			printf("XXX read start %lld, end %lld, rvstart %lld, nused %d\n",
+					start, end, rv->start, rv->nused);
+			if (rv->nused > 0)
+				printf("    last end %lld\n", rv->ends[rv->nused - 1]);
+			printf("    stack: "); 
+			int x = 0;
+			while ( x < rv->nused)
+				printf(" %lld", rv->ends[x++]);
+			printf("\n");
+		}
+//		EP_ASSERT_INSIST(rv->nused <= 0 || end >= rv->ends[rv->nused - 1]);
+
+		// see if this just extends an existing entry
+		for (i = 0; i < rv->nused; i++)
+		{
+			if (rv->ends[i] + 1 == start)
+			{
+//				printf("XXX extending entry %d\n", i);
+				rv->ends[i] = end;
+				goto done;
+			}
+		}
+
+		// flush old entries
+		if (start > rv->start)
+		{
+			// find the entries that are completely dead
+			i = 0;
+			while (i < rv->nused && rv->ends[i] < start)
+				i = recseq_flush(ctx, rv, i, start);
+
+			// keep track of our last ending record
+			if (i < rv->nused)
+				last_end = rv->ends[i];
+			else if (rv->nused > 0)
+				last_end = rv->ends[rv->nused - 1];
+
+			// can now compress the records that are flushed, if any
+			if (i > 0)
+			{
+//				int j;
+//				printf("XXX pre-compress stack (i %d, nused %d):", i, rv->nused);
+//				for (j = 0; j < rv->nused; j++)
+//					printf(" %lld", rv->ends[j]);
+//				printf("\n");
+				memmove(&rv->ends[0], &rv->ends[i], i * sizeof rv->ends[0]);
+				rv->nused -= i;
+//				printf("XXX post-compress stack (i %d, nused %d):", i, rv->nused);
+//				for (j = 0; j < rv->nused; j++)
+//					printf(" %lld", rv->ends[j]);
+//				printf("\n");
+			}
+
+			// there may be some entries that are still active
+			for (i = 0; i < rv->nused; )
+				i = recseq_flush(ctx, rv, i, start);
+
+			// now reset our starting point
+			rv->start = start;
+		}
+
+		// if the list is now empty, there may be a gap
+		if (last_end < start - 1)
+		{
+			recseq_output(last_end + 1, start - 1, 0);
+		}
+
+		// add the new info
+		if (rv->nused >= rv->nalloc)
+		{
+			// allocate more space
+			int new_nalloc = (rv->nalloc + 1) * 3 / 2;
+//			printf("XXX allocating to %d entries\n", new_nalloc);
+			rv->ends = ep_mem_realloc(rv->ends, new_nalloc);
+			rv->nalloc = new_nalloc;
+		}
+//		printf("XXX adding entry %lld .. %lld\n", rv->start, end);
+		rv->ends[rv->nused++] = end;
+
+	done:
+		// make sure the list remains sorted
+		recseq_sort(rv);
+	}
+
+	// output anything left in the sequence vector
+//	printf("XXX flushing final values, nused %d\n", rv->nused);
+	for (i = 0; i < rv->nused; )
+		i = recseq_flush(ctx, rv, i, rv->ends[i] + 1);
 }
 
 
@@ -282,6 +638,7 @@ scan_recs(gdp_gcl_t *gcl,
 		struct ctx *ctx)
 {
 	EP_STAT estat;
+	EP_STAT return_stat = EP_STAT_OK;
 	int segno;
 	struct physinfo *phys = GETPHYS(gcl);
 
@@ -380,33 +737,37 @@ scan_recs(gdp_gcl_t *gcl,
 				{
 					// gap in data
 					estat = GDP_STAT_RECORD_MISSING;
-					ep_app_message(estat, "%s\n"
-							"   data records missing, offset %jd,"
-							" records %" PRIgdp_recno "-%" PRIgdp_recno,
-							gcl->pname, (intmax_t) record_offset,
-							recno + 1, log_record.recno);
+					if (Verbose)
+						ep_app_message(estat, "%s\n"
+								"   data records missing, offset %jd,"
+								" records %" PRIgdp_recno "-%" PRIgdp_recno,
+								gcl->pname, (intmax_t) record_offset,
+								recno + 1, log_record.recno);
 				}
 				else
 				{
 					// duplicated record
 					estat = GDP_STAT_RECORD_DUPLICATED;
-					ep_app_message(estat, "%s\n"
-							"    data records duplicated, got %" PRIgdp_recno
-								" expected %" PRIgdp_recno "\n"
-							"    (delta = %" PRIgdp_recno ", offset = %jd)",
-							gcl->pname, log_record.recno, recno + 1,
-							recno + 1 - log_record.recno,
-							(intmax_t) record_offset);
+					if (Verbose)
+						ep_app_message(estat, "%s\n"
+								"    data records duplicated, got %"
+								PRIgdp_recno " expected %" PRIgdp_recno "\n"
+								"    (delta = %" PRIgdp_recno ", offset = %jd)",
+								gcl->pname, log_record.recno, recno + 1,
+								recno + 1 - log_record.recno,
+								(intmax_t) record_offset);
 				}
 			}
+			if (EP_STAT_SEVERITY(estat) > EP_STAT_SEVERITY(return_stat))
+				return_stat = estat;
 
 			// reset the expected recno to whatever we actually have
 			recno = log_record.recno;
 
 			// do per-record processing
 			estat = (*per_rec_f)(gcl, &log_record, record_offset, seg, ctx);
-			if (EP_STAT_ISFAIL(estat))		// warnings are OK
-				break;
+			if (EP_STAT_SEVERITY(estat) > EP_STAT_SEVERITY(return_stat))
+				return_stat = estat;
 
 			// skip over header and data (that part is opaque)
 			record_offset += sizeof log_record + log_record.data_length;
@@ -434,9 +795,13 @@ scan_recs(gdp_gcl_t *gcl,
 fail1:
 		segment_free(seg);
 		phys->segments[segno] = NULL;
+		if (EP_STAT_SEVERITY(estat) > EP_STAT_SEVERITY(return_stat))
+			return_stat = estat;
 	}
 
-	return estat;
+	if (EP_STAT_SEVERITY(estat) > EP_STAT_SEVERITY(return_stat))
+		return_stat = estat;
+	return return_stat;
 }
 
 
@@ -444,7 +809,7 @@ fail1:
 **  Check a named log for consistency
 */
 
-EP_STAT
+void
 testfail(const char *fmt, ...)
 {
 	va_list ap;
@@ -452,7 +817,6 @@ testfail(const char *fmt, ...)
 	va_start(ap, fmt);
 	vfprintf(stdout, fmt, ap);
 	va_end(ap);
-	return GDP_STAT_CORRUPT_INDEX;
 }
 
 // check a segment header
@@ -484,6 +848,7 @@ check_record(
 			struct ctx *ctx)			// our internal data
 {
 	EP_STAT estat = EP_STAT_OK;
+	EP_STAT return_stat = EP_STAT_OK;
 	gcl_physinfo_t *phys = GETPHYS(gcl);
 
 	// check record number to offset index
@@ -496,16 +861,27 @@ check_record(
 
 		// do consistency checks
 		if (xent->recno != rec->recno)
-			estat = testfail("ridx recno inconsistency: %" PRIgdp_recno
-							" != %" PRIgdp_recno "\n",
-							xent->recno, rec->recno);
+		{
+			estat = GDP_STAT_CORRUPT_INDEX;			// this seems bad
+			testfail("ridx recno inconsistency: %" PRIgdp_recno
+							" != %" PRIgdp_recno ", offset %jd\n",
+							xent->recno, rec->recno, (intmax_t) offset);
+		}
 		else if (xent->offset != offset)
-			estat = testfail("ridx offset inconsistency: %jd != %jd\n",
+		{
+			estat = GDP_STAT_RECORD_DUPLICATED;		// most likely
+			testfail("ridx offset inconsistency: %jd != %jd\n",
 							xent->offset, offset);
+		}
 		else if (xent->segment != seg->segno)
-			estat = testfail("ridx segment inconsistency: %d != %d\n",
+		{
+			estat = GDP_STAT_RECORD_DUPLICATED;		// most likely
+			testfail("ridx segment inconsistency: %d != %d\n",
 							xent->segment, seg->segno);
+		}
 	}
+	if (EP_STAT_SEVERITY(estat) > EP_STAT_SEVERITY(return_stat))
+		return_stat = estat;
 
 	// check timestamp to record number index
 	if (phys->tidx.db != NULL)
@@ -528,29 +904,36 @@ check_record(
 		{
 			char ebuf[100];
 
-			(void) testfail("tidx read failure: %s\n",
+			testfail("tidx read failure: %s\n",
 					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 			goto fail0;
 		}
 
 		if (tval_dbt.size != sizeof *tvalp)
 		{
-			estat = testfail("tidx inconsistency");
+			estat = GDP_STAT_CORRUPT_INDEX;
+			testfail("tidx inconsistency");
 			goto fail0;
 		}
 
 		tvalp = tval_dbt.data;
 		if (tvalp->recno != rec->recno)
 		{
-			estat = testfail("tidx recno inconsistency: %" PRIgdp_recno
+			estat = GDP_STAT_CORRUPT_INDEX;
+			testfail("tidx recno inconsistency: %" PRIgdp_recno
 							" != %" PRIgdp_recno "\n",
 							tvalp->recno, rec->recno);
 			goto fail0;
 		}
 	}
 
+	// keep track of record numbers
+	recseq_add_recno(rec->recno, ctx);
+
 fail0:
-	return estat;
+	if (EP_STAT_SEVERITY(estat) > EP_STAT_SEVERITY(return_stat))
+		return_stat = estat;
+	return return_stat;
 }
 
 
@@ -559,6 +942,9 @@ do_check(gdp_gcl_t *gcl, struct ctx *ctx)
 {
 	EP_STAT estat;
 	const char *phase;
+
+	// set up info for recno tracking
+	recseq_init(ctx);
 
 	// open recno index for read
 	phase = "ridx_open";
@@ -573,6 +959,9 @@ do_check(gdp_gcl_t *gcl, struct ctx *ctx)
 	phase = NULL;
 	estat = scan_recs(gcl, check_segment, check_record, ctx);
 	EP_STAT_CHECK(estat, goto fail0);
+
+	// output result of record number scanning
+	recseq_process(ctx);
 
 fail0:
 	if (EP_STAT_ISOK(estat))
