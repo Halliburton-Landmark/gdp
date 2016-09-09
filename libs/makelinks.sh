@@ -36,7 +36,7 @@ case "$OS" in
 
   "darwin")
 	rm -f lib$lib.$ver.dylib lib$lib.dylib
-	ln lib$lib.so.$ver lib$lib.$ver.dylib
+	mv lib$lib.so.$ver lib$lib.$ver.dylib
 	ln -s lib$lib.$ver.dylib lib$lib.dylib
 	install_name_tool -id lib$lib.$ver.dylib lib$lib.$ver.dylib
 	;;

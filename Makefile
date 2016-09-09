@@ -31,7 +31,9 @@ DESTDIR=
 LOCALROOT=	/usr
 INSTALLROOT=	${DESTDIR}${LOCALROOT}
 DOCDIR=		${INSTALLROOT}/share/doc/gdp
-
+CLEANEXTRA=	gdp-client*.deb gdp-server*.deb python-gdp*.deb \
+		README*.html \
+		libs/*.a libs/*.so* libs/*.dylib \
 
 all:
 	#(cd doc;	make all)	# needs pandoc
@@ -64,7 +66,7 @@ clean:
 	(cd apps;	make clean)
 	(cd util;	make clean)
 	(cd examples;	make clean)
-	rm -f gdp-client*.deb gdp-server*.deb python-gdp*.deb README*.html
+	rm -f ${CLEANEXTRA}
 
 install-client:
 	(cd ep;		make install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
