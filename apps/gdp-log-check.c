@@ -1038,17 +1038,32 @@ rebuild_record(
 
 
 bool
-askuser(const char *query)
+askuser(const char *query, bool nullanswer)
 {
 	char buf[20];
 
 	printf("%s ", query);
 	fflush(stdout);
 	if (fgets(buf, sizeof buf, stdin) == NULL)
-		return false;
+		return nullanswer;
 	if (strchr("yYtT1", buf[0]) != NULL)
 		return true;
-	return false;
+	if (strchr("nNfF0", buf[0]) != NULL)
+		return false;
+	return nullanswer;
+}
+
+
+void
+remove_temp_files(gdp_gcl_t *gcl)
+{
+	// remove the temporary indexes
+	char temp_path[GCL_PATH_MAX];
+	get_gcl_path(gcl, -1, ".tmpridx", temp_path, sizeof temp_path);
+	unlink(temp_path);
+
+	get_gcl_path(gcl, -1, ".tmptidx", temp_path, sizeof temp_path);
+	unlink(temp_path);
 }
 
 
@@ -1094,8 +1109,11 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 	if (EP_STAT_ISWARN(estat))
 	{
 		ep_app_message(estat, "changes made to log %s", ctx->logxname);
-		if (Flags.force || askuser("Do you want to install the new indices?"))
+		if (Flags.force ||
+			askuser("Do you want to install the new indices [Yn]?", true))
+		{
 			install_new_files = true;
+		}
 	}
 	else
 	{
@@ -1133,13 +1151,7 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 	}
 	else
 	{
-		// remove the temporary indexes
-		char temp_path[GCL_PATH_MAX];
-		get_gcl_path(gcl, -1, ".tmpridx", temp_path, sizeof temp_path);
-		unlink(temp_path);
-
-		get_gcl_path(gcl, -1, ".tmptidx", temp_path, sizeof temp_path);
-		unlink(temp_path);
+		remove_temp_files(gcl);
 	}
 
 	if (false)
@@ -1154,6 +1166,18 @@ fail0:
 	}
 
 	return estat;
+}
+
+
+gdp_gcl_t	*CurrentGcl;		// only for cleanup on signal during rebuild
+
+void
+sigint(int sig)
+{
+	if (CurrentGcl != NULL)
+		remove_temp_files(CurrentGcl);
+	ep_app_warn("Exiting on signal %d", sig);
+	exit(EX_UNAVAILABLE);
 }
 
 
@@ -1205,9 +1229,15 @@ scan_log(const char *logxname, bool rebuild)
 	}
 
 	if (rebuild)
+	{
+		CurrentGcl = gcl;
 		estat = do_rebuild(gcl, ctx);
+		CurrentGcl = NULL;
+	}
 	else
+	{
 		estat = do_check(gcl, ctx);
+	}
 
 	// free up physical info (also closes files, etc.)
 	physinfo_free(GETPHYS(gcl));
@@ -1235,6 +1265,7 @@ initialize(void)
 	ep_dbg_setfile(NULL);
 	_gdp_stat_init();
 	ep_stat_reg_strings(Stats);
+	signal(SIGINT, sigint);
 	
 	disk_init();
 }
