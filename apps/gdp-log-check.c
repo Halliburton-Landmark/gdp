@@ -651,7 +651,7 @@ scan_recs(gdp_gcl_t *gcl,
 						struct ctx *ctx),
 		struct ctx *ctx)
 {
-	EP_STAT estat;
+	EP_STAT estat = EP_STAT_OK;
 	EP_STAT return_stat = EP_STAT_OK;
 	int segno;
 	struct physinfo *phys = GETPHYS(gcl);
