@@ -65,14 +65,19 @@
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdp-log-rebuild", "GDP Log Rebuilder");
 
-bool	Verbose;
+struct
+{
+	bool	verbose;
+	bool	silent;
+	bool	force;
+}				Flags;
 
 struct ctx
 {
 	// info about the log we are working on
 	const char		*logpath;		// path to the log directory
+	const char		*logxname;		// external name of log
 	gcl_physinfo_t	*phys;			// physical manifestation
-	gdp_gcl_t		*gcl;
 	
 	// info about the record number index
 
@@ -415,7 +420,7 @@ recseq_process(struct ctx *ctx)
 //					start, end, rv->start, rv->nused);
 //			if (rv->nused > 0)
 //				printf("    last end %lld\n", rv->ends[rv->nused - 1]);
-//			printf("    stack: "); 
+//			printf("    stack: ");
 //			int x = 0;
 //			while ( x < rv->nused)
 //				printf(" %lld", rv->ends[x++]);
@@ -530,6 +535,7 @@ find_segs(gdp_gcl_t *gcl)
 	if (dir == NULL)
 	{
 		// if directory does not exist, the log does not exist
+		ep_app_severe("Cannot open directory %s", dirname);
 		return GDP_STAT_NOTFOUND;
 	}
 
@@ -736,7 +742,7 @@ scan_recs(gdp_gcl_t *gcl,
 				{
 					// gap in data
 					estat = GDP_STAT_RECORD_MISSING;
-					if (Verbose)
+					if (Flags.verbose)
 						ep_app_message(estat, "%s\n"
 								"   data records missing, offset %jd,"
 								" records %" PRIgdp_recno "-%" PRIgdp_recno,
@@ -747,7 +753,7 @@ scan_recs(gdp_gcl_t *gcl,
 				{
 					// duplicated record
 					estat = GDP_STAT_RECORD_DUPLICATED;
-					if (Verbose)
+					if (Flags.verbose)
 						ep_app_message(estat, "%s\n"
 								"    data records duplicated, got %"
 								PRIgdp_recno " expected %" PRIgdp_recno "\n"
@@ -855,7 +861,7 @@ check_record(
 		ridx_entry_t xentbuf;
 		ridx_entry_t *xent = &xentbuf;
 
-		estat = ridx_entry_read(gcl, rec->recno, ctx->gcl->pname, xent);
+		estat = ridx_entry_read(gcl, rec->recno, gcl->pname, xent);
 		EP_STAT_CHECK(estat, goto fail0);
 
 		// do consistency checks
@@ -957,19 +963,28 @@ do_check(gdp_gcl_t *gcl, struct ctx *ctx)
 
 	phase = NULL;
 	estat = scan_recs(gcl, check_segment, check_record, ctx);
-	EP_STAT_CHECK(estat, goto fail0);
 
 	// output result of record number scanning
 	recseq_process(ctx);
 
 fail0:
-	if (EP_STAT_ISOK(estat))
-		ep_app_info("Log %s looks OK", gcl->pname);
-	else if (phase == NULL)
-		ep_app_message(estat, "%s", gcl->pname);
-	else
-		ep_app_message(estat, "%s:\n    error during during %s",
-					gcl->pname, phase);
+	if (!Flags.silent)
+	{
+		const char *fgcolor;
+		char ebuf[100];
+
+		if (EP_STAT_ISOK(estat))
+			fgcolor = EpVid->vidfggreen;
+		else if (EP_STAT_ISWARN(estat))
+			fgcolor = EpVid->vidfgyellow;
+		else
+			fgcolor = EpVid->vidfgred;
+		printf("%s%s%s", fgcolor, EpVid->vidbgblack, ctx->logxname);
+		if (phase != NULL)
+			printf(" (during %s)", phase);
+		printf(": %s%s\n", ep_stat_tostr(estat, ebuf, sizeof ebuf),
+				EpVid->vidnorm);
+	}
 	return estat;
 }
 
@@ -1013,6 +1028,21 @@ rebuild_record(
 }
 
 
+bool
+askuser(const char *query)
+{
+	char buf[20];
+
+	printf("%s ", query);
+	fflush(stdout);
+	if (fgets(buf, sizeof buf, stdin) == NULL)
+		return false;
+	if (strchr("yYtT1", buf[0]) != NULL)
+		return true;
+	return false;
+}
+
+
 EP_STAT
 do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 {
@@ -1040,11 +1070,27 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 	bdb_close(phys->tidx.db);
 	phys->tidx.db = NULL;
 
+	bool install_new_files = false;
 	if (EP_STAT_ISWARN(estat))
 	{
-		ep_app_message(estat, "changes made to log %s", gcl->pname);
+		ep_app_message(estat, "changes made to log %s", ctx->logxname);
+		if (Flags.force || askuser("Do you want to install the new indices?"))
+			install_new_files = true;
+	}
+	else
+	{
+		if (!EP_STAT_ISOK(estat))
+		{
+			ep_app_message(estat, "could not rebuild log %s", ctx->logxname);
+		}
+		else
+		{
+			ep_app_info("no changes to %s", ctx->logxname);
+		}
+	}
 
-#if DEBUGGING
+	if (install_new_files)
+	{
 		// move the new indexes into place
 		char real_path[GCL_PATH_MAX];
 		get_gcl_path(gcl, -1, GCL_RIDX_SUFFIX, real_path, sizeof real_path);
@@ -1062,20 +1108,9 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 
 		rename(real_path, save_path);
 		rename(temp_path, real_path);
-#endif
 	}
 	else
 	{
-		if (!EP_STAT_ISOK(estat))
-		{
-			ep_app_message(estat, "could not rebuild log %s", gcl->pname);
-		}
-		else
-		{
-			ep_app_info("no changes to %s", gcl->pname);
-		}
-
-#if DEBUGGING
 		// remove the temporary indexes
 		char temp_path[GCL_PATH_MAX];
 		get_gcl_path(gcl, -1, ".tmpridx", temp_path, sizeof temp_path);
@@ -1083,7 +1118,6 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 
 		get_gcl_path(gcl, -1, ".tmptidx", temp_path, sizeof temp_path);
 		unlink(temp_path);
-#endif
 	}
 
 	if (false)
@@ -1114,7 +1148,16 @@ scan_log(const char *logxname, bool rebuild)
 	struct ctx ctxbuf;
 	struct ctx *ctx = &ctxbuf;
 
+	if (!Flags.silent)
+	{
+		printf("%s%s%s log %s%s\n",
+				EpVid->vidfggreen, EpVid->vidbgblack,
+				rebuild ? "Rebuilding" : "Scanning", logxname,
+				EpVid->vidnorm);
+	}
+
 	memset(&ctxbuf, 0, sizeof ctxbuf);
+	ctx->logxname = logxname;
 
 	estat = open_fake_gcl(logxname, &gcl);
 	EP_STAT_CHECK(estat, return estat);
@@ -1198,7 +1241,7 @@ main(int argc, char **argv)
 
 	initialize();
 
-	while ((opt = getopt(argc, argv, "D:r")) > 0)
+	while ((opt = getopt(argc, argv, "D:fqrv")) > 0)
 	{
 		switch (opt)
 		{
@@ -1206,8 +1249,20 @@ main(int argc, char **argv)
 			 ep_dbg_set(optarg);
 			 break;
 
+		 case 'f':
+			 Flags.force = true;
+			 break;
+
+		 case 'q':
+			 Flags.silent = true;
+			 break;
+
 		 case 'r':
 			 rebuild = true;
+			 break;
+
+		 case 'v':
+			 Flags.verbose = true;
 			 break;
 
 		 default:
@@ -1219,6 +1274,11 @@ main(int argc, char **argv)
 
 	if (show_usage || argc < 1)
 		usage();
+
+	GdplogdForgive.allow_log_gaps =
+			ep_adm_getboolparam("swarm.gdplogd.sequencing.allowgaps", true);
+	GdplogdForgive.allow_log_dups =
+			ep_adm_getboolparam("swarm.gdplogd.sequencing.allowdups", true);
 
 	while (argc-- > 0)
 	{
