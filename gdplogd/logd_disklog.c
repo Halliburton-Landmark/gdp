@@ -71,6 +71,8 @@ static uint32_t		DefaultLogFlags;	// as indicated
 
 #define GETPHYS(gcl)	((gcl)->x->physinfo)
 
+#define FLAG_TMPFILE		0x00000001	// this is a temporary file
+
 
 
 /*
@@ -1208,7 +1210,10 @@ fail3:
 */
 
 static EP_STAT
-ridx_create(gdp_gcl_t *gcl, const char *suffix, gdp_recno_t min_recno)
+ridx_create(gdp_gcl_t *gcl,
+			const char *suffix,
+			gdp_recno_t min_recno,
+			uint32_t flags)
 {
 	EP_STAT estat;
 	gcl_physinfo_t *phys = GETPHYS(gcl);
@@ -1220,7 +1225,10 @@ ridx_create(gdp_gcl_t *gcl, const char *suffix, gdp_recno_t min_recno)
 	EP_STAT_CHECK(estat, goto fail0);
 
 	ep_dbg_cprintf(Dbg, 20, "ridx_create: creating %s\n", ridx_pbuf);
-	ridx_fd = open(ridx_pbuf, O_RDWR | O_CREAT | O_EXCL, GCLfilemode);
+	int openflags = O_RDWR | O_CREAT;
+	if (!EP_UT_BITSET(FLAG_TMPFILE, flags))
+		openflags |= O_EXCL;
+	ridx_fd = open(ridx_pbuf, openflags, GCLfilemode);
 	if (ridx_fd < 0)
 	{
 		char nbuf[40];
@@ -1426,7 +1434,7 @@ fail0:
 */
 
 static EP_STAT
-tidx_create(gdp_gcl_t *gcl, const char *suffix)
+tidx_create(gdp_gcl_t *gcl, const char *suffix, uint32_t flags)
 {
 	EP_STAT estat;
 	gcl_physinfo_t *phys = GETPHYS(gcl);
@@ -1436,7 +1444,10 @@ tidx_create(gdp_gcl_t *gcl, const char *suffix)
 	EP_STAT_CHECK(estat, goto fail0);
 
 	ep_dbg_cprintf(Dbg, 20, "tidx_create: creating %s\n", tidx_pbuf);
-	estat = bdb_open(tidx_pbuf, DB_CREATE | DB_EXCL, GCLfilemode,
+	int dbflags = DB_CREATE;
+	if (!EP_UT_BITSET(FLAG_TMPFILE, flags))
+		dbflags |= DB_EXCL;
+	estat = bdb_open(tidx_pbuf, dbflags, GCLfilemode,
 						DB_BTREE, &phys->tidx.db);
 	if (!EP_STAT_ISOK(estat))
 	{
@@ -1590,14 +1601,14 @@ disk_create(gdp_gcl_t *gcl, gdp_gclmd_t *gmd)
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// create a record number to offset index for that gcl
-	estat = ridx_create(gcl, GCL_RIDX_SUFFIX, (gdp_recno_t) 1);
+	estat = ridx_create(gcl, GCL_RIDX_SUFFIX, (gdp_recno_t) 1, 0);
 
 	// create a cache for that recno index
 	estat = ridx_cache_create(phys);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// create a database for the timestamp index
-	estat = tidx_create(gcl, GCL_TIDX_SUFFIX);
+	estat = tidx_create(gcl, GCL_TIDX_SUFFIX, 0);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// success!

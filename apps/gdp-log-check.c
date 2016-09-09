@@ -65,12 +65,20 @@
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdp-log-rebuild", "GDP Log Rebuilder");
 
+#define LOGCHECK_MISSING_INDEX	EP_STAT_NEW(WARN, EP_REGISTRY_USER, 1, 1)
+
+static struct ep_stat_to_string	Stats[] =
+{
+	{ LOGCHECK_MISSING_INDEX,		"missing index",						},
+	{ EP_STAT_OK,					NULL,									}
+};
+
 struct
 {
-	bool	verbose;
-	bool	silent;
-	bool	force;
-}				Flags;
+	bool	verbose:1;
+	bool	silent:1;
+	bool	force:1;
+} Flags;
 
 struct ctx
 {
@@ -875,12 +883,13 @@ check_record(
 		else if (xent->offset != offset)
 		{
 			estat = GDP_STAT_RECORD_DUPLICATED;		// most likely
-			testfail("ridx offset inconsistency: %jd != %jd\n",
-							xent->offset, offset);
+			if (!GdplogdForgive.allow_log_dups || Flags.verbose)
+				testfail("ridx offset inconsistency: %jd != %jd\n",
+								xent->offset, offset);
 		}
 		else if (xent->segment != seg->segno)
 		{
-			estat = GDP_STAT_RECORD_DUPLICATED;		// most likely
+			estat = GDP_STAT_RECORD_DUPLICATED;		// most likely, but ...
 			testfail("ridx segment inconsistency: %d != %d\n",
 							xent->segment, seg->segno);
 		}
@@ -1052,12 +1061,12 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 
 	// create temporary recno index
 	phase = "create ridx temp";
-	estat = ridx_create(gcl, ".tmpridx", (gdp_recno_t) 1);
+	estat = ridx_create(gcl, ".tmpridx", (gdp_recno_t) 1, FLAG_TMPFILE);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// create temporary timestamp index
 	phase = "create tidx temp";
-	estat = tidx_create(gcl, ".tmptidx");
+	estat = tidx_create(gcl, ".tmptidx", FLAG_TMPFILE);
 	EP_STAT_CHECK(estat, goto fail1);
 
 	// do the actual scan
@@ -1079,7 +1088,7 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 		// if no tidx file exists, always ask if you want to install
 		estat = get_gcl_path(gcl, -1, GCL_TIDX_SUFFIX, pbuf, sizeof pbuf);
 		if (EP_STAT_ISOK(estat) && stat(pbuf, &st) < 0)
-			estat = EP_STAT_WARN;		//XXX should be a better choice
+			estat = LOGCHECK_MISSING_INDEX;
 	}
 
 	if (EP_STAT_ISWARN(estat))
@@ -1096,11 +1105,13 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 		}
 		else
 		{
-			ep_app_info("no changes to %s", ctx->logxname);
+			ep_app_info("no changes to %s%s\n\t", ctx->logxname,
+					Flags.force ? "(forcing new index installation anyway)"
+								: "(use -f to force new index installation)");
 		}
 	}
 
-	if (install_new_files)
+	if (Flags.force || install_new_files)
 	{
 		// move the new indexes into place
 		char real_path[GCL_PATH_MAX];
@@ -1161,10 +1172,8 @@ scan_log(const char *logxname, bool rebuild)
 
 	if (!Flags.silent)
 	{
-		printf("%s%s%s log %s%s\n",
-				EpVid->vidfggreen, EpVid->vidbgblack,
-				rebuild ? "Rebuilding" : "Scanning", logxname,
-				EpVid->vidnorm);
+		printf("\n%s log %s\n",
+				rebuild ? "Rebuilding" : "Scanning", logxname);
 	}
 
 	memset(&ctxbuf, 0, sizeof ctxbuf);
@@ -1225,6 +1234,7 @@ initialize(void)
 		ep_adm_readparams(progname);				// should be in ep_lib_init
 	ep_dbg_setfile(NULL);
 	_gdp_stat_init();
+	ep_stat_reg_strings(Stats);
 	
 	disk_init();
 }
@@ -1234,9 +1244,12 @@ void
 usage(void)
 {
 	fprintf(stderr,
-			"Usage: %s [-D dbg_spec] [-r] log-name ...\n"
+			"Usage: %s [-D dbg_spec] [-f] [-q] [-r] [-v] log-name ...\n"
 			"    -D  set debugging flags\n"
-			"    -r  rebuild the log (rather than just check consistency)\n",
+			"    -f  force rebuilt index installation (with -r)\n"
+			"    -q  run quietly\n"
+			"    -r  rebuild the log (rather than just check consistency)\n"
+			"    -v  run verbosely\n",
 			ep_app_getprogname());
 	exit(EX_USAGE);
 }
