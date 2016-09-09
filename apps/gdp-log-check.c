@@ -1071,6 +1071,17 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 	phys->tidx.db = NULL;
 
 	bool install_new_files = false;
+	if (EP_STAT_ISOK(estat))
+	{
+		struct stat st;
+		char pbuf[GCL_PATH_MAX];
+
+		// if no tidx file exists, always ask if you want to install
+		estat = get_gcl_path(gcl, -1, GCL_TIDX_SUFFIX, pbuf, sizeof pbuf);
+		if (EP_STAT_ISOK(estat) && stat(pbuf, &st) < 0)
+			estat = EP_STAT_WARN;		//XXX should be a better choice
+	}
+
 	if (EP_STAT_ISWARN(estat))
 	{
 		ep_app_message(estat, "changes made to log %s", ctx->logxname);
