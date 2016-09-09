@@ -41,7 +41,7 @@ extern void		_gdp_stat_init(void);
 //		to avoid conflicts in the future
 #define GDP_MODULE			1
 
-#define GDP_STAT_NEW(sev, det)		EP_STAT_NEW(EP_STAT_SEV_ ## sev,	\
+#define GDP_STAT_NEW(sev, det)		EP_STAT_NEW(sev, \
 										EP_REGISTRY_UCB, GDP_MODULE, det)
 #define GDP_STAT_IS_GDP(estat)		(EP_STAT_REGISTRY(estat) == EP_REGISTRY_UCB && \
 									 EP_STAT_MODULE(estat) == GDP_MODULE)

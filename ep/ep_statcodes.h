@@ -29,7 +29,7 @@
 ***********************************************************************/
 
 // generic status codes
-#define EP_STAT_OK		EP_STAT_NEW(EP_STAT_SEV_OK, 0, 0, 0)
+#define EP_STAT_OK		EP_STAT_NEW(OK, 0, 0, 0)
 #define EP_STAT_WARN		_EP_STAT_INTERNAL(WARN, EP_STAT_MOD_GENERIC, 0)
 #define EP_STAT_ERROR		_EP_STAT_INTERNAL(ERROR, EP_STAT_MOD_GENERIC, 0)
 #define EP_STAT_SEVERE		_EP_STAT_INTERNAL(SEVERE, EP_STAT_MOD_GENERIC, 0)
