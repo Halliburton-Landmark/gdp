@@ -60,6 +60,7 @@
 #include "../gdplogd/logd_disklog.c"
 #undef Dbg
 
+#include <signal.h>
 #include <sysexits.h>
 
 
