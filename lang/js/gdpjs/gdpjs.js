@@ -719,7 +719,7 @@ var libgdpjs = ffi.Library(GDPJS_DIR + '/../libs/libgdpjs.1.0', {
 
     // From ep/ep_statcodes.h
     //CJS // generic status codes
-    //CJS #define EP_STAT_OK         EP_STAT_NEW(EP_STAT_SEV_OK, 0, 0, 0)
+    //CJS #define EP_STAT_OK         EP_STAT_NEW(OK, 0, 0, 0)
     'ep_stat_ok': [EP_STAT, []],
 
     // common shared errors

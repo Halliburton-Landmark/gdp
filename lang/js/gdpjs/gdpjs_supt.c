@@ -262,14 +262,14 @@ gdp_stat_nak_notfound()
 // From ep/ep_statcodes.h
 
 // generic status codes
-// #define EP_STAT_OK            EP_STAT_NEW(EP_STAT_SEV_OK, 0, 0, 0)
+// #define EP_STAT_OK            EP_STAT_NEW(OK, 0, 0, 0)
 
 // Returns a EP_STAT with severity field OK; other fields are 0.
 EP_STAT
 ep_stat_ok()
 {
     EP_STAT_32_64 rv;
-    rv.as_EP_STAT = (EP_STAT_NEW(EP_STAT_SEV_OK, 0, 0, 0));
+    rv.as_EP_STAT = (EP_STAT_NEW(OK, 0, 0, 0));
 #if DEBUG
     fprintf( stderr, "ep_stat_ok:  Returning EP_STAT_OK = %x\n", rv.as_32_64_t );
     fflush(stderr);
