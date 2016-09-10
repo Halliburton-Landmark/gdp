@@ -77,14 +77,12 @@ all: $(NODE_MODULES) adm/gdp-setup.sh adm/common-support.sh
 	-rm libs/*
 	(cd gdpjs; make clean all)
 	(cd apps;  make clean all)
-	(cd tests; make clean all)
 
 
 all_noavahi: $(NODE_MODULES) adm/gdp-setup.sh adm/common-support.sh
 	-rm libs/*
 	(cd gdpjs; make clean all_noavahi)
 	(cd apps;  make clean all)
-	(cd tests; make clean all)
 
 
 # We need a copy of the setup scripts so that node @terraswarm/gdp
@@ -106,10 +104,9 @@ clean:
 	-rm -fr -- $(NMOD)
 	(cd gdpjs; make clean)
 	(cd apps;  make clean)
-	(cd tests; make clean)
 
-test:
-	(cd tests; make clean all run)
+tests:
+	mocha test/mocha
 
 # TBD: Tag file builders exist for JavaScript - find one and include it.
 tags: .FORCE
