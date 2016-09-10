@@ -285,6 +285,19 @@ var EP_TIME_SPEC_struct_Ptr = ref.refType(EP_TIME_SPEC_struct);
 //?? just below is not used yet
 var EP_TIME_SPEC_struct_PtrPtr = ref.refType(EP_TIME_SPEC_struct_Ptr);
 
+
+// libcrypto and libssl are different under RHEL vs. Ubuntu, so
+// we have different shared libraries for RHEL.
+var libgdpPath = '/libs/libgdp.0.7';
+var libgdpjsPath = '/../libs/libgdpjs.1.0';
+try {
+    fs.accessSync('/etc/redhat-release', fs.F_OK);
+    libgdpPath = '/libs/libgdp.0.7-rhel';
+    libgdpjsPath = '/../libs/libgdpjs.1.0-rhel';
+} catch (exception) {
+    // Not under RHEL.
+}
+
 // The libgdp shared library is linked statically to libep.a, so
 // instead of looking for the ep_* symbols in libep, we look in
 // libgdp.  If we get the ep_* symbols from the libep shared library,
@@ -293,7 +306,7 @@ var EP_TIME_SPEC_struct_PtrPtr = ref.refType(EP_TIME_SPEC_struct_Ptr);
 // appear not to work.
 
 //var libep = ffi.Library(GDP_DIR + '/libs/libep.3.0', {
-var libep = ffi.Library(GDP_DIR + '/libs/libgdp.0.7', {
+var libep = ffi.Library(GDP_DIR + libgdpPath, {
 
     // From ep/ep_dbg.h
     //CJS // initialization
@@ -474,7 +487,7 @@ var GDP_EVENT_DATA = 1 // returned data
 var GDP_EVENT_EOS = 2 // end of subscription
 
 
-var libgdp = ffi.Library(GDP_DIR + '/libs/libgdp.0.7', {
+var libgdp = ffi.Library(GDP_DIR + libgdpPath, {
 
     // From gdp/gdp.h
     //CJS // free an event (required after gdp_event_next)
@@ -656,7 +669,7 @@ exports.gdp_parse_name = libgdp.gdp_parse_name;
 
 // JS-to-GDP onion skin layer on selected GDP functions and macros.
 //
-var libgdpjs = ffi.Library(GDPJS_DIR + '/../libs/libgdpjs.1.0', {
+var libgdpjs = ffi.Library(GDPJS_DIR + libgdpjsPath, {
 
     // Some general libc-related functions
 
