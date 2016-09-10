@@ -158,13 +158,13 @@ libgdpjs.so.${GDPJSLIBVER}: ${OBJS}
 		fi; \
 	else \
 		if [ -f /etc/redhat-release ]; then \
-			echo "Setting up libgdpjs"; \
+			echo "Setting up libgdpjs for RHEL"; \
 			cp libgdpjs.so.${GDPJSLIBVER} ${LIBDIR}/libgdpjs.${GDPJSLIBVER}-rhel.so; \
-			echo "Setting up libgdp"; \
+			echo "Setting up libgdp for RHEL"; \
 			cp ../../../libs/${LIBGDP}.so ${LIBDIR}/libgdp.${GDPLIBVER}-rhel.so; \
 			echo "Created links in ${LIBDIR}/"; \
 			if [ -f $(PTII)/lib/libgdpjs.${GDPJSLIBVER}.so ]; then \
-				echo "Copying Linux shared libraries from $(PTII)"; \
+				echo "Copying Linux shared libraries from $(PTII) for non-RHEL"; \
 				cp $(PTII)/lib/libgdpjs.${GDPJSLIBVER}.so ${LIBDIR}; \
 				cp $(PTII)/lib/libgdp.${GDPLIBVER}.so ${LIBDIR}; \
 			fi; \
@@ -172,10 +172,10 @@ libgdpjs.so.${GDPJSLIBVER}: ${OBJS}
 			echo "Setting up libgdpjs"; \
 			cp libgdpjs.so.${GDPJSLIBVER} ${LIBDIR}/libgdpjs.${GDPJSLIBVER}.so; \
 			echo "Setting up libgdp"; \
-			cp ../../../libs/${LIBGDP}.so ${LIBDIR}/libgdp.${GDPLIBVER}.so; \
+			cp ../../../libs/libgdp*${LIBGDPVER}.so ${LIBDIR}/libgdp.${GDPLIBVER}.so; \
 			echo "Created links in ${LIBDIR}/"; \
 			if [ -f $(PTII)/lib/libgdpjs.${GDPJSLIBVER}-rhel.so ]; then \
-				echo "Copying Linux shared libraries from $(PTII)"; \
+				echo "Copying Linux shared libraries from $(PTII) for RHEL"; \
 				cp $(PTII)/lib/libgdpjs.${GDPJSLIBVER}-rhel.so ${LIBDIR}; \
 				cp $(PTII)/lib/libgdp.${GDPLIBVER}-rhel.so ${LIBDIR}; \
 			fi; \

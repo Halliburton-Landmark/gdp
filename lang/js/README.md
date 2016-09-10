@@ -1,34 +1,78 @@
-JavaScript GDP access application programs and support libraries
-===============================================================
+JavaScript Global Data Plane access application programs and support libraries
+==============================================================================
 
-Authors
--------
-* Alec Dara-Abrams: 11/04/2015 - 12/2015
-* Christopher Brooks: 12/2015 - present
+The Global Data Plane (GDP) is a middleware that provides a
+data-centric glue for swarm applications. The basic primitive is that
+of a secure single-writer append-only log stored on potentially
+untrusted distributed infrastructure. Logs natively support a
+publish-subscribe mode, making GDP a communication tool. At the same
+time, data in a GDP log can be stored for long-term in a
+fault-tolerant manner, thus making it an ideal tool for data-storage.
+
+For more information about GDP, see the following publications:
+- [Toward a Global Data Infrastructure](http://ieeexplore.ieee.org/xpl/login.jsp?tp=&arnumber=7436637)
+- [The Cloud is Not Enough: Saving IoT from the Cloud](https://www.terraswarm.org/pubs/518.html)
+
+This package provides a JavaScript interface to the GDP.
 
 Resources
---------
+---------
+* [https://gdp.cs.berkeley.edu](https://gdp.cs.berkeley.edu)
 * [GDP API documentation](https://docs.google.com/document/d/1MdJ47NEfUQdJlTyAXwotZp8aJbXchRIi3VgwOz4LWuU/edit?usp=sharing) 
 * [Discussion of the GDP JS interface](http://www.terraswarm.org/swarmos/wiki/Main/GDPJavaScriptInterface)
 
-See the apps/README.txt.
+See also apps/README.txt.
+
+Installation
+------------
+The libs/ directory contains shared libraries for Darwin, RHEL and
+Ubuntu.  RHEL and Ubuntu libraries are needed because of issues with
+libgdp need libcrypto and libcrypto needing different versions of
+libssl.
+
+A modern version of npm is required, where modern is not npm 1.3.6.
+
+We create a local `node_modules/` directory to make it easier to 
+describe the installation process.  In practice, `npm` will install
+in the `node_modules/` directory that is above the current directory.
+
+  mkdir node_modules
+
+Install using npm:
+
+  npm install @terraswarm/gdp
+
+Try out a test:
+
+  npm install mocha
+  cd node_modules/@terraswarm/gdp
+  ../../mocha/bin/mocha -t 400 tests/mocha
+
+What the test does is create a new log, write a string to it and then
+read back the string from the log.
+
+Issues
+------
+* The functions that are exported are funky. 
+** The read_gcl_records() and write_gcl_records() functions take too many arguments and open and close the log each time
+* Subscription via a callback is not yet supported.
 
 Files
 -----
-* Makefile: Recursive make for gdpjs/, apps/ and tests/.
-  Currently, apps/ and tests/ do not build anything.
+* Makefile: Recursive make for gdpjs/ and apps/.
+  Currently, apps/ does not build anything.
 
 * README.md: This file.  Also, see README's in our subdirectories.
 
-* apps/: JS standalone applications programs.  In particular, apps/writer-test.js
+* apps/: JavaScript standalone applications programs.  In particular, apps/writer-test.js
   and apps/reader-test.js - both hand translations of corresponding gdp/apps/ 
   C programs.  These should also provide good examples of access to GDP from
-  Node.js JavaScript.  Run with Node.js .  See apps/README.txt.
+  Node.js JavaScript.  Run with Node.js.  See apps/README.txt.
 
 * adm/: The libgdp shared library depends on libevent2 and other libraries.
   To install the necessary libraries, run adm/gdp-setup.sh.
 
-* gdpjs/: JS and C support libraries.  Has a local Makefile that does build things.
+* gdpjs/: JavaScript and C support libraries.  Has a local Makefile that does build things.
 
 * libs/: Running make in gdpjs/ populates the libs/ directory.  If $PTII
   is set, then shared libraries for other platforms are copied from $PTII/lib.
@@ -89,7 +133,7 @@ To update the @terraswarm/gdp package on npmjs:
 1.  Update libgdp and libep:
         (cd ../..; make all_noavahi)
 2.  Update libgdpjs:
-        make all_noavahi
+        make all
 3.  Update the patch number in package.json
 4.  Login to npm
         npm login
