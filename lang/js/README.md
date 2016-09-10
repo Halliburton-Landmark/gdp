@@ -42,6 +42,9 @@ Install using npm:
 
   npm install @terraswarm/gdp
 
+Ignore messages about "ENOENT: no such file or directory, open 'xxx/package.json'".
+To remove them, see [npm-autoint](https://www.npmjs.com/package/npm-autoinit).
+
 Try out a test:
 
   npm install mocha

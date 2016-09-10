@@ -291,11 +291,12 @@ var EP_TIME_SPEC_struct_PtrPtr = ref.refType(EP_TIME_SPEC_struct_Ptr);
 var libgdpPath = '/libs/libgdp.0.7';
 var libgdpjsPath = '/../libs/libgdpjs.1.0';
 try {
+    var fs = require('fs');
     fs.accessSync('/etc/redhat-release', fs.F_OK);
     libgdpPath = '/libs/libgdp.0.7-rhel';
     libgdpjsPath = '/../libs/libgdpjs.1.0-rhel';
 } catch (exception) {
-    // Not under RHEL.
+    // Not under RHEL
 }
 
 // The libgdp shared library is linked statically to libep.a, so
