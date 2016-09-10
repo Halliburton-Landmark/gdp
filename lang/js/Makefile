@@ -73,17 +73,33 @@ NODE_MODULES = $(NMOD)/ffi $(NMOD)/jsesc     $(NMOD)/posix-getopt \
 
 # External makefile targets: all, clean, test
 
-all: $(NODE_MODULES)
+all: $(NODE_MODULES) adm/gdp-setup.sh adm/common-support.sh
 	-rm libs/*
 	(cd gdpjs; make clean all)
 	(cd apps;  make clean all)
 	(cd tests; make clean all)
 
-all_noavahi: $(NODE_MODULES)
+
+all_noavahi: $(NODE_MODULES) adm/gdp-setup.sh adm/common-support.sh
 	-rm libs/*
 	(cd gdpjs; make clean all_noavahi)
 	(cd apps;  make clean all)
 	(cd tests; make clean all)
+
+
+# We need a copy of the setup scripts so that node @terraswarm/gdp
+# users can install the necessary packages.
+
+adm/gdp-setup.sh: adm ../../adm/gdp-setup.sh
+	sed 's/\(package .*pandoc\)/#\1/' ../../adm/gdp-setup.sh > $@
+
+adm/common-support.sh: adm ../../adm/common-support.sh
+	cp ../../adm/common-support.sh $@
+
+adm:
+	if [ ! -d adm ]; then \
+		mkdir adm; \
+	fi
 
 clean:
 	-rm libs/*
