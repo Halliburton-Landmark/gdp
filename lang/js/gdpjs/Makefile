@@ -131,18 +131,13 @@ libgdpjs.a: ${OBJS}
 # libraries so that we can build a npm package.  Unfortunatley, RHEL
 # and Ubuntu seem to have different versioning conventions, so we need
 # both libxx-n.m.so and libxx.so.n-m.
-# Even more unfortunately, the way the Node ffi interface works, we have lines like
-
-#   var libgdp = ffi.Library(GDP_DIR + '/libs/libgdp.0.7', {
-
-# that need to work under RHEL, Ubuntu and Darwin.  So we default to
-# libgdp.n.m.so and libgdp.n.m.dylib.  We copy libgdp-n.m.so so as to
-# preserve the choices made in ../../../libs.
+#
+# libcrypto and libssl are different under RHEL vs. Ubuntu, so
+# we have different shared libraries for RHEL.
 #
 # There is no need to ship the libep shared library with the GDP/JS
 # interface because libgdp and libgdpjs have linked with the libep
 # static library.
-#
 libgdpjs.so.${GDPJSLIBVER}: ${OBJS}
 	${CC} ${SHARED} -o $@ ${OBJS} ${LDFLAGS}
 	@echo "gdpjs.js expects to load 'libgdp.${GDPLIBVER}' etc., so use that style versioning in libs/."
@@ -152,17 +147,39 @@ libgdpjs.so.${GDPJSLIBVER}: ${OBJS}
 			echo "Copying ../../../libs/libgdp.${GDPLIBVER}.dylib to ${LIBDIR}"; \
 			cp ../../../libs/libgdp.${GDPLIBVER}.dylib ${LIBDIR}/; \
 		fi; \
-		if [ -f $(PTII)/lib/libgdpjs.${GDPJSLIBVER}.so ]; then \
+		if [ -f $(PTII)/lib/libgdpjs.${GDPJSLIBVER}-rhel.so ]; then \
 			echo "Copying Linux shared libraries from $(PTII)"; \
+			cp $(PTII)/lib/libgdpjs.${GDPJSLIBVER}-rhel.so ${LIBDIR}; \
+			cp $(PTII)/lib/libgdp.${GDPLIBVER}-rhel.so ${LIBDIR}; \
+		fi; \
+		if [ -f $(PTII)/lib/libgdpjs.${GDPJSLIBVER}.so ]; then \
 			cp $(PTII)/lib/libgdpjs.${GDPJSLIBVER}.so ${LIBDIR}; \
 			cp $(PTII)/lib/libgdp.${GDPLIBVER}.so ${LIBDIR}; \
 		fi; \
 	else \
-		echo "Setting up libgdpjs"; \
-		cp libgdpjs.so.${GDPJSLIBVER} ${LIBDIR}/libgdpjs.${GDPJSLIBVER}.so; \
-		echo "Setting up libgdp"; \
-		cp ../../../libs/${LIBGDP}.so ${LIBDIR}/libgdp.${GDPLIBVER}.so; \
-		echo "Created links in ${LIBDIR}/"; \
+		if [ -f /etc/redhat-release ]; then \
+			echo "Setting up libgdpjs"; \
+			cp libgdpjs.so.${GDPJSLIBVER} ${LIBDIR}/libgdpjs.${GDPJSLIBVER}-rhel.so; \
+			echo "Setting up libgdp"; \
+			cp ../../../libs/${LIBGDP}.so ${LIBDIR}/libgdp.${GDPLIBVER}-rhel.so; \
+			echo "Created links in ${LIBDIR}/"; \
+			if [ -f $(PTII)/lib/libgdpjs.${GDPJSLIBVER}.so ]; then \
+				echo "Copying Linux shared libraries from $(PTII)"; \
+				cp $(PTII)/lib/libgdpjs.${GDPJSLIBVER}.so ${LIBDIR}; \
+				cp $(PTII)/lib/libgdp.${GDPLIBVER}.so ${LIBDIR}; \
+			fi; \
+		else \
+			echo "Setting up libgdpjs"; \
+			cp libgdpjs.so.${GDPJSLIBVER} ${LIBDIR}/libgdpjs.${GDPJSLIBVER}.so; \
+			echo "Setting up libgdp"; \
+			cp ../../../libs/${LIBGDP}.so ${LIBDIR}/libgdp.${GDPLIBVER}.so; \
+			echo "Created links in ${LIBDIR}/"; \
+			if [ -f $(PTII)/lib/libgdpjs.${GDPJSLIBVER}-rhel.so ]; then \
+				echo "Copying Linux shared libraries from $(PTII)"; \
+				cp $(PTII)/lib/libgdpjs.${GDPJSLIBVER}-rhel.so ${LIBDIR}; \
+				cp $(PTII)/lib/libgdp.${GDPLIBVER}-rhel.so ${LIBDIR}; \
+			fi; \
+		fi; \
 		if [ -f $(PTII)/lib/libgdpjs.${GDPJSLIBVER}.dylib ]; then \
 			echo "Copying Darwin shared libraries from $(PTII)"; \
 			cp $(PTII)/lib/libgdpjs.${GDPJSLIBVER}.dylib ${LIBDIR}; \
