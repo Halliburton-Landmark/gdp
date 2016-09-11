@@ -104,8 +104,8 @@ sudo apt-get install -y \
 	$pkgadd
 
 info "Turning off excessive mosquitto logging"
-sed -i .ORIG -e '/#log_type error/i \
-	log_type none' /etc/mosquitto/mosquitto.conf
+sudo sed -i.ORIG -e '/#log_type error/i log_type none' \
+	/etc/mosquitto/mosquitto.conf
 
 info "Enabling bluetooth daemon"
 sudo update-rc.d bluetooth defaults
