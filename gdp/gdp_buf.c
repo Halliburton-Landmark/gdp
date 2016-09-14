@@ -202,6 +202,45 @@ gdp_buf_dump(gdp_buf_t *buf, FILE *fp)
 }
 
 /*
+**  Get a 16 bit signed int in network byte order from a buffer.
+*/
+
+int16_t
+gdp_buf_get_int16(gdp_buf_t *buf)
+{
+	int16_t t;
+
+	evbuffer_remove(buf, &t, sizeof t);
+	return ntohl(t);
+}
+
+/*
+**  Get a 16 bit unsigned int in network byte order from a buffer.
+*/
+
+uint16_t
+gdp_buf_get_uint16(gdp_buf_t *buf)
+{
+	uint16_t t;
+
+	evbuffer_remove(buf, &t, sizeof t);
+	return ntohl(t);
+}
+
+/*
+**  Get a 32 bit signed int in network byte order from a buffer.
+*/
+
+int32_t
+gdp_buf_get_int32(gdp_buf_t *buf)
+{
+	uint32_t t;
+
+	evbuffer_remove(buf, &t, sizeof t);
+	return ntohl(t);
+}
+
+/*
 **  Get a 32 bit unsigned int in network byte order from a buffer.
 */
 
@@ -212,6 +251,21 @@ gdp_buf_get_uint32(gdp_buf_t *buf)
 
 	evbuffer_remove(buf, &t, sizeof t);
 	return ntohl(t);
+}
+
+/*
+**  Get a 48 bit signed int in network byte order from a buffer.
+*/
+
+int64_t
+gdp_buf_get_int48(gdp_buf_t *buf)
+{
+	int16_t h;
+	uint32_t l;
+
+	evbuffer_remove(buf, &h, sizeof h);
+	evbuffer_remove(buf, &l, sizeof l);
+	return ((int64_t) ntohs(h) << 32) | ((uint64_t) ntohl(l));
 }
 
 /*
@@ -227,6 +281,30 @@ gdp_buf_get_uint48(gdp_buf_t *buf)
 	evbuffer_remove(buf, &h, sizeof h);
 	evbuffer_remove(buf, &l, sizeof l);
 	return ((uint64_t) ntohs(h) << 32) | ((uint64_t) ntohl(l));
+}
+
+/*
+**  Get a 64 bit signed int in network byte order from a buffer.
+*/
+
+int64_t
+gdp_buf_get_int64(gdp_buf_t *buf)
+{
+	int64_t t;
+	static const int32_t num = 42;
+
+	evbuffer_remove(buf, &t, sizeof t);
+	if (ntohl(num) == num)
+	{
+		return t;
+	}
+	else
+	{
+		int32_t h = htonl((int32_t) (t >> 32));
+		uint32_t l = htonl((uint32_t) (t & UINT64_C(0xffffffff)));
+
+		return ((int64_t) l) << 32 | h;
+	}
 }
 
 /*
@@ -270,6 +348,18 @@ gdp_buf_get_timespec(gdp_buf_t *buf, EP_TIME_SPEC *ts)
 
 
 /*
+**  Put a 32 bit signed integer to a buffer in network byte order.
+*/
+
+void
+gdp_buf_put_int32(gdp_buf_t *buf, const int32_t v)
+{
+	int32_t t = htonl(v);
+	evbuffer_add(buf, &t, sizeof t);
+}
+
+
+/*
 **  Put a 32 bit unsigned integer to a buffer in network byte order.
 */
 
@@ -278,6 +368,20 @@ gdp_buf_put_uint32(gdp_buf_t *buf, const uint32_t v)
 {
 	uint32_t t = htonl(v);
 	evbuffer_add(buf, &t, sizeof t);
+}
+
+
+/*
+**  Put a 48 bit signed integer to a buffer in network byte order.
+*/
+
+void
+gdp_buf_put_int48(gdp_buf_t *buf, const int64_t v)
+{
+	uint16_t h = htons((v >> 32) & 0xffff);
+	uint32_t l = htonl((uint32_t) (v & UINT64_C(0xffffffff)));
+	evbuffer_add(buf, &h, sizeof h);
+	evbuffer_add(buf, &l, sizeof l);
 }
 
 
@@ -292,6 +396,29 @@ gdp_buf_put_uint48(gdp_buf_t *buf, const uint64_t v)
 	uint32_t l = htonl((uint32_t) (v & UINT64_C(0xffffffff)));
 	evbuffer_add(buf, &h, sizeof h);
 	evbuffer_add(buf, &l, sizeof l);
+}
+
+
+/*
+**  Put a 64 bit signed integer to a buffer in network byte order.
+*/
+
+void
+gdp_buf_put_int64(gdp_buf_t *buf, const int64_t v)
+{
+	static const int32_t num = 42;
+
+	if (htonl(num) == num)
+	{
+		evbuffer_add(buf, &v, sizeof v);
+	}
+	else
+	{
+		int64_t t = htonl(v & INT64_C(0xffffffff));
+		t <<= 32;
+		t |= (int64_t) htonl((int32_t) ((v >> 32)) & INT64_C(0xffffffff));
+		evbuffer_add(buf, &t, sizeof t);
+	}
 }
 
 

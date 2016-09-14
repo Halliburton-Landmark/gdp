@@ -97,22 +97,49 @@ extern void			gdp_buf_dump(
 						gdp_buf_t *buf,
 						FILE *fp);
 
+extern int16_t		gdp_buf_get_int16(
+						gdp_buf_t *buf);
+
+extern uint16_t		gdp_buf_get_uint16(
+						gdp_buf_t *buf);
+
+extern int32_t		gdp_buf_get_int32(
+						gdp_buf_t *buf);
+
 extern uint32_t		gdp_buf_get_uint32(
 						gdp_buf_t *buf);
+
+extern void			gdp_buf_put_int32(
+						gdp_buf_t *buf,
+						const int32_t v);
 
 extern void			gdp_buf_put_uint32(
 						gdp_buf_t *buf,
 						const uint32_t v);
 
+extern int64_t		gdp_buf_get_int48(
+						gdp_buf_t *buf);
+
 extern uint64_t		gdp_buf_get_uint48(
 						gdp_buf_t *buf);
+
+extern void			gdp_buf_put_int48(
+						gdp_buf_t *buf,
+						const int64_t v);
 
 extern void			gdp_buf_put_uint48(
 						gdp_buf_t *buf,
 						const uint64_t v);
 
+extern int64_t		gdp_buf_get_int64(
+						gdp_buf_t *buf);
+
 extern uint64_t		gdp_buf_get_uint64(
 						gdp_buf_t *buf);
+
+extern void			gdp_buf_put_int64(
+						gdp_buf_t *buf,
+						const int64_t v);
 
 extern void			gdp_buf_put_uint64(
 						gdp_buf_t *buf,
