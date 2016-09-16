@@ -86,9 +86,12 @@ gdp_recno_t = c_int64
 #   GDP_EVENT_DATA      1   // returned data
 #   GDP_EVENT_EOS       2   // normal end of subscription
 #   GDP_EVENT_SHUTDOWN  3   // subscription terminating because of shutdown
-#   GDP_EVENT_ASTAT     4   // asynchronous status
+#   GDP_EVENT_CREATED   4   // successful append, create, or other similar
+#   GDP_EVENT_SUCCESS   5   // generic asynchronous success status
+#   GDP_EVENT_FAILURE   6   // generic asynchronous failure status
 
-(GDP_EVENT_DATA, GDP_EVENT_EOS, GDP_EVENT_SHUTDOWN, GDP_EVENT_ASTAT)=(1,2,3,4)
+(GDP_EVENT_DATA, GDP_EVENT_EOS, GDP_EVENT_SHUTDOWN,
+        GDP_EVENT_CREATED, GDP_EVENT_SUCCESS, GDP_EVENT_FAILURE)=(1,2,3,4,5,6)
 
 # GCL Metadata keys
 # GDP_GCLMD_XID       0x00584944  // XID (external id)
