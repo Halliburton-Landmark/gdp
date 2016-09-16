@@ -69,7 +69,7 @@ from MISC import GDP_MODE_ANY, GDP_MODE_RO, GDP_MODE_AO, GDP_MODE_RA, \
     GDP_EVENT_DATA, GDP_EVENT_EOS, GDP_EVENT_SHUTDOWN, \
     GDP_EVENT_CREATED, GDP_EVENT_SUCCESS, GDP_EVENT_FAILURE, \
     GDP_GCLMD_XID, GDP_GCLMD_PUBKEY, GDP_GCLMD_CTIME, GDP_GCLMD_CID, \
-    gdp_init, gdp_run_accept_event_loop, dbg_set
+    gdp_init, gdp_run_accept_event_loop, dbg_set, check_EP_STAT, ep_stat_tostr
 from GDP_NAME import GDP_NAME
 from GDP_GCL import GDP_GCL
 from EP_CRYPTO import EP_CRYPTO_KEY, \
@@ -80,7 +80,9 @@ __all__ = [GDP_MODE_ANY, GDP_MODE_RO, GDP_MODE_AO, GDP_MODE_RA,
            GDP_EVENT_DATA, GDP_EVENT_EOS, GDP_EVENT_SHUTDOWN,
            GDP_EVENT_CREATED, GDP_EVENT_SUCCESS, GDP_EVENT_FAILURE,
            GDP_GCLMD_XID, GDP_GCLMD_PUBKEY, GDP_GCLMD_CTIME, GDP_GCLMD_CID,
-           gdp_init, gdp_run_accept_event_loop, dbg_set, GDP_NAME, GDP_GCL,
+           gdp_init, gdp_run_accept_event_loop, dbg_set,
+           check_EP_STAT, ep_stat_tostr,
+           GDP_NAME, GDP_GCL,
            EP_CRYPTO_KEY,
            EP_CRYPTO_KEYFORM_UNKNOWN, EP_CRYPTO_KEYFORM_PEM,
            EP_CRYPTO_KEYFORM_DER,
