@@ -129,42 +129,6 @@ class GDP_GCL(object):
 
         assert False    # should never get here
 
-    def T__init__(self, name, iomode, open_info={}):
-        # self.ptr is just a C style pointer, that we will assign to something
-        self.ptr = POINTER(self.gdp_gcl_t)()
-
-        # we do need an internal represenation of the name.
-        gcl_name_python = name.internal_name()
-        # convert this to a string that ctypes understands. Some ctypes magic
-        # ahead
-        buf = create_string_buffer(gcl_name_python, 32+1)
-        gcl_name_ctypes_ptr = cast(byref(buf), POINTER(GDP_NAME.name_t))
-        gcl_name_ctypes = gcl_name_ctypes_ptr.contents
-
-        # (optional) Do a quick sanity checking on open_info 
-        #   use it to get a GDP_GCL_OPEN_INFO structure
-        self.gdp_gcl_open_info = GDP_GCL_OPEN_INFO(open_info)
-
-        # open an existing gcl
-        __func = gdp.gdp_gcl_open
-        __func.argtypes = [GDP_NAME.name_t, c_int,
-                           POINTER(GDP_GCL_OPEN_INFO.gdp_gcl_open_info_t),
-                           POINTER(POINTER(self.gdp_gcl_t))]
-        __func.restype = EP_STAT
-
-        estat = __func(gcl_name_ctypes, iomode,
-                            self.gdp_gcl_open_info.gdp_gcl_open_info_ptr,
-                            pointer(self.ptr))
-        check_EP_STAT(estat)
-
-        # Also add itself to the global list of objects
-        # XXX: See if there is a cleaner way of dealing with this?
-        self.object_dir[addressof(self.ptr.contents)] = self
-
-        # A hack to make sure we can make get_next_event both a class method
-        #   to listen for ALL events, as well as an instance method to listen
-        #   to this particular instance's events
-        self.get_next_event = self.__get_next_event
 
     def __del__(self):
         "close this GCL handle, and free the allocated resources"
