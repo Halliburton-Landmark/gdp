@@ -396,8 +396,8 @@ gdp_gcl_open(gdp_name_t name,
 	}
 	else
 	{
-		// no need to free the GCL on error; _gdp_req_free (called from
-		// _gdp_gcl_open) has done this already
+		// there's still a reference to the GCL in the cache which must go
+		_gdp_gcl_decref(&gcl);
 	}
 
 fail0:
