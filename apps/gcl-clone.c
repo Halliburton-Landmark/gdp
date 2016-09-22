@@ -97,9 +97,6 @@ main(int argc, char **argv)
 	bool show_usage = false;
 	bool quiet = false;
 
-	// preinit library (must be early due to crypto code in arg processing)
-	gdp_lib_init(NULL);
-
 	// collect command-line arguments
 	while ((opt = getopt(argc, argv, "D:G:")) > 0)
 	{
