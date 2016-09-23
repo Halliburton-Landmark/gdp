@@ -55,8 +55,9 @@ GDP_JAR=gdp-$(GDP_MAJOR_MINOR_VERSION)-$(GDP_PATCH_VERSION).jar
 DARWIN_LIB=libgdp.$(GDP_MAJOR_MINOR_VERSION).dylib
 LINUX_LIB=libgdp.$(GDP_MAJOR_MINOR_VERSION).so
 LINUX_DASH_LIB=libgdp-$(GDP_MAJOR_MINOR_VERSION).so
-install: all darwin/$(DARWIN_LIB) linux-amd64/$(LINUX_LIB)
-	jar cf $(GDP_JAR) org/terraswarm/gdp/*.class darwin linux-amd64
+LINUX_RHEL_LIB=libgdp.$(GDP_MAJOR_MINOR_VERSION)-rhel.so
+install: all darwin/$(DARWIN_LIB) linux-amd64/$(LINUX_LIB) linux-x86-64/$(LINUX_LIB)
+	jar cf $(GDP_JAR) org/terraswarm/gdp/*.class darwin linux-amd64 linux-x86-64
 
 darwin/$(DARWIN_LIB): 
 	if [ ! -d darwin ]; then mkdir darwin; fi
@@ -78,11 +79,25 @@ linux-amd64/$(LINUX_LIB):
 		echo "Copying ../../libs/$(LINUX_DASH_LIB) to $@"; \
 		cp ../../libs/$(LINUX_DASH_LIB) $@; \
 	else \
+		if [ -f $(PTII)/lib/$(LINUX_RHEL_LIB) ]; then \
+			echo "Copying $(PTII)/lib/$(LINUX_RHEL_LIB) to $@"; \
+			cp $(PTII)/lib/$(LINUX_RHEL_LIB) $@; \
+		else \
+			echo "Could not find the Linux GDP RHEL shared library, so the jar file will not contain it."; \
+		fi \
+	fi
+
+linux-x86-64/$(LINUX_LIB):
+	if [ ! -d linux-x86-64 ]; then mkdir linux-x86-64; fi
+	if [ -f ../../libs/$(LINUX_DASH_LIB) ]; then \
+		echo "Copying ../../libs/$(LINUX_DASH_LIB) to $@"; \
+		cp ../../libs/$(LINUX_DASH_LIB) $@; \
+	else \
 		if [ -f $(PTII)/lib/$(LINUX_LIB) ]; then \
 			echo "Copying $(PTII)/lib/$(LINUX_LIB) to $@"; \
 			cp $(PTII)/lib/$(LINUX_LIB) $@; \
 		else \
-			echo "Could not find the Linux GDP shared library, so the jar file will not contain it."; \
+			echo "Could not find the Linux GDP non-RHEL shared library, so the jar file will not contain it."; \
 		fi \
 	fi
 
@@ -202,7 +217,7 @@ runHelloWorld: all
 
 clean:
 	rm -f jna _* org/terraswarm/gdp/*.class org/terraswarm/gdp/EP* org/terraswarm/gdp/e* org/terraswarm/gdp/*Library.java org/terraswarm/gdp/apps/*.class *.jar
-	rm -rf darwin linux-amd64
+	rm -rf darwin linux-amd64 linux-x86-64
 
 distclean: clean
 	rm -f *.jar

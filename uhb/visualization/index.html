@@ -46,21 +46,23 @@
 
     <div class="container">
       <div class="starter-template">
-        <form name="arg_picker" class="form-inline">
+        <form name="arg_picker" class="form-horizontal">
         <div class="form-group">
-            <label>Sort By:</label>
-            <select class="form-control" name="category" id="category"></select>
-            <select class="form-control" name="subcat" id="subcat"></select>
-            <label>Sensor:</label>
-            <select class="form-control" name="logname" id="logname"></select>
+            <label class="col-sm-1 control-label">Sort By:</label>
+            <div class="col-sm-2"> <select class="form-control" name="category" id="category"></select> </div>
+            <div class="col-sm-2"> <select class="form-control" name="subcat" id="subcat"></select> </div>
         </div>
         <div class="form-group">
-            <label>Start Time</label>
-            <input class="form-control" type='text' id='startTime' name='startTime'>
+            <label class="col-sm-1 control-label">Sensor:</label>
+            <div class="col-sm-4"> <select class="form-control" name="logname" id="logname"></select> </div>
         </div>
         <div class="form-group">
-            <label>End Time</label>
-            <input class="form-control" type='text' id='endTime' name='endTime'>
+            <label class="col-sm-1 control-label">Start:</label>
+            <div class="col-sm-4"> <input class="form-control" type='text' id='startTime' name='startTime'> </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-1 control-label">End:</label>
+            <div class="col-sm-4"> <input class="form-control" type='text' id='endTime' name='endTime'> </div>
         </div>
         <div class="form-group">
             <input class="btn btn-default" type="button" value="Plot" onClick='plot(this.form)'>
