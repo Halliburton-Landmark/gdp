@@ -396,7 +396,9 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 		uint8_t *sigp = NULL;
 
 		if (use_sigbuf)
+		{
 			sigp = sigbuf;
+		}
 		else if (pdu->datum->sig != NULL)
 		{
 			sigp = gdp_buf_getptr(pdu->datum->sig, pdu->datum->siglen);
@@ -412,7 +414,7 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 		}
 		else
 		{
-			ep_dbg_cprintf(Dbg, 1, "_gdp_pdu_out: siglen = %d but no data",
+			ep_dbg_cprintf(Dbg, 1, "_gdp_pdu_out: siglen = %d but no data\n",
 					pdu->datum->siglen);
 		}
 		if (sigp != NULL)
