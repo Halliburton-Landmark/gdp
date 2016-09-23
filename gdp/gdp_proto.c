@@ -268,15 +268,22 @@ acknak(gdp_req_t *req, const char *where, bool reuse_pdu)
 			req->rpdu->datum->dbuf = user_dbuf;
 
 			// same for signature
-			if (req->pdu->datum->sig != NULL)
+			gdp_buf_t *user_sig = req->pdu->datum->sig;
+			if (user_sig != NULL)
 			{
-				gdp_buf_t *user_sig = req->pdu->datum->sig;
 				gdp_buf_reset(user_sig);
-				gdp_buf_move(user_sig, req->rpdu->datum->sig,
-						gdp_buf_getlength(req->rpdu->datum->sig));
-				gdp_buf_free(req->rpdu->datum->sig);
-				req->rpdu->datum->sig = user_sig;
+				if (req->rpdu->datum->sig != NULL)
+				{
+					gdp_buf_move(user_sig, req->rpdu->datum->sig,
+							gdp_buf_getlength(req->rpdu->datum->sig));
+				}
 			}
+			if (req->rpdu->datum->sig != NULL)
+				gdp_buf_free(req->rpdu->datum->sig);
+			req->rpdu->datum->sig = user_sig;
+			req->rpdu->datum->siglen = user_sig == NULL
+								? 0
+								: gdp_buf_getlength(user_sig);
 
 			// copy the contents of the response datum over the user datum
 			// (this has the pointer to user dbuf with response contents)
