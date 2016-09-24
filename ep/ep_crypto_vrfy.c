@@ -53,7 +53,7 @@ ep_crypto_vrfy_new(EP_CRYPTO_KEY *pkey, int md_alg_id)
 	if (md_alg == NULL)
 		return _ep_crypto_error("unknown digest algorithm %d",
 				md_alg_id);
-	md = EVP_MD_CTX_new();
+	md = EVP_MD_CTX_create();
 	if (md == NULL)
 		return _ep_crypto_error("cannot create message digest for verification");
 	istat = EVP_DigestVerifyInit(md, NULL, md_alg, NULL, pkey);
@@ -126,5 +126,5 @@ ep_crypto_vrfy_final(EP_CRYPTO_MD *md, void *obuf, size_t obufsize)
 void
 ep_crypto_vrfy_free(EP_CRYPTO_MD *md)
 {
-	EVP_MD_CTX_free(md);
+	EVP_MD_CTX_destroy(md);
 }

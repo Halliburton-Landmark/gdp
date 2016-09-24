@@ -339,13 +339,16 @@ void	*_ep_crypto_error(const char *msg, ...);
 
 /*
 **  Back compatilibity with old versions of OpenSSL
+**	"EVP_MD_CTX_create() and EVP_MD_CTX_destroy() were renamed to
+**	 EVP_MD_CTX_new() and EVP_MD_CTX_free() in OpenSSL 1.1."
+**
+**	LibreSSL uses the old names, and OpenSSL has compatibility macros,
+**	so stick with old names.
 */
 
-#if OPENSSL_VERSION_NUMBER < 0x010100000
-// "EVP_MD_CTX_create() and EVP_MD_CTX_destroy() were renamed to
-//  EVP_MD_CTX_new() and EVP_MD_CTX_free() in OpenSSL 1.1."
-# define EVP_MD_CTX_new		EVP_MD_CTX_create
-# define EVP_MD_CTX_free	EVP_MD_CTX_destroy
-#endif
+//#if OPENSSL_VERSION_NUMBER < 0x010100000
+//# define EVP_MD_CTX_new		EVP_MD_CTX_create
+//# define EVP_MD_CTX_free	EVP_MD_CTX_destroy
+//#endif
 
 #endif // _EP_CRYPTO_H_

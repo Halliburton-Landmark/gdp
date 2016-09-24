@@ -60,7 +60,7 @@ ep_crypto_sign_new(EP_CRYPTO_KEY *skey, int md_alg_id)
 		return _ep_crypto_error("ep_crypto_sign_new: "
 				"unknown digest algorithm %d",
 				md_alg_id);
-	md = EVP_MD_CTX_new();
+	md = EVP_MD_CTX_create();
 	if (md == NULL)
 		return _ep_crypto_error("ep_crypto_sign_new: "
 				"cannot create message digest for signing");
@@ -128,5 +128,5 @@ ep_crypto_sign_final(EP_CRYPTO_MD *md, void *sbuf, size_t *sbufsize)
 void
 ep_crypto_sign_free(EP_CRYPTO_MD *md)
 {
-	EVP_MD_CTX_free(md);
+	EVP_MD_CTX_destroy(md);
 }

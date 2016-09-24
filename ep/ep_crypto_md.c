@@ -97,19 +97,19 @@ EP_CRYPTO_MD *
 ep_crypto_md_new(int md_alg_id)
 {
 	const EVP_MD *md_alg;
-	EP_CRYPTO_MD *md = EVP_MD_CTX_new();
+	EP_CRYPTO_MD *md;
 	int istat;
 
 	md_alg = _ep_crypto_md_getalg_byid(md_alg_id);
 	if (md_alg == NULL)
 		return NULL;		// error already given
-	md = EVP_MD_CTX_new();
+	md = EVP_MD_CTX_create();
 	if (md == NULL)
 		return _ep_crypto_error("cannot create new message digest");
 	istat = EVP_DigestInit_ex(md, md_alg, NULL);
 	if (istat != 1)
 	{
-		EVP_MD_CTX_free(md);
+		EVP_MD_CTX_destroy(md);
 		return _ep_crypto_error("cannot initialize message digest");
 	}
 	return md;
@@ -123,13 +123,10 @@ ep_crypto_md_new(int md_alg_id)
 EP_CRYPTO_MD *
 ep_crypto_md_clone(EP_CRYPTO_MD *oldmd)
 {
-	EP_CRYPTO_MD *md;
-	int istat;
-
-	md = EVP_MD_CTX_new();
+	EP_CRYPTO_MD *md = EVP_MD_CTX_create();
 	if (md == NULL)
 		return _ep_crypto_error("cannot create cloned message digest");
-	istat = EVP_MD_CTX_copy_ex(md, oldmd);
+	int istat = EVP_MD_CTX_copy_ex(md, oldmd);
 	if (istat != 1)
 		return _ep_crypto_error("cannot clone message digest");
 
@@ -188,7 +185,7 @@ ep_crypto_md_final(EP_CRYPTO_MD *md, void *dbuf, size_t *dbufsize)
 void
 ep_crypto_md_free(EP_CRYPTO_MD *md)
 {
-	EVP_MD_CTX_free(md);
+	EVP_MD_CTX_destroy(md);
 }
 
 
