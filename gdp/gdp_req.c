@@ -569,6 +569,11 @@ static gdp_rid_t	MaxRid = 0;
 gdp_rid_t
 _gdp_rid_new(gdp_gcl_t *gcl, gdp_chan_t *chan)
 {
+	if (MaxRid == UINT32_MAX)
+	{
+		// overflow!!!  at least log something
+		ep_log(EP_STAT_SEVERE, "Request ID overflow");
+	}
 	return ++MaxRid;
 }
 
