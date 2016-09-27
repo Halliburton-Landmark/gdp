@@ -34,6 +34,7 @@
 */
 
 #include "gdp.h"
+#include "gdp_event.h"
 #include "gdp_priv.h"
 
 #include <ep/ep_dbg.h>
@@ -179,6 +180,9 @@ _gdp_invoke(gdp_req_t *req)
 			ep_time_nanosleep(retry_delay MILLISECONDS);
 		}
 	}
+
+	// if we had any pending asynchronous events, deliver them
+	_gdp_event_trigger_pending(&req->events);
 
 	if (ep_dbg_test(Dbg, 10))
 	{

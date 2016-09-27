@@ -59,4 +59,8 @@ extern void				_gdp_event_setcb(
 extern EP_STAT			_gdp_event_add_from_req(
 								gdp_req_t *req);
 
+// add pending events to appropriate current queue
+extern void				_gdp_event_trigger_pending(
+								struct gev_list *glist);
+
 #endif // _GDP_EVENT_H_

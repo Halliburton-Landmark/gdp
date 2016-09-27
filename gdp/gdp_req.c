@@ -31,8 +31,10 @@
 */
 
 #include <string.h>
+#include <sys/queue.h>
 
 #include "gdp.h"
+#include "gdp_event.h"
 #include "gdp_priv.h"
 
 #include <ep/ep_dbg.h>
@@ -136,6 +138,7 @@ _gdp_req_new(int cmd,
 		req = ep_mem_zalloc(sizeof *req);
 		ep_thr_mutex_init(&req->mutex, EP_THR_MUTEX_DEFAULT);
 		ep_thr_cond_init(&req->cond);
+		STAILQ_INIT(&req->events);
 	}
 	else
 	{
@@ -235,6 +238,13 @@ _gdp_req_free(gdp_req_t **reqp)
 		LIST_REMOVE(req, gcllist);
 		req->flags &= ~GDP_REQ_ON_GCL_LIST;
 		ep_thr_mutex_unlock(&req->gcl->mutex);
+	}
+
+	// remove any pending events from the request
+	{
+		gdp_event_t *gev;
+		while ((gev = STAILQ_FIRST(&req->events)) != NULL)
+			STAILQ_REMOVE_HEAD(&req->events, queue);
 	}
 
 	// req should be unreferencable now

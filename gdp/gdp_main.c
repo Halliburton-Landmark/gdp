@@ -50,7 +50,8 @@
 #include <string.h>
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.main", "GDP initialization and main loop");
-static EP_DBG	EvLockDbg = EP_DBG_INIT("gdp.libevent.locks", "GDP libevent lock debugging");
+static EP_DBG	DbgEvLock = EP_DBG_INIT("gdp.libevent.locks", "GDP libevent lock debugging");
+static EP_DBG	DbgProcResp = EP_DBG_INIT("gdp.response", "GDP response processing");
 
 struct event_base	*GdpIoEventBase;	// the base for GDP I/O events
 gdp_name_t			_GdpMyRoutingName;	// source name for PDUs
@@ -296,10 +297,10 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 	int resp;
 	int ocmd;					// original command prompting this response
 
-	ep_dbg_cprintf(Dbg, 50,
-			"gdp_pdu_proc_resp(%s)\n",
-			_gdp_proto_cmd_name(cmd));
 	gcl = _gdp_gcl_cache_get(rpdu->src, 0);
+	ep_dbg_cprintf(DbgProcResp, 20,
+			"gdp_pdu_proc_resp(%p %s) gcl %p\n",
+			rpdu, _gdp_proto_cmd_name(cmd), gcl);
 	if (gcl == NULL)
 	{
 		do
@@ -309,11 +310,11 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 
 		if (req == NULL)
 		{
-			if (ep_dbg_test(Dbg, 1))
+			if (ep_dbg_test(DbgProcResp, 1))
 			{
 				gdp_pname_t pname;
 				ep_dbg_printf("gdp_pdu_proc_resp: discarding PDU for unknown GCL\n");
-				if (ep_dbg_test(Dbg, 24))
+				if (ep_dbg_test(DbgProcResp, 24))
 					_gdp_pdu_dump(rpdu, ep_dbg_getfile());
 				else
 					ep_dbg_printf("    %s\n", gdp_printable_name(rpdu->src, pname));
@@ -340,7 +341,7 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 		if (req == NULL)
 		{
 			// no req for incoming response --- "can't happen"
-			if (ep_dbg_test(Dbg, 1))
+			if (ep_dbg_test(DbgProcResp, 1))
 			{
 				ep_dbg_printf("gdp_pdu_proc_resp: no req for incoming response\n");
 				_gdp_pdu_dump(rpdu, ep_dbg_getfile());
@@ -352,7 +353,7 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 		else if (rpdu == req->pdu)
 		{
 			// this could be an assertion
-			if (ep_dbg_test(Dbg, 1))
+			if (ep_dbg_test(DbgProcResp, 1))
 			{
 				ep_dbg_printf("gdp_pdu_proc_resp(%d): pdu == rpdu\n", rpdu->cmd);
 				_gdp_pdu_dump(rpdu, ep_dbg_getfile());
@@ -363,7 +364,7 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 
 	if (req->pdu == NULL)
 	{
-		ep_dbg_cprintf(Dbg, 1,
+		ep_dbg_cprintf(DbgProcResp, 1,
 				"gdp_pdu_proc_resp(%d): no corresponding command PDU\n",
 				rpdu->cmd);
 		ocmd = rpdu->cmd;
@@ -378,7 +379,7 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 	// save the response PDU for further processing
 	if (req->rpdu != NULL)
 	{
-		if (ep_dbg_test(Dbg, 1))
+		if (ep_dbg_test(DbgProcResp, 1))
 		{
 			ep_dbg_printf("gdp_pdu_proc_resp: req->rpdu already set\n");
 			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
@@ -387,7 +388,7 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 	}
 	req->rpdu = rpdu;
 
-	if (ep_dbg_test(Dbg, 43))
+	if (ep_dbg_test(DbgProcResp, 43))
 	{
 		ep_dbg_printf("gdp_pdu_proc_resp: ");
 		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
@@ -407,7 +408,7 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 	// we compute even if unused so we can log server errors
 	resp = acknak_from_estat(estat, req->pdu->cmd);
 
-	if (ep_dbg_test(Dbg,
+	if (ep_dbg_test(DbgProcResp,
 				(resp >= GDP_NAK_S_MIN && resp <= GDP_NAK_S_MAX) ? 1 : 44))
 	{
 		char ebuf[100];
@@ -416,18 +417,27 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 				_gdp_proto_cmd_name(cmd),
 				_gdp_proto_cmd_name(ocmd),
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
-		if (ep_dbg_test(Dbg, 55))
+		if (ep_dbg_test(DbgProcResp, 55))
 			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
 	// ASSERT(all data from chan has been consumed);
 
-	if (req->state == GDP_REQ_WAITING)
+	if (EP_UT_BITSET(GDP_REQ_ASYNCIO, req->flags))
+	{
+		// send the status as an event
+		estat = _gdp_event_add_from_req(req);
+	}
+	else if (req->state == GDP_REQ_WAITING)
 	{
 		// return our status via the request
 		req->stat = estat;
 		req->flags |= GDP_REQ_DONE;
-		if (ep_dbg_test(Dbg, 40))
+
+		// any further data or status is delivered via event
+		req->flags |= GDP_REQ_ASYNCIO;
+
+		if (ep_dbg_test(DbgProcResp, 40))
 		{
 			ep_dbg_printf("gdp_pdu_proc_resp: signaling ");
 			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
@@ -437,16 +447,10 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 		ep_thr_cond_signal(&req->cond);
 
 		// give _gdp_invoke a chance to run; not necessary, but
-		// gives avoids having to wait on condition variables
+		// avoids having to wait on condition variables
 		ep_thr_yield();
 	}
-	else if (EP_UT_BITSET(GDP_REQ_CLT_SUBSCR | GDP_REQ_ASYNCIO, req->flags))
-	{
-		// send the status as an event
-		EP_ASSERT(req->state == GDP_REQ_IDLE);
-		estat = _gdp_event_add_from_req(req);
-	}
-	else if (ep_dbg_test(Dbg, 1))
+	else if (ep_dbg_test(DbgProcResp, 1))
 	{
 		ep_dbg_printf("gdp_pdu_proc_resp: discarding response ");
 		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
@@ -463,7 +467,7 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 		_gdp_req_unlock(req);
 	}
 
-	ep_dbg_cprintf(Dbg, 40, "gdp_pdu_proc_resp <<< done\n");
+	ep_dbg_cprintf(DbgProcResp, 40, "gdp_pdu_proc_resp <<< done\n");
 }
 
 
@@ -752,7 +756,7 @@ gdp_lib_init(const char *myname)
 	// tell the event library that we're using pthreads
 	if (evthread_use_pthreads() < 0)
 		return init_error("cannot use pthreads", "gdp_lib_init");
-	if (ep_dbg_test(EvLockDbg, 90))
+	if (ep_dbg_test(DbgEvLock, 90))
 	{
 		evthread_enable_lock_debuging();
 	}

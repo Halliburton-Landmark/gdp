@@ -48,6 +48,7 @@
 
 typedef struct gdp_chan		gdp_chan_t;
 typedef struct gdp_req		gdp_req_t;
+STAILQ_HEAD(gev_list, gdp_event);
 
 extern EP_THR		_GdpIoEventLoopThread;
 extern gdp_chan_t	*_GdpChannel;		// our primary app-level protocol port
@@ -425,6 +426,13 @@ struct gdp_gcl_open_info
 **		The invariant is that any req being passed between threads
 **		should always be ACTIVE.
 **
+**		In some cases requests may have pending events.  This
+**		occurs for commands such as SUBSCRIBE or MULTIREAD when
+**		the first data return appears before the ack for the
+**		initial command has finished processing.  To avoid confusing
+**		applications you have to defer these events until the app
+**		knows that the command succeeded.
+**
 **		Implemented in gdp_req.c.
 */
 
@@ -449,6 +457,7 @@ struct gdp_req
 	gdp_event_cbfunc_t	sub_cb;		// callback function (subscribe & async I/O)
 	void				*udata;		// user-supplied opaque data to cb
 	EP_CRYPTO_MD		*md;		// message digest context
+	struct gev_list		events;		// pending events (see above)
 };
 
 // states

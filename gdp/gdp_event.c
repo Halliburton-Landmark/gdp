@@ -43,21 +43,19 @@
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.event", "GDP event handling");
 
 
-STAILQ_HEAD(ev_head, gdp_event);
-
 // free (unused) events
 static EP_THR_MUTEX		FreeListMutex	EP_THR_MUTEX_INITIALIZER;
-static struct ev_head	FreeList		= STAILQ_HEAD_INITIALIZER(FreeList);
+static struct gev_list	FreeList		= STAILQ_HEAD_INITIALIZER(FreeList);
 
 // active events (synchronous, ready for gdp_event_next)
 static EP_THR_MUTEX		ActiveListMutex	EP_THR_MUTEX_INITIALIZER;
 static EP_THR_COND		ActiveListSig	EP_THR_COND_INITIALIZER;
-static struct ev_head	ActiveList		= STAILQ_HEAD_INITIALIZER(ActiveList);
+static struct gev_list	ActiveList		= STAILQ_HEAD_INITIALIZER(ActiveList);
 
 // callback events (asynchronous, ready for delivery in callback thread)
 static EP_THR_MUTEX		CallbackListMutex	EP_THR_MUTEX_INITIALIZER;
 static EP_THR_COND		CallbackListSig		EP_THR_COND_INITIALIZER;
-static struct ev_head	CallbackList		= STAILQ_HEAD_INITIALIZER(CallbackList);
+static struct gev_list	CallbackList		= STAILQ_HEAD_INITIALIZER(CallbackList);
 static EP_THR			CallbackThread;
 static bool				CallbackThreadStarted	= false;
 
@@ -217,6 +215,30 @@ _gdp_event_trigger(gdp_event_t *gev)
 
 
 /*
+**  Make pending events current (when a request leaves WAITING state)
+**
+**		The gdp_req_t containing events is locked when this is called
+**		so we don't have to worry about locking it ourself.
+*/
+
+void
+_gdp_event_trigger_pending(struct gev_list *events)
+{
+	gdp_event_t *gev;
+
+	ep_dbg_cprintf(Dbg, 48,
+			"_gdp_event_trigger_pending(%p): %s\n",
+			events,
+			STAILQ_FIRST(events) == NULL ? "empty" : "events");
+	while ((gev = STAILQ_FIRST(events)) != NULL)
+	{
+		STAILQ_REMOVE_HEAD(events, queue);
+		_gdp_event_trigger(gev);
+	}
+}
+
+
+/*
 **  This is the thread that processes callbacks.
 **		The event is freed, so the callback should NOT call
 **			gdp_event_free.
@@ -356,7 +378,18 @@ _gdp_event_add_from_req(gdp_req_t *req)
 	req->pdu->datum = NULL;
 
 	// schedule the event for delivery
-	_gdp_event_trigger(gev);
+	if (req->state == GDP_REQ_WAITING)
+	{
+		// can't deliver yet: make it pending
+		ep_dbg_cprintf(Dbg, 40,
+				"_gdp_event_add_from_req: event %p pending\n", gev);
+		STAILQ_INSERT_TAIL(&req->events, gev, queue);
+	}
+	else
+	{
+		// go ahead and deliver
+		_gdp_event_trigger(gev);
+	}
 
 	return estat;
 }

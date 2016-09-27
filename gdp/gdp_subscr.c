@@ -223,9 +223,13 @@ _gdp_gcl_subscribe(gdp_req_t *req,
 	}
 	else
 	{
+		// at this point remaining results will be asynchronous
+		req->flags |= GDP_REQ_ASYNCIO;
+
 		// now waiting for other events; go ahead and unlock
 		req->state = GDP_REQ_IDLE;
-		gdp_datum_free(req->pdu->datum);
+		if (req->pdu->datum != NULL)
+			gdp_datum_free(req->pdu->datum);
 		req->pdu->datum = NULL;
 		ep_thr_cond_signal(&req->cond);
 		_gdp_req_unlock(req);
