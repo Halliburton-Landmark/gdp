@@ -49,9 +49,29 @@ public class GDPException extends Exception {
 
     /** Construct an exception for the Global Data Plane.
      *  @param message The detail message.
+     *  @param estat The status of the system
+     */
+    public GDPException(String message, EP_STAT estat) {
+	super(message +
+	      "(code: " + estat.code + ": " + GDP.ep_stat_toStr(estat) + ")"); 
+    }
+
+    /** Construct an exception for the Global Data Plane.
+     *  @param message The detail message.
      *  @param cause The exception that caused this exception.
      */
     public GDPException(String message, Throwable cause) {
 	super(message, cause);
+    }
+
+    /** Construct an exception for the Global Data Plane.
+     *  @param message The detail message.
+     *  @param cause The exception that caused this exception.
+     *  @param estat The status of the system
+     */
+    public GDPException(String message, Throwable cause, EP_STAT estat) {
+	super(message +
+	      "(code: " + estat.code + ": " + GDP.ep_stat_toStr(estat) + ")",
+	      cause);
     }
 }

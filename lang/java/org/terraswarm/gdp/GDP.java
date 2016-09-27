@@ -94,8 +94,12 @@ public class GDP {
     public static boolean check_EP_STAT(EP_STAT estat){
 
         int code = estat.code;
+
         int EP_STAT_SEVERITY = (code >>> Gdp07Library._EP_STAT_SEVSHIFT)
                 & ((1 << Gdp07Library._EP_STAT_SEVBITS) - 1);
+
+	//System.out.println("check_EP_STAT(" + estat.code + ") " + ep_stat_toStr(estat));
+
         return (EP_STAT_SEVERITY < Gdp07Library.EP_STAT_SEV_WARN);
     }
 
@@ -107,10 +111,21 @@ public class GDP {
      * @exception GDPException If {@link #check_EP_STAT(EP_STAT)} returns false.
      */
     public static void check_EP_STAT(EP_STAT estat, String message)
-	throws GDPException {
+            throws GDPException {
 	if (!check_EP_STAT(estat)) {
-	    throw new GDPException(message + " (code was " + estat.code + ")");
+	    throw new GDPException(message, estat);
 	}
+    }
+
+    /** Given a EP_STAT, return the description of the status.
+     *  @param estat The status
+     *  @return The status
+     */
+    public static String ep_stat_toStr(EP_STAT estat) {
+	int length = 200;
+	ByteBuffer buffer = ByteBuffer.allocate(length);
+	Pointer statusMessage = Gdp07Library.INSTANCE.ep_stat_tostr((EP_STAT.ByValue)estat, buffer, new NativeSize(length));
+	return new String(buffer.array()).trim();
     }
 
     public static final int GDP_GCLMD_XID     = 0x00584944; 
