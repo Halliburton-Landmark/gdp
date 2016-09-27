@@ -286,8 +286,9 @@ ep_str_vid_set(
 		if (isatty(1))
 		{
 			type = getenv("TERM");
-			if (strncmp(type, "xterm", 5) == 0 ||
-			    strncmp(type, "ansi", 4) == 0)
+			if (type != NULL &&
+			    (strncmp(type, "xterm", 5) == 0 ||
+			     strncmp(type, "ansi", 4) == 0))
 				EpVid = &EpVidANSI_X3_64;
 		}
 		return EP_STAT_OK;
