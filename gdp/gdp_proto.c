@@ -128,6 +128,7 @@ _gdp_invoke(gdp_req_t *req)
 		ep_time_deltanow(&delta_ts, &abs_to);
 		estat = EP_STAT_OK;
 		req->state = GDP_REQ_WAITING;
+		req->flags &= ~GDP_REQ_ASYNCIO;
 		while (!EP_UT_BITSET(GDP_REQ_DONE, req->flags))
 		{
 			// cond_wait will unlock the mutex
