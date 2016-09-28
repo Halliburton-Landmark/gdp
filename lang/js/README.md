@@ -49,7 +49,7 @@ Try out a test:
 
   npm install mocha
   cd node_modules/@terraswarm/gdp
-  ../../mocha/bin/mocha -t 400 tests/mocha
+  ../../mocha/bin/mocha -t 4000 test/mocha
 
 What the test does is create a new log, write a string to it and then
 read back the string from the log.
@@ -134,7 +134,7 @@ repository to manage the @terraswarm/gdp package.
 To update the @terraswarm/gdp package on npmjs:
 
 1.  Update libgdp and libep:
-        (cd ../..; make all_noavahi)
+        (cd ../..; make all)
 2.  Update libgdpjs:
         make all
 3.  Update the patch number in package.json
