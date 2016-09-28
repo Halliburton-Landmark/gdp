@@ -56,8 +56,8 @@ DARWIN_LIB=libgdp.$(GDP_MAJOR_MINOR_VERSION).dylib
 LINUX_LIB=libgdp.$(GDP_MAJOR_MINOR_VERSION).so
 LINUX_DASH_LIB=libgdp-$(GDP_MAJOR_MINOR_VERSION).so
 LINUX_RHEL_LIB=libgdp.$(GDP_MAJOR_MINOR_VERSION)-rhel.so
-install: all darwin/$(DARWIN_LIB) linux-amd64/$(LINUX_LIB) linux-x86-64/$(LINUX_LIB)
-	jar cf $(GDP_JAR) org/terraswarm/gdp/*.class darwin linux-amd64 linux-x86-64
+install: all darwin/$(DARWIN_LIB) linux-x86-64-rhel/$(LINUX_LIB) linux-x86-64/$(LINUX_LIB)
+	jar cf $(GDP_JAR) org/terraswarm/gdp/*.class darwin linux-x86-64-rhel linux-x86-64
 
 darwin/$(DARWIN_LIB): 
 	if [ ! -d darwin ]; then mkdir darwin; fi
@@ -73,9 +73,9 @@ darwin/$(DARWIN_LIB):
 		fi \
 	fi
 
-linux-amd64/$(LINUX_LIB):
-	if [ ! -d linux-amd64 ]; then mkdir linux-amd64; fi
-	if [ -f ../../libs/$(LINUX_DASH_LIB) ]; then \
+linux-x86-64-rhel/$(LINUX_LIB):
+	if [ ! -d linux-x86-64-rhel ]; then mkdir linux-x86-64-rhel; fi
+	if [ -f /etc/redhat-release -a -f ../../libs/$(LINUX_DASH_LIB) ]; then \
 		echo "Copying ../../libs/$(LINUX_DASH_LIB) to $@"; \
 		cp ../../libs/$(LINUX_DASH_LIB) $@; \
 	else \
@@ -89,7 +89,7 @@ linux-amd64/$(LINUX_LIB):
 
 linux-x86-64/$(LINUX_LIB):
 	if [ ! -d linux-x86-64 ]; then mkdir linux-x86-64; fi
-	if [ -f ../../libs/$(LINUX_DASH_LIB) ]; then \
+	if [ ! -f /etc/redhat-release -a -f ../../libs/$(LINUX_DASH_LIB) ]; then \
 		echo "Copying ../../libs/$(LINUX_DASH_LIB) to $@"; \
 		cp ../../libs/$(LINUX_DASH_LIB) $@; \
 	else \
@@ -217,7 +217,7 @@ runHelloWorld: all
 
 clean:
 	rm -f jna _* org/terraswarm/gdp/*.class org/terraswarm/gdp/EP* org/terraswarm/gdp/e* org/terraswarm/gdp/*Library.java org/terraswarm/gdp/apps/*.class *.jar
-	rm -rf darwin linux-amd64 linux-x86-64
+	rm -rf darwin linux-x86-64-rhel linux-x86-64
 
 distclean: clean
 	rm -f *.jar
