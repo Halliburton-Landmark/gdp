@@ -54,8 +54,9 @@ GDP_JAR=gdp-$(GDP_MAJOR_MINOR_VERSION)-$(GDP_PATCH_VERSION).jar
 # version number.
 DARWIN_LIB=libgdp.$(GDP_MAJOR_MINOR_VERSION).dylib
 LINUX_LIB=libgdp.$(GDP_MAJOR_MINOR_VERSION).so
+LINUX_LIB2=libgdp.so$($(GDP_MAJOR_MINOR_VERSION)
 LINUX_DASH_LIB=libgdp-$(GDP_MAJOR_MINOR_VERSION).so
-LINUX_RHEL_LIB=libgdp.$(GDP_MAJOR_MINOR_VERSION)-rhel.so
+
 install: all darwin/$(DARWIN_LIB) linux-x86-64-rhel/$(LINUX_LIB) linux-x86-64/$(LINUX_LIB)
 	jar cf $(GDP_JAR) org/terraswarm/gdp/*.class darwin linux-x86-64-rhel linux-x86-64
 
@@ -79,9 +80,9 @@ linux-x86-64-rhel/$(LINUX_LIB):
 		echo "Copying ../../libs/$(LINUX_DASH_LIB) to $@"; \
 		cp ../../libs/$(LINUX_DASH_LIB) $@; \
 	else \
-		if [ -f $(PTII)/lib/$(LINUX_RHEL_LIB) ]; then \
-			echo "Copying $(PTII)/lib/$(LINUX_RHEL_LIB) to $@"; \
-			cp $(PTII)/lib/$(LINUX_RHEL_LIB) $@; \
+		if [ -f $(PTII)/lib/linux-x86-64-rhel/$(LINUX_LIB) ]; then \
+			echo "Copying $(PTII)/lib/linux-x86-64-rhel/$(LINUX_LIB) to $@"; \
+			cp $(PTII)/lib/linux-x86-64-rhel/$(LINUX_LIB) $@; \
 		else \
 			echo "Could not find the Linux GDP RHEL shared library, so the jar file will not contain it."; \
 		fi \
@@ -89,9 +90,9 @@ linux-x86-64-rhel/$(LINUX_LIB):
 
 linux-x86-64/$(LINUX_LIB):
 	if [ ! -d linux-x86-64 ]; then mkdir linux-x86-64; fi
-	if [ ! -f /etc/redhat-release -a -f ../../libs/$(LINUX_DASH_LIB) ]; then \
-		echo "Copying ../../libs/$(LINUX_DASH_LIB) to $@"; \
-		cp ../../libs/$(LINUX_DASH_LIB) $@; \
+	if [ ! -f /etc/redhat-release -a -f ../../libs/$(LINUX_LIB2) ]; then \
+		echo "Copying ../../libs/$(LINUX_LIB2) to $@"; \
+		cp ../../libs/$(LINUX_LIB2) $@; \
 	else \
 		if [ -f $(PTII)/lib/$(LINUX_LIB) ]; then \
 			echo "Copying $(PTII)/lib/$(LINUX_LIB) to $@"; \
