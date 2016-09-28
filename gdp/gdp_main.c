@@ -258,7 +258,7 @@ find_req_in_channel_list(
 	EP_STAT estat = EP_STAT_OK;
 	gdp_req_t *req;
 
-	ep_dbg_cprintf(Dbg, 14, "find_req_in_channel_list: searching\n");
+	ep_dbg_cprintf(DbgProcResp, 14, "find_req_in_channel_list: searching\n");
 	ep_thr_mutex_lock(&chan->mutex);
 	LIST_FOREACH(req, &chan->reqs, chanlist)
 	{
@@ -337,6 +337,9 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 	else
 	{
 		// find the corresponding request
+		ep_dbg_cprintf(DbgProcResp, 23,
+				"gdp_pdu_proc_resp: searching gcl %p for rid %" PRIgdp_rid "\n",
+				gcl, rpdu->rid);
 		req = _gdp_req_find(gcl, rpdu->rid);
 		if (req == NULL)
 		{
@@ -434,14 +437,14 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 		req->stat = estat;
 		req->flags |= GDP_REQ_DONE;
 
-		// any further data or status is delivered via event
-		req->flags |= GDP_REQ_ASYNCIO;
-
 		if (ep_dbg_test(DbgProcResp, 40))
 		{
 			ep_dbg_printf("gdp_pdu_proc_resp: signaling ");
 			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 		}
+
+		// any further data or status is delivered via event
+		req->flags |= GDP_REQ_ASYNCIO;
 
 		// wake up invoker, which will return the status
 		ep_thr_cond_signal(&req->cond);

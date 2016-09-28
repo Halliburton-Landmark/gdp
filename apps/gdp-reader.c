@@ -182,7 +182,7 @@ do_simpleread(gdp_gcl_t *gcl,
 		// move to next record
 		recno = gdp_datum_getrecno(datum) + 1;
 		estat = gdp_gcl_read(gcl, recno, datum);
-	};
+	}
 
 	// print the final value
 	if (EP_STAT_ISOK(estat))
@@ -199,9 +199,15 @@ done:
 }
 
 
+/*
+**  Multiread and Subscriptions.
+*/
+
 EP_STAT
-multiread_print_event(gdp_event_t *gev, bool subscribe)
+print_event(gdp_event_t *gev, bool subscribe)
 {
+	EP_STAT estat = gdp_event_getstat(gev);
+
 	// decode it
 	switch (gdp_event_gettype(gev))
 	{
@@ -215,13 +221,27 @@ multiread_print_event(gdp_event_t *gev, bool subscribe)
 		// "end of subscription": no more data will be returned
 		fprintf(stderr, "End of %s\n",
 				subscribe ? "Subscription" : "Multiread");
-		return EP_STAT_END_OF_FILE;
+		estat = EP_STAT_END_OF_FILE;
+		break;
 
 	  case GDP_EVENT_SHUTDOWN:
 		// log daemon has shut down, meaning we lose our subscription
 		fprintf(stderr, "%s terminating because of log daemon shutdown\n",
 				subscribe ? "Subscription" : "Multiread");
-		return GDP_STAT_DEAD_DAEMON;
+		estat = GDP_STAT_DEAD_DAEMON;
+		break;
+
+	  case GDP_EVENT_CREATED:
+		fprintf(stderr, "Successful append, create, or similar\n");
+		break;
+
+	  case GDP_EVENT_SUCCESS:
+		fprintf(stderr, "Generic success\n");
+		break;
+
+	  case GDP_EVENT_FAILURE:
+		fprintf(stderr, "Generic failure\n");
+		break;
 
 	  default:
 		// should be ignored, but we print it since this is a test program
@@ -232,14 +252,20 @@ multiread_print_event(gdp_event_t *gev, bool subscribe)
 		break;
 	}
 
-	return EP_STAT_OK;
+	if (!EP_STAT_ISOK(estat))
+	{
+		char ebuf[100];
+		fprintf(stderr, "    STATUS: %s\n",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
+	return estat;
 }
 
 
 void
 multiread_cb(gdp_event_t *gev)
 {
-	(void) multiread_print_event(gev, false);
+	(void) print_event(gev, false);
 	gdp_event_free(gev);
 }
 
@@ -322,7 +348,7 @@ do_multiread(gdp_gcl_t *gcl,
 			gdp_event_t *gev = gdp_event_next(NULL, 0);
 
 			// print it
-			estat = multiread_print_event(gev, subscribe);
+			estat = print_event(gev, subscribe);
 
 			// don't forget to free the event!
 			gdp_event_free(gev);
@@ -334,6 +360,78 @@ do_multiread(gdp_gcl_t *gcl,
 	{
 		// hang for an hour waiting for events
 		sleep(3600);
+	}
+
+	return estat;
+}
+
+
+/*
+**  DO_ASYNC_READ --- read asynchronously
+*/
+
+EP_STAT
+do_async_read(gdp_gcl_t *gcl,
+		gdp_recno_t firstrec,
+		int32_t numrecs,
+		bool use_callbacks)
+{
+	EP_STAT estat = EP_STAT_OK;
+	gdp_event_cbfunc_t cbfunc = NULL;
+
+	if (use_callbacks)
+		cbfunc = multiread_cb;
+
+	// make the flags more user-friendly
+	if (firstrec == 0)
+		firstrec = 1;
+	if (numrecs <= 0)
+		numrecs = gdp_gcl_getnrecs(gcl);
+
+	// issue the multiread commands without reading results
+	gdp_recno_t recno = firstrec;
+	int n = 0;
+	while (EP_STAT_ISOK(estat) && n++ < numrecs)
+	{
+		// issue multiread of size 1 for this record
+		estat = gdp_gcl_read_async(gcl, recno, cbfunc, NULL);
+		if (!EP_STAT_ISOK(estat))
+		{
+			char ebuf[100];
+			ep_app_error("async_read: gdp_gcl_read_async error:\n\t%s",
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		}
+		else
+		{
+			recno++;
+		}
+	}
+
+	// this sleep will allow multiple results to appear before we start reading
+	if (ep_dbg_test(Dbg, 100))
+		ep_time_nanosleep(500000000);	//DEBUG: one half second
+
+	// now start reading the events that will be generated
+	if (!use_callbacks)
+	{
+		for (n = 0; n < numrecs; n++)
+		{
+			// get the next incoming event
+			gdp_event_t *gev = gdp_event_next(NULL, 0);
+
+			// print it
+			estat = print_event(gev, false);
+
+			// don't forget to free the event!
+			gdp_event_free(gev);
+
+			//EP_STAT_CHECK(estat, break);
+		}
+	}
+	else
+	{
+		// hang for an minute waiting for events
+		sleep(60);
 	}
 
 	return estat;
@@ -370,9 +468,10 @@ void
 usage(void)
 {
 	fprintf(stderr,
-			"Usage: %s [-c] [-d datetime] [-D dbgspec] [-f firstrec]\n"
+			"Usage: %s [-a] [-c] [-d datetime] [-D dbgspec] [-f firstrec]\n"
 			"  [-G router_addr] [-m] [-L logfile] [-M] [-n nrecs]\n"
 			"  [-s] [-t] [-v] log_name\n"
+			"    -a  read asynchronously\n"
 			"    -c  use callbacks\n"
 			"    -d  first date/time to read from\n"
 			"    -D  turn on debugging flags\n"
@@ -405,6 +504,7 @@ main(int argc, char **argv)
 	char *gdpd_addr = NULL;
 	bool subscribe = false;
 	bool multiread = false;
+	bool async = false;
 	bool use_callbacks = false;
 	bool showmetadata = false;
 	int32_t numrecs = 0;
@@ -419,12 +519,17 @@ main(int argc, char **argv)
 	//setbuffer(stdout, outbuf, sizeof outbuf);		//DEBUG
 
 	// parse command-line options
-	while ((opt = getopt(argc, argv, "Acd:D:f:G:L:mMn:qstv")) > 0)
+	while ((opt = getopt(argc, argv, "aAcd:D:f:G:L:mMn:qstv")) > 0)
 	{
 		switch (opt)
 		{
 		  case 'A':				// hidden flag for debugging only
 			open_mode = GDP_MODE_RA;
+			break;
+
+		  case 'a':
+			// do asynchronous read
+			async = true;
 			break;
 
 		  case 'c':
@@ -502,6 +607,19 @@ main(int argc, char **argv)
 		exit(EX_USAGE);
 	}
 
+	int ntypes = 0;
+	if (async)
+		ntypes++;
+	if (multiread)
+		ntypes++;
+	if (subscribe)
+		ntypes++;
+	if (ntypes > 1)
+	{
+		fprintf(stderr, "Can only specify one of -a, -m, and -s\n");
+		exit(EX_USAGE);
+	}
+
 	// we require a GCL name
 	if (show_usage || argc <= 0)
 		usage();
@@ -564,7 +682,9 @@ main(int argc, char **argv)
 		print_metadata(gcl);
 
 	// arrange to do the reading via one of the helper routines
-	if (subscribe || multiread || use_callbacks)
+	if (async)
+		estat = do_async_read(gcl, firstrec, numrecs, use_callbacks);
+	else if (subscribe || multiread || use_callbacks)
 		estat = do_multiread(gcl, firstrec, dtstr, numrecs,
 						subscribe, use_callbacks);
 	else

@@ -305,6 +305,7 @@ gdp_gcl_create(gdp_name_t gclname,
 	gdp_name_t namebuf;
 
 	GDP_CHECK_INITIALIZED;				// make sure gdp_init is done
+	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_create\n");
 
 	if (gclname == NULL)
 	{
@@ -320,7 +321,7 @@ gdp_gcl_create(gdp_name_t gclname,
 	if (EP_STAT_ISOK(estat))
 		(*pgcl)->iomode = GDP_MODE_ANY;
 
-	ep_dbg_cprintf(Dbg, 8, "gdp_gcl_create: %s\n",
+	ep_dbg_cprintf(Dbg, 8, "<<< gdp_gcl_create: %s\n",
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	return estat;
 }
@@ -342,6 +343,7 @@ gdp_gcl_open(gdp_name_t name,
 	EP_CRYPTO_KEY *skey = NULL;
 
 	GDP_CHECK_INITIALIZED;				// make sure gdp_init is done
+	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_open\n");
 
 	if (mode == GDP_MODE_RO)
 		cmd = GDP_CMD_OPEN_RO;
@@ -415,6 +417,7 @@ gdp_gcl_close(gdp_gcl_t *gcl)
 {
 	EP_STAT estat;
 
+	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_close\n");
 	estat = _gdp_gcl_close(gcl, _GdpChannel, 0);
 	return estat;
 }
@@ -427,6 +430,7 @@ gdp_gcl_close(gdp_gcl_t *gcl)
 EP_STAT
 gdp_gcl_append(gdp_gcl_t *gcl, gdp_datum_t *datum)
 {
+	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_append\n");
 	return _gdp_gcl_append(gcl, datum, _GdpChannel, 0);
 }
 
@@ -441,6 +445,7 @@ gdp_gcl_append_async(gdp_gcl_t *gcl,
 			gdp_event_cbfunc_t cbfunc,
 			void *udata)
 {
+	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_append_async\n");
 	return _gdp_gcl_append_async(gcl, datum, cbfunc, udata, _GdpChannel, 0);
 }
 
@@ -464,6 +469,7 @@ gdp_gcl_read(gdp_gcl_t *gcl,
 			gdp_datum_t *datum)
 {
 	EP_ASSERT_POINTER_VALID(datum);
+	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_read\n");
 	datum->recno = recno;
 	EP_TIME_INVALIDATE(&datum->ts);
 
@@ -490,11 +496,31 @@ gdp_gcl_read_ts(gdp_gcl_t *gcl,
 			gdp_datum_t *datum)
 {
 	EP_ASSERT_POINTER_VALID(datum);
+	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_read_ts\n");
 	memcpy(&datum->ts, ts, sizeof datum->ts);
 	datum->recno = GDP_PDU_NO_RECNO;
 
 	return _gdp_gcl_read(gcl, datum, _GdpChannel, 0);
 }
+
+
+/*
+**  GDP_GCL_READ_ASYNC --- read asynchronously
+**
+**  Data and status are delivered as events.  Each call to this routine
+**  returns exactly one event, either data or an error.
+*/
+
+EP_STAT
+gdp_gcl_read_async(gdp_gcl_t *gcl,
+			gdp_recno_t recno,
+			gdp_event_cbfunc_t cbfunc,
+			void *cbarg)
+{
+	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_read_async\n");
+	return _gdp_gcl_read_async(gcl, recno, cbfunc, cbarg, _GdpChannel);
+}
+
 
 
 /*
@@ -512,6 +538,7 @@ gdp_gcl_subscribe(gdp_gcl_t *gcl,
 	EP_STAT estat;
 	gdp_req_t *req;
 
+	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_subscribe\n");
 	// create the subscribe request
 	estat = _gdp_req_new(GDP_CMD_SUBSCRIBE, gcl, _GdpChannel, NULL,
 			GDP_REQ_PERSIST | GDP_REQ_CLT_SUBSCR | GDP_REQ_ALLOC_RID,
@@ -544,6 +571,7 @@ gdp_gcl_subscribe_ts(gdp_gcl_t *gcl,
 	EP_STAT estat;
 	gdp_req_t *req;
 
+	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_subscribe_ts\n");
 	// create the subscribe request
 	estat = _gdp_req_new(GDP_CMD_SUBSCRIBE, gcl, _GdpChannel, NULL,
 			GDP_REQ_PERSIST | GDP_REQ_CLT_SUBSCR | GDP_REQ_ALLOC_RID,
@@ -578,6 +606,7 @@ gdp_gcl_multiread(gdp_gcl_t *gcl,
 	EP_STAT estat;
 	gdp_req_t *req;
 
+	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_multiread\n");
 	// create the multiread request
 	estat = _gdp_req_new(GDP_CMD_MULTIREAD, gcl, _GdpChannel, NULL,
 			GDP_REQ_PERSIST | GDP_REQ_CLT_SUBSCR | GDP_REQ_ALLOC_RID,
@@ -612,6 +641,7 @@ gdp_gcl_multiread_ts(gdp_gcl_t *gcl,
 	EP_STAT estat;
 	gdp_req_t *req;
 
+	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_multiread_ts\n");
 	// create the multiread request
 	estat = _gdp_req_new(GDP_CMD_MULTIREAD, gcl, _GdpChannel, NULL,
 			GDP_REQ_PERSIST | GDP_REQ_CLT_SUBSCR | GDP_REQ_ALLOC_RID,
@@ -637,6 +667,7 @@ EP_STAT
 gdp_gcl_getmetadata(gdp_gcl_t *gcl,
 		gdp_gclmd_t **gmdp)
 {
+	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_getmetadata\n");
 	return _gdp_gcl_getmetadata(gcl, gmdp, _GdpChannel, 0);
 }
 
@@ -651,6 +682,7 @@ gdp_gcl_getmetadata(gdp_gcl_t *gcl,
 EP_STAT
 gdp_gcl_newsegment(gdp_gcl_t *gcl)
 {
+	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_newsegment\n");
 	return _gdp_gcl_newsegment(gcl, _GdpChannel, 0);
 }
 
@@ -665,6 +697,7 @@ gdp_gcl_set_append_filter(gdp_gcl_t *gcl,
 		void *filterdata)
 {
 	GDP_ASSERT_GOOD_GCL(gcl);
+	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_set_append_filter\n");
 	gcl->apndfilter = appendfilter;
 	gcl->apndfpriv = filterdata;
 }
@@ -680,6 +713,7 @@ gdp_gcl_set_read_filter(gdp_gcl_t *gcl,
 		void *filterdata)
 {
 	GDP_ASSERT_GOOD_GCL(gcl);
+	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_set_read_filter\n");
 	gcl->readfilter = readfilter;
 	gcl->readfpriv = filterdata;
 }

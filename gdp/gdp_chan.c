@@ -43,7 +43,7 @@
 #include <errno.h>
 #include <string.h>
 
-static EP_DBG	Dbg = EP_DBG_INIT("gdp.gdp_chan", "GDP protocol processing");
+static EP_DBG	Dbg = EP_DBG_INIT("gdp.chan", "GDP channel processing");
 static EP_DBG	DemoMode = EP_DBG_INIT("_demo", "Demo Mode");
 
 

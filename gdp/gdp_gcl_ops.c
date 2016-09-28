@@ -587,7 +587,8 @@ _gdp_gcl_append_async(
 	gdp_req_t *req = NULL;
 	int i;
 
-	reqflags |= GDP_REQ_ASYNCIO | GDP_REQ_PERSIST | GDP_REQ_ALLOC_RID;
+	// deliver results asynchronously
+	reqflags |= GDP_REQ_ASYNCIO;
 	estat = append_common(gcl, datum, chan, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
@@ -635,7 +636,6 @@ fail0:
 **		Parameters:
 **			gcl --- the gcl from which to read
 **			datum --- the data buffer (to avoid dynamic memory)
-**			cmd --- the actually command to use
 **			chan --- the data channel used to contact the remote
 **			reqflags --- flags for the request
 **
@@ -670,6 +670,68 @@ _gdp_gcl_read(gdp_gcl_t *gcl,
 	// ok, done!
 	req->pdu->datum = NULL;			// owned by caller
 	_gdp_req_free(&req);
+fail0:
+	return estat;
+}
+
+
+/*
+**  _GDP_GCL_READ_ASYNC --- asynchronously read a record from a GCL
+**
+**		Parameters:
+**			gcl --- the gcl from which to read
+**			recno --- the record number to read
+**			cbfunc --- the callback function (NULL => deliver as events)
+**			cbarg --- user argument to cbfunc
+**			chan --- the data channel used to contact the remote
+**
+**		This might be read by recno or read by timestamp based on
+**		the command.  In any case the cmd is the defining factor.
+*/
+
+EP_STAT
+_gdp_gcl_read_async(gdp_gcl_t *gcl,
+			gdp_recno_t recno,
+			gdp_event_cbfunc_t cbfunc,
+			void *cbarg,
+			gdp_chan_t *chan)
+{
+	EP_STAT estat = GDP_STAT_BAD_IOMODE;
+	gdp_req_t *req;
+	gdp_datum_t datumbuf;
+
+	errno = 0;				// avoid spurious messages
+
+	// sanity checks
+	GDP_ASSERT_GOOD_GCL(gcl);
+	if (!EP_UT_BITSET(GDP_MODE_RO, gcl->iomode))
+		goto fail0;
+
+	// create a new READ request (don't need a special command)
+	estat = _gdp_req_new(GDP_CMD_READ, gcl, chan, NULL, GDP_REQ_ASYNCIO, &req);
+	EP_STAT_CHECK(estat, goto fail0);
+	_gdp_event_setcb(req, cbfunc, cbarg);
+
+	// set up fake datum solely to send record number
+	memset(&datumbuf, 0, sizeof datumbuf);
+	datumbuf.recno = recno;
+	EP_TIME_INVALIDATE(&datumbuf.ts);
+
+	req->pdu->datum = &datumbuf;
+	estat = _gdp_req_send(req);
+	req->pdu->datum = NULL;
+
+	if (EP_STAT_ISOK(estat))
+	{
+		req->state = GDP_REQ_IDLE;
+		_gdp_req_unlock(req);
+	}
+	else
+	{
+		_gdp_req_free(&req);
+	}
+
+	// ok, done!
 fail0:
 	return estat;
 }
@@ -771,7 +833,8 @@ _gdp_gcl_fwd_append(
 		EP_ASSERT_FAILURE("_gdp_gcl_fwd_append: forwarding to myself");
 	}
 
-	reqflags |= GDP_REQ_ASYNCIO | GDP_REQ_PERSIST | GDP_REQ_ALLOC_RID;
+	// deliver results asynchronously
+	reqflags |= GDP_REQ_ASYNCIO;
 
 	estat = _gdp_req_new(GDP_CMD_FWD_APPEND, gcl, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);

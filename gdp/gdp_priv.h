@@ -292,11 +292,10 @@ EP_STAT			_gdp_gcl_read(				// read GCL record based on datum
 
 EP_STAT			_gdp_gcl_read_async(		// read asynchronously
 						gdp_gcl_t *gcl,
-						gdp_datum_t *datum,
+						gdp_recno_t recno,
 						gdp_event_cbfunc_t cbfunc,
 						void *cbarg,
-						gdp_chan_t *chan,
-						uint32_t reqflags);
+						gdp_chan_t *chan);
 
 EP_STAT			_gdp_gcl_append(			// append a record (gdpd shared)
 						gdp_gcl_t *gcl,

@@ -118,6 +118,10 @@ _gdp_req_new(int cmd,
 	flags |= GDP_REQ_ALLOC_RID;		//DEBUG
 #endif								//DEBUG
 
+	// if the caller wants asynchronous results, tweak flags accordingly
+	if (EP_UT_BITSET(GDP_REQ_ASYNCIO, flags))
+		flags |= GDP_REQ_PERSIST | GDP_REQ_ALLOC_RID;
+
 	EP_ASSERT_REQUIRE(gcl == NULL || EP_UT_BITSET(GCLF_INUSE, gcl->flags));
 
 	// simplify the simple case

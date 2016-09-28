@@ -36,7 +36,7 @@
   <body>
     <h1>Global Data Plane Programmatic API </h1>
     <h4>Editor: Eric Allman, U.C. Berkeley Swarm Lab, eric@cs.berkeley.edu<br>
-      Version 0.7.1, 2016-08-18</h4>
+      Version 0.7.2, 2016-09-28</h4>
     <p>This document describes the procedural programmatic interface to the
       Global Data Plane.&nbsp; The native code is written in C for maximum
       flexibility and performance, but it is expected that most applications
@@ -355,9 +355,18 @@
         exactly the same data structure as returned by <code>gdp_event_next</code>.</li>
       <li>In all cases, if the callback function is not specified the
         information will be returned through the event interface.&nbsp; The two
-        interfaces are related but mutually exclusive.</li>
+        interfaces are related but mutually exclusive.</li></ul><p><br></p><ul>
     </ul>
-    <hr size="2" width="100%">
+
+        <hr>
+        <h4>Name</h4>
+        <p>gdp_gcl_read_async &mdash; Asynchronously read data from a GCL</p><h4>Synopsis</h4><pre>EP_STAT gdp_gcl_read_async(<br>                gdp_gcl_t *gcl,<br>                gdp_recno_t recno,<br>                gdp_event_cbfunc_t *cbfunc,<br>                void *udata)</pre><h4><span
+style="font-family: monospace;"><span style="font-family: serif;">Notes</span></span></h4><ul><li>Initializes a read of the given record number.</li><li>This function returns before any result is read and thus does not
+        include the final status information.</li><li>The return status will be <code>GDP_STAT_OK</code> if the read
+        command is successfully sent, and a later callback or event will give        the actual status; otherwise no callback or event will occur.</li><li>Status is returned through the event interface (if <code>cbfunc</code>
+        is <code>NULL</code>) or through <code>cbfunc</code>.</li><li>Exactly one event will be generated for each successful return.&nbsp; Those events will be <code>GDP_EVENT_DATA</code> if the read succeeded or an error event if the read failed.</li></ul>
+    
+        <hr size="2" width="100%">
     <h4> Name</h4>
     <p>gdp_gcl_append_async &mdash; Asynchronously append to a writable GCL</p>
     <h4>Synopsis</h4>

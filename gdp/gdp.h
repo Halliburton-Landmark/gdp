@@ -223,6 +223,13 @@ extern EP_STAT	gdp_gcl_read(
 					gdp_recno_t recno,		// GCL record number
 					gdp_datum_t *datum);	// pointer to result message
 
+// read asynchronously from a GCL based on record number
+extern EP_STAT	gdp_gcl_read_async(
+					gdp_gcl_t *gcl,			// readable GCL handle
+					gdp_recno_t recno,		// GCL record number
+					gdp_event_cbfunc_t cbfunc,	// callback function
+					void *cbarg);			// argument to cbfunc
+
 // read from a readable GCL based on timestamp
 extern EP_STAT	gdp_gcl_read_ts(
 					gdp_gcl_t *gcl,			// readable GCL handle
