@@ -14,8 +14,28 @@ info "Setting up packages for GDP compilation."
 info "This is overkill if you are only installing binaries."
 
 info "Installing packages needed by GDP for $OS"
+
+info "Updating the package database"
+case "$PKGMGR" in
+    "brew")
+	brewUser=`ls -l $brew | awk '{print $3}'`
+	# Only use sudo to update brew if the brew binary is owned by root.
+	# This avoids "Cowardly refusing to 'sudo brew update'"
+	if [ "$brewUser" = "root" ]; then
+	    sudo brew update
+	else
+	    brew update
+	fi
+	;;
+
+    "macports")
+	sudo port selfupdate
+	;;
+esac
+
+
 case "$OS" in
-    "ubuntu" | "debian")
+    "ubuntu" | "debian" | "raspbian")
 	sudo apt-get update
 	sudo apt-get clean
 	package libdb-dev
@@ -44,7 +64,7 @@ case "$OS" in
 	package lighttpd
 	package jansson
 	package pandoc
-	if [ "$pkgmgr" = "brew" ]
+	if [ "$PKGMGR" = "brew" ]
 	then
 		package mosquitto
 		warn "Homebrew doesn't support Avahi."
@@ -91,7 +111,7 @@ case "$OS" in
 	;;
 
     *)
-	fatal "oops, we don't support $OS"
+	fatal "$0: unknown OS $OS"
 	;;
 esac
 
