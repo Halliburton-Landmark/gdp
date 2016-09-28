@@ -35,8 +35,9 @@ CLEANEXTRA=	gdp-client*.deb gdp-server*.deb python-gdp*.deb \
 		README*.html \
 		libs/*.a libs/*.so* libs/*.dylib \
 
-all:
-	#(cd doc;	make all)	# needs pandoc
+all: all-nodoc
+
+all-nodoc:
 	(cd ep;		make all)
 	(cd gdp;	make all)
 	(cd scgilib;	make all)
@@ -44,6 +45,14 @@ all:
 	(cd apps;	make all)
 	(cd util;	make all)
 	(cd examples;	make all)
+
+all-withdoc: all-nodoc
+	(cd doc;	make all)	# needs pandoc
+
+all-clientonly:
+	(cd ep;		make all)
+	(cd gdp;	make all)
+	(cd apps;	make all)
 
 # Build without avahi, the zero-conf facility that
 # can be tricky to compile under Mac OS X.
