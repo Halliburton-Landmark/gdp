@@ -211,11 +211,11 @@ _gdp_gcl_dump(
 				char tbuf[40];
 				struct tm tm;
 
-				fprintf(fp, "\tfreefunc = %p, gclmd = %p, digest = %p, x = %p\n",
-						gcl->freefunc, gcl->gclmd, gcl->digest, gcl->x);
+				fprintf(fp, "\tfreefunc = %p, gclmd = %p, digest = %p\n",
+						gcl->freefunc, gcl->gclmd, gcl->digest);
 				gmtime_r(&gcl->utime, &tm);
-				strftime(tbuf, sizeof tbuf, "%Y-%m-%dT%H:%M:%S", &tm);
-				fprintf(fp, "\tutime = %s\n", tbuf);
+				strftime(tbuf, sizeof tbuf, "%Y-%m-%d %H:%M:%S", &tm);
+				fprintf(fp, "\tutime = %s, x = %p\n", tbuf, gcl->x);
 			}
 		}
 	}
