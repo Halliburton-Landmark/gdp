@@ -296,6 +296,20 @@ class GDP_GCL(object):
         return self.__read(tsdict)
 
 
+    def read_async(self, recno):
+        """
+        Same as 'read', but aysnchoronous version. Returns events
+        """
+
+        __func = gdp.gdp_gcl_read_async
+        __func.argtypes = [POINTER(self.gdp_gcl_t), gdp_recno_t,
+                                c_void_p, c_void_p]
+        __func.restype = EP_STAT
+
+        estat = __func(self.ptr, gdp_recno_t(recno), None, None)
+        check_EP_STAT(estat)
+
+
     def append(self, datum_dict):
         """
         Write a datum to the GCL. The datum should be a dictionary, with
@@ -316,7 +330,6 @@ class GDP_GCL(object):
         estat = __func(self.ptr, datum.gdp_datum)
         check_EP_STAT(estat)
 
-        return
 
     def append_async(self, datum_dict):
         """

@@ -183,6 +183,9 @@ gdp.GDP_GCL = class GDP_GCL
  |          - tv_nsec: nano seconds (an integer)
  |          - tv_accuracy: accuracy (a float)
  |  
+ |  read_async(self, recno)
+ |      Same as 'read', but aysnchoronous version. Returns events  
+ |  
  |  subscribe(self, start, numrecs, timeout)
  |      Subscriptions. Refer to the C-API for more details
  |      For now, callbacks are not exposed to end-user. Events are 
