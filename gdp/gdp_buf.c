@@ -33,9 +33,21 @@
 #include "gdp.h"
 #include "gdp_buf.h"
 
+#include <ep/ep_dbg.h>
+
+#include <errno.h>
 #include <stdarg.h>
 #include <string.h>
 #include <arpa/inet.h>
+
+static EP_DBG	Dbg = EP_DBG_INIT("gdp.buf", "GDP buffer processing");
+
+#define DIAGNOSE(cmd, istat)										\
+			do {													\
+				if (istat < 0 && ep_dbg_test(Dbg, 10))				\
+					ep_dbg_printf("gdp_buf_%s: %s\n",				\
+								cmd, strerror(errno));				\
+			} while (false)
 
 /*
 **  Create a new buffer
@@ -112,7 +124,9 @@ gdp_buf_getlength(const gdp_buf_t *buf)
 size_t
 gdp_buf_read(gdp_buf_t *buf, void *out, size_t sz)
 {
-	return evbuffer_remove(buf, out, sz);
+	int istat = evbuffer_remove(buf, out, sz);
+	DIAGNOSE("read", istat);
+	return istat;
 }
 
 /*
@@ -124,6 +138,7 @@ size_t
 gdp_buf_peek(gdp_buf_t *buf, void *out, size_t sz)
 {
 	ssize_t s = evbuffer_copyout(buf, out, sz);
+	DIAGNOSE("peek", s);
 	if (s < 0)
 		return 0;
 	return s;
@@ -137,7 +152,9 @@ gdp_buf_peek(gdp_buf_t *buf, void *out, size_t sz)
 int
 gdp_buf_drain(gdp_buf_t *buf, size_t sz)
 {
-	return evbuffer_drain(buf, sz);
+	int istat = evbuffer_drain(buf, sz);
+	DIAGNOSE("drain", istat);
+	return istat;
 }
 
 /*
@@ -158,7 +175,9 @@ gdp_buf_getptr(gdp_buf_t *buf, size_t sz)
 int
 gdp_buf_write(gdp_buf_t *buf, const void *in, size_t sz)
 {
-	return evbuffer_add(buf, in, sz);
+	int istat = evbuffer_add(buf, in, sz);
+	DIAGNOSE("write", istat);
+	return istat;
 }
 
 /*
@@ -355,7 +374,8 @@ void
 gdp_buf_put_int32(gdp_buf_t *buf, const int32_t v)
 {
 	int32_t t = htonl(v);
-	evbuffer_add(buf, &t, sizeof t);
+	int istat = evbuffer_add(buf, &t, sizeof t);
+	DIAGNOSE("put_int32", istat);
 }
 
 
@@ -367,7 +387,8 @@ void
 gdp_buf_put_uint32(gdp_buf_t *buf, const uint32_t v)
 {
 	uint32_t t = htonl(v);
-	evbuffer_add(buf, &t, sizeof t);
+	int istat = evbuffer_add(buf, &t, sizeof t);
+	DIAGNOSE("put_uint32", istat);
 }
 
 
@@ -380,8 +401,11 @@ gdp_buf_put_int48(gdp_buf_t *buf, const int64_t v)
 {
 	uint16_t h = htons((v >> 32) & 0xffff);
 	uint32_t l = htonl((uint32_t) (v & UINT64_C(0xffffffff)));
-	evbuffer_add(buf, &h, sizeof h);
-	evbuffer_add(buf, &l, sizeof l);
+	int istat;
+	istat = evbuffer_add(buf, &h, sizeof h);
+	DIAGNOSE("put_int48", istat);
+	istat = evbuffer_add(buf, &l, sizeof l);
+	DIAGNOSE("put_int48", istat);
 }
 
 
@@ -394,8 +418,11 @@ gdp_buf_put_uint48(gdp_buf_t *buf, const uint64_t v)
 {
 	uint16_t h = htons((v >> 32) & 0xffff);
 	uint32_t l = htonl((uint32_t) (v & UINT64_C(0xffffffff)));
-	evbuffer_add(buf, &h, sizeof h);
-	evbuffer_add(buf, &l, sizeof l);
+	int istat;
+	istat = evbuffer_add(buf, &h, sizeof h);
+	DIAGNOSE("put_uint48", istat);
+	istat = evbuffer_add(buf, &l, sizeof l);
+	DIAGNOSE("put_uint48", istat);
 }
 
 
@@ -407,18 +434,20 @@ void
 gdp_buf_put_int64(gdp_buf_t *buf, const int64_t v)
 {
 	static const int32_t num = 42;
+	int istat;
 
 	if (htonl(num) == num)
 	{
-		evbuffer_add(buf, &v, sizeof v);
+		istat = evbuffer_add(buf, &v, sizeof v);
 	}
 	else
 	{
 		int64_t t = htonl(v & INT64_C(0xffffffff));
 		t <<= 32;
 		t |= (int64_t) htonl((int32_t) ((v >> 32)) & INT64_C(0xffffffff));
-		evbuffer_add(buf, &t, sizeof t);
+		istat = evbuffer_add(buf, &t, sizeof t);
 	}
+	DIAGNOSE("put_int64", istat);
 }
 
 
@@ -430,18 +459,20 @@ void
 gdp_buf_put_uint64(gdp_buf_t *buf, const uint64_t v)
 {
 	static const int32_t num = 42;
+	int istat;
 
 	if (htonl(num) == num)
 	{
-		evbuffer_add(buf, &v, sizeof v);
+		istat = evbuffer_add(buf, &v, sizeof v);
 	}
 	else
 	{
 		uint64_t t = htonl(((uint32_t) v & UINT64_C(0xffffffff)));
 		t <<= 32;
 		t |= (uint64_t) htonl((uint32_t) (v >> 32));
-		evbuffer_add(buf, &t, sizeof t);
+		istat = evbuffer_add(buf, &t, sizeof t);
 	}
+	DIAGNOSE("put_uint64", istat);
 }
 
 
