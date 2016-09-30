@@ -187,7 +187,10 @@ gdp_datum_print(const gdp_datum_t *datum, FILE *fp, uint32_t flags)
 		l = gdp_buf_getlength(datum->dbuf);
 		if (!quiet)
 			fprintf(fp, "len %d", l);
-		d = gdp_buf_getptr(datum->dbuf, l);
+		if (l > 0)
+			d = gdp_buf_getptr(datum->dbuf, l);
+		else
+			d = "";
 	}
 
 	if (!quiet)
@@ -205,13 +208,10 @@ gdp_datum_print(const gdp_datum_t *datum, FILE *fp, uint32_t flags)
 		fprintf(fp, "%s\n", datum->inuse ? "" : ", !inuse");
 	}
 
-	if (l > 0)
-	{
-		if (EP_UT_BITSET(GDP_DATUM_PRTEXT, flags))
-			fprintf(fp, "%.*s\n", l, d);
-		else
-			ep_hexdump(d, l, fp, EP_HEXDUMP_ASCII, 0);
-	}
+	if (EP_UT_BITSET(GDP_DATUM_PRTEXT, flags))
+		fprintf(fp, "%.*s\n", l, d);
+	else
+		ep_hexdump(d, l, fp, EP_HEXDUMP_ASCII, 0);
 
 	if (EP_UT_BITSET(GDP_DATUM_PRSIG, flags))
 	{
