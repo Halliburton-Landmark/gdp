@@ -562,9 +562,10 @@ cmd_append(gdp_req_t *req)
 	if (req->pdu->datum->recno != req->gcl->nrecs + 1)
 	{
 		// replay or missing a record
-		ep_dbg_cprintf(Dbg, 1, "cmd_append: record sequence error: got %"
-						PRIgdp_recno ", wanted %" PRIgdp_recno "\n"
-						"\t%s\n",
+		ep_dbg_cprintf(Dbg, GdplogdForgive.allow_log_gaps ? 19 : 1,
+						"cmd_append: record out of sequence: got %"
+						PRIgdp_recno ", expected %" PRIgdp_recno "\n"
+						"\ton log %s\n",
 						req->pdu->datum->recno, req->gcl->nrecs + 1,
 						req->gcl->pname);
 

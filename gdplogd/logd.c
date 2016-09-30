@@ -352,7 +352,7 @@ main(int argc, char **argv)
 	// check for some options
 #if _GDPLOGD_FORGIVING
 	GdplogdForgive.allow_log_gaps =
-		ep_adm_getboolparam("swarm.gdplogd.sequencing.allowgaps", false);
+		ep_adm_getboolparam("swarm.gdplogd.sequencing.allowgaps", true);
 	GdplogdForgive.allow_log_dups =
 		ep_adm_getboolparam("swarm.gdplogd.sequencing.allowdups", false);
 #endif
