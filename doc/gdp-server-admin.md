@@ -344,6 +344,9 @@ have to change any of these.
 * `swarm.gdplogd.gcl.dir` &mdash; the directory in which log data will
 	be stored.  Defaults to `/var/swarm/gdp/gcls`.
 
+* `swarm.gdplogd.advertise.interval` &mdash; how often to renew
+    advertisements of known logs.  Defaults to 30 (seconds).
+
 * `swarm.gdplogd.reclaim.interval` &mdash; how often to wake up to
 	reclaim unused resources.  Defaults to 15 (seconds).
 

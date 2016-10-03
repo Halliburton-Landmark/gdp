@@ -108,6 +108,12 @@ this specifies the interval in seconds
 at which gdplogd will output a summary of the known logs.
 If zero or negative no summaries will be produced.
 .
+.It swarm.gdplogd.advertise.interval
+The time in seconds before
+.Nm
+will renew its advertisements of known names.
+Defaults to 30 seconds.
+.
 .It swarm.gdplogd.crypto.strictness
 Specifies how strict the daemon will be about enforcing signatures
 on append (write) requests to logs.

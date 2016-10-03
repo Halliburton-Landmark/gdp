@@ -82,6 +82,13 @@ gdpd_reclaim_resources(int fd, short what, void *ctx)
 }
 
 
+void
+renew_advertisements(int fd, short what, void *u)
+{
+	(void) logd_advertise_all(GDP_CMD_ADVERTISE);
+}
+
+
 /*
 **  Do shutdown at exit
 */
@@ -409,6 +416,18 @@ main(int argc, char **argv)
 	phase = "advertise GCLs";
 	estat = logd_advertise_all(GDP_CMD_ADVERTISE);
 	EP_STAT_CHECK(estat, goto fail0);
+
+	// arrange to re-advertise on a regular basis
+	{
+		long adv_intvl = ep_adm_getlongparam("swarm.gdplogd.advertise.interval",
+								30);
+		struct event *advtimer = event_new(GdpIoEventBase, -1, EV_PERSIST,
+										&renew_advertisements, NULL);
+		if (adv_intvl < 1)
+			adv_intvl = 30;
+		struct timeval tv = { adv_intvl, 0 };
+		event_add(advtimer, &tv);
+	}
 
 	// arrange for clean shutdown
 	atexit(&logd_shutdown);
