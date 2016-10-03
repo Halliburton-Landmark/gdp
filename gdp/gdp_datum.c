@@ -190,7 +190,7 @@ gdp_datum_print(const gdp_datum_t *datum, FILE *fp, uint32_t flags)
 		if (l > 0)
 			d = gdp_buf_getptr(datum->dbuf, l);
 		else
-			d = "";
+			d = (unsigned char *) "";
 	}
 
 	if (!quiet)
