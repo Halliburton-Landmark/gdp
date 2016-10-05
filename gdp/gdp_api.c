@@ -398,8 +398,17 @@ gdp_gcl_open(gdp_name_t name,
 	}
 	else
 	{
-		// there's still a reference to the GCL in the cache which must go
-		_gdp_gcl_decref(&gcl);
+		if (gcl->refcnt > 0)
+		{
+			gcl->refcnt = 0;			// avoid errors in _gdp_gcl_cache_drop
+			gcl->flags |= GCLF_INUSE;	// avoid errors in _gdp_gcl_freehandle
+			_gdp_gcl_freehandle(gcl);
+		}
+		else
+		{
+			ep_thr_mutex_destroy(&gcl->mutex);
+			ep_mem_free(gcl);
+		}
 	}
 
 fail0:

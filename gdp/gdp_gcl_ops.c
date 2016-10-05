@@ -408,7 +408,10 @@ fail1:
 
 fail0:
 	if (req != NULL)
+	{
+		req->gcl = NULL;		// owned by caller
 		_gdp_req_free(&req);
+	}
 
 	// log failure
 	if (EP_STAT_ISOK(estat))

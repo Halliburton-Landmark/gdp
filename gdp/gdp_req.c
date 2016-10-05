@@ -236,7 +236,7 @@ _gdp_req_free(gdp_req_t **reqp)
 	}
 
 	// remove the request from the GCL list
-	if (EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
+	if (EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags) && req->gcl != NULL)
 	{
 		ep_thr_mutex_lock(&req->gcl->mutex);
 		LIST_REMOVE(req, gcllist);
