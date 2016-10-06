@@ -301,7 +301,7 @@ _gdp_req_freeall(struct req_head *reqlist, void (*shutdownfunc)(gdp_req_t *))
 			if (!EP_STAT_ISOK(estat))
 			{
 				ep_log(estat, "_gdp_req_freeall: couldn't acquire req lock");
-				break;
+				goto fail0;
 			}
 
 			nextreq = LIST_NEXT(req, gcllist);
@@ -311,7 +311,13 @@ _gdp_req_freeall(struct req_head *reqlist, void (*shutdownfunc)(gdp_req_t *))
 		}
 	} while (!EP_STAT_ISOK(estat));
 
-	ep_dbg_cprintf(Dbg, 49, "<<< _gdp_req_freeall(%p)\n", reqlist);
+fail0:
+	{
+		char ebuf[100];
+		ep_dbg_cprintf(Dbg, EP_STAT_ISOK(estat) ? 49 : 1,
+					"<<< _gdp_req_freeall(%p): %s\n",
+					reqlist, ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
 }
 
 
