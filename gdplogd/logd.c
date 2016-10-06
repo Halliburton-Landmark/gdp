@@ -419,14 +419,15 @@ main(int argc, char **argv)
 
 	// arrange to re-advertise on a regular basis
 	{
-		long adv_intvl = ep_adm_getlongparam("swarm.gdplogd.advertise.interval",
-								30);
-		struct event *advtimer = event_new(GdpIoEventBase, -1, EV_PERSIST,
-										&renew_advertisements, NULL);
-		if (adv_intvl < 1)
-			adv_intvl = 30;
-		struct timeval tv = { adv_intvl, 0 };
-		event_add(advtimer, &tv);
+		long adv_intvl = ep_adm_getlongparam(
+								"swarm.gdplogd.advertise.interval", 150);
+		if (adv_intvl > 0)
+		{
+			struct event *advtimer = event_new(GdpIoEventBase, -1, EV_PERSIST,
+											&renew_advertisements, NULL);
+			struct timeval tv = { adv_intvl, 0 };
+			event_add(advtimer, &tv);
+		}
 	}
 
 	// arrange for clean shutdown

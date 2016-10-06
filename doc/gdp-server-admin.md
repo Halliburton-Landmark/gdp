@@ -345,7 +345,8 @@ have to change any of these.
 	be stored.  Defaults to `/var/swarm/gdp/gcls`.
 
 * `swarm.gdplogd.advertise.interval` &mdash; how often to renew
-    advertisements of known logs.  Defaults to 30 (seconds).
+    advertisements of known logs.  If set to zero advertisments are
+	not renewed.  Defaults to 150 (seconds).
 
 * `swarm.gdplogd.reclaim.interval` &mdash; how often to wake up to
 	reclaim unused resources.  Defaults to 15 (seconds).
