@@ -96,6 +96,19 @@ deviceData = {
             { "logname": "edu.tamu.esp.Setup1c.device.c098e57000c4", "type": "PowerBlade", "humanName": 'TAMU PowerBlade: unknown2'}, 
             { "logname": "edu.tamu.esp.Setup1c.device.c098e57000a8", "type": "PowerBlade", "humanName": 'TAMU PowerBlade: unknown3'}, 
 
+//clark kerr sensors added 9/6
+            { "logname": "edu.berkeley.eecs.clark-kerr.device.c098e5900098", "type": "Blink", "humanName": 'CKC Blink Krutch Auditorium entrance by stage'}, 
+            { "logname": "edu.berkeley.eecs.clark-kerr.device.c098e5900083", "type": "Blink", "humanName": 'CKC Blink Krutch Auditorium rear wall of theater'}, 
+            { "logname": "edu.berkeley.eecs.clark-kerr.device.c098e5900016", "type": "Blink", "humanName": 'CKC Blink Krutch Auditorium mid wall stage left'}, 
+            { "logname": "edu.berkeley.eecs.clark-kerr.device.c098e590002d", "type": "Blink", "humanName": 'CKC Blink room 102 facing south door'}, 
+            { "logname": "edu.berkeley.eecs.clark-kerr.device.c098e53000ae", "type": "BLEES", "humanName": 'CKC BLEES Krutch Auditorium entrance by stage'},
+            { "logname": "edu.berkeley.eecs.clark-kerr.device.c098e5300060", "type": "BLEES", "humanName": 'CKC BLEES Krutch Auditorium rear wall of theater'},
+            { "logname": "edu.berkeley.eecs.clark-kerr.device.c098e53000ad", "type": "BLEES", "humanName": 'CKC BLEES Krutch Auditorium mid wall stage left'}, 
+            { "logname": "edu.berkeley.eecs.clark-kerr.device.c098e53000a6", "type": "BLEES", "humanName": 'CKC BLEES room 102 facing south door'},
+            { "logname": "edu.berkeley.eecs.clark-kerr.device.c098e53000a7", "type": "BLEES", "humanName": 'CKC BLEES room 102 facing north door'},
+
+
+
 ],    };
 
 deviceCategories = { //DEPENDENT
@@ -111,7 +124,8 @@ place = {
          { "officename" : "bwrc" },
          { "officename" : "swarmlab" },
          { "officename" : "jacobs" },
-         { "officename" : "tamu" }
+         { "officename" : "tamu" },
+         { "officename" : "clark-kerr" }
 ], };
 
 typelist = {
