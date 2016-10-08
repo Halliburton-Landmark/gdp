@@ -10,6 +10,7 @@
 .Op Fl f
 .Op Fl q
 .Op Fl r
+.Op Fl s
 .Op Fl v
 .Ar log-name ...
 .Sh DESCRIPTION
@@ -50,6 +51,10 @@ Run quietly (suppresses informational output).
 .
 .It Fl r
 Rebuild (rather than check) log indices.
+.
+.It Fl s
+Just print summaries of log status when checking
+(i.e., skip record-by-record errors).
 .
 .It Fl v
 Run verbosely.

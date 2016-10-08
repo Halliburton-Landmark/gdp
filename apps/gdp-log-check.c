@@ -79,6 +79,7 @@ struct
 	bool	verbose:1;
 	bool	silent:1;
 	bool	force:1;
+	bool	summaryonly:1;
 } Flags;
 
 struct ctx
@@ -828,6 +829,8 @@ testfail(const char *fmt, ...)
 {
 	va_list ap;
 
+	if (Flags.summaryonly || Flags.silent)
+		return;
 	va_start(ap, fmt);
 	vfprintf(stdout, fmt, ap);
 	va_end(ap);
@@ -987,6 +990,8 @@ fail0:
 			fgcolor = EpVid->vidfggreen;
 		else if (EP_STAT_ISWARN(estat))
 			fgcolor = EpVid->vidfgyellow;
+		else if (EP_STAT_ISERROR(estat))
+			fgcolor = EpVid->vidfgcyan;
 		else
 			fgcolor = EpVid->vidfgred;
 		printf("%s%s%s", fgcolor, EpVid->vidbgblack, ctx->logxname);
@@ -1195,7 +1200,7 @@ scan_log(const char *logxname, bool rebuild)
 	struct ctx ctxbuf;
 	struct ctx *ctx = &ctxbuf;
 
-	if (!Flags.silent)
+	if (!Flags.silent && !Flags.summaryonly)
 	{
 		printf("\n%s log %s\n",
 				rebuild ? "Rebuilding" : "Scanning", logxname);
@@ -1297,7 +1302,7 @@ main(int argc, char **argv)
 
 	initialize();
 
-	while ((opt = getopt(argc, argv, "D:fqrv")) > 0)
+	while ((opt = getopt(argc, argv, "D:fqrsv")) > 0)
 	{
 		switch (opt)
 		{
@@ -1315,6 +1320,10 @@ main(int argc, char **argv)
 
 		 case 'r':
 			 rebuild = true;
+			 break;
+
+		 case 's':
+			 Flags.summaryonly = true;
 			 break;
 
 		 case 'v':
