@@ -877,7 +877,7 @@ _gdp_advertise(EP_STAT (*func)(gdp_buf_t *, void *, int), void *ctx, int cmd)
 	_gdp_req_free(&req);
 
 fail0:
-	if (ep_dbg_test(Dbg, 10))
+	if (ep_dbg_test(Dbg, 21))
 	{
 		char ebuf[100];
 

@@ -1822,7 +1822,8 @@ disk_read_by_recno(gdp_gcl_t *gcl,
 	if (datum->sig != NULL)
 		gdp_buf_reset(datum->sig);
 
-	ep_dbg_cprintf(Dbg, 14, "disk_read(%" PRIgdp_recno "): ", datum->recno);
+	ep_dbg_cprintf(Dbg, 14, "disk_read_by_recno(%s %" PRIgdp_recno "): ",
+			gcl->pname, datum->recno);
 
 	ep_thr_rwlock_rdlock(&phys->lock);
 
@@ -1852,6 +1853,7 @@ disk_read_by_recno(gdp_gcl_t *gcl,
 	{
 		xent = &ridx_entry;
 		estat = ridx_entry_read(gcl, datum->recno, gcl->pname, xent);
+		ep_dbg_cprintf(Dbg, 14, "\n");
 	}
 
 	EP_STAT_CHECK(estat, goto fail0);
@@ -1897,8 +1899,8 @@ disk_read_by_recno(gdp_gcl_t *gcl,
 	{
 		ep_dbg_cprintf(Dbg, 1,
 				"disk_read_by_recno: recno mismatch: wanted %" PRIgdp_recno
-				", got %" PRIgdp_recno,
-				datum->recno, log_record.recno);
+				", got %" PRIgdp_recno "\n    (%s)\n",
+				datum->recno, log_record.recno, gcl->pname);
 		estat = GDP_STAT_CORRUPT_INDEX;
 		goto fail1;
 	}

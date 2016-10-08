@@ -78,7 +78,7 @@ EP_STAT
 logd_advertise_all(int cmd)
 {
 	EP_STAT estat = _gdp_advertise(advertise_all, NULL, cmd);
-	if (ep_dbg_test(Dbg, 10))
+	if (ep_dbg_test(Dbg, 21))
 	{
 		char ebuf[100];
 

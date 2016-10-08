@@ -361,7 +361,7 @@ main(int argc, char **argv)
 	GdplogdForgive.allow_log_gaps =
 		ep_adm_getboolparam("swarm.gdplogd.sequencing.allowgaps", true);
 	GdplogdForgive.allow_log_dups =
-		ep_adm_getboolparam("swarm.gdplogd.sequencing.allowdups", false);
+		ep_adm_getboolparam("swarm.gdplogd.sequencing.allowdups", true);
 #endif
 
 	// go into background mode (before creating any threads!)

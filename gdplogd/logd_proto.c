@@ -319,6 +319,14 @@ fail0:
 				"status", ep_stat_tostr(estat, ebuf, sizeof ebuf),
 				NULL, NULL);
 	}
+
+	if (ep_dbg_test(Dbg, 20))
+	{
+		char ebuf[100];
+		ep_dbg_printf("<<< cmd_create(%s): %s\n", gcl->pname,
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
+
 	return estat;
 }
 
@@ -368,6 +376,13 @@ cmd_open(gdp_req_t *req)
 	}
 	req->pdu->datum->recno = gcl->nrecs;
 
+	if (ep_dbg_test(Dbg, 20))
+	{
+		char ebuf[100];
+		ep_dbg_printf("<<< cmd_open(%s): %s\n", gcl->pname,
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
+
 	_gdp_gcl_decref(&req->gcl);
 	return estat;
 }
@@ -407,6 +422,13 @@ cmd_close(gdp_req_t *req)
 
 	//return number of records
 	req->pdu->datum->recno = req->gcl->nrecs;
+
+	if (ep_dbg_test(Dbg, 20))
+	{
+		char ebuf[100];
+		ep_dbg_printf("<<< cmd_close(%s): %s\n", req->gcl->pname,
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
 
 	// drop reference
 	_gdp_gcl_decref(&req->gcl);
@@ -578,8 +600,11 @@ cmd_append(gdp_req_t *req)
 			{
 				// may be a duplicate append
 				// XXX check that records match?
-				estat = gdpd_gcl_error(req->pdu->dst,
-						"cmd_append: record number duplicated",
+				char mbuf[100];
+				snprintf(mbuf, sizeof mbuf,
+						"cmd_append: record number %" PRIgdp_recno " duplicated",
+						req->pdu->datum->recno);
+				estat = gdpd_gcl_error(req->pdu->dst, mbuf,
 						GDP_STAT_RECORD_DUPLICATED, GDP_STAT_NAK_CONFLICT);
 				goto fail0;
 			}
@@ -587,8 +612,11 @@ cmd_append(gdp_req_t *req)
 					!GdplogdForgive.allow_log_gaps)
 			{
 				// gap in record numbers
-				estat = gdpd_gcl_error(req->pdu->dst,
-						"cmd_append: record number missing",
+				char mbuf[100];
+				snprintf(mbuf, sizeof mbuf,
+						"cmd_append: record number %" PRIgdp_recno " missing",
+						req->pdu->datum->recno);
+				estat = gdpd_gcl_error(req->pdu->dst, mbuf,
 						GDP_STAT_RECNO_SEQ_ERROR, GDP_STAT_NAK_FORBIDDEN);
 				goto fail0;
 			}

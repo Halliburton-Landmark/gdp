@@ -305,7 +305,7 @@ gdp_gcl_create(gdp_name_t gclname,
 	gdp_name_t namebuf;
 
 	GDP_CHECK_INITIALIZED;				// make sure gdp_init is done
-	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_create\n");
+	ep_dbg_cprintf(Dbg, 19, "\n>>> gdp_gcl_create\n");
 
 	if (gclname == NULL)
 	{
@@ -343,7 +343,12 @@ gdp_gcl_open(gdp_name_t name,
 	EP_CRYPTO_KEY *skey = NULL;
 
 	GDP_CHECK_INITIALIZED;				// make sure gdp_init is done
-	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_open\n");
+	if (ep_dbg_test(Dbg, 19))
+	{
+		gdp_pname_t pname;
+		ep_dbg_printf("\n>>> gdp_gcl_open(%s)\n",
+					gdp_printable_name(name, pname));
+	}
 
 	if (mode == GDP_MODE_RO)
 		cmd = GDP_CMD_OPEN_RO;
@@ -413,6 +418,12 @@ gdp_gcl_open(gdp_name_t name,
 
 fail0:
 	ep_thr_mutex_unlock(&OpenMutex);
+	if (ep_dbg_test(Dbg, 8))
+	{
+		char ebuf[100];
+		ep_dbg_printf("<<< gdp_gcl_open(%s): %s\n", gcl->pname,
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
 	return estat;
 }
 
@@ -425,9 +436,12 @@ EP_STAT
 gdp_gcl_close(gdp_gcl_t *gcl)
 {
 	EP_STAT estat;
+	char ebuf[100];
 
-	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_close\n");
+	ep_dbg_cprintf(Dbg, 19, "\n>>> gdp_gcl_close(%s)\n", gcl->pname);
 	estat = _gdp_gcl_close(gcl, _GdpChannel, 0);
+	ep_dbg_cprintf(Dbg, 8, "<<< gdp_gcl_close(%s): %s\n", gcl->pname,
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	return estat;
 }
 
