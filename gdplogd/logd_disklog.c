@@ -2052,7 +2052,7 @@ disk_append(gdp_gcl_t *gcl,
 	segment_t *seg;
 	EP_STAT estat = EP_STAT_OK;
 
-	if (ep_dbg_test(Dbg, 14))
+	if (ep_dbg_test(Dbg, 24))
 	{
 		ep_dbg_printf("disk_append ");
 		_gdp_datum_dump(datum, ep_dbg_getfile());
