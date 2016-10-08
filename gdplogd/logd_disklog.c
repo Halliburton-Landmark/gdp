@@ -2052,10 +2052,11 @@ disk_append(gdp_gcl_t *gcl,
 	segment_t *seg;
 	EP_STAT estat = EP_STAT_OK;
 
-	if (ep_dbg_test(Dbg, 24))
+	if (ep_dbg_test(Dbg, 14))
 	{
 		ep_dbg_printf("disk_append ");
-		_gdp_datum_dump(datum, ep_dbg_getfile());
+		gdp_datum_print(datum, ep_dbg_getfile(),
+					ep_dbg_test(Dbg, 24) ? 0 : GDP_DATUM_PRMETAONLY);
 	}
 
 	phys = GETPHYS(gcl);
