@@ -2054,9 +2054,10 @@ disk_append(gdp_gcl_t *gcl,
 
 	if (ep_dbg_test(Dbg, 14))
 	{
-		ep_dbg_printf("disk_append ");
+		ep_dbg_printf("disk_append(%s):\n    ", gcl->pname);
 		gdp_datum_print(datum, ep_dbg_getfile(),
-					ep_dbg_test(Dbg, 24) ? 0 : GDP_DATUM_PRMETAONLY);
+					GDP_DATUM_PRDEBUG |
+						(ep_dbg_test(Dbg, 24) ? 0 : GDP_DATUM_PRMETAONLY));
 	}
 
 	phys = GETPHYS(gcl);

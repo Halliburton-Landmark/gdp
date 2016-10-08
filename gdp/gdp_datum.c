@@ -159,7 +159,7 @@ gdp_datum_print(const gdp_datum_t *datum, FILE *fp, uint32_t flags)
 	bool quiet = EP_UT_BITSET(GDP_DATUM_PRQUIET, flags);
 	bool debug = EP_UT_BITSET(GDP_DATUM_PRDEBUG, flags);
 
-	if (quiet && debug)
+	if (quiet && (debug || EP_UT_BITSET(GDP_DATUM_PRMETAONLY, flags)))
 		quiet = false;
 
 	flockfile(fp);
@@ -206,6 +206,12 @@ gdp_datum_print(const gdp_datum_t *datum, FILE *fp, uint32_t flags)
 		}
 
 		fprintf(fp, "%s\n", datum->inuse ? "" : ", !inuse");
+	}
+
+	if (EP_UT_BITSET(GDP_DATUM_PRMETAONLY, flags))
+	{
+		fprintf(fp, "\n");
+		goto done;
 	}
 
 	if (EP_UT_BITSET(GDP_DATUM_PRTEXT, flags))

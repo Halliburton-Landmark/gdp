@@ -154,8 +154,10 @@ siginfo(int sig, short what, void *arg)
 void
 sigterm(int sig)
 {
-	ep_log(EP_STAT_OK, "Terminating on signal %d", sig);
 	signal(sig, SIG_DFL);
+	ep_log(EP_STAT_OK, "Terminating on signal %d", sig);
+	if (ep_dbg_test(Dbg, 1))
+		dump_state(GDP_PR_DETAILED);
 	exit(EX_UNAVAILABLE);		// this will do cleanup
 }
 
@@ -170,7 +172,7 @@ sigabort(int sig)
 	signal(sig, SIG_DFL);
 	ep_log(EP_STAT_ABORT, "Aborting on signal %d", sig);
 	dump_state(GDP_PR_DETAILED);
-	kill(getpid(), sig);
+	kill(getpid(), sig);		// this will not do cleanup
 }
 
 

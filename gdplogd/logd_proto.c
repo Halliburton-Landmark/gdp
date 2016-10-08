@@ -379,7 +379,8 @@ cmd_open(gdp_req_t *req)
 	if (ep_dbg_test(Dbg, 20))
 	{
 		char ebuf[100];
-		ep_dbg_printf("<<< cmd_open(%s): %s\n", gcl->pname,
+		ep_dbg_printf("<<< cmd_open(%s): gcl %p nrecs %" PRIgdp_recno ":\n    %s\n",
+					gcl->pname, gcl, gcl->nrecs,
 					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 

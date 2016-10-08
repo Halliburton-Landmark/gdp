@@ -407,10 +407,11 @@ extern void		gdp_datum_print(
 					FILE *fp,					// file to print it to
 					uint32_t flags);			// formatting options
 
-#define GDP_DATUM_PRTEXT	0x00000001		// print data as text
-#define GDP_DATUM_PRDEBUG	0x00000002		// print debugging info
-#define GDP_DATUM_PRSIG		0x00000004		// print the signature
-#define GDP_DATUM_PRQUIET	0x00000008		// don't print any metadata
+#define GDP_DATUM_PRTEXT		0x00000001		// print data as text
+#define GDP_DATUM_PRDEBUG		0x00000002		// print debugging info
+#define GDP_DATUM_PRSIG			0x00000004		// print the signature
+#define GDP_DATUM_PRQUIET		0x00000008		// don't print any metadata
+#define GDP_DATUM_PRMETAONLY	0x00000010		// only print metadata
 
 // get the record number from a datum
 extern gdp_recno_t	gdp_datum_getrecno(
