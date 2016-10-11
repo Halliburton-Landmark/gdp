@@ -96,6 +96,14 @@ deviceData = {
             { "logname": "edu.tamu.esp.Setup1c.device.c098e57000c4", "type": "PowerBlade", "humanName": 'TAMU PowerBlade: unknown2'}, 
             { "logname": "edu.tamu.esp.Setup1c.device.c098e57000a8", "type": "PowerBlade", "humanName": 'TAMU PowerBlade: unknown3'}, 
 
+            { "logname": "edu.berkeley.eecs.swarmlab.device.00124b000a64aa04", "type": "i3mote", "humanName": 'swarmlab i3mote-1'}, 
+            { "logname": "edu.berkeley.eecs.swarmlab.device.00124b000a55f706", "type": "i3mote", "humanName": 'swarmlab i3mote-2'}, 
+            // { "logname": "edu.berkeley.eecs.swarmlab.device.00124b0007907583", "type": "i3mote", "humanName": 'swarmlab i3mote-3'}, 
+            { "logname": "edu.berkeley.eecs.swarmlab.device.00124b000a4c5880", "type": "i3mote", "humanName": 'swarmlab i3mote-4'}, 
+            { "logname": "edu.berkeley.eecs.swarmlab.device.00124b000d7dfa07", "type": "i3mote", "humanName": 'swarmlab i3mote-5'}, 
+            // { "logname": "edu.berkeley.eecs.swarmlab.device.00124b000d7dfb87", "type": "i3mote", "humanName": 'swarmlab i3mote-6'}, 
+            // { "logname": "edu.berkeley.eecs.swarmlab.device.00124b0007910e03", "type": "i3mote", "humanName": 'swarmlab i3mote-7'}, 
+
 ],    };
 
 deviceCategories = { //DEPENDENT
@@ -119,6 +127,7 @@ typelist = {
          { "type" : "BLEES" },
          { "type" : "Blink" },
          { "type" : "PowerBlade" },
+         { 'type' : 'i3mote'},
 ], };
 
 function selectSubcats(doc) {

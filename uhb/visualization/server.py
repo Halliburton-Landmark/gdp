@@ -53,16 +53,19 @@ class DataResource(Resource):
 
         sampleRecord = gdpcache.mostRecent()
         sampleData = json.loads(sampleRecord['data'])
-        if sampleData['device'] == "BLEES":
+        if sampleData.get('device') == "BLEES":
             keys = ['pressure_pascals', 'humidity_percent',
                     'temperature_celcius', 'light_lux',
                     'acceleration_advertisement', 'acceleration_interval']
-        elif sampleData['device'] == "Blink":
+        elif sampleData.get('device') == "Blink":
             keys = ['current_motion', 'motion_since_last_adv',
                     'motion_last_minute']
-        elif sampleData['device'] == 'PowerBlade':
+        elif sampleData.get('device') == 'PowerBlade':
             keys = ['rms_voltage', 'power', 'apparent_power', 'energy',
                     'power_factor']
+        elif (('msp432_active' in sampleData.keys()) and
+                ('cc2650_active' in sampleData.keys())):
+            keys = ['rhum', 'tamb', 'press', 'bat', 'lux']
         else:
             keys = []
 
