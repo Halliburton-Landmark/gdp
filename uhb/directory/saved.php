@@ -32,30 +32,67 @@ $conn = new mysqli($servername, $username, $pass, $dbname);
 if ($conn->connect_error) {
 die("Connection failed: " . $conn->connect_error);
 } 
+//echo "Connected successfully\n";
 
+function close_sql() {
+    $conn->close();
+} 
+function insert_sql($humanname, $location, $logname, $sensortype, $keys) {
+    echo $humanname;
+}
 //function select_type() {
 $sql = "SELECT type_name FROM type";
 $types = $conn->query($sql);
+/*
+if ($types->num_rows > 0) {
+// output data of each row
+    while($row = $types->fetch_assoc()) {
+        echo $row["type_name"];
+    }
+} else {
+    echo "0 results";
+}
+*/
 
+function select_keys($type) {
+    if ($sql = $conn->prepare("SELECT metric_name, value_type FROM metric as m join type as t on m.t_id = t.type_id where t.type_name = ?")) {
+        $sql->bind_param("s", $type);
+        $sql->execute();
+        $sql->bind_result($result);
+        $sql->fetch();
+        
+   // $result = $conn->query($sql);
 
-//returns a 2-item list: [a boolean, and correctly parsed {key:value} list of metrics]
+    if ($result->num_rows > 0) {
+        // output data of each row
+        while($row = $result->fetch_assoc()) {
+        echo $row["type_name"];
+        }
+    } else {
+        echo "0 results";
+    } 
+    $sql->close();
+    }
+}
+
 function parse_keys($metrics) {
-//should be: 'metric name : value type, ...'
+//should be: 'metric name : value type , ...'
     $final = [];
     $shortened = false;
     $result = explode("," , $metrics);
     foreach ($result as $pair) {
-      $inner = explode(":" , $pair);
-      if (count($inner) == 2) {
-        //exactly two items must make up the pair, and they must both exist
-        if (trim($inner[0]) and trim($inner[1])) {
+	$inner = explode(":" , $pair);
+        if (count($inner) == 2) {
+           if (trim($inner[0]) and trim($inner[1])) {
+               $final[trim($inner[0])] = trim($inner[1]);
+           }
+        } else if (trim($inner[0])) { $shortened = true; }
 
-          $final[trim($inner[0])] = trim($inner[1]);
-
-        }
-      } else if (trim($inner[0])) { $shortened = true; }
     }
-    //if shortened == true, some values were removed due to incorrect formatting
+foreach ($final as $x => $x_value) {
+//    echo $x . " : " . $x_value;
+//    echo ", ";
+}
     return [$shortened,$final];
 }
 
@@ -69,9 +106,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (!preg_match("/^[a-zA-Z ]*$/",$humanname)) {
       $humannameErr = "Only letters and white space allowed";    
     }
-    if (strlen($humanname) > 254) {
-      $humannameErr = "String too long";
-    }
   }
     
   if (empty($_POST["logname"])) {
@@ -82,21 +116,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (!preg_match("/^[a-zA-Z0-9_-~+.:<> ]*$/",$logname)) {
       $lognameErr = "Invalid characters given"; 
     }
-    if (strlen($logname) > 509) {
-      $lognameErr = "String too long";
-    }
   }
 
   if (empty($_POST["sensortype"])) {
     $sensortypeErr = "Sensor type is required";
   } else {
     $sensortype = test_input($_POST["sensortype"]);
-    // check if syntax is valid
+    // check if syntax is valid (this regular expression also allows dashes in the URL)
     if (!preg_match("/^[a-zA-Z0-9-*_~.,' ]*$/",$sensortype)) {
       $sensortypeErr = "Invalid characters given"; 
-    }
-    if (strlen($sensortype) > 254) {
-      $sensortypeErr = "String too long";
     }
   }
 
@@ -104,12 +132,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $location = "";
   } else {
     $location = test_input($_POST["location"]);
-    // check if syntax is valid
+    // check if syntax is valid (this regular expression also allows dashes in the URL)
     if (!preg_match("/^[a-zA-Z0-9-.,;' ]*$/",$location)) {
       $locationErr = "Invalid characters given"; 
-    }
-    if (strlen($location) > 509) {
-      $locationErr = "String too long";
     }
   }
 
@@ -122,11 +147,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $keyErr = "Invalid characters given"; 
     }
     if (!is_array($keys)) {
-      $parsed = parse_keys($keys);
-      $keys = $parsed[1];
-      if ($parsed[0]) {
-        $checkErr = "Warning: Some sensor metrics removed due to incorrect formatting.";
-      } 
+        $parsed = parse_keys($keys);
+	$keys = $parsed[1];
+	if ($parsed[0]) {
+            $checkErr = "Warning: Some sensor metrics removed due to incorrect formatting.";
+        } 
     } 
   }
 
@@ -134,10 +159,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $passwordErr = "Password is required to submit form";
   } else {
     $password = test_input($_POST["password"]);
-    // check if password matches
+    // check if URL address syntax is valid (this regular expression also allows dashes in the URL)
     if (!password_verify($password, $hash)) {
-      $passwordErr = "Password doesn't match";
-      $passMatch = false;
+    $passwordErr = "Password doesn't match";
+    $passMatch = false;
     } else {
       $passMatch = true;
     }
@@ -155,65 +180,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
   if (isset($_POST["submit"])) {
     if (check_errors($humannameErr,$keyErr,$lognameErr,$locationErr,$sensortypeErr)) {
-      if ($passMatch) {
-        //need to check whether logname already exists in database
-        $sql = "SELECT logname FROM sensor WHERE logname = '".$logname."'";
-        $result = $conn->query($sql);
-        if (!$result) {
-            echo "Query failed: (" . $conn->errno . ") " . $conn->error;
-        } else {
-          if (mysqli_num_rows($result) > 0) {
-            //log of this name exists already
-            $submitErr = "Cannot submit form. This log name is already in the database.";
-          } else {
-            //insert the data
-            $t_id = "";
-            //if new type:
-            if (mysqli_num_rows($conn->query("SELECT * FROM type WHERE type_name LIKE '".$sensortype."'")) == 0) {
-             $typeinsert = "INSERT INTO type (type_name) VALUES ('".$sensortype."')";
-              if ($conn->query($typeinsert)) {
-                $submitErr = "New type record created. ";
-                $t_id = $conn->insert_id;	 
-                foreach ($keys as $x => $x_value) {
-                  $metricinsert = "INSERT INTO metric (metric_name, value_type, t_id) VALUES ('".$x."', '".$x_value."', '".$t_id."')";
-                  if ($conn->query($metricinsert)) {
-                  } else {
-                    $submitErr = $submitErr . "Failed to insert new metric type for " . $x;
-                  }
-                }
-              } else {
-                $submitErr = $submitErr . "Failed to insert new sensor type " . $sensortype;
-              }
-
-           } else {
-              //get the id for known sensortype
-              $typequery = "SELECT type_id FROM type WHERE type_name LIKE '".$sensortype."'";
-              $result = $conn->query($typequery);
-              if ($result) {
-                if ($result->num_rows == 1) {
-                  while($row = $result->fetch_assoc()) {
-                    $t_id = $row["type_id"];
-                  }
-                }
-              }
-            }
-            $submitErr = $submitErr . " Type id " . $t_id . ". ";
-            //if type exists:
-            if ($t_id) {
-              $sensorinsert = "INSERT INTO sensor (logname, humanname, location, t_id) VALUES ('".$logname."', '".$humanname."', '".$location."', '".$t_id."')";
-              if ($conn->query($sensorinsert)) {
-                $submitErr = $submitErr . "Sensor entered into database successfully.";
-              } else {
-                $submitErr = $submitErr . "Failed to insert new sensor " . $logname;
-              }
-            }
-          }
-        }
-      }
-    } 
-    if ($submitErr == "") {
-      $submitErr = "Please fix remaining errors.";
-    }
+       if ($passMatch) { $submitErr =  "Data entered."; }
+     } 
+     if ($submitErr == "") {$submitErr = "Please fix remaining errors.";}
   }
 }
 
@@ -248,15 +217,12 @@ echo htmlspecialchars($_SERVER["PHP_SELF"]);?>">
   Human's name (first and last): <input type="text" name="humanname" value="<?php echo $humanname;?>">
   <span class="error">* <?php echo $humannameErr;?></span>
   <br><br>
-
-  Location: <input style="width: 25%;" type="text" name="location" value="<?php echo $location;?>"><span class="error"><?php echo " " . $locationErr;?></span>
-<br><label for="location"><small>Example: 'University name, building name'</small></label>  
+  Location: <input style="width: 25%;" type="text" name="location" value="<?php echo $location;?>">
+<br><label for="location"><small>Example: 'University name, building name'</small></label>  <span class="error"><?php echo $locationErr;?></span>
 <br><br>
-
   Logname: <input style="width: 25%;" type="text" name="logname" value="<?php echo $logname;?>">
   <span class="error">* <?php echo $lognameErr;?></span>
   <br><br>
-
   Sensor Type: <input list="types" name="sensortype" value="<?php echo $sensortype;?>">
     <datalist id="types">
     <?php 
@@ -266,7 +232,6 @@ echo htmlspecialchars($_SERVER["PHP_SELF"]);?>">
     ?></datalist>
   <span class="error">* <?php echo $sensortypeErr;?></span>
 <br><br>
-
 <label>  Sensor Metrics: <textarea list="types" name="keys" rows="5" cols="70">
 <?php
 $sql = "SELECT metric_name, value_type FROM metric JOIN type on metric.t_id = type.type_id WHERE type_name LIKE '".$sensortype."'";
@@ -293,7 +258,6 @@ if ($keys) {
   <br><br>
 <input type="submit" name="checkdata" value="Check Data Validity"><span class="error"><?php echo " " . $checkErr;?></span>
 <br><br>
-
   Password: <input type="password" name="password">
   <span class="error">* <?php echo $passwordErr;?></span>
   <br><br>
@@ -301,23 +265,24 @@ if ($keys) {
 </form>
 
 <?php
-if ($submitErr == "Data entered.") {
-  echo "<h2>Your Input:</h2>";
-  echo $humanname;
-  echo "<br>";
-  echo $location;
-  echo "<br>";
-  echo $logname;
-  echo "<br>";
-  echo $sensortype;
-  echo "<br>";
-  if ($keys) {
-      foreach ($keys as $x => $x_value) {
-          echo $x . " : " . $x_value;
-          echo ", ";
-      }
-  }
+echo "<h2>Your Input:</h2>";
+echo $humanname;
+echo "<br>";
+echo $logname;
+echo "<br>";
+echo $sensortype;
+echo "<br>";
+echo $location;
+echo "<br>";
+if ($keys) {
+    foreach ($keys as $x => $x_value) {
+        echo $x . " : " . $x_value;
+        echo ", ";
+    }
 }
+echo "<br>";
+echo $passMatch;
+echo "<br>";
 ?>
 
 </body>
