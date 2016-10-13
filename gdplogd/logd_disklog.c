@@ -1401,6 +1401,8 @@ ridx_put(gdp_gcl_t *gcl, gdp_recno_t recno, int segno, off_t offset)
 	ridx_entry.offset = ep_net_hton64(offset);
 	ridx_entry.reserved = 0;
 
+	flockfile(phys->ridx.fp);
+
 	// write ridx record
 	estat = ridx_fseek_to_recno(phys, recno, gcl->pname);
 	EP_STAT_CHECK(estat, goto fail0);
@@ -1425,6 +1427,7 @@ ridx_put(gdp_gcl_t *gcl, gdp_recno_t recno, int segno, off_t offset)
 	EP_STAT_CHECK(estat, goto fail0);
 
 fail0:
+	funlockfile(phys->ridx.fp);
 	return estat;
 }
 
@@ -2188,6 +2191,7 @@ disk_getmetadata(gdp_gcl_t *gcl,
 
 	// lock the GCL so that no one else seeks around on us
 	ep_thr_rwlock_rdlock(&phys->lock);
+	flockfile(seg->fp);					// need exclusive control of seek ptr
 
 	// seek to the metadata area
 	STDIOCHECK("gcl_physgetmetadata: fseek#0", 0,
@@ -2239,6 +2243,7 @@ fail_stdio:
 		estat = GDP_STAT_CORRUPT_GCL;
 	}
 
+	funlockfile(seg->fp);
 	ep_thr_rwlock_unlock(&phys->lock);
 	return estat;
 }
