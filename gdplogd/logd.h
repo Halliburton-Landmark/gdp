@@ -176,6 +176,9 @@ struct gcl_phys_impl
 	EP_STAT		(*ts_to_recno)(
 						gdp_gcl_t *gcl,
 						gdp_datum_t *datum);
+	bool		(*recno_exists)(
+						gdp_gcl_t *gcl,
+						gdp_recno_t recno);
 };
 
 // known implementations

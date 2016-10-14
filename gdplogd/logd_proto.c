@@ -584,43 +584,46 @@ cmd_append(gdp_req_t *req)
 	// validate sequence number and signature
 	if (req->pdu->datum->recno != req->gcl->nrecs + 1)
 	{
+		bool random_order_ok = GdplogdForgive.allow_log_gaps &&
+								GdplogdForgive.allow_log_dups;
+
 		// replay or missing a record
-		ep_dbg_cprintf(Dbg, GdplogdForgive.allow_log_gaps ? 19 : 1,
+		ep_dbg_cprintf(Dbg, random_order_ok ? 29 : 9,
 						"cmd_append: record out of sequence: got %"
 						PRIgdp_recno ", expected %" PRIgdp_recno "\n"
 						"\ton log %s\n",
 						req->pdu->datum->recno, req->gcl->nrecs + 1,
 						req->gcl->pname);
 
-		// XXX TEMPORARY: if no key, allow any record number XXX
-		// (for compatibility with older clients) [delete if condition]
-		if (GDP_PROTO_MIN_VERSION > 2 || req->pdu->ver > 2)
+		if (req->pdu->datum->recno <= req->gcl->nrecs)
 		{
-			if (req->pdu->datum->recno <= req->gcl->nrecs &&
-					!GdplogdForgive.allow_log_dups)
+			// may be a duplicate append, or just filling in a gap
+			// (should probably see if duplicates are the same data)
+
+			if (!GdplogdForgive.allow_log_dups &&
+				req->gcl->x->physimpl->recno_exists(
+									req->gcl, req->pdu->datum->recno))
 			{
-				// may be a duplicate append
-				// XXX check that records match?
 				char mbuf[100];
 				snprintf(mbuf, sizeof mbuf,
-						"cmd_append: record number %" PRIgdp_recno " duplicated",
+						"cmd_append: duplicate record number %" PRIgdp_recno,
 						req->pdu->datum->recno);
 				estat = gdpd_gcl_error(req->pdu->dst, mbuf,
 						GDP_STAT_RECORD_DUPLICATED, GDP_STAT_NAK_CONFLICT);
 				goto fail0;
 			}
-			else if (req->pdu->datum->recno > req->gcl->nrecs + 1 &&
-					!GdplogdForgive.allow_log_gaps)
-			{
-				// gap in record numbers
-				char mbuf[100];
-				snprintf(mbuf, sizeof mbuf,
-						"cmd_append: record number %" PRIgdp_recno " missing",
-						req->pdu->datum->recno);
-				estat = gdpd_gcl_error(req->pdu->dst, mbuf,
-						GDP_STAT_RECNO_SEQ_ERROR, GDP_STAT_NAK_FORBIDDEN);
-				goto fail0;
-			}
+		}
+		else if (req->pdu->datum->recno > req->gcl->nrecs + 1 &&
+				!GdplogdForgive.allow_log_gaps)
+		{
+			// gap in record numbers
+			char mbuf[100];
+			snprintf(mbuf, sizeof mbuf,
+					"cmd_append: record number %" PRIgdp_recno " missing",
+					req->pdu->datum->recno);
+			estat = gdpd_gcl_error(req->pdu->dst, mbuf,
+					GDP_STAT_RECNO_SEQ_ERROR, GDP_STAT_NAK_FORBIDDEN);
+			goto fail0;
 		}
 	}
 

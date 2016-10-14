@@ -1971,6 +1971,44 @@ fail0:
 
 
 /*
+**  DISK_RECNO_EXISTS --- determine if a record number already exists
+*/
+
+static bool
+disk_recno_exists(gdp_gcl_t *gcl, gdp_recno_t recno)
+{
+	gcl_physinfo_t *phys = GETPHYS(gcl);
+	bool rval = false;
+
+	ep_thr_rwlock_rdlock(&phys->lock);
+
+	if (recno > phys->max_recno || recno < phys->min_recno)
+		goto done;
+
+	if (ridx_cache_get(phys, recno) != NULL)
+	{
+		rval = true;
+	}
+	else
+	{
+		EP_STAT estat;
+		ridx_entry_t ridx_entry;
+
+		estat = ridx_entry_read(gcl, recno, gcl->pname, &ridx_entry);
+		if (!EP_STAT_ISOK(estat))
+			goto done;
+
+		if (ridx_entry.offset != 0)
+			rval = true;
+	}
+
+done:
+	ep_thr_rwlock_unlock(&phys->lock);
+	return rval;
+}
+
+
+/*
 **  DISK_TS_TO_RECNO --- map a timestamp to a record number
 */
 
@@ -2371,4 +2409,5 @@ struct gcl_phys_impl	GdpDiskImpl =
 #endif
 	.foreach =			disk_foreach,
 	.getstats =			disk_getstats,
+	.recno_exists =		disk_recno_exists,
 };
