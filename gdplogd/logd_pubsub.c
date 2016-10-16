@@ -66,6 +66,8 @@ sub_send_message_notification(gdp_req_t *req, gdp_datum_t *datum, int cmd)
 	}
 	req->pdu->datum = NULL;				// we just borrowed the datum
 
+	req->nextrec++;
+
 	if (cmd == GDP_ACK_CONTENT && req->numrecs > 0 && --req->numrecs <= 0)
 		sub_end_subscription(req);
 }

@@ -902,13 +902,13 @@ cmd_subscribe(gdp_req_t *req)
 		}
 		if (r1 != NULL)
 		{
-			// this overlaps a previous subscription; just update
-			r1->nextrec = req->nextrec;
-			r1->numrecs = req->numrecs;
+			// make sure we don't send data already sent
+			req->nextrec = r1->nextrec;
 
-			// abandon new request
-			_gdp_gcl_decref(&req->gcl);
-			req = r1;
+			// abandon old request, we'll overwrite it with new request
+			ep_dbg_cprintf(Dbg, 20, "cmd_subscribe: removing old request\n");
+			_gdp_req_lock(r1);
+			_gdp_req_free(&r1);
 		}
 	}
 
