@@ -26,6 +26,7 @@ import traceback
 from datetime import datetime
 
 from bokeh.io import curdoc
+from bokeh.models.sources import ColumnDataSource
 from bokeh.layouts import row, column
 from bokeh.plotting import figure
 from bokeh.models.widgets import Paragraph
@@ -68,15 +69,17 @@ def generatePlot(lines, title, height, width):
     # lines is a list of (linename, [t0, t1...], [v0, v1...]) items,
     #     that ought to be plotted as individual lines.
 
+    colors = ['red', 'green', 'blue', 'orange', 'black']
     plot = figure(plot_width=width, plot_height=height, tools='',
                         toolbar_location=None,
                         x_axis_type='datetime', title=title)
-    Xs, Ys = [], []
-    for (name, X, Y) in lines:
-        Xs.append(X), Ys.append(Y)
 
-    colors = ['red', 'green', 'blue', 'orange', 'black'][:len(Xs)]
-    plot.multi_line(xs=Xs, ys=Ys, color=colors)
+    for i in xrange(len(lines)):
+        name, X, Y = lines[i]
+        color = colors[i]   # Hope nobody comes along asking for 20 plots
+
+        source = ColumnDataSource(data=dict(x=X, y=Y))
+        plot.line('x', 'y', source=source, color=color)
 
     return plot
 
