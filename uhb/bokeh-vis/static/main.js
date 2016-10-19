@@ -65,12 +65,28 @@ function makeForm() {
     document.getElementById('endTime').value = new Date(timeNow).toLocaleString();
 }
 
+// from https://stackoverflow.com/questions/111529/how-to-create-query-parameters-in-javascript
+function EncodeQueryData(data) {
+   var ret = [];
+   for (var d in data)
+      ret.push(encodeURIComponent(d) + "=" + encodeURIComponent(data[d]));
+   return ret.join("&");
+}
+
+
 function plot(form) {
     var logname = form.logname.value;
     startTime = Date.parse(form.startTime.value)/1000.0;
     endTime = Date.parse(form.endTime.value)/1000.0;
-    urlString = "http://localhost:5006/main?log=edu.berkeley.eecs.bwrc.device.c098e5300009&log=edu.berkeley.eecs.swarmlab.device.c098e5300003&log=edu.berkeley.eecs.swarmlab.device.c098e530000a&start=1473225641.397882&end=1475817641.397882&height=200&width=800&plot_0_title=Light&plot_0_keys=light_lux&plot_1_title=Temperature&plot_1_keys=temperature_celcius&plot_2_title=Humidity&plot_2_keys=humidity_percent";
+    var params = {  'log': logname,
+                    'start': startTime, 'end': endTime,
+                    'height': 200, 'width': document.body.clientWidth-300 }
+    urlString = "http://localhost:5006/oneD?" + EncodeQueryData(params)
+
     document.getElementById('dashboard_div').innerHTML = "<iframe src=\"" + urlString + "\"></iframe>"
 
 }
 
+
+
+// urlString = "http://localhost:5006/main?log=edu.berkeley.eecs.bwrc.device.c098e5300009&log=edu.berkeley.eecs.swarmlab.device.c098e5300003&log=edu.berkeley.eecs.swarmlab.device.c098e530000a&start=1473225641.397882&end=1475817641.397882&height=200&width=800&plot_0_title=Light&plot_0_keys=light_lux&plot_1_title=Temperature&plot_1_keys=temperature_celcius&plot_2_title=Humidity&plot_2_keys=humidity_percent";
