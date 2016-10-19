@@ -68,6 +68,7 @@ class GDPcache:
         """
 
         gdp.gdp_init()      # No side-effects of calling this multiple times
+        # gdp.dbg_set("*=10")
         self.logname = logname
         self.lh = gdp.GDP_GCL(gdp.GDP_NAME(logname), gdp.GDP_MODE_RO)
         self.limit = limit
@@ -130,18 +131,19 @@ class GDPcache:
         I don't check for already-cached entries """
 
         numRecords = 0
+        usingMultiread = False
         if step == 1:
             self.lh.multiread(start, num)
-            numRecords = num
+            usingMultiread = True
         else:
             # do lots of multireads of size 1
             for i in xrange(start, start+num, step):
                 self.lh.read_async(i)
                 numRecords += 1
         ret = []
-        while numRecords>0:
+        while usingMultiread or numRecords>0:
             event = self.lh.get_next_event(None)
-            if event['type'] == gdp.GDP_EVENT_EOS:
+            if event['type'] == gdp.GDP_EVENT_EOS and usingMultiread:
                 break
             if event["type"] not in [gdp.GDP_EVENT_EOS, gdp.GDP_EVENT_DATA]:
                 print "Unknown event type", event
