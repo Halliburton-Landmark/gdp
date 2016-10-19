@@ -41,34 +41,46 @@ from bokeh.plotting import figure
 from bokeh.models.widgets import PreText
 
 
-## Initialize stuff
+class NoDataFound(Exception):
+    def __init__(self, arg):
+        self.msg = arg
+
+
 try:
+
+    ### Initialize things and parse the URL arguments
     utils.init()
-    # first parse the arguments
     common_args = utils.parseCommonArgs()
     plot_args = utils.parsePlots()
 
+
+    ### Now get data out of GDP (raw data, no filtering on keys yet)
     alldata = utils.getGDPdata(common_args)
+
 
     # Do we have at least one record? If not, probably tell the
     #   user that they did not choose properly
-    assert len(alldata)>0   # We should have at least one log
-    assert len(alldata[0][2])>0 # We should have at least one data point
+    try:
+        assert len(alldata)>0   # We should have at least one log
+        assert len(alldata[0][2])>0 # We should have at least one data point
+    except AssertionError as e:
+        raise NoDataFound("No data found for the selected time range")
 
- 
+
+    ### If the user didn't specify a list of keys, we try to plot all the
+    ###     keys. This is as general as it can be
     if len(plot_args)==0:
         # The user didn't tell us what keys to plot. We are going to plot
         #   everything that we can using some heuristics from data
-        sampleRecord = alldata[0][2][0] # FIXME: this is going to break
+        sampleRecord = alldata[0][2][0] # there'll be at least one record
         plottable_types = [int, float]
         for k in sampleRecord.keys():
             if type(sampleRecord[k]) in plottable_types:
                 plot_args.append( {'title': k, 'keys': [k] })
-    
         print "Updated parameters for individual plots", plot_args
     
+    ### Here's the cool stuff, where we actually generate plots from data
     plot_objs = []
-    ## Here's the cool stuff, where we actually generate plots from data
     for _args in plot_args:
         title = _args['title']
         keys = _args['keys']
@@ -85,16 +97,14 @@ try:
         plot_objs.append(p)
     
     
-    ## initialize data now
+    ### Put the generated plots into a document now, bokeh will take care
+    ### of plotting them for us.
     curdoc().add_root(column(*plot_objs))
 
-    ## Add the exceptions and other junk
-    # p = PreText(text=str(utils.error_text))
-    # curdoc().add_root(p)
-
 except Exception as e:
-    ## Any other exception encountered above will be passed to our
-    ##  custom exception hook, which will lend us here.
+    ## Any exception encountered above will lead us here, and we will
+    ##  tell the user to fix their stuff. It's better than silently ignoring
+    ##  any errors and generating nothing.
     error_string = "Exception: %s\n\n" % str(e)
     error_string += traceback.format_exc()
     p = PreText(text=str(error_string), width=800)
