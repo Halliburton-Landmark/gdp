@@ -68,11 +68,11 @@ def updateData():
     # update the sources for the data
     for p in plots:
         ctr = 0
+        rollover = max([len(_s.data['x']) for _s in p.sources])
         for l in p.logs:
             (X, _Y) = alldata[l]
             for k in p.keys:
                 Y = [t[k] for t in _Y]
-                rollover = len(p.sources[ctr].data['x'])
                 p.sources[ctr].stream(dict(x=X, y=Y), rollover=rollover)
                 ctr += 1
 
