@@ -33,29 +33,72 @@ http://localhost:5006/oneD?log=edu.berkeley.eecs.bwrc.device.c098e5300009&log=ed
 """
 
 import utils
+from gdp.MISC import EP_STAT_Exception
+import time
 import sys
 import traceback
 from bokeh.io import curdoc
+from bokeh.models.sources import ColumnDataSource
 from bokeh.layouts import row, column
 from bokeh.plotting import figure
 from bokeh.models.widgets import PreText
 
+
+last_update_time = 0.0
+logs = []
+plot_sources = []
+plot_args = []
 
 class NoDataFound(Exception):
     def __init__(self, arg):
         self.msg = arg
 
 
+def updateData():
+    # this function gets called every once in a while.
+    # > Fetches new data out of GDP and updates the source for plots
+    global last_update_time
+    current_time = time.time()
+    try:
+        alldata = utils.getGDPdata(logs, last_update_time, current_time)
+    except EP_STAT_Exception as e:
+        return
+    last_update_time = current_time
+
+    # update the sources for the data
+    ctr = 0
+    for _args in plot_args:
+        keys = _args['keys']
+        for d in alldata:
+            for k in keys:
+                _logname, _X, _Y = d[0], d[1], [_x[k] for _x in d[2]]
+                _source = plot_sources[ctr]
+                ctr += 1
+                rollover = len(_source.data['x'])
+                _source.stream(dict(x=_X, y=_Y), rollover=rollover)
+ 
+
 try:
 
     ### Initialize things and parse the URL arguments
     utils.init()
     common_args = utils.parseCommonArgs()
+    logs = common_args['log']
     plot_args = utils.parsePlots()
 
-
     ### Now get data out of GDP (raw data, no filtering on keys yet)
-    alldata = utils.getGDPdata(common_args)
+    if common_args['end'] > 0.0:
+        alldata = utils.getGDPdata(logs, common_args['start'],
+                                        common_args['end'])
+    else:
+        # We probably need to do live oscilloscope like plots
+        current_time = time.time()
+        alldata = utils.getGDPdata(logs, common_args['start'], current_time)
+
+        # Also set up things for the periodic callback
+        last_update_time = current_time
+        curdoc().add_periodic_callback(updateData, 500)
+
 
 
     # Do we have at least one record? If not, probably tell the
@@ -64,6 +107,7 @@ try:
         assert len(alldata)>0   # We should have at least one log
         assert len(alldata[0][2])>0 # We should have at least one data point
     except AssertionError as e:
+        print alldata
         raise NoDataFound("No data found for the selected time range")
 
 
@@ -88,8 +132,10 @@ try:
         for d in alldata:
             for k in keys:
                 _logname, _X, _Y = d[0], d[1], [_x[k] for _x in d[2]]
-                _linename = "%s: %s" % (_logname, k)
-                lines.append((_linename, _X, _Y))
+                _legend = "%s: %s" % (_logname, k)
+                _source = ColumnDataSource(dict(x=_X, y=_Y))
+                plot_sources.append(_source)
+                lines.append((_legend, _source))
     
         p = utils.generatePlot(lines, title,
                             common_args['height'], common_args['width'])

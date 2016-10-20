@@ -68,7 +68,7 @@ class GDPcache:
         """
 
         gdp.gdp_init()      # No side-effects of calling this multiple times
-        # gdp.dbg_set("*=10")
+        # gdp.dbg_set("*=20")
         self.logname = logname
         self.lh = gdp.GDP_GCL(gdp.GDP_NAME(logname), gdp.GDP_MODE_RO)
         self.limit = limit

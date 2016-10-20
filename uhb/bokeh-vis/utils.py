@@ -75,11 +75,10 @@ def generatePlot(lines, title, height, width):
                         x_axis_type='datetime', title=title)
 
     for i in xrange(len(lines)):
-        name, X, Y = lines[i]
+        _legend, _source = lines[i]
         color = colors[i]   # Hope nobody comes along asking for 20 plots
 
-        source = ColumnDataSource(data=dict(x=X, y=Y))
-        plot.line('x', 'y', source=source, color=color)
+        plot.line('x', 'y', source=_source, color=color)
 
     return plot
 
@@ -132,7 +131,7 @@ def parsePlots():
 
 
 
-def getGDPdata(common_args):
+def getGDPdata(logs, start, end):
     # Fetch the data from GDP. This returns records parsed as JSON
     #   objects. Does not attempt to do any filtering based on keys
 
@@ -141,7 +140,7 @@ def getGDPdata(common_args):
     #   (logname, Xvals, Yvals)         # Xvals, Yvals are lists
 
     alldata = []
-    for l in common_args['log']:
+    for l in logs:
 
         # TODO: make a shared cache of caches
 
@@ -149,7 +148,7 @@ def getGDPdata(common_args):
         __gc = None
         try:
             __gc = GDPcache(l)
-            __l_data = __gc.getRange(common_args['start'], common_args['end'])
+            __l_data = __gc.getRange(start, end)
             del __gc
         except EP_STAT_Exception as e:
             del __gc
