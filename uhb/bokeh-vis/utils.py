@@ -42,11 +42,6 @@ from bokeh.models.widgets import Paragraph
 #     "width"     : 900,
 #     }
 # 
-# plot_defaults = {
-#     "title" : "Temperature",
-#     "keys"  : ["temperature_celcius"],
-#     }
-# 
 
 # First, find out how many plots do we have to generate? We support
 #   an arbitrary number of plots (ideally, let us keep it a small number)
@@ -76,6 +71,8 @@ class GDPPlot:
     keys = []       # keys in a JSON record from logs that this plot plots
     figure = None   # Bokeh figure object that represents this plot    
     sources = []    # Bokeh's ColumnDataSource = len(logs) * len(keys)
+                    #   it is a row major representation, each row represents
+                    #   data from a single log
 
     def __init__(self, logs, start, end, title, keys):
         """ The items that should be known to begin with """
@@ -84,6 +81,78 @@ class GDPPlot:
         self.end = end
         self.title = title
         self.keys = keys
+
+
+    def initFigure(self, width, height):
+        self.figure = figure(plot_width=width, plot_height=height,
+                                tools='', toolbar_location=None,
+                                x_axis_type='datetime', title=self.title)
+        self.figure.legend.location = "top_left"
+
+
+    def __getLegend(self, logname, keyname):
+        """ Returns a smart legend, only information that is necessary"""
+
+        # get log number
+        lognum = self.logs.index(logname)
+
+        if len(self.logs)==1 and len(self.keys)==1:
+            legend = None
+        elif len(self.logs)==1 and len(self.keys)>1:
+            legend = str(keyname)
+        elif len(self.logs)>1 and len(self.keys)==1:
+            legend = str(lognum)
+        else:
+            legend = "%d: %s" %(lognum, keyname)
+
+        return legend 
+
+
+    def initData(self, data):
+        """
+        Initialize the data for this specific plot using the raw data.
+        data is a dictionary of { lognames => (X,Y) }
+        => Involves filtering and updating self.sources
+        Remeber, self.sources is a row major representation
+            of a matrix, with each row representing logs, columns represent
+            a single key
+        """
+
+        self.sources = []
+        _log_ctr = 0
+
+        for l in self.logs:
+
+            (X, _Y) = data[l]        # _Y is the list of raw JSON recs
+            _key_ctr = 0
+
+            for k in self.keys:
+
+                Y = [t[k] for t in _Y]
+                s = ColumnDataSource(dict(x=X, y=Y))
+                self.figure.line('x', 'y', source=s,
+                                line_color=colors[_log_ctr],
+                                line_dash=line_styles[_key_ctr],
+                                legend=self.__getLegend(l,k))
+                self.sources.append(s)
+                _key_ctr += 1
+
+            _log_ctr += 1
+
+
+    def updateData(self, data):
+        """
+        Similar to initData, except that we just need to update already
+            existing sources. We still need to do filtering, however.
+        """
+        ctr = 0
+        rollover = max([len(_s.data['x']) for _s in self.sources])
+        for l in self.logs:
+            (X, _Y) = data[l]
+            for k in self.keys:
+                Y = [t[k] for t in _Y]
+                self.sources[ctr].stream(dict(x=X, y=Y), rollover=rollover)
+                ctr += 1
 
 
 ############ Functions go here ##########
@@ -112,6 +181,7 @@ def parseCommonArgs():
     common_args['end']      = float(args.get('end', [cur_time])[0])
     common_args['height']   = int(args.get('height', [200])[0])
     common_args['width']    = int(args.get('width', [800])[0])
+    common_args['type']     = args.get('type', ['oneD'])[0]
     
     # For sanity checks
     print "Common parameters for all plots", common_args

@@ -56,25 +56,18 @@ class NoDataFound(Exception):
 
 def updateData():
     # this function gets called every once in a while.
-    # > Fetches new data out of GDP and updates the source for plots
+    # > Fetches new data out of GDP and calls updateData on individual plots
     global last_update_time
     current_time = time.time()
     try:
-        alldata = utils.getGDPdata(logs, last_update_time, current_time)
+        newdata = utils.getGDPdata(logs, last_update_time, current_time)
     except EP_STAT_Exception as e:
         return
     last_update_time = current_time
 
     # update the sources for the data
     for p in plots:
-        ctr = 0
-        rollover = max([len(_s.data['x']) for _s in p.sources])
-        for l in p.logs:
-            (X, _Y) = alldata[l]
-            for k in p.keys:
-                Y = [t[k] for t in _Y]
-                p.sources[ctr].stream(dict(x=X, y=Y), rollover=rollover)
-                ctr += 1
+        p.updateData(newdata)
 
 
 try:
@@ -130,37 +123,11 @@ try:
     ### Here's the cool stuff, where we actually generate plots from data
     for p in plots:
 
-        p.figure = figure(plot_width=common_args['width'],
-                            plot_height=common_args['height'],
-                            tools='', toolbar_location=None,
-                            x_axis_type='datetime', title=p.title)
+        # initialize the high level figure
+        p.initFigure(common_args['width'], common_args['height'])
 
-        p.sources = []
-        _log_ctr = 0
-        for l in p.logs:
-            (X, _Y) = alldata[l]        # _Y is the list of raw JSON recs
-            _key_ctr = 0
-            for k in p.keys:
-                Y = [t[k] for t in _Y]
-                s = ColumnDataSource(dict(x=X, y=Y))
-                if len(p.logs)==1 and len(p.keys)==1:
-                    legend = None
-                elif len(p.logs)==1 and len(p.keys)>1:
-                    legend = k
-                elif len(p.logs)>1 and len(p.keys)==1:
-                    legend = str(_log_ctr)
-                else:
-                    legend = "%d: %s" %(_log_ctr, k)
-                p.figure.line('x', 'y', source=s,
-                                line_color=utils.colors[_log_ctr],
-                                line_dash=utils.line_styles[_key_ctr],
-                                legend=legend)
-                p.figure.legend.location = "top_left"
-
-                p.sources.append(s)
-                _key_ctr += 1
-
-            _log_ctr += 1
+        # initialize indvidual lines with dat
+        p.initData(alldata)
 
     
     ### Put the generated plots into a document now, bokeh will take care
