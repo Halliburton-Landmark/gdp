@@ -78,7 +78,7 @@ function plot(form) {
     var logname = form.logname.value;
     startTime = Date.parse(form.startTime.value)/1000.0;
     endTime = Date.parse(form.endTime.value)/1000.0;
-    var params = {  'log': logname,
+    var params = {  'log_0': logname,
                     'start': startTime, 'end': endTime,
                     'height': 200, 'width': document.body.clientWidth-300 }
     urlString = "http://localhost:5006/oneD?" + EncodeQueryData(params)
