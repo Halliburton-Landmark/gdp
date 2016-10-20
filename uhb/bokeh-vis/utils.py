@@ -62,6 +62,29 @@ from bokeh.models.widgets import Paragraph
 args = None
 cur_time = 0.0
  
+
+############ Classes ###################
+
+class GDPPlot:
+    """ Just a structure to keep things organized """
+
+    logs = []       # A list of logs from which the data is sourced
+    start = 0.0     # Start time (definitely non-zero when initialized)
+    end = 0.0       # Can be zero
+    title = ""      # Title of this plot
+    keys = []       # keys in a JSON record from logs that this plot plots
+    figure = None   # Bokeh figure object that represents this plot    
+    sources = []    # Bokeh's ColumnDataSource = len(logs) * len(keys)
+
+    def __init__(self, logs, start, end, title, keys):
+        """ The items that should be known to begin with """
+        self.logs = logs
+        self.start = start
+        self.end = end
+        self.title = title
+        self.keys = keys
+
+
 ############ Functions go here ##########
 
 def generatePlot(lines, title, height, width):
@@ -102,7 +125,7 @@ def parseCommonArgs():
 
 
 
-def parsePlots():
+def parsePlots(common_args):
     # Parse arguments for individual plots (as passed in URL)
     # Can return empty. In that case, a fallback is to plot all
 
@@ -115,19 +138,18 @@ def parsePlots():
     #   [ 'plot_0_keys', 'plot_0_title', 'plot_1_keys', 'plot_1_title', ... ]
     assert len(plot_specific_keys)%2 == 0
     
-    plot_args = []
+    plots = []
     num_plots = len(plot_specific_keys)/2
     for i in xrange(num_plots):
         keys = args.get('plot_%d_keys' % i)
         title = args.get('plot_%d_title' % i)
-    
         assert len(keys)>0
         assert len(title)==1
-        plot_args.append({'title': title[0], 'keys': keys })
+
+        p = GDPPlot(common_args['log'], common_args['start'],
+                        common_args['end'], title, keys)
     
-    # For sanity checks
-    print "User supplied parameters for individual plots", plot_args
-    return plot_args 
+    return plots 
 
 
 
@@ -139,7 +161,7 @@ def getGDPdata(logs, start, end):
     #   format:
     #   (logname, Xvals, Yvals)         # Xvals, Yvals are lists
 
-    alldata = []
+    alldata = {}
     for l in logs:
 
         # TODO: make a shared cache of caches
@@ -166,7 +188,7 @@ def getGDPdata(logs, start, end):
         # l is the name of the log,
         # X is a list of timestamps
         # Y is a list of parsed JSON dictionaries
-        alldata.append((l,X,Y))
+        alldata[l] = (X, Y)
 
     return alldata 
 

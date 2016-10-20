@@ -46,8 +46,8 @@ from bokeh.models.widgets import PreText
 
 last_update_time = 0.0
 logs = []
-plot_sources = []
-plot_args = []
+plots = []  # A list of utils.GDPPlot objects
+
 
 class NoDataFound(Exception):
     def __init__(self, arg):
@@ -66,46 +66,52 @@ def updateData():
     last_update_time = current_time
 
     # update the sources for the data
-    ctr = 0
-    for _args in plot_args:
-        keys = _args['keys']
-        for d in alldata:
-            for k in keys:
-                _logname, _X, _Y = d[0], d[1], [_x[k] for _x in d[2]]
-                _source = plot_sources[ctr]
+    for p in plots:
+        ctr = 0
+        for l in p.logs:
+            (X, _Y) = alldata[l]
+            for k in p.keys:
+                Y = [t[k] for t in _Y]
+                rollover = len(p.sources[ctr].data['x'])
+                p.sources[ctr].stream(dict(x=X, y=Y), rollover=rollover)
                 ctr += 1
-                rollover = len(_source.data['x'])
-                _source.stream(dict(x=_X, y=_Y), rollover=rollover)
- 
+
 
 try:
 
     ### Initialize things and parse the URL arguments
     utils.init()
     common_args = utils.parseCommonArgs()
+
     logs = common_args['log']
-    plot_args = utils.parsePlots()
+    start = common_args['start']
+    end = common_args['end']
+
+    # populate the list of plots
+    plots = utils.parsePlots(common_args)
 
     ### Now get data out of GDP (raw data, no filtering on keys yet)
     if common_args['end'] > 0.0:
-        alldata = utils.getGDPdata(logs, common_args['start'],
-                                        common_args['end'])
+        _end = end
     else:
         # We probably need to do live oscilloscope like plots
-        current_time = time.time()
-        alldata = utils.getGDPdata(logs, common_args['start'], current_time)
-
+        _end = time.time()
         # Also set up things for the periodic callback
-        last_update_time = current_time
+        last_update_time = _end
         curdoc().add_periodic_callback(updateData, 500)
 
+    alldata = utils.getGDPdata(logs, start, _end)
 
 
     # Do we have at least one record? If not, probably tell the
-    #   user that they did not choose properly
+    #   user that they did not chioose properly
+    sampleRecord = None
     try:
-        assert len(alldata)>0   # We should have at least one log
-        assert len(alldata[0][2])>0 # We should have at least one data point
+        assert len(alldata.keys())>0   # We should have at least one log
+        for l in alldata.keys():
+            if len(alldata[l][1])>0:
+                sampleRecord = alldata[l][1][0] # Get the Y value
+        assert sampleRecord is not None
     except AssertionError as e:
         print alldata
         raise NoDataFound("No data found for the selected time range")
@@ -113,39 +119,36 @@ try:
 
     ### If the user didn't specify a list of keys, we try to plot all the
     ###     keys. This is as general as it can be
-    if len(plot_args)==0:
+    if len(plots)==0:
         # The user didn't tell us what keys to plot. We are going to plot
         #   everything that we can using some heuristics from data
-        sampleRecord = alldata[0][2][0] # there'll be at least one record
         plottable_types = [int, float]
         for k in sampleRecord.keys():
             if type(sampleRecord[k]) in plottable_types:
-                plot_args.append( {'title': k, 'keys': [k] })
-        print "Updated parameters for individual plots", plot_args
+                plots.append(utils.GDPPlot(logs, start, end, k, [k]))
     
     ### Here's the cool stuff, where we actually generate plots from data
-    plot_objs = []
-    for _args in plot_args:
-        title = _args['title']
-        keys = _args['keys']
-        lines = []
-        for d in alldata:
-            for k in keys:
-                _logname, _X, _Y = d[0], d[1], [_x[k] for _x in d[2]]
-                _legend = "%s: %s" % (_logname, k)
-                _source = ColumnDataSource(dict(x=_X, y=_Y))
-                plot_sources.append(_source)
-                lines.append((_legend, _source))
-    
-        p = utils.generatePlot(lines, title,
-                            common_args['height'], common_args['width'])
-    
-        plot_objs.append(p)
-    
+    for p in plots:
+
+        p.figure = figure(plot_width=common_args['width'],
+                            plot_height=common_args['height'],
+                            tools='', toolbar_location=None,
+                            x_axis_type='datetime', title=p.title)
+
+        p.sources = []
+        for l in p.logs:
+            (X, _Y) = alldata[l]        # _Y is the list of raw JSON recs
+            for k in p.keys:
+                Y = [t[k] for t in _Y]
+                s = ColumnDataSource(dict(x=X, y=Y))
+                p.figure.line('x', 'y', source=s)
+                p.sources.append(s)
+
     
     ### Put the generated plots into a document now, bokeh will take care
     ### of plotting them for us.
-    curdoc().add_root(column(*plot_objs))
+    _figures = [p.figure for p in plots]
+    curdoc().add_root(column(*_figures))
 
 except Exception as e:
     ## Any exception encountered above will lead us here, and we will
