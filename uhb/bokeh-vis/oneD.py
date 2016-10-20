@@ -145,6 +145,10 @@ try:
                 s = ColumnDataSource(dict(x=X, y=Y))
                 if len(p.logs)==1 and len(p.keys)==1:
                     legend = None
+                elif len(p.logs)==1 and len(p.keys)>1:
+                    legend = k
+                elif len(p.logs)>1 and len(p.keys)==1:
+                    legend = str(_log_ctr)
                 else:
                     legend = "%d: %s" %(_log_ctr, k)
                 p.figure.line('x', 'y', source=s,
