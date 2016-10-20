@@ -87,7 +87,6 @@ class GDPPlot:
         self.figure = figure(plot_width=width, plot_height=height,
                                 tools='', toolbar_location=None,
                                 x_axis_type='datetime', title=self.title)
-        self.figure.legend.location = "top_left"
 
 
     def __getLegend(self, logname, keyname):
@@ -138,6 +137,9 @@ class GDPPlot:
                 _key_ctr += 1
 
             _log_ctr += 1
+
+        # for some reason, this doesn't work unless we have a legend    
+        self.figure.legend.location = "top_left"
 
 
     def updateData(self, data):
