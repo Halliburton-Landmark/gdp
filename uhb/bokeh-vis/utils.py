@@ -7,8 +7,8 @@
 
 	An example of such parameters is:
 
-    >  log=edu.berkeley.eecs.swarmlab.device.c098e5300003\
-      &log=edu.berkeley.eecs.swarmlab.device.c098e530000a\
+    >  log_0=edu.berkeley.eecs.swarmlab.device.c098e5300003\
+      &log_1=edu.berkeley.eecs.swarmlab.device.c098e530000a\
       &start=1473225641.397882\
       &end=1475817641.397882\
       &height=200\
@@ -61,7 +61,7 @@ from bokeh.models.widgets import Paragraph
 
 args = None
 cur_time = 0.0
-colors = ['red', 'green', 'blue', 'black', 'orange', 'yellow'] 
+colors = ['black', 'red', 'green', 'blue', 'orange', 'yellow'] 
 line_styles = ['solid', 'dashed', 'dotted', 'dotdash', 'dashdot']
 
 ############ Classes ###################
@@ -87,26 +87,6 @@ class GDPPlot:
 
 
 ############ Functions go here ##########
-
-def generatePlot(lines, title, height, width):
-
-    # lines is a list of (linename, [t0, t1...], [v0, v1...]) items,
-    #     that ought to be plotted as individual lines.
-
-    colors = ['red', 'green', 'blue', 'orange', 'black']
-    plot = figure(plot_width=width, plot_height=height, tools='',
-                        toolbar_location=None,
-                        x_axis_type='datetime', title=title)
-
-    for i in xrange(len(lines)):
-        _legend, _source = lines[i]
-        color = colors[i]   # Hope nobody comes along asking for 20 plots
-
-        plot.line('x', 'y', source=_source, color=color)
-
-    return plot
-
-
 
 def parseCommonArgs():
     # Parse arguments common to all plots
@@ -161,7 +141,8 @@ def parsePlots(common_args):
         assert len(title)==1
 
         p = GDPPlot(common_args['log'], common_args['start'],
-                        common_args['end'], title, keys)
+                        common_args['end'], title[0], keys)
+        plots.append(p)
     
     return plots 
 
