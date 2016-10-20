@@ -61,7 +61,8 @@ from bokeh.models.widgets import Paragraph
 
 args = None
 cur_time = 0.0
- 
+colors = ['red', 'green', 'blue', 'black', 'orange', 'yellow'] 
+line_styles = ['solid', 'dashed', 'dotted', 'dotdash', 'dashdot']
 
 ############ Classes ###################
 
@@ -113,7 +114,20 @@ def parseCommonArgs():
     global args
 
     common_args = {}
-    common_args['log']      = args.get('log')
+
+    # We'd like to label plots with log numbers. In order for that, we need
+    #   to ensure that ordering doesn't get messed up. We can't just ask
+    #   for 'log' and get a list. Instead, we need to ask for 'log_0'...
+    num_logs = 0
+    for k in args.keys():
+        if k.startswith('log_'):
+            num_logs+=1
+    logs = []
+    for i in xrange(num_logs):
+        _k = "log_%d" % i
+        logs.append(args[_k][0]) 
+    common_args['log']      = logs
+
     common_args['start']    = float(args.get('start', [cur_time-86400.0])[0])
     common_args['end']      = float(args.get('end', [cur_time])[0])
     common_args['height']   = int(args.get('height', [200])[0])

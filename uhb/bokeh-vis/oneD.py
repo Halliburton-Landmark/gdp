@@ -136,13 +136,27 @@ try:
                             x_axis_type='datetime', title=p.title)
 
         p.sources = []
+        _log_ctr = 0
         for l in p.logs:
             (X, _Y) = alldata[l]        # _Y is the list of raw JSON recs
+            _key_ctr = 0
             for k in p.keys:
                 Y = [t[k] for t in _Y]
                 s = ColumnDataSource(dict(x=X, y=Y))
-                p.figure.line('x', 'y', source=s)
+                if len(p.logs)==1 and len(p.keys)==1:
+                    legend = None
+                else:
+                    legend = "%d: %s" %(_log_ctr, k)
+                p.figure.line('x', 'y', source=s,
+                                line_color=utils.colors[_log_ctr],
+                                line_dash=utils.line_styles[_key_ctr],
+                                legend=legend)
+                p.figure.legend.location = "top_left"
+
                 p.sources.append(s)
+                _key_ctr += 1
+
+            _log_ctr += 1
 
     
     ### Put the generated plots into a document now, bokeh will take care
