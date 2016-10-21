@@ -1,7 +1,8 @@
 // All javascript functions go here...
 
 
-BaseURL = "http://gdp.cs.berkeley.edu:5006/main?"
+//BaseURL = "http://gdp.cs.berkeley.edu:5006/main?"
+BaseURL = "http://localhost:5006/main?"
 
 // from https://stackoverflow.com/questions/111529/how-to-create-query-parameters-in-javascript
 function EncodeQueryData(data) {
