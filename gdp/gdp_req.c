@@ -336,6 +336,7 @@ _gdp_req_lock(gdp_req_t *req)
 		return EP_STAT_OK;
 
 	// oops, unlock it and return failure
+	ep_dbg_cprintf(Dbg, 10, "_gdp_req_lock: req @ %p freed\n", req);
 	ep_thr_mutex_unlock(&req->mutex);
 	return GDP_STAT_DEAD_REQ;
 }

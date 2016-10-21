@@ -268,11 +268,24 @@ find_req_in_channel_list(
 				GDP_NAME_SAME(req->pdu->dst, rpdu->src))
 			break;
 	}
+	if (ep_dbg_test(DbgProcResp, 40))
+	{
+		if (req == NULL)
+			ep_dbg_printf("    ... not found\n");
+		else
+			ep_dbg_printf("    ... found req @ %p\n", req);
+	}
 	ep_thr_mutex_unlock(&chan->mutex);
 
 	// request should be locked for symmetry with _gdp_req_find
 	if (req != NULL)
+	{
+		char ebuf[100];
 		estat = _gdp_req_lock(req);
+		ep_dbg_cprintf(DbgProcResp, 44, 
+				"find_req_in_channel_list: _gdp_req_lock => %s\n",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
 	*reqp = req;
 	return estat;
 }
@@ -291,7 +304,7 @@ static void
 gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 {
 	int cmd = rpdu->cmd;
-	EP_STAT estat;
+	EP_STAT estat = EP_STAT_OK;
 	gdp_gcl_t *gcl;
 	gdp_req_t *req = NULL;
 	int resp;
@@ -324,9 +337,9 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 		}
 
 		// remove the request from the GCL list it is already on
+		// req is already locked by find_req_in_channel_list
 		if (EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
 		{
-			estat = _gdp_req_lock(req);
 			LIST_REMOVE(req, gcllist);
 			req->flags &= ~GDP_REQ_ON_GCL_LIST;
 
@@ -341,6 +354,7 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 				"gdp_pdu_proc_resp: searching gcl %p for rid %" PRIgdp_rid "\n",
 				gcl, rpdu->rid);
 		req = _gdp_req_find(gcl, rpdu->rid);
+		// req is already locked by _gdp_req_find
 		if (req == NULL)
 		{
 			// no req for incoming response --- "can't happen"

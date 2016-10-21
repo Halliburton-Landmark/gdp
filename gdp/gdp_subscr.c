@@ -240,20 +240,24 @@ _gdp_gcl_subscribe(gdp_req_t *req,
 		if (orig_cmd == GDP_CMD_SUBSCRIBE)
 		{
 			long poke = ep_adm_getlongparam("swarm.gdp.subscr.pokeintvl", 60L);
-			int istat = 0;
+			bool spawnthread = false;
 
 			ep_thr_mutex_lock(&req->chan->mutex);
 			if (poke > 0 && !EP_UT_BITSET(GDP_CHAN_HAS_SUB_THR, req->chan->flags))
 			{
-				istat = ep_thr_spawn(&req->chan->sub_thr_id, 
-									subscr_poker_thread, req->chan);
+				spawnthread = true;
 				req->chan->flags |= GDP_CHAN_HAS_SUB_THR;
+				ep_thr_mutex_unlock(&req->chan->mutex);
 			}
-			ep_thr_mutex_unlock(&req->chan->mutex);
-			if (istat != 0)
+			if (spawnthread)
 			{
-				EP_STAT spawn_stat = ep_stat_from_errno(istat);
-				ep_log(spawn_stat, "_gdp_gcl_subscribe: thread spawn failure");
+				int istat = ep_thr_spawn(&req->chan->sub_thr_id,
+									subscr_poker_thread, req->chan);
+				if (istat != 0)
+				{
+					EP_STAT spawn_stat = ep_stat_from_errno(istat);
+					ep_log(spawn_stat, "_gdp_gcl_subscribe: thread spawn failure");
+				}
 			}
 		}
 	}
