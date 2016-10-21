@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <link rel="icon" href="static/favicon.ico">
+
+    <title>Just a simple wrapper template</title>
+
+    <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+
+    <!-- libraries -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
+    <script type="text/javascript" src="/main.js"></script>
+    <link href="/starter-template.css" rel="stylesheet">
+
+  </head>
+
+  <body>
+
+    <nav class="navbar navbar-inverse navbar-fixed-top">
+      <div class="container">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="/">A simple wrapper template for embedding GDP plots</a>
+        </div>
+      </div>
+    </nav>
+
+
+    <div class="container">
+      <div class="starter-template">
+        <p class="lead"> In order to ensure visual presentation, here is a simple tool that generates
+            plots from GDP logs based on user-supplied parameters. The hope is that invidual users
+            will embed such plots in their web-pages, applications, and elsewhere.
+        </p>
+        <form name="arg_picker">
+            <div class="form-group">
+                <label class="control-label">Log names</label>
+                <textarea class="form-control" name="lognames" id="lognames" rows="3" placeholder="edu.berkeley.eecs.swarmlab.device.c098e530000a"></textarea>
+                <span id="helpBlock" class="help-block">
+                    <p>Enter the names of logs, one log per line. The input
+                    is converted to <code>log_0=first_line&log_1=second_line&...</code>.
+                    There should be at least one log at the very mimimum.</p>
+                    <p>We support
+                    simple logs where each record is a JSON object serialized
+                    to a string. It is your responsibility to ensure that each
+                    record of each log has the same JSON schema.
+                    An example record may look like : </p>
+                    <p>{"device" : "BLEES", "pressure_pascals" : 100327.9, "humidity_percent" : 41.18, "temperature_celcius" : 22.56, "light_lux" : 20, "acceleration_advertisement" : false, "acceleration_interval" : true, "sequence_number" : -1, "id" : "c098e5300003", "_meta" : {"received_time" : "2016-10-20T04:27:44.672Z", "device_id" : "c098e5300003", "receiver" : "ble-gateway", "gateway_id" : "6c:ec:eb:ac:00:02"}}</p>
+                    </span>
+            </div>
+            <div class="form-group">
+                <label class="control-label">Start time:</label>
+                <input class="form-control" type='text' id='startTime' name='startTime' placeholder="1476999906"> 
+                <span id="helpBlock" class="help-block">
+                    <p>Enter the time from which you would like your
+                    plot to start from (in seconds since epoch). It is
+                    sent as <code>start=1234...</code>.
+                    Ideally, you will either use a more
+                    user-friendly wrapper, or put some sensible default
+                    based on your particular application.</p>
+                </span>
+            </div>
+            <div class="form-group">
+                <label class="control-label">End time:</label>
+                <input class="form-control" type='text' id='endTime' name='endTime' placeholder="0">
+                <span id="helpBlock" class="help-block">
+                    <p> Enter the end-time for your plots, again in seconds
+                    since epoch. It is sent as <code>end=2345...</code>.
+                    A special value of '0'
+                    signifies a live streaming plot, periodically refreshing
+                    every 500 ms. Again, whether you need a live streaming plot
+                    or a static plot depends on your application.<p>
+            	</span>
+            </div>
+            <div class="form-group">
+                <label class="control-label">(Optional) Titles and Keys</label>
+                <textarea class="form-control" name="plot_params" id="plot_params" rows="3" placeholder="Temperature, temperature_celcius"></textarea>
+                <span id="helpBlock" class="help-block">
+                    <p> Optional parameters: If omitted, keys in JSON objects
+                    that are integers or floats will be plotted in their
+                    own separate plots. However, you can specify that only
+                    certain keys be plotted (instead of plotting all the garbage).</p>
+                    <p> If desired, you can specify individual plots as
+                    <code>plot_0_title=Temperature&plot_0_keys=temperature_celcius...</code>.
+                    It is also possible to specify multiple keys to be plotted
+                    together as well (for example, acceleration on different axes).
+                    You would do that with something like:
+                    <code>plot_0_title=ACC&plot_0_keys=accel_x&plot_0_keys=accel_y...</code>.
+                    </p>
+                    <p>Note that if you do not how to count from 0, things will not work very
+                    well. Also, a title is not optional anymore when you start plotting
+                    individual keys.</p>
+                    
+                </span>
+            <div class="form-group">
+                <input class="btn btn-default" type="button" value="Plot" onClick='plot(this.form)'>
+            </div>
+        </form>
+
+        <div id='generatedURL'></div>
+
+        <div class='embed-container' id="dashboard_div"></div>
+      </div>
+    </div><!-- /.container -->
+
+
+  </body>
+</html>
