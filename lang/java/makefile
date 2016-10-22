@@ -30,11 +30,12 @@
 ##########################################################################
 
 # To update the GDP version, see ../../gdp/gdp_version.h
-# If you change the GDP version, then also update $PTII/configure.in and
-# https://www.terraswarm.org/swarmos/wiki/Main/GDPJavaInterface
-GDPLIBMAJVER=	0
-GDPLIBMINVER=	7
-GDP_PATCH_VERSION=0
+#
+# If you change the GDP version, see the instructions in package.html
+#
+GDPLIBMAJVER=0
+GDPLIBMINVER=7
+GDP_PATCH_VERSION=2
 
 GDP_MAJOR_MINOR_VERSION=$(GDPLIBMAJVER).$(GDPLIBMINVER)
 
@@ -108,17 +109,35 @@ JNAERATOR_VERSION = 0.12
 JNAERATOR_JAR = jnaerator-$(JNAERATOR_VERSION)-shaded.jar
 JNAERATOR_RUNTIME_JAR = jnaerator-runtime-$(JNAERATOR_VERSION).jar
 
+BUILD_JARS=$(JNA_JAR) $(JNAERATOR_JAR) $(JNAERATOR_RUNTIME_JAR)
+
 ### Download required files. If there is an updated version of these, it needs
 ### to be manually updated.
 
 $(JNA_JAR):
-	wget 'https://maven.java.net/content/repositories/releases/net/java/dev/jna/jna/4.2.2/$(JNA_JAR)' -O $@
+	wget 'https://maven.java.net/content/repositories/releases/net/java/dev/jna/jna/4.2.2x/$@' -O $@; \
+	status=$$?; \
+	if [ $$status -ne 0 ]; then \
+		echo "Failed to get $@ from maven.java.net, getting it from terraswarm.org instead."; \
+		wget 'https://www.terraswarm.org/downloads/$@' -O $@; \
+	fi
 
 $(JNAERATOR_JAR):
-	wget 'https://search.maven.org/remotecontent?filepath=com/nativelibs4java/jnaerator/$(JNAERATOR_VERSION)/$(JNAERATOR_JAR)' -O $@
+	wget 'https://search.maven.org/remotecontent?filepath=com/nativelibs4java/jnaeratorx/$(JNAERATOR_VERSION)/$@' -O $@; \
+	status=$$?; \
+	if [ $$status -ne 0 ]; then \
+		echo "Failed to get $@ from search.maven.org, getting it from terraswarm.org instead."; \
+		wget 'https://www.terraswarm.org/downloads/$@' -O $@; \
+	fi
 
 $(JNAERATOR_RUNTIME_JAR):
-	wget 'https://search.maven.org/remotecontent?filepath=com/nativelibs4java/jnaerator-runtime/$(JNAERATOR_VERSION)/$(JNAERATOR_RUNTIME_JAR)' -O $@
+	wget 'https://search.maven.org/remotecontent?filepath=com/nativelibs4java/jnaerator-runtimex/$(JNAERATOR_VERSION)/$@' -O $@; \
+	status=$$?; \
+	if [ $$status -ne 0 ]; then \
+		echo "Failed to get $@ from search.maven.org, getting it from terraswarm.org instead."; \
+		wget 'https://www.terraswarm.org/downloads/$@' -O $@; \
+	fi
+
 
 ##############################
 
@@ -217,8 +236,9 @@ runHelloWorld: all
 ### 
 
 clean:
-	rm -f jna _* org/terraswarm/gdp/*.class org/terraswarm/gdp/EP* org/terraswarm/gdp/e* org/terraswarm/gdp/*Library.java org/terraswarm/gdp/apps/*.class *.jar
+	rm -f jna _* org/terraswarm/gdp/*.class org/terraswarm/gdp/EP* org/terraswarm/gdp/e* org/terraswarm/gdp/*Library.java org/terraswarm/gdp/apps/*.class $(GDP_JAR).jar
 	rm -rf darwin linux-x86-64-rhel linux-x86-64
+	@echo "Run 'make distclean' to remove $(BUILD_JARS)"
 
 distclean: clean
 	rm -f *.jar
