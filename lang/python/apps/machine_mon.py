@@ -38,9 +38,90 @@ import gdp
 import psutil
 import time
 import os
+import socket
 import json
 
 SLEEP_INTERVAL = 60
+
+##### global variables #####
+
+# disk
+last_read_count = 0
+last_write_count = 0
+last_read_bytes = 0
+last_write_bytes = 0
+
+# network
+last_packets_sent = 0
+last_packets_recv = 0
+last_bytes_sent = 0
+last_bytes_recv = 0
+
+
+def getInfo():
+    """ Returns a bunch of information as a dictionary """
+
+    global last_read_count
+    global last_write_count
+
+    # Collect information that we are going to log
+    d = {}
+    d['host'] = socket.gethostname()
+
+    # Using psutil categorization of cpu, memory, disks and network
+    d['cpu_percent'] = psutil.cpu_percent(interval=None)
+    d['memory_percent'] = psutil.virtual_memory().percent
+
+    # disk
+    iostat = psutil.disk_io_counters()
+    try:
+        assert last_read_count !=0 and last_write_count !=0 and \
+                last_read_bytes != 0 and last_write_bytes !=0
+
+        d['read_count'] = iostat.read_count - last_read_count
+        d['write_count'] = iostat.write_count - last_write_count
+        d['read_bytes'] = iostat.read_bytes - last_read_bytes
+        d['write_bytes'] = iostat.write_bytes - last_write_bytes
+
+        # make sure the counters aren't wrapped around
+        assert d['read_count']>=0 and d['write_count']>=0 and \
+                    d['read_bytes']>=0 and d['write_bytes']>=0
+
+    except AssertionError:
+        d['read_count'], d['write_count'] = 0, 0
+        d['read_bytes'], d['write_bytes'] = 0, 0
+
+    last_read_count = iostat.read_count
+    last_write_count = iostat.write_count
+    last_read_bytes = iostat.read_bytes
+    last_write_bytes = iostat.write_bytes
+
+    # network
+    netstat = psutil.net_io_counters()
+    try:
+        assert last_packets_sent !=0 and last_packets_recv !=0 and \
+                last_bytes_sent != 0 and last_bytes_recv !=0
+
+        d['packets_sent'] = netstat.packets_sent - last_packets_sent
+        d['packets_recv'] = netstat.packets_recv - last_packets_recv
+        d['bytes_sent'] = netstat.bytes_sent - last_bytes_sent
+        d['bytes_recv'] = netstat.bytes_recv - last_bytes_recv
+
+        # make sure the counters aren't wrapped around
+        assert d['packets_sent']>=0 and d['packets_recv']>=0 and \
+                    d['bytes_sent']>=0 and d['bytes_recv']>=0
+
+    except AssertionError:
+        d['packets_sent'], d['packets_recv'] = 0, 0
+        d['bytes_sent'], d['bytes_recv'] = 0, 0
+
+    last_packets_sent = netstat.packets_sent
+    last_packets_recv = netstat.packets_recv
+    last_bytes_sent = netstat.bytes_sent
+    last_bytes_recv = netstat.bytes_recv
+
+    return d
+
 
 def main(name_str, keyfile, hostname):
 
@@ -57,14 +138,7 @@ def main(name_str, keyfile, hostname):
 
     while True:
 
-        # Collect information that we are going to log
-        d = {}
-        d['host'] = hostname
-        l = os.getloadavg()
-        d['load1'], d['load5'], d['load15'] = l[0], l[1], l[2]
-        d['freeram'] = psutil.phymem_usage().free
-        d['nprocs'] = len(psutil.get_pid_list())
-
+        d = getInfo()
         # convert that to a nice string
         string_to_write = json.dumps(d)
 
