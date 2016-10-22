@@ -30,7 +30,7 @@ function plot(form) {
 
     // height and width of individual plots
     params['height'] = 200;
-    params['width'] = document.body.clientWidth-400;
+    params['width'] = parseInt(document.body.clientWidth/2);
 
     // (Optional) Get titles and key names
     var plot_params = form.plot_params.value;
@@ -64,7 +64,8 @@ function plot(form) {
             " parameters properly, and start visualizing." +
             "</blockquote></p>";
     } else {
-        document.getElementById('dashboard_div').innerHTML = "<iframe src=\"" + urlString + "\"></iframe>";
+        document.getElementById('dashboard_div').innerHTML =
+                    "<iframe src=\"" + urlString + "\"></iframe>";
     }
 
 }
