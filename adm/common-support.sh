@@ -253,6 +253,9 @@ case $OS in
 	if type port > /dev/null 2>&1 && port installed | grep -q .; then
 	    if [ "$PKGMGR" = "brew" ]; then
 		warn "You seem to have both macports and homebrew installed."
+		warn "They conflict with each other, and you may break all your"
+		warn "packages if you try to use them at the same time."
+		warn "Please choose one or the other."
 		fatal "You will have to deactivate one (or modify this script)"
 	    else
 		PKGMGR=macports
