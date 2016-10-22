@@ -113,13 +113,29 @@ JNAERATOR_RUNTIME_JAR = jnaerator-runtime-$(JNAERATOR_VERSION).jar
 ### to be manually updated.
 
 $(JNA_JAR):
-	wget 'https://maven.java.net/content/repositories/releases/net/java/dev/jna/jna/4.2.2/$(JNA_JAR)' -O $@
+	wget 'https://maven.java.net/content/repositories/releases/net/java/dev/jna/jna/4.2.2/$@' -O $@; \
+	status=$$?; \
+	if [ $$status -ne 0 ]; then \
+		echo "Failed to get $@ from maven.java.net, getting it from terraswarm.org instead."; \
+		wget 'https://www.terraswarm.org/downloads/$@' -O $@; \
+	fi
 
 $(JNAERATOR_JAR):
-	wget 'https://search.maven.org/remotecontent?filepath=com/nativelibs4java/jnaerator/$(JNAERATOR_VERSION)/$(JNAERATOR_JAR)' -O $@
+	wget 'https://search.maven.org/remotecontent?filepath=com/nativelibs4java/jnaerator/$(JNAERATOR_VERSION)/$@' -O $@; \
+	status=$$?; \
+	if [ $$status -ne 0 ]; then \
+		echo "Failed to get $@ from search.maven.org, getting it from terraswarm.org instead."; \
+		wget 'https://www.terraswarm.org/downloads/$@' -O $@; \
+	fi
 
 $(JNAERATOR_RUNTIME_JAR):
-	wget 'https://search.maven.org/remotecontent?filepath=com/nativelibs4java/jnaerator-runtime/$(JNAERATOR_VERSION)/$(JNAERATOR_RUNTIME_JAR)' -O $@
+	wget 'https://search.maven.org/remotecontent?filepath=com/nativelibs4java/jnaerator-runtime/$(JNAERATOR_VERSION)/$@' -O $@; \
+	status=$$?; \
+	if [ $$status -ne 0 ]; then \
+		echo "Failed to get $@ from search.maven.org, getting it from terraswarm.org instead."; \
+		wget 'https://www.terraswarm.org/downloads/$@' -O $@; \
+	fi
+
 
 ##############################
 
