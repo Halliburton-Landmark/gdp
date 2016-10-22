@@ -123,7 +123,7 @@ def getInfo():
     return d
 
 
-def main(name_str, keyfile, hostname):
+def main(name_str, keyfile):
 
     skey = gdp.EP_CRYPTO_KEY(filename=keyfile,                                  
                                 keyform=gdp.EP_CRYPTO_KEYFORM_PEM,              
@@ -150,10 +150,10 @@ def main(name_str, keyfile, hostname):
 
 if __name__ == "__main__":
 
-    if len(sys.argv) < 4:
-        print "Usage: %s <hostname> <gcl_name> <signing-keyfile>" % sys.argv[0]
+    if len(sys.argv) < 3:
+        print "Usage: %s <gcl_name> <signing-keyfile>" % sys.argv[0]
         sys.exit(1)
 
     # Change this to point to a gdp_router
     gdp.gdp_init()
-    main(sys.argv[2], sys.argv[3], sys.argv[1])
+    main(sys.argv[1], sys.argv[2])
