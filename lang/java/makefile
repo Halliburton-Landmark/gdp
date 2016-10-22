@@ -109,11 +109,13 @@ JNAERATOR_VERSION = 0.12
 JNAERATOR_JAR = jnaerator-$(JNAERATOR_VERSION)-shaded.jar
 JNAERATOR_RUNTIME_JAR = jnaerator-runtime-$(JNAERATOR_VERSION).jar
 
+BUILD_JARS=$(JNA_JAR) $(JNAERATOR_JAR) $(JNAERATOR_RUNTIME_JAR)
+
 ### Download required files. If there is an updated version of these, it needs
 ### to be manually updated.
 
 $(JNA_JAR):
-	wget 'https://maven.java.net/content/repositories/releases/net/java/dev/jna/jna/4.2.2/$@' -O $@; \
+	wget 'https://maven.java.net/content/repositories/releases/net/java/dev/jna/jna/4.2.2x/$@' -O $@; \
 	status=$$?; \
 	if [ $$status -ne 0 ]; then \
 		echo "Failed to get $@ from maven.java.net, getting it from terraswarm.org instead."; \
@@ -121,7 +123,7 @@ $(JNA_JAR):
 	fi
 
 $(JNAERATOR_JAR):
-	wget 'https://search.maven.org/remotecontent?filepath=com/nativelibs4java/jnaerator/$(JNAERATOR_VERSION)/$@' -O $@; \
+	wget 'https://search.maven.org/remotecontent?filepath=com/nativelibs4java/jnaeratorx/$(JNAERATOR_VERSION)/$@' -O $@; \
 	status=$$?; \
 	if [ $$status -ne 0 ]; then \
 		echo "Failed to get $@ from search.maven.org, getting it from terraswarm.org instead."; \
@@ -129,7 +131,7 @@ $(JNAERATOR_JAR):
 	fi
 
 $(JNAERATOR_RUNTIME_JAR):
-	wget 'https://search.maven.org/remotecontent?filepath=com/nativelibs4java/jnaerator-runtime/$(JNAERATOR_VERSION)/$@' -O $@; \
+	wget 'https://search.maven.org/remotecontent?filepath=com/nativelibs4java/jnaerator-runtimex/$(JNAERATOR_VERSION)/$@' -O $@; \
 	status=$$?; \
 	if [ $$status -ne 0 ]; then \
 		echo "Failed to get $@ from search.maven.org, getting it from terraswarm.org instead."; \
@@ -234,8 +236,9 @@ runHelloWorld: all
 ### 
 
 clean:
-	rm -f jna _* org/terraswarm/gdp/*.class org/terraswarm/gdp/EP* org/terraswarm/gdp/e* org/terraswarm/gdp/*Library.java org/terraswarm/gdp/apps/*.class *.jar
+	rm -f jna _* org/terraswarm/gdp/*.class org/terraswarm/gdp/EP* org/terraswarm/gdp/e* org/terraswarm/gdp/*Library.java org/terraswarm/gdp/apps/*.class $(GDP_JAR).jar
 	rm -rf darwin linux-x86-64-rhel linux-x86-64
+	@echo "Run 'make distclean' to remove $(BUILD_JARS)"
 
 distclean: clean
 	rm -f *.jar
