@@ -61,11 +61,15 @@ last_bytes_recv = 0
 def getInfo():
     """ Returns a bunch of information as a dictionary """
 
-    global last_read_count
-    global last_write_count
+    global last_read_count, last_write_count, \
+            last_read_bytes, last_write_bytes
+
+    global last_packets_sent, last_packets_recv, \
+            last_bytes_sent, last_bytes_recv
 
     # Collect information that we are going to log
     d = {}
+    d['time'] = time.time()
     d['host'] = socket.gethostname()
 
     # Using psutil categorization of cpu, memory, disks and network
