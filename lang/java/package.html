@@ -23,7 +23,8 @@ An Java interface to the Global Data Plane.
 <p>When the GDP Version number in <code>../../gdp/gdp_version.h</code> changes, then make the following changes:</p>
 <ol>
   <li>Edit <code>makefile</code> and change <code>GDPLIBMAJVER</code>, <code>GDPLIBMINVER</code> and <code>GDP_PATCH_VERSION</code></li>
-  <li>Run <code>make clean; make</code>, which will may fail.</li>
+  <li>Run <code>make clean; make</code>, which will may fail
+  if <code>GDPLIBMAJVER</code> is updated.</li>
   <li>If the <code>make</code> command fails, then edit <code>org/terraswarm/gdp/GDP*.java</code> files and update <code>Gdp<i>NMLibrary</i></code> to the new version.</li>
   <li>Run <code>make</code> and edit files until the make successfully completes.</li>
   <li>Run <code>make install</code>.</li>
@@ -32,27 +33,27 @@ An Java interface to the Global Data Plane.
       <li>Update the jar file in $PTII/lib:
       <pre>
  bash-3.2$ svn delete --force $PTII/lib/gdp*.jar
-D         /Users/cxh/ptII/lib/gdp-0.5-0.jar
+D         /Users/cxh/ptII/lib/gdp-0.7-0.jar
 bash-3.2$ cp gdp*.jar $PTII/lib
-bash-3.2$ svn add $PTII/lib/gdp-0.6-1.jar 
-A  (bin)  /Users/cxh/ptII/lib/gdp-0.6-1.jar
+bash-3.2$ svn add $PTII/lib/gdp-0.7-2.jar 
+A  (bin)  /Users/cxh/ptII/lib/gdp-0.7-2.jar
 bash-3.2$ 
       </pre>
       </li>
-      <li>Update the GDP shared library:<pre>
-bash-3.2$ svn delete --force $PTII/lib/libgdp.0.5.*
-D         /Users/cxh/ptII/lib/libgdp.0.5.dylib
-D         /Users/cxh/ptII/lib/libgdp.0.5.so
-bash-3.2$ cp ../../libs/libgdp.0.6.dylib $PTII/lib
-bash-3.2$ svn add $PTII/lib/libgdp.0.6.dylib 
-A  (bin)  /Users/cxh/ptII/lib/libgdp.0.6.dylib
+      <li>If <code>GDPLIBMAJVER@</code> changed, then update the GDP
+        shared library for the current platform:<pre>
+bash-3.2$ svn delete --force $PTII/lib/libgdp.0.6.dylib
+D         /Users/cxh/ptII/lib/libgdp.0.6.dylib
+bash-3.2$ cp ../../libs/libgdp.0.7.dylib $PTII/lib
+bash-3.2$ svn add $PTII/lib/libgdp.0.7.dylib 
+A  (bin)  /Users/cxh/ptII/lib/libgdp.0.7.dylib
 bash-3.2$ 
           </pre>
       <li>Edit <code>$PTII/configure.in</code> and <code>$PTII/build.default.xml</code> and update the <code>gdp-N.M-P</code> string to the new version</li>
 
       <li> Run <code>(cd $PTII;autoconf;./configure)</code> and verify that <code>$PTII/mk/ptII.mk</code> refers to the new jar file</li>
       <li>Commit the changes to the ptII svn repo: <pre>
-          (cd $PTII; svn commit -m "Updated the gdp to 0.6-1." configure.in build.default.xml lib/gdp-0.5-0.jar lib/libgdp-0.5.dylib lib/libgdp0.5.so lib/libgdp*dylib lib/gdp*.jar)
+          (cd $PTII; svn commit -m "Updated the gdp to 0.7-2." configure.in build.default.xml lib)
         </pre>
         The above commands are for Mac OS X, which uses .dylib.  We delete the .so, which is used by Linux here anyway.  The gdp shared library must be updated on the build machine so that the nightly build will successfully run the GDP tests under Linux.
       <li>

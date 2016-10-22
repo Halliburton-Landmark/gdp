@@ -30,11 +30,12 @@
 ##########################################################################
 
 # To update the GDP version, see ../../gdp/gdp_version.h
-# If you change the GDP version, then also update $PTII/configure.in and
-# https://www.terraswarm.org/swarmos/wiki/Main/GDPJavaInterface
-GDPLIBMAJVER=	0
-GDPLIBMINVER=	7
-GDP_PATCH_VERSION=0
+#
+# If you change the GDP version, see the instructions in package.html
+#
+GDPLIBMAJVER=0
+GDPLIBMINVER=7
+GDP_PATCH_VERSION=2
 
 GDP_MAJOR_MINOR_VERSION=$(GDPLIBMAJVER).$(GDPLIBMINVER)
 
