@@ -30,6 +30,11 @@ Ubuntu.  RHEL and Ubuntu libraries are needed because of issues with
 libgdp need libcrypto and libcrypto needing different versions of
 libssl.
 
+Note that the GDP shared library included in this module requires
+other packages.  To install the other packages, run
+
+   ./adm/gdp-setup.sh
+
 A modern version of npm is required, where modern is not npm 1.3.6.
 
 We create a local `node_modules/` directory to make it easier to 
@@ -88,6 +93,26 @@ Files
 	npm install mocha
 	mocha test/mocha  
 
+
+Updating this module and using those changes with the Node Accessor Host
+========================================================================
+
+To make channges visible to the Node Accessor Host, one can either
+upload the changes to npm, which requires updating the version number
+in package.json or one can install the module locally.
+
+To install the module locally:
+
+         cd $PTII/org/terraswarm/accessor/accessors/web/hosts/node
+         npm install $PTII/vendors/gdp/gdp/lang/js
+
+$PTII/org/terraswarm/accessor/accessors/web/hosts/node/node_modules/@terraswarm/gdp/
+should be created or updated.
+
+After that, one may edit
+$PTII/org/terraswarm/accessor/accessors/web/hosts/node/node_modules/@terraswarm/gdp/gdpjs/gdpjs.js,
+but don't forget to fold the changes back in to
+$PTII/vendors/gdp/gdp/lang/js/gdpjs/gdpjs.js
 
 Testing using Ptolemy II
 ========================
