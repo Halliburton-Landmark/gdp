@@ -177,7 +177,7 @@ libgdpjs.so.${GDPJSLIBVER}: ${OBJS}
 			if [ -f $(PTII)/lib/libgdpjs.${GDPJSLIBVER}-rhel.so ]; then \
 				echo "Copying Linux shared libraries from $(PTII) for RHEL"; \
 				cp $(PTII)/lib/libgdpjs.${GDPJSLIBVER}-rhel.so ${LIBDIR}; \
-				cp $(PTII)/lib/libgdp.${GDPLIBVER}-rhel.so ${LIBDIR}; \
+				cp $(PTII)/lib/linux-x86-64-rhel/libgdp.${GDPLIBVER}.so ${LIBDIR}/libgdp.${GDPLIBVER}-rhel.so; \
 			fi; \
 		fi; \
 		if [ -f $(PTII)/lib/libgdpjs.${GDPJSLIBVER}.dylib ]; then \
