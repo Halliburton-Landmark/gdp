@@ -247,8 +247,8 @@ _gdp_gcl_subscribe(gdp_req_t *req,
 			{
 				spawnthread = true;
 				req->chan->flags |= GDP_CHAN_HAS_SUB_THR;
-				ep_thr_mutex_unlock(&req->chan->mutex);
 			}
+			ep_thr_mutex_unlock(&req->chan->mutex);
 			if (spawnthread)
 			{
 				int istat = ep_thr_spawn(&req->chan->sub_thr_id,
