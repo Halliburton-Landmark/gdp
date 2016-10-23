@@ -1798,6 +1798,8 @@ function gdp_event_getdatum_js(gev_Ptr)
     return libgdp.gdp_event_getdatum(gev_Ptr);
 }
 
+exports.gdp_event_getdatum_js = gdp_event_getdatum_js;
+
 /* void */
 function gdp_datum_print_stdout_js(datum)
 // Arg datum can be viewed by JS as an opaque handle for a gdp_datum.
@@ -1806,6 +1808,7 @@ function gdp_datum_print_stdout_js(datum)
     libgdpjs.gdp_datum_print_stdout(datum);
 }
 
+exports.gdp_datum_print_stdout_js = gdp_datum_print_stdout_js;
 
 /* EP_STAT */
 function gdp_event_free_js(gev_Ptr)
@@ -1813,6 +1816,8 @@ function gdp_event_free_js(gev_Ptr)
 {
     return libgdp.gdp_event_free(gev_Ptr);
 }
+
+exports.gdp_event_free_js = gdp_event_free_js;
 
 /* EP_STAT */
 function gdp_gcl_close_js(gcl_Ptr) {
@@ -1997,7 +2002,7 @@ function gdp_datum_buf_as_string(datum)
     return rvString;
 } /* function get_datum_buf_as_string() */
 
-
+exports.gdp_datum_buf_as_string = gdp_datum_buf_as_string;
 
 // Some temporary test output ===============================================
 

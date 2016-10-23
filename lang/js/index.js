@@ -151,3 +151,21 @@ exports.write_gcl_records = function (gdpdAddress, gclName, logdxname, gclAppend
                                    recordArrayOut);
 }
 
+exports.gdp_datum_buf_as_string = function (datum) {
+    return gdpjsSupport.gdp_datum_buf_as_string(datum);
+}
+
+exports.gdp_datum_print_stdout_js = function (datum) {
+    return gdpjsSupport.gdp_datum_print_stdout_js(datum);
+}
+
+exports.gdp_event_free_js = function (gev_Ptr) {
+    return gdpjsSupport.gdp_event_free_js(gev_Ptr);
+}
+
+exports.gdp_event_getdatum_js = function (gev_Ptr) {
+    return gdpjsSupport.gdp_event_getdatum_js(gev_Ptr);
+}
+
+
+
