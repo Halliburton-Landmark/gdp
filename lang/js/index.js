@@ -43,6 +43,7 @@ exports.ep_dbg_set = gdpjsSupport.ep_dbg_set;
 
 exports.gclPrintableNameType = gdpjsSupport.gcl_pname_t;
 
+var debug = false;
 /**
  * Open a Global Data Plane log.
  * @param name The external, possibly human readable name.
@@ -50,8 +51,9 @@ exports.gclPrintableNameType = gdpjsSupport.gcl_pname_t;
  * @return the GCL handle;
  */
 exports.gdp_gcl_open = function (name, iomode, gdpdAddress) {
-    console.log("gdpjs/index.js: gdp_gcl_open(" + name + ", " + iomode + ", " + gdpdAddress + ")");
-
+    if (debug) {
+        console.log("gdpjs/index.js: gdp_gcl_open(" + name + ", " + iomode + ", " + gdpdAddress + ")");
+    }
     // FIXME: Need to figure out how to allocate ebuf.
     // One issue is that we don't want this to go out of scope.
 
@@ -71,9 +73,15 @@ exports.gdp_gcl_open = function (name, iomode, gdpdAddress) {
 //         throw new Error(message);
 //     }
 
-    console.log("gdpjs/index.js: gdp_gcl_open(" + name + ", " + iomode + "): calling gdpGclOpen()");
+    if (debug) {
+        console.log("gdpjs/index.js: gdp_gcl_open(" + name + ", " + iomode + "): calling gdpGclOpen()");
+    }
     var rv = gdpjsSupport.gdpGclOpen(name, iomode, gdpdAddress);
-    console.log("gdpjs/index.js: gdp_gcl_open(" + name + ", " + iomode + "): done calling gdpGclOpen()");
+
+    if (debug) {
+        console.log("gdpjs/index.js: gdp_gcl_open(" + name + ", " + iomode + "): done calling gdpGclOpen()");
+    }
+
     var estat = rv.error_code;
     gclH = rv.gclH;
     if ( ! gdpjsSupport.ep_stat_isok(estat) ) {
