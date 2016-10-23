@@ -216,6 +216,17 @@ public class GDP_GCL {
         this.append_async(datum);
     }
 
+    /** Close the GCL.
+     */
+    public void close() {
+        System.out.println("GDP_GCL.close()");
+        // Remove ourselves from the global list.
+        _allGclhs.remove(gclh);
+        
+        // Free the associated gdp_gcl_t.
+        Gdp07Library.INSTANCE.gdp_gcl_close(gclh);
+    }
+
     /**
      * Create a GCL.
      * 
@@ -281,13 +292,8 @@ public class GDP_GCL {
      *  that an object will be gc'd and that finalize
      *  will be called.
      */
-   public void finalize() {
-        
-        // remove ourselves from the global list
-        _allGclhs.remove(this.gclh);
-        
-        // free the associated gdp_gcl_t
-        Gdp07Library.INSTANCE.gdp_gcl_close(this.gclh);
+     public void finalize() {
+        close();
     }
 
     /** 
