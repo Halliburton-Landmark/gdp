@@ -2190,14 +2190,20 @@ function misc_lower_level_inline_tests( /* Boolean */ do_tests) {
 
 /** Write to a Global Data Plane log.
  *  
- * @param gdpdAddress gdp daemon's <host:port>; if null, use default
+ * @param gdpd_addr gdp daemon's <host:port>; if null, use default
  * "127.0.0.1:2468" @param gclName name of existing GCL @param
  * logdxname String: the name of the log server.  Use os.hostname()
  * for local 
- * @param logdxname String: the name of the log server.  Use os.hostname() for local.
- * @param gclAppend Boolean: append to an existing GCL
  *
- * @param recordSource The source of the records. recordSource == -1:
+ * @param gcl_name If gcl_append is true, name of existing GCL; 
+ * if gcl_append is false, ignored.  A new GCL will be created.
+ *
+ * @param logdxname String: the name of the log server.  Use
+ * os.hostname() for local.
+ * 
+ * @param gcl_append Boolean: append to an existing GCL
+ *
+ * @param recsrc The source of the records. recordSource == -1:
  * read the gcl records to be written from stdin with prompts to and
  * echoing for the user on stdout. recordSource = 0: read the gcl
  * records from the Array recordArray. In this case only, for each gcl
@@ -2208,16 +2214,16 @@ function misc_lower_level_inline_tests( /* Boolean */ do_tests) {
  * content: the integers starting at 1 and going up to recsrc,
  * inclusive.
  *
- * @param recordArray if recordSource is 0, then the records are written to 
+ * @param recarray if recsrc is 0, then the records are written to 
  * recordArray.
  *
- * @param consoleOut Boolean: iff true, for recsrc = -1, prompt user
+ * @param conout Boolean: iff true, for recsrc = -1, prompt user
  * and echo written records on stdout; for recsrc = 0, echo written
  * records on stdout, not recommended; for recsrc > 0, Note, echoed
  * written records also include GCL record number (recno) and
  * timestamp.
  *
- * @param recordArrayOut Array: see recsrc = 0, above.
+ * @param recarray_out Array: see recsrc = 0, above.
  *
  * @return error_isok: false|true, error_code: EP_STAT, error_msg: String, gcl_name: String
  */
@@ -2256,7 +2262,7 @@ function write_gcl_records(gdpd_addr, gcl_name, logdxname, gcl_append,
 {
     var debug = true;
     if (debug) {
-        console.log("gdpjs.js: write_gcl_records() start");
+        console.log("gdpjs.js: write_gcl_records() start: recsrc: " + recsrc);
     }
     // internal variables for historical reasons
     var xname = gcl_name;
@@ -2476,12 +2482,12 @@ function write_gcl_records(gdpd_addr, gcl_name, logdxname, gcl_append,
         for (var crec = 0; crec < recarray.length; crec++) {
             var rvgets; /* String */
             rvgets = recarray[crec].toString();
-
-            var buf = new buf_t(rvgets.length + 1); // we'll tack on a \0
+            
+            var buf = new buf_t(rvgets.length); // No need to tack on a \0
             for (var i = 0; i < rvgets.length; i++) {
                 buf[i] = rvgets.charCodeAt(i); // not sure if really necessary
             }
-            buf[rvgets.length] = 0; // Hopefully, interpreted in C as \0
+            //buf[rvgets.length] = 0; // Hopefully, interpreted in C as \0
             if (conout == true) {
                 console.log("Got input %s%s%s", "<<", rvgets, ">>");
             }
