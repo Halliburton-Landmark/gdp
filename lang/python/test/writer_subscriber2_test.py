@@ -32,6 +32,9 @@ subscribes and then creates another log
 
 See README.txt for instructions.
 
+To run this test by hand, use
+  python writer_subscriber2_test.py foo
+
 """
 
 import sys
@@ -97,7 +100,7 @@ def create_append_subscribe():
 
 # To run this by hand:
 #  python writer_subscriber_test2.py
-def main():
+def main(name_str):
     create_append_subscribe();
     create_append_subscribe();
 
@@ -105,8 +108,8 @@ def main():
 if __name__ == "__main__":
     if len(sys.argv) != 1:
         print "Usage: %s " % sys.argv[0]
-        sys.exit(1)
+        print "Note that this test takes no arguments. %s will be ignored." % sys.argv[0]
 
     # Change this to point to a gdp_router
     gdp.gdp_init()
-    main();
+    main(sys.argv[1]);
