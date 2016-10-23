@@ -13,6 +13,11 @@ If the daemons are already running, then to create a log and run the tests, use:
   ../../../apps/gcl-create -k none -s ealmac23.local $newLog
   py.test --logName=$newLog
 
+If the daemons are not running, try:
+  export newLog=gdp.runPythonTests.newLog.$RANDOM
+  ../../../apps/gcl-create -k none -s edu.berkeley.eecs.gdp-01.gdplogd $newLog
+  py.test --logName=$newLog
+
 To run just one test, use:
   py.test --logName=$newLog xxx.py
   

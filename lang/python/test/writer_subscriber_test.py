@@ -40,6 +40,10 @@ import gdp
 def test_answer(logName):
     main(logName)
     
+# To run this by hand:
+#  export newLog=gdp.runPythonTests.newLog.$RANDOM
+#  ../../../apps/gcl-create -k none -s edu.berkeley.eecs.gdp-01.gdplogd $newLog
+#  python writer_subscriber_test.py $newLog
 def main(name_str):
 
     # Create a GDP_NAME object from a python string provided as argument.
