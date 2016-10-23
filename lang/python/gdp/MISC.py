@@ -40,8 +40,12 @@ try:
     gdp = CDLL(os.path.join(package_directory,
            "..", "..", "..", "libs",  "libgdp.so"))
 except OSError:
-    gdp = CDLL(os.path.join(package_directory,
-           "..", "..", "..", "gdp",  "libgdp.so.0.5"))
+    try:
+        gdp = CDLL(os.path.join(package_directory,
+                                "..", "..", "..", "gdp",  "libgdp.so.0.7"))
+    except OSError:
+        gdp = CDLL(os.path.join(package_directory,
+                                "..", "..", "..", "gdp",  "libgdp.0.7.dylib"))
 
 #ep = CDLL(os.path.join(package_directory,
 #          "..", "..", "..", "libs", "libep.so"))
@@ -51,7 +55,7 @@ except OSError:
     try:
         evb = CDLL("libevent.dylib")    # On Mac
     except OSError:
-        evb = CDLL("/usr/local/lib/libevent.dylib")    # On Mac, use absolute path
+        evb = CDLL("/opt/local/lib/libevent.dylib")    # On Mac, use absolute path as installed by Mac port
 
 # hack for file pointer. Apparently this works only on Python 2.x and not with 3
 # copied from
