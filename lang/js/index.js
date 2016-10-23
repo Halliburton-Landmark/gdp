@@ -159,6 +159,10 @@ exports.gdp_datum_print_stdout_js = function (datum) {
     return gdpjsSupport.gdp_datum_print_stdout_js(datum);
 }
 
+exports.gdp_gcl_close_js = function (gcl_Ptr) {
+    return gdpjsSupport.gdp_gcl_close_js(gcl_Ptr);
+}
+
 exports.gdp_event_free_js = function (gev_Ptr) {
     return gdpjsSupport.gdp_event_free_js(gev_Ptr);
 }
@@ -166,6 +170,4 @@ exports.gdp_event_free_js = function (gev_Ptr) {
 exports.gdp_event_getdatum_js = function (gev_Ptr) {
     return gdpjsSupport.gdp_event_getdatum_js(gev_Ptr);
 }
-
-
 
