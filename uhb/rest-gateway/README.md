@@ -28,7 +28,7 @@ usual `apt-get` commands should work.
 
 ## Data format and interaction
 
-You can either use `GET` or `POST` to send data. Any data sent is interepreted
+You can either use `GET` or `PUT` to send data. Any data sent is interepreted
 as `key, value` pairs, converted to a JSON object, and appended to the log
 specified at initialization time. By default, a single key can have multiple
 values, hence values are always a list. However, this behavior can be modified
