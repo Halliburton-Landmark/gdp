@@ -1824,6 +1824,8 @@ function gdp_gcl_close_js(gcl_Ptr) {
     return libgdp.gdp_gcl_close(gcl_Ptr);
 }
 
+exports.gdp_gcl_close_js = gdp_gcl_close_js;
+
 /* void */
 function fflush_all_js()
 // Explicit print buffer flush; sometimes Node.js may not empty buffers
