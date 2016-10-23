@@ -49,8 +49,12 @@ bash-3.2$ svn add $PTII/lib/libgdp.0.7.dylib
 A  (bin)  /Users/cxh/ptII/lib/libgdp.0.7.dylib
 bash-3.2$ 
           </pre>
-      <li>Edit <code>$PTII/configure.in</code> and <code>$PTII/build.default.xml</code> and update the <code>gdp-N.M-P</code> string to the new version</li>
 
+      <li>Update the <code>gdp-N.M-P</code> string to the new version
+      in <code>$PTII/configure.in</code>, <code>$PTII/.classpath.default</code>
+      and <code>$PTII/build.default.xml</code>
+      </li>
+      
       <li> Run <code>(cd $PTII;autoconf;./configure)</code> and verify that <code>$PTII/mk/ptII.mk</code> refers to the new jar file</li>
       <li>Commit the changes to the ptII svn repo: <pre>
           (cd $PTII; svn commit -m "Updated the gdp to 0.7-2." configure.in build.default.xml lib)

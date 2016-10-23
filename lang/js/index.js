@@ -43,6 +43,7 @@ exports.ep_dbg_set = gdpjsSupport.ep_dbg_set;
 
 exports.gclPrintableNameType = gdpjsSupport.gcl_pname_t;
 
+var debug = false;
 /**
  * Open a Global Data Plane log.
  * @param name The external, possibly human readable name.
@@ -50,8 +51,9 @@ exports.gclPrintableNameType = gdpjsSupport.gcl_pname_t;
  * @return the GCL handle;
  */
 exports.gdp_gcl_open = function (name, iomode, gdpdAddress) {
-    console.log("gdpjs/index.js: gdp_gcl_open(" + name + ", " + iomode + ", " + gdpdAddress + ")");
-
+    if (debug) {
+        console.log("gdpjs/index.js: gdp_gcl_open(" + name + ", " + iomode + ", " + gdpdAddress + ")");
+    }
     // FIXME: Need to figure out how to allocate ebuf.
     // One issue is that we don't want this to go out of scope.
 
@@ -71,9 +73,15 @@ exports.gdp_gcl_open = function (name, iomode, gdpdAddress) {
 //         throw new Error(message);
 //     }
 
-    console.log("gdpjs/index.js: gdp_gcl_open(" + name + ", " + iomode + "): calling gdpGclOpen()");
+    if (debug) {
+        console.log("gdpjs/index.js: gdp_gcl_open(" + name + ", " + iomode + "): calling gdpGclOpen()");
+    }
     var rv = gdpjsSupport.gdpGclOpen(name, iomode, gdpdAddress);
-    console.log("gdpjs/index.js: gdp_gcl_open(" + name + ", " + iomode + "): done calling gdpGclOpen()");
+
+    if (debug) {
+        console.log("gdpjs/index.js: gdp_gcl_open(" + name + ", " + iomode + "): done calling gdpGclOpen()");
+    }
+
     var estat = rv.error_code;
     gclH = rv.gclH;
     if ( ! gdpjsSupport.ep_stat_isok(estat) ) {
@@ -149,5 +157,25 @@ exports.write_gcl_records = function (gdpdAddress, gclName, logdxname, gclAppend
     return gdpjsSupport.write_gcl_records(gdpdAddress, gclName, logdxname, gclAppend,
                                    recordSource, recordArray, consoleOut,
                                    recordArrayOut);
+}
+
+exports.gdp_datum_buf_as_string = function (datum) {
+    return gdpjsSupport.gdp_datum_buf_as_string(datum);
+}
+
+exports.gdp_datum_print_stdout_js = function (datum) {
+    return gdpjsSupport.gdp_datum_print_stdout_js(datum);
+}
+
+exports.gdp_gcl_close_js = function (gcl_Ptr) {
+    return gdpjsSupport.gdp_gcl_close_js(gcl_Ptr);
+}
+
+exports.gdp_event_free_js = function (gev_Ptr) {
+    return gdpjsSupport.gdp_event_free_js(gev_Ptr);
+}
+
+exports.gdp_event_getdatum_js = function (gev_Ptr) {
+    return gdpjsSupport.gdp_event_getdatum_js(gev_Ptr);
 }
 

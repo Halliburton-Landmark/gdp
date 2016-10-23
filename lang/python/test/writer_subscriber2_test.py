@@ -32,14 +32,18 @@ subscribes and then creates another log
 
 See README.txt for instructions.
 
+To run this test by hand, use
+  python writer_subscriber2_test.py foo
+
 """
 
 import sys
 sys.path.append("../")
 import gdp
 
-import string
+import platform
 import random
+import string
 
 def test_answer(logName):
     main(logName)
@@ -47,14 +51,22 @@ def test_answer(logName):
 
 def create_append_subscribe():    
     # http://stackoverflow.com/questions/2257441/random-string-generation-with-upper-case-letters-and-digits-in-python
-    name_str = 'python.test.writer_subscriber_test2.' + ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(10))
+    name_str = 'python.test.writer_subscriber2_test.' + ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(10))
     print "Name: " + name_str;
     gcl_name = gdp.GDP_NAME(name_str);
 
-    # FIXME: Probably don't want to hardcode in the log name
-    logd_name = gdp.GDP_NAME('edu.berkeley.eecs.gdp-01.gdplogd');
+    print "Trying to create using " + platform.node();
+    logd_name = gdp.GDP_NAME(platform.node());
+
     print "About to create " + name_str 
-    gdp.GDP_GCL.create(gcl_name, logd_name, '');
+    try:
+        gdp.GDP_GCL.create(gcl_name, logd_name, '');
+    except :
+        # If run with "python writer_subscriber2_test.py foo"
+        # and the router and logd daemons are not running, then we end up here.
+        # FIXME: Probably don't want to hardcode in the log name
+        logd_name = gdp.GDP_NAME('edu.berkeley.eecs.gdp-01.gdplogd');
+        gdp.GDP_GCL.create(gcl_name, logd_name, '');
     print "Created " + name_str
 
     print "Get the writer"
@@ -97,7 +109,7 @@ def create_append_subscribe():
 
 # To run this by hand:
 #  python writer_subscriber_test2.py
-def main():
+def main(name_str):
     create_append_subscribe();
     create_append_subscribe();
 
@@ -105,8 +117,8 @@ def main():
 if __name__ == "__main__":
     if len(sys.argv) != 1:
         print "Usage: %s " % sys.argv[0]
-        sys.exit(1)
+        print "Note that this test takes no arguments. %s will be ignored." % sys.argv[0]
 
     # Change this to point to a gdp_router
     gdp.gdp_init()
-    main();
+    main(sys.argv[1]);

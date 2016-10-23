@@ -136,8 +136,7 @@ try {
 // lines with something like:
 //    sed  -e '/^\/\/C/d' liggdp_h.js
 
-
-var debug = true;
+var debug = false;
 
 ////////////////////////////////////
 // Load Node.js modules for calling foreign functions; C functions here.
@@ -906,7 +905,9 @@ function read_gcl_records(gdpd_addr, gcl_name,
     var called = "";
     if (gcl_subscribe || gcl_multiread) {
 	if (gdp_event_cbfunc !== null) {
-	    console.log('gdpjs.js: read_gcl_records(): before do_multiread_subscribe()' );
+            if (debug) {
+	        console.log('gdpjs.js: read_gcl_records(): before do_multiread_subscribe()' );
+            }
 	    estat = libgdp.gdp_gcl_subscribe(gcl_Ptr, gcl_firstrec, gcl_numrecs,
 					     null, gdp_event_cbfunc, null);
 	    called = "gdp_gcl_subscribe()";
@@ -958,7 +959,7 @@ function read_gcl_records(gdpd_addr, gcl_name,
     // TBD: fix this error return - see corresponding location in reader-test.js
     // string.repeat not available for us here in ECMASscript<6
     var str = new Array(200 + 1).join(" "); // long enough??
-    var emsg = ("gdpjs.js: read_gcl_reacords(): exiting with status " +
+    var emsg = ("gdpjs.js: read_gcl_records(): exiting with status " +
         ep_stat_tostr_js(estat, str, str.length));
     if (conout == true) {
         fflush_all_js(); // sometimes Node.js may not empty buffers
@@ -1387,7 +1388,6 @@ function gdp_init_js( /* String */ gdpd_addr) {
     // null string but an undefined argument works OK to start the
     // library on the default gdpd host:port .
     // So we protect this call from incoming JS null strings.
-    var debug = true;
     if (debug) {
         console.log("gdpjs.js: gdp_init_js(" + gdpd_addr + ")");
     }
@@ -1441,17 +1441,20 @@ function gdp_gcl_create_js( /* gcl_name_t */ gclxname,
     var logdiname = new gcl_name_t(32);
     //var logdiname = ref.alloc(gcl_name_t);
 
-    console.log("gdpjs.js: gdp_gcl_create_js(): gclxname: " + gclxname + ", logdxname: " + logdxname);
+    if (debug) {
+        console.log("gdpjs.js: gdp_gcl_create_js(): gclxname: " + gclxname + ", logdxname: " + logdxname);
+    }
+
     gdp_parse_name_js(gclxname, gcliname);
     gdp_parse_name_js(logdxname, logdiname);
 
     var gmd = libgdp.gdp_gclmd_new(0);
-    console.log("gdpjs.js: gdp_gcl_create_js(): gmd created");
+
     libgdp.gdp_gclmd_add(gmd, GDP_GCLMD_XID, gclxname.length, ref.allocCString(gclxname));
-    console.log("gdpjs.js: gdp_gcl_create_js(): gmd added to");
+
 
     var estat = libgdp.gdp_gcl_create(gcliname, logdiname, gmd, gclPtrPtr);
-    console.log("gdpjs.js: gdp_gcl_create_js(): gdp_gcl_create() returned");
+
     if ( ! ep_stat_isok_js(estat) ) {
 	var ebuf = new Array(200 + 1).join(" "); // long enough??
 	var emsg = "gdpjs.js: gdp_gcl_create_js(): gdp_gcl_create() is not ok.";
@@ -1467,19 +1470,22 @@ function gdp_gcl_create_js( /* gcl_name_t */ gclxname,
 
 /* EP_STAT */
 function gdp_parse_name_js( /* String */ xname, /* gcl_name_t */ gcliname) {
-    console.log("gdpjs.js: gdp_parse_name_js(): " + xname + ", ...");
+    if (debug) {
+        console.log("gdpjs.js: gdp_parse_name_js(): " + xname + ", ...");
+    }
     var estat = libgdp.gdp_parse_name(xname, gcliname);
-    console.log("gdpjs.js: gdp_parse_name_js(): " + xname + ", ");
+
     for (i=0; i<gcliname.length; i++) {
         process.stdout.write(gcliname[i].toString(16));
     }
+    if (debug) {
         console.log("\n");
+    }
     return estat
 };
 
 
 function gdpGclOpen(name, iomode, logdname) {
-    var debug = true;
     if (debug) {
 	console.log("gdpjs.js: 0 gdpGclOpen(" + name + ", " + iomode + ", " + logdname + "): setting debugging (dbg_set_js)"); 
 	ep_dbg_set_js("*=8");
@@ -1798,6 +1804,8 @@ function gdp_event_getdatum_js(gev_Ptr)
     return libgdp.gdp_event_getdatum(gev_Ptr);
 }
 
+exports.gdp_event_getdatum_js = gdp_event_getdatum_js;
+
 /* void */
 function gdp_datum_print_stdout_js(datum)
 // Arg datum can be viewed by JS as an opaque handle for a gdp_datum.
@@ -1806,6 +1814,7 @@ function gdp_datum_print_stdout_js(datum)
     libgdpjs.gdp_datum_print_stdout(datum);
 }
 
+exports.gdp_datum_print_stdout_js = gdp_datum_print_stdout_js;
 
 /* EP_STAT */
 function gdp_event_free_js(gev_Ptr)
@@ -1814,10 +1823,14 @@ function gdp_event_free_js(gev_Ptr)
     return libgdp.gdp_event_free(gev_Ptr);
 }
 
+exports.gdp_event_free_js = gdp_event_free_js;
+
 /* EP_STAT */
 function gdp_gcl_close_js(gcl_Ptr) {
     return libgdp.gdp_gcl_close(gcl_Ptr);
 }
+
+exports.gdp_gcl_close_js = gdp_gcl_close_js;
 
 /* void */
 function fflush_all_js()
@@ -1997,7 +2010,7 @@ function gdp_datum_buf_as_string(datum)
     return rvString;
 } /* function get_datum_buf_as_string() */
 
-
+exports.gdp_datum_buf_as_string = gdp_datum_buf_as_string;
 
 // Some temporary test output ===============================================
 
@@ -2260,7 +2273,6 @@ function write_gcl_records(gdpd_addr, gcl_name, logdxname, gcl_append,
 // TBD: We could also return recarray_out[] for recsrc > 0. And, even
 // augmented with the manually entered record content, for recsrc = -1.
 {
-    var debug = true;
     if (debug) {
         console.log("gdpjs.js: write_gcl_records() start: recsrc: " + recsrc);
     }
