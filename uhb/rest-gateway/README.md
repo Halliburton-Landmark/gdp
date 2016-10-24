@@ -30,11 +30,11 @@ usual `apt-get` commands should work.
 
 ## Data format and interaction
 
-You can either use `GET` or `PUT` to send data. Any data sent is interepreted
-as `key, value` pairs, converted to a JSON object, and appended to the log
-specified at initialization time. By default, a single key can have multiple
-values, hence values are always a list. However, this behavior can be modified
-by passing appropriate flags at startup time.
+You can either use `GET` or `PUT` to send data. Any data passed in the URL is
+parsed into as `key, value` pairs (see example below), converted to a JSON
+object, and appended to the log specified at initialization time. By default, a
+single key can have multiple values, hence values are always a list. However,
+this behavior can be modified by passing appropriate flags at startup time.
 
 ## Execution
 
@@ -46,6 +46,18 @@ python gdp-rest.py -h
 
 ### Example:
 
+If you start the RESTful interface by doing something like
+
 ```
-python gdp-rest.py --nolist -k key.pem edu.berkeley.eecs.mor.Oct22.00
+python gdp-rest.py --nolist --convert-num -k key.pem logname
 ```
+
+A `GET` request such as
+`http://localhost:8080/?start=1476313665&end=1476314070&val=hello` will result
+into the following data published to `logname`: `{"start": 1476313665.0, "end":
+1476314070.0, "_meta": "/?start=1476313665&end=1476314070&val=hello", "val":
+"hello"}`
+
+Without the `--nolist` and `--convert-num` options, the same request will
+result in: `{"start": ["1476313665"], "end": ["1476314070"], "_meta":
+"/?start=1476313665&end=1476314070&val=hello", "val": ["hello"]}`
