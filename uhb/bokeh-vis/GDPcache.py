@@ -188,6 +188,8 @@ class GDPcache:
         _startR = self.__findRec(tStart)+1
         _endR = self.__findRec(tEnd)
 
+        if not (_startR<=_endR):
+            return []
         # Calculate step size
         stepSize = max((_endR+1-_startR)/numPoints, 1)
         return self.__multiread(_startR, (_endR+1)-_startR, stepSize)
