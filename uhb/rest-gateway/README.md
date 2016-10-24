@@ -1,5 +1,7 @@
 # A REST-ful endpoint for publishing
 
+**Do not use this in production without understanding the consequences.**
+
 Certain applications that generate data, for whatever reason, can not
 incorporate a full GDP client. An example category are web-browser based
 applications which have only limited functionality.
