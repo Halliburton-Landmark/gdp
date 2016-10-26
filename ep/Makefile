@@ -80,6 +80,7 @@ OBJS_MOST=	\
 	ep_pprint.o \
 	ep_prflags.o \
 	ep_rpool.o \
+	ep_sd.o \
 	ep_stat.o \
 	ep_statcodes.o \
 	ep_string.o \
@@ -144,6 +145,7 @@ HFILES=	\
 	ep_prflags.h \
 	ep_registry.h \
 	ep_rpool.h \
+	ep_sd.h \
 	ep_stat.h \
 	ep_statcodes.h \
 	ep_string.h \

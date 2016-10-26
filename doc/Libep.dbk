@@ -2460,6 +2460,51 @@ ep_logv(
       <programlisting>    fprintf(ep_dbg_getfile(), "Input was %s%s%s\n",
                         EpVidSeq.lquote, input, EpVidSeq.rquote);</programlisting>
     </section>
+
+    <section>
+      <title>Startup/Shutdown</title>
+
+      <para>If running under <systemitem>systemd</systemitem>-based versions
+      of Linux, it is possible to signal status changes to the startup
+      environment, notably about system startup and shutdown. This is only
+      relevant for programs that run as system daemons.</para>
+
+      <programlisting>#include &lt;ep/ep_sd.h&gt;
+
+void
+ep_sd_notifyf(
+        const char *fmt,
+        ...);</programlisting>
+
+      <para>The <parameter>fmt</parameter> and any arguments are printed a'la
+      <function>printf</function>(3) to a system buffer that is delivered to
+      <systemitem>systemd</systemitem>. The format of that buffer is defined
+      by <function>sd_notify</function>(3) and is not detailed here. Roughly,
+      each line of the output looks like an environment variable definition.
+      For example:</para>
+
+      <programlisting>// to inform the system that this service is ready:
+ep_sd_notifyf(
+        "READY=1");
+
+// to inform the system that this service is shutting down:
+ep_sd_notifyf(
+        "STOPPING=1\n"
+        "STATUS=Exiting on user signal %d\n",
+        sig);</programlisting>
+
+      <para>Important values include <literal>READY=1</literal>,
+      <literal>RELOADING=1</literal>, <literal>WATCHDOG=1</literal>, and
+      <literal>STOPPING=...</literal>.</para>
+
+      <para>If the <constant>EP_OSCF_HAS_SD_NOTIFY</constant> flag is set to
+      zero at compilation time, this call is a no-op. This is the case on most
+      systems.</para>
+
+      <remark>This should really abstract the syntax out more, rather than
+      making it <systemitem>systemd</systemitem> specific, so that it can
+      potentially be used on other systems.</remark>
+    </section>
   </section>
 
   <section>

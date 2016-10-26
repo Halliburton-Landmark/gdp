@@ -76,6 +76,8 @@
 **		Use strptime(3) for time/date parsing
 **	EP_OSCF_USE_GETDATE
 **		Use getdate(3) for time/date parsing
+**	EP_OSCF_HAS_SD_NOTIFY
+**		Use sd_notify(3) for system notification
 **
 **  Configuration is probably better done using autoconf
 **
@@ -133,6 +135,9 @@
 # define EP_OSCF_HAS_STRLCPY		0	// no strlcpy on linux
 # ifndef EP_OSCF_USE_GETDATE
 #  define EP_OSCF_USE_GETDATE		1	// does getdate(3) exist?
+# endif
+# ifndef EP_OSCF_HAS_SD_NOTIFY
+#  define EP_OSCF_HAS_SD_NOTIFY		0	// has sd_notify(3) (systemd)
 # endif
 
 # define _BSD_SOURCE			1	// needed to compile on Linux
