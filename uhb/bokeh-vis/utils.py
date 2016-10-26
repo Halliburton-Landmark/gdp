@@ -148,7 +148,7 @@ class GDPPlot:
                                 x_range=x_range, y_range=y_range,
                                 x_axis_type=x_axis_type, title=self.title)
 
-        self.scatter_shapes = [self.figure.x, self.figure.asterisk,
+        self.figure_shapes = [self.figure.x, self.figure.asterisk,
                                 self.figure.triangle, self.figure.square_x,
                                 self.figure.square_cross]
 
@@ -226,11 +226,12 @@ class GDPPlot:
                                 legend=self.__getLegend(l))
 
                 if self.plot_type == "twoD-heat":
-                    self.scatter_shapes[_log_ctr]('x', 'y',
+                    self.figure_shapes[_log_ctr]('x', 'y',
                                             source=s, size=10,
                                             line_color='color',
                                             fill_color='color',
-                                            fill_alpha=0.6)
+                                            fill_alpha=0.6,
+                                            legend=self.__getLegend(l))
 
 
         # for some reason, this doesn't work unless we have a legend
