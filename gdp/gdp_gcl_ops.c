@@ -56,7 +56,7 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.gcl.ops", "GCL operations for GDP");
 void
 _gdp_gcl_newname(gdp_gcl_t *gcl)
 {
-	GDP_ASSERT_GOOD_GCL(gcl);
+	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
 	_gdp_newname(gcl->name, gcl->gclmd);
 	gdp_printable_name(gcl->name, gcl->pname);
 }
@@ -120,16 +120,13 @@ void
 _gdp_gcl_freehandle(gdp_gcl_t *gcl)
 {
 	ep_dbg_cprintf(Dbg, 28, "_gdp_gcl_freehandle(%p)\n", gcl);
-	GDP_ASSERT_GOOD_GCL(gcl);
+	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
 
 	// release any remaining requests
 	_gdp_req_freeall(&gcl->reqs, NULL);
 
 	// drop it from the name -> handle cache
 	_gdp_gcl_cache_drop(gcl);
-
-	// should still be in use, but now no other way to reach the GCL
-	EP_ASSERT_INSIST(EP_UT_BITSET(GCLF_INUSE, gcl->flags));
 
 	// free any additional per-GCL resources
 	if (gcl->freefunc != NULL)
@@ -193,7 +190,6 @@ _gdp_gcl_dump(
 		}
 		else
 		{
-			EP_ASSERT_POINTER_VALID(gcl);
 			fprintf(fp, "%s\n", gcl->pname);
 		}
 
@@ -312,7 +308,8 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 	int md_alg;
 //	int pktype;
 
-	GDP_ASSERT_GOOD_GCL(gcl);
+	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
+					return EP_STAT_ASSERT_ABORT);
 
 	// send the request across to the log daemon
 	errno = 0;				// avoid spurious messages
@@ -453,7 +450,8 @@ _gdp_gcl_close(gdp_gcl_t *gcl,
 	int nrefs;
 
 	errno = 0;				// avoid spurious messages
-	GDP_ASSERT_GOOD_GCL(gcl);
+	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
+					return EP_STAT_ASSERT_ABORT);
 
 	if (ep_dbg_test(Dbg, 38))
 	{
@@ -511,7 +509,8 @@ append_common(gdp_gcl_t *gcl,
 
 	errno = 0;				// avoid spurious messages
 
-	GDP_ASSERT_GOOD_GCL(gcl);
+	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
+					return EP_STAT_ASSERT_ABORT);
 	EP_ASSERT_POINTER_VALID(datum);
 	if (!EP_UT_BITSET(GDP_MODE_AO, gcl->iomode))
 		goto fail0;
@@ -524,7 +523,9 @@ append_common(gdp_gcl_t *gcl,
 	// ignore the new datum: use the one passed in
 	gdp_datum_free(req->pdu->datum);
 	req->pdu->datum = datum;
-	EP_ASSERT(datum->inuse);
+
+	// if the assertion fails, we may be using an already freed datum
+	EP_ASSERT_ELSE(datum->inuse, return EP_STAT_ASSERT_ABORT);
 
 	// set up for signing (req->md will be updated with data part)
 	req->md = gcl->digest;
@@ -657,7 +658,8 @@ _gdp_gcl_read(gdp_gcl_t *gcl,
 
 	errno = 0;				// avoid spurious messages
 
-	GDP_ASSERT_GOOD_GCL(gcl);
+	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
+					return EP_STAT_ASSERT_ABORT);
 	EP_ASSERT_POINTER_VALID(datum);
 	if (!EP_UT_BITSET(GDP_MODE_RO, gcl->iomode))
 		goto fail0;
@@ -666,7 +668,7 @@ _gdp_gcl_read(gdp_gcl_t *gcl,
 
 	gdp_datum_free(req->pdu->datum);
 	req->pdu->datum = datum;
-	EP_ASSERT(datum->inuse);
+	EP_ASSERT_ELSE(datum->inuse, return EP_STAT_ASSERT_ABORT);
 
 	estat = _gdp_invoke(req);
 
@@ -706,7 +708,8 @@ _gdp_gcl_read_async(gdp_gcl_t *gcl,
 	errno = 0;				// avoid spurious messages
 
 	// sanity checks
-	GDP_ASSERT_GOOD_GCL(gcl);
+	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
+					return EP_STAT_ASSERT_ABORT);
 	if (!EP_UT_BITSET(GDP_MODE_RO, gcl->iomode))
 		goto fail0;
 
@@ -753,7 +756,8 @@ _gdp_gcl_getmetadata(gdp_gcl_t *gcl,
 	EP_STAT estat;
 	gdp_req_t *req;
 
-	GDP_ASSERT_GOOD_GCL(gcl);
+	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
+					return EP_STAT_ASSERT_ABORT);
 
 	errno = 0;				// avoid spurious messages
 	estat = _gdp_req_new(GDP_CMD_GETMETADATA, gcl, chan, NULL, reqflags, &req);
@@ -784,7 +788,8 @@ _gdp_gcl_newsegment(gdp_gcl_t *gcl,
 	EP_STAT estat;
 	gdp_req_t *req;
 
-	GDP_ASSERT_GOOD_GCL(gcl);
+	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
+					return EP_STAT_ASSERT_ABORT);
 	estat = _gdp_req_new(GDP_CMD_NEWSEGMENT, gcl, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
@@ -833,7 +838,8 @@ _gdp_gcl_fwd_append(
 	if (memcmp(to_server, _GdpMyRoutingName, sizeof _GdpMyRoutingName) == 0)
 	{
 		// forwarding to ourselves: bad idea
-		EP_ASSERT_FAILURE("_gdp_gcl_fwd_append: forwarding to myself");
+		EP_ASSERT_PRINT("_gdp_gcl_fwd_append: forwarding to myself");
+		return EP_STAT_ASSERT_ABORT;
 	}
 
 	// deliver results asynchronously

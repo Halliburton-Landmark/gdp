@@ -217,7 +217,7 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 	uint8_t sigbuf[EP_CRYPTO_MAX_SIG];
 	bool use_sigbuf = false;
 
-	EP_ASSERT_POINTER_VALID(pdu);
+	EP_ASSERT_ELSE(pdu != NULL, return EP_STAT_ASSERT_ABORT);
 
         // avoid segfault if the daemon is not running
         if (chan == NULL)
@@ -776,17 +776,17 @@ _gdp_pdu_new(void)
 	gdp_pdu_t *pdu;
 
 	ep_thr_mutex_lock(&PduFreeListMutex);
-	if ((pdu = TAILQ_FIRST(&PduFreeList)) != NULL)
-		TAILQ_REMOVE(&PduFreeList, pdu, list);
+	do
+	{
+		if ((pdu = TAILQ_FIRST(&PduFreeList)) != NULL)
+			TAILQ_REMOVE(&PduFreeList, pdu, list);
+		else
+			pdu = ep_mem_zalloc(sizeof *pdu);
+		EP_ASSERT_ELSE(!pdu->inuse, pdu = NULL);
+	} while (pdu == NULL);
 	ep_thr_mutex_unlock(&PduFreeListMutex);
 
-	if (pdu == NULL)
-	{
-		pdu = ep_mem_zalloc(sizeof *pdu);
-	}
-
 	// initialize the PDU
-	EP_ASSERT(!pdu->inuse);
 	memset(pdu, 0, sizeof *pdu);
 	pdu->ver = GDP_PROTO_CUR_VERSION;
 	pdu->ttl = GDP_TTL_DEFAULT;
@@ -801,10 +801,12 @@ void
 _gdp_pdu_free(gdp_pdu_t *pdu)
 {
 	ep_dbg_cprintf(Dbg, 48, "_gdp_pdu_free(%p)\n", pdu);
-	EP_ASSERT(pdu->inuse);
+
 	if (pdu->datum != NULL)
 		gdp_datum_free(pdu->datum);
 	pdu->datum = NULL;
+	// abandon this PDU if already free
+	EP_ASSERT_ELSE(pdu->inuse, return);
 	pdu->inuse = false;
 	ep_thr_mutex_lock(&PduFreeListMutex);
 	TAILQ_INSERT_HEAD(&PduFreeList, pdu, list);

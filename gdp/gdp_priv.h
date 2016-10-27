@@ -188,15 +188,18 @@ struct gdp_gcl
 #define GCLF_INUSE			0x0008		// handle is allocated
 #define GCLF_DEFER_FREE		0x0010		// defer actual free until reclaim
 
-#define GDP_ASSERT_GOOD_GCL(gcl)	\
-				(EP_ASSERT_REQUIRE((gcl) != NULL &&	\
-				EP_UT_BITSET(GCLF_INUSE, (gcl)->flags)))
+#define GDP_GCL_ISGOOD(gcl)												\
+				((gcl) != NULL && EP_UT_BITSET(GCLF_INUSE, (gcl)->flags))
+#define GDP_ASSERT_GCL_ISGOOD(gcl)										\
+				(EP_ASSERT(GDP_GCL_ISGOOD(gcl))
+
 #if GDP_EXTENDED_LOCKING_CHECK
-#define GDP_ASSERT_LOCKED(x)											\
-				(EP_ASSERT_REQUIRE((x) != NULL &&						\
-					ep_thr_mutex_trylock(&(x)->mutex) != 0))
+#define GDP_ASSERT_MUTEX_ISLOCKED(m, r)									\
+				EP_ASSERT_ELSE(ep_thr_mutex_trylock(m) != 0, r)
+#define GDP_ASSERT_MUTEX_ISUNLOCKED(m, r)			//XXX
 #else
-#define GDP_ASSERT_LOCKED(x)
+#define GDP_ASSERT_MUTEX_ISLOCKED(m, r)
+#define GDP_ASSERT_MUTEX_ISUNLOCKED(m, r)
 #endif
 
 /*

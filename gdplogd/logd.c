@@ -175,7 +175,6 @@ sigabort(int sig)
 	signal(sig, SIG_DFL);
 	ep_sd_notifyf("STOPPING=1\nSTATUS=Aborting on signal %d\n", sig);
 	ep_log(EP_STAT_ABORT, "Aborting on signal %d", sig);
-	dump_state(GDP_PR_DETAILED);
 	kill(getpid(), sig);		// this will not do cleanup
 }
 
@@ -187,7 +186,7 @@ sigabort(int sig)
 static void
 assertion_dump(void)
 {
-	sigabort(SIGABRT);
+	dump_state(GDP_PR_DETAILED);
 }
 
 
@@ -392,7 +391,7 @@ main(int argc, char **argv)
 	signal(SIGABRT, sigabort);
 
 	// dump state on assertion failure
-	EpAbortFunc = assertion_dump;
+	EpAssertInfo = assertion_dump;
 
 	// arrange to clean up resources periodically
 	{

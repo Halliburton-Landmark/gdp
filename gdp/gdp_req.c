@@ -122,7 +122,9 @@ _gdp_req_new(int cmd,
 	if (EP_UT_BITSET(GDP_REQ_ASYNCIO, flags))
 		flags |= GDP_REQ_PERSIST | GDP_REQ_ALLOC_RID;
 
-	EP_ASSERT_REQUIRE(gcl == NULL || EP_UT_BITSET(GCLF_INUSE, gcl->flags));
+	// if assertion fails, may be working with an unallocated GCL
+	EP_ASSERT_ELSE(gcl == NULL || GDP_GCL_ISGOOD(gcl),
+			return EP_STAT_ASSERT_ABORT);
 
 	// simplify the simple case
 	if (chan == NULL)
@@ -130,10 +132,11 @@ _gdp_req_new(int cmd,
 
 	// get memory, off free list if possible
 	ep_thr_mutex_lock(&ReqFreeListMutex);
-	if ((req = LIST_FIRST(&ReqFreeList)) != NULL)
+	while ((req = LIST_FIRST(&ReqFreeList)) != NULL)
 	{
 		LIST_REMOVE(req, gcllist);
-		EP_ASSERT(req->state == GDP_REQ_FREE);
+		EP_ASSERT_ELSE(req->state == GDP_REQ_FREE,
+						req = NULL);
 	}
 	ep_thr_mutex_unlock(&ReqFreeListMutex);
 	if (req == NULL)
@@ -465,7 +468,8 @@ _gdp_req_find(gdp_gcl_t *gcl, gdp_rid_t rid)
 
 	ep_dbg_cprintf(Dbg, 50, "_gdp_req_find(gcl=%p, rid=%" PRIgdp_rid")\n",
 			gcl, rid);
-	GDP_ASSERT_GOOD_GCL(gcl);
+	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
+					return NULL);
 
 	for (;;)
 	{
@@ -491,7 +495,9 @@ _gdp_req_find(gdp_gcl_t *gcl, gdp_rid_t rid)
 		if (req == NULL)
 			break;				// nothing to find
 
-		EP_ASSERT(req->state != GDP_REQ_FREE);
+		// if we find a free request, just ignore it
+		EP_ASSERT_ELSE(req->state != GDP_REQ_FREE,
+						continue);
 		if (req->state != GDP_REQ_ACTIVE)
 			break;				// this is what we are looking for!
 

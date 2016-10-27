@@ -94,7 +94,7 @@ _gdp_invoke(gdp_req_t *req)
 			_gdp_datum_dump(req->pdu->datum, ep_dbg_getfile());
 		}
 	}
-	EP_ASSERT(req->state == GDP_REQ_ACTIVE);
+	EP_ASSERT_ELSE(req->state == GDP_REQ_ACTIVE, return EP_STAT_ASSERT_ABORT);
 	//EP_ASSERT_REQUIRE(ep_thr_mutex_islocked(&req->mutex));
 
 	// scale timeout to milliseconds
@@ -301,7 +301,7 @@ acknak(gdp_req_t *req, const char *where, bool reuse_pdu)
 
 			// point the new PDU at the old datum
 			req->rpdu->datum = req->pdu->datum;
-			EP_ASSERT(req->rpdu->datum->inuse);
+			(void) EP_ASSERT_TEST(req->rpdu->datum->inuse);
 		}
 
 		// can now drop the old pdu and switch to the new one

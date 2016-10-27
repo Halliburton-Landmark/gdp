@@ -217,7 +217,8 @@ gdp_name_is_valid(const gdp_name_t name)
 gdp_recno_t
 gdp_gcl_getnrecs(const gdp_gcl_t *gcl)
 {
-	GDP_ASSERT_GOOD_GCL(gcl);
+	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
+					return GDP_PDU_NO_RECNO);
 	return gcl->nrecs;
 }
 
@@ -719,8 +720,8 @@ gdp_gcl_set_append_filter(gdp_gcl_t *gcl,
 		EP_STAT (*appendfilter)(gdp_datum_t *, void *),
 		void *filterdata)
 {
-	GDP_ASSERT_GOOD_GCL(gcl);
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_set_append_filter\n");
+	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
 	gcl->apndfilter = appendfilter;
 	gcl->apndfpriv = filterdata;
 }
@@ -735,8 +736,8 @@ gdp_gcl_set_read_filter(gdp_gcl_t *gcl,
 		EP_STAT (*readfilter)(gdp_datum_t *, void *),
 		void *filterdata)
 {
-	GDP_ASSERT_GOOD_GCL(gcl);
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_set_read_filter\n");
+	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
 	gcl->readfilter = readfilter;
 	gcl->readfpriv = filterdata;
 }
