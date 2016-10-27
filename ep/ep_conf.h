@@ -88,9 +88,6 @@
 # ifndef EP_OSCF_USE_PTHREADS
 #  define EP_OSCF_USE_PTHREADS		1
 # endif
-# ifndef EP_OSCF_USE_GETDATE
-#  define EP_OSCF_USE_GETDATE		0
-# endif
 
 // these should be defined on all POSIX platforms
 # define EP_OSCF_HAS_INTTYPES_H		1	// does <inttypes.h> exist?
@@ -110,9 +107,6 @@
 #  define EP_OSCF_HAS_LSTAT		1	// does lstat(2) exist?
 #  if __FreeBSD_version >= 440000
 #   define EP_OSCF_HAS_GETPROGNAME	1	// does getprogname(3) exist?
-#  endif
-#  ifndef EP_OSCF_USE_GETDATE
-#   define EP_OSCF_USE_GETDATE		0	// does getdate(3) exist?
 #  endif
 #  define EP_OSCF_NEED_OPTRESET		1	// optreset needed in getopt(3)
 # endif // __FreeBSD__
@@ -134,10 +128,12 @@
 # define EP_TYPE_PRINTFLIKE(a, b)
 # define EP_OSCF_HAS_STRLCPY		0	// no strlcpy on linux
 # ifndef EP_OSCF_USE_GETDATE
-#  define EP_OSCF_USE_GETDATE		1	// does getdate(3) exist?
-# endif
-# ifndef EP_OSCF_HAS_SD_NOTIFY
-#  define EP_OSCF_HAS_SD_NOTIFY		0	// has sd_notify(3) (systemd)
+#  if _XOPEN_SOURCE >= 500 || _XOPEN_SOURCE && _XOPEN_SOURCE_EXTENDED
+#   define EP_OSCF_USE_GETDATE		1	// does getdate(3) exist?
+#   if _GNU_SOURCE
+#    define EP_OSCF_HAS_GETDATE_R	1	// getdate_r is available
+#   endif
+#  endif
 # endif
 
 # define _BSD_SOURCE			1	// needed to compile on Linux
@@ -151,9 +147,23 @@
 #  define EP_OSCF_64BITPTR		0
 # endif
 
+// defaults if not set above
 #ifndef EP_TYPE_PRINTFLIKE
 # define EP_TYPE_PRINTFLIKE(a, b)	__printflike(a, b)
 #endif
+#ifndef EP_OSCF_USE_GETDATE
+# define EP_OSCF_USE_GETDATE		0	// does getdate(3) exist?
+#endif
+#ifndef EP_OSCF_HAS_SD_NOTIFY
+# ifdef __has_include
+#  if __has_include("systemd/sd-daemon.h")
+#   define EP_OSCF_HAS_SD_NOTIFY	1	// have sd_notify(3) (systemd)
+#  else
+#   define EP_OSCF_HAS_SD_NOTIFY	0	// no sd_notify(3) (systemd)
+#  endif
+# endif
+#endif
+
 
 /*
 ** C Compiler configuration variables
