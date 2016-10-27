@@ -426,6 +426,12 @@ EP_STAT  EP_STAT_FROM_INT(unsigned int istat)  // convert unsigned integer to st
 
           <td>Buffer overflow averted</td>
         </tr>
+
+        <tr>
+          <td>EP_STAT_ASSERT_ABORT</td>
+
+          <td>Assertion failiure: backout now!</td>
+        </tr>
       </informaltable>
 
       <para>There is also a special module
@@ -1716,34 +1722,40 @@ EP_STAT                 ep_crypto_cipher_final(
 
     <programlisting>    #include &lt;ep/ep_assert.h&gt;
 
-    EP_ASSERT_REQUIRE(expression)       // input to routines
-    EP_ASSERT_ENSURE(expression)        // output from routines
-    EP_ASSERT_INSIST(expression)        // other unclassified assertions
-    EP_ASSERT_INVARIANT(expression)     // loop invariants
-    EP_ASSERT(expression)               // miscellaneous assertions
+    EP_ASSERT(condition)                // print and abort if condition not satisfied
+
+    EP_ASSERT_TEST(condition)           // print and return true if condition not satisfied
+
+    EP_ASSERT_ELSE(condition, recovery) // print and run recovery code if condition not satisfied
+
+    EP_ASSERT_PRINT(                    // print assertion failure message
+            const char *msg,               // message to print
+            ...)                           // arguments to message
 
     EP_ASSERT_FAILURE(                  // abort process with message
             const char *msg,               // message to print
             ...)                           // arguments to message
     ep_assert_failure(                  // abort process with extra info and message
-            const char *type,              // type of abort (e.g., "insist")
             const char *file,              // file name
             int line,                      // line number
             const char *msg,               // message to print
             ...)                           // arguments to message
 
-    void    (*EpAbortFunc)(void)        // function to call before aborting</programlisting>
+    void    (*EpAssertInfo)(void)       // if set, call to print additional information
+    void    (*EpAssertAbort)(void)      // function to call before aborting</programlisting>
 
     <para>Processes can abort as though they got an assertion failure by
     calling <function>ep_assert_failure</function>. The macro
     <function>EP_ASSERT_FAILURE</function> does the same thing, but provides
-    the error <parameter>type</parameter>, <parameter>file</parameter> name,
-    and <parameter>line</parameter> number in the same way as the assertion
-    calls (with <parameter>type</parameter> set to
-    "<constant>failure</constant>"). If the <varname>EpAbortFunc</varname>
-    variable is set, that function will be called after printing the message
-    but before aborting. It can be used to dump process state for
-    debugging.</para>
+    the <parameter>file</parameter> name and <parameter>line</parameter>
+    number in the same way as the assertion calls. If the
+    <varname>EpAssertInfo</varname> variable is set, that function will be
+    called after printing the message but before aborting. It can be used to
+    dump process state for debugging. If the <varname>EpAssertAbort</varname>
+    variable is set, that function will be called after the message is printed
+    and immediately before the process aborts. This might do last minute
+    recovery or alternative termination (e.g., terminate just the thread
+    rather than the entire process).</para>
   </section>
 
   <section>

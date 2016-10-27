@@ -38,12 +38,84 @@
 #include <string.h>
 
 
+void	(*EpAssertInfo)(void) = NULL;	// can be used to dump state
+void	(*EpAssertAbort)(void) = NULL;	// alternate abort() function
+
+/***********************************************************************
+**
+**  ASSERT_ABORT -- abort process because of an assertion failure
+*/
+
+static void EP_ATTR_NORETURN
+assert_abort(void)
+{
+	// give the application an opportunity to do something else
+	if (EpAssertAbort != NULL)
+	{
+		// avoid assertion failure loops
+		void (*abortfunc)(void) = EpAssertAbort;
+		EpAssertAbort = NULL;
+		(*abortfunc)();
+	}
+
+	// we're still here....   but not for long
+	abort();
+}
+
+
+/***********************************************************************
+**
+**  EP_ASSERT_PRINT[V] -- print assertion failure message (but do not abort)
+*/
+
+void
+ep_assert_printv(
+	const char *file,
+	int line,
+	const char *msg,
+	va_list av)
+{
+	// log something here?
+
+	flockfile(stderr);
+	fprintf(stderr, "%s%sAssertion failed at %s:%d:\n\t",
+			EpVid->vidfgcyan, EpVid->vidbgred,
+			file, line);
+	vfprintf(stderr, msg, av);
+	fprintf(stderr, "%s\n", EpVid->vidnorm);
+
+	// give the application a chance to print state
+	if (EpAssertInfo != NULL)
+		(*EpAssertInfo)();
+
+	funlockfile(stderr);
+
+#if _EP_ASSERT_ALL_ABORT	//DEBUG: abort on all exceptions
+	assert_abort();
+#endif
+}
+
+void
+ep_assert_print(
+	const char *file,
+	int line,
+	const char *msg,
+	...)
+{
+	va_list av;
+
+	va_start(av, msg);
+	ep_assert_printv(file, line, msg, av);
+	va_end(av);
+}
+
 /***********************************************************************
 **
 **  EP_ASSERT_FAILURE -- internal routine to raise an assertion failure
 **
+**	ep_assert_nofail variant prints message but returns
+**
 **	Parameters:
-**		type -- the assertion type -- require, ensure, etc.
 **		file -- which file contained the assertion
 **		line -- which line was it on
 **		msg -- the message to print (printf format)
@@ -53,11 +125,8 @@
 **		never
 */
 
-void	(*EpAbortFunc)(void) = NULL;
-
 void
 ep_assert_failure(
-	const char *type,
 	const char *file,
 	int line,
 	const char *msg,
@@ -65,26 +134,10 @@ ep_assert_failure(
 {
 	va_list av;
 
-	// log something here?
-
-	flockfile(stderr);
-	fprintf(stderr, "%s%sAssertion failed at %s:%d: %s:\n\t",
-			EpVid->vidfgcyan, EpVid->vidbgred,
-			file, line, type);
 	va_start(av, msg);
-	vfprintf(stderr, msg, av);
+	ep_assert_printv(file, line, msg, av);
 	va_end(av);
-	fprintf(stderr, "%s\n", EpVid->vidnorm);
-	funlockfile(stderr);
 
-	// give the application an opportunity to do something else
-	if (EpAbortFunc != NULL)
-	{
-		void (*abortfunc)(void) = EpAbortFunc;
-		EpAbortFunc = NULL;
-		(*abortfunc)();
-	}
-
-	abort();
+	assert_abort();
 	/*NOTREACHED*/
 }
