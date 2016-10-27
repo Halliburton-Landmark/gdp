@@ -21,3 +21,12 @@ if [ ! -z "$candidates" ]
 then
 	echo "-ldb"
 fi
+
+candidates=`ls \
+	/usr/lib/libsystemd.* \
+	/usr/lib/*/libsystemd.* \
+	2>/dev/null`
+if [ ! -z "$candidates" ]
+then
+	echo "-lsystemd"
+fi
