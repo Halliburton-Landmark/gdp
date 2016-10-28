@@ -301,12 +301,13 @@ gdp_gcl_create(gdp_name_t gclname,
 				gdp_gclmd_t *gmd,
 				gdp_gcl_t **pgcl)
 {
-	EP_STAT estat = EP_STAT_OK;
+	EP_STAT estat;
 	char ebuf[100];
 	gdp_name_t namebuf;
 
-	GDP_CHECK_INITIALIZED;				// make sure gdp_init is done
 	ep_dbg_cprintf(Dbg, 19, "\n>>> gdp_gcl_create\n");
+	estat = GDP_CHECK_INITIALIZED;		// make sure gdp_init is done
+	EP_STAT_CHECK(estat, return estat);
 
 	if (gclname == NULL)
 	{
@@ -343,13 +344,14 @@ gdp_gcl_open(gdp_name_t name,
 	int cmd;
 	EP_CRYPTO_KEY *skey = NULL;
 
-	GDP_CHECK_INITIALIZED;				// make sure gdp_init is done
 	if (ep_dbg_test(Dbg, 19))
 	{
 		gdp_pname_t pname;
 		ep_dbg_printf("\n>>> gdp_gcl_open(%s)\n",
 					gdp_printable_name(name, pname));
 	}
+	estat = GDP_CHECK_INITIALIZED;		// make sure gdp_init is done
+	EP_STAT_CHECK(estat, return estat);
 
 	if (mode == GDP_MODE_RO)
 		cmd = GDP_CMD_OPEN_RO;

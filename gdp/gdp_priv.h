@@ -56,10 +56,8 @@ extern gdp_name_t	_GdpMyRoutingName;	// source name for PDUs
 extern bool			_GdpLibInitialized;	// are we initialized?
 
 #define GDP_CHECK_INITIALIZED											\
-				{														\
-					if (!_GdpLibInitialized)							\
-						(void) gdp_init(NULL);							\
-				}
+					(_GdpLibInitialized ? EP_STAT_OK					\
+										: gdp_init(NULL))
 
 #include "gdp_pdu.h"
 
