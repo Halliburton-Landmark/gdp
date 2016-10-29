@@ -77,7 +77,7 @@ static struct ep_stat_to_string Stats[] =
 	{ GDP_STAT_CRYPTO_SIGFAIL,			"signature failure",				},
 	{ GDP_STAT_PHYSIO_ERROR,            "physical I/O error on log",        },
 	{ GDP_STAT_RECORD_EXPIRED,			"record expired",					},
-	{ GDP_STAT_DEAD_REQ,				"request freed while in use",		},
+	{ GDP_STAT_USING_FREE_REQ,			"trying to use free req",			},
 	{ GDP_STAT_BAD_REFCNT,				"invalid reference count",			},
 	{ GDP_STAT_RECORD_MISSING,			"record missing (look elsewhere)",	},
 	{ GDP_STAT_RECORD_DUPLICATED,		"record duplicated",				},
