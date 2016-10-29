@@ -30,6 +30,9 @@
 
 #include <ep.h>
 #include <ep_sd.h>
+#if EP_OSCF_HAS_SD_NOTIFY
+# include <systemd/sd-daemon.h>
+#endif
 
 #include <stdarg.h>
 
