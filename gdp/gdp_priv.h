@@ -191,13 +191,23 @@ struct gdp_gcl
 #define GDP_ASSERT_GCL_ISGOOD(gcl)										\
 				(EP_ASSERT(GDP_GCL_ISGOOD(gcl))
 
-#if GDP_EXTENDED_LOCKING_CHECK
+#if GDP_EXTENDED_LOCKING_CHECK		// these don't work on recursive mutexes
+
+// don't use "do { } while(false)" so r can use break and continue
 #define GDP_ASSERT_MUTEX_ISLOCKED(m, r)									\
-				EP_ASSERT_ELSE(ep_thr_mutex_trylock(m) != 0, r)
-#define GDP_ASSERT_MUTEX_ISUNLOCKED(m, r)			//XXX
+				if (EP_ASSERT_TEST(ep_thr_mutex_trylock(m) != 0))		\
+				{														\
+					ep_thr_mutex_unlock(m);								\
+					r;													\
+				}
+
+#define GDP_ASSERT_MUTEX_ISUNLOCKED(m, r)			//XXX IMPLEMENT ME
+
 #else
+
 #define GDP_ASSERT_MUTEX_ISLOCKED(m, r)
 #define GDP_ASSERT_MUTEX_ISUNLOCKED(m, r)
+
 #endif
 
 /*
