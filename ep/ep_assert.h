@@ -75,10 +75,13 @@
 **	It could, for example, kill the current thread as opposed to
 **	the current process.
 **
-**	If _EP_ASSERT_ALL_ABORT is set during compilation, then all
-**	assertions (actually all calls to _ep_assert_printv) cause
+**	If _EP_CCCF_ASSERT_ALL_ABORT is set during compilation, then
+**	all assertions (actually all calls to _ep_assert_printv) cause
 **	immediate death.  This is to simplify debugging, where
 **	ignoring an assertion could result in cascading failures.
+**
+**	If _EP_CCCF_ASSERT_NONE is set during compilation, then all
+**	assertions are compiled out.
 */
 
 
@@ -86,6 +89,8 @@
 #define _EP_ASSERT_H_
 
 #include "ep_conf.h"
+
+#if !_EP_CCCF_ASSERT_NONE
 
 // assert that an expression must be true
 #define EP_ASSERT(e)							\
@@ -101,26 +106,24 @@
 			: (ep_assert_print(__FILE__, __LINE__,		\
 					"%s", #e), true))
 
-// assert condition with recovery
+// assert condition with recovery (note: doesn't use do ... while (false)
+// paradigm to allow break & continue in recovery actions)
 #define EP_ASSERT_ELSE(e, r)						\
-		do {							\
-			if (!(e))					\
-			{						\
-				ep_assert_print(__FILE__, __LINE__,	\
-						"%s", #e);		\
-				r;					\
-			}						\
-		} while (false)
+		if (!(e))						\
+		{							\
+			ep_assert_print(__FILE__, __LINE__,		\
+					"%s", #e);			\
+			r;						\
+		}
 
-// force assertion failure
+
+// force assertion failure and abort
 #define EP_ASSERT_FAILURE(...)						\
-			ep_assert_failure(__FILE__, __LINE__,		\
-					__VA_ARGS__)
+		ep_assert_failure(__FILE__, __LINE__, __VA_ARGS__)
 
 // print assertion failure and return
 #define EP_ASSERT_PRINT(...)						\
-			ep_assert_print(__FILE__, __LINE__,		\
-					__VA_ARGS__)
+		ep_assert_print(__FILE__, __LINE__, __VA_ARGS__)
 
 // called if the assertion failed
 extern void	ep_assert_failure(
@@ -142,6 +145,19 @@ extern void	ep_assert_print(
 			int line,
 			const char *msg,
 			...);
+
+#else // _EP_CCCF_ASSERT_NONE
+
+#define EP_ASSERT(e)
+#define EP_ASSERT_TEST(e)		false
+#define EP_ASSERT_ELSE(e, r)
+#define EP_ASSERT_FAILURE(...)
+#define EP_ASSERT_PRINT(...)
+#define ep_assert_failure(f, l, m, ...)
+#define ep_assert_printv(f, l, m, av)
+#define ep_assert_print(f, l, m, ...)
+
+#endif // _EP_CCCF_ASSERT_NONE
 
 // callback functions
 extern void	(*EpAssertInfo)(void);		// show additional info

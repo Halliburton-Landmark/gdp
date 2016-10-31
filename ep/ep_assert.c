@@ -41,6 +41,8 @@
 void	(*EpAssertInfo)(void) = NULL;	// can be used to dump state
 void	(*EpAssertAbort)(void) = NULL;	// alternate abort() function
 
+#if !_EP_CCCF_ASSERT_NONE
+
 /***********************************************************************
 **
 **  ASSERT_ABORT -- abort process because of an assertion failure
@@ -90,7 +92,7 @@ ep_assert_printv(
 
 	funlockfile(stderr);
 
-#if _EP_ASSERT_ALL_ABORT	//DEBUG: abort on all exceptions
+#if _EP_CCCF_ASSERT_ALL_ABORT	//DEBUG: abort on all exceptions
 	assert_abort();
 #endif
 }
@@ -141,3 +143,5 @@ ep_assert_failure(
 	assert_abort();
 	/*NOTREACHED*/
 }
+
+#endif // _EP_CCCF_ASSERT_NONE
