@@ -5,7 +5,7 @@ G=		-g
 O=		-O
 STD=
 COPTS=		${PG} ${WALL} $G $O ${STD}
-CFLAGS=		${COPTS} ${INCS}
+CFLAGS+=	${COPTS} ${INCS}
 ALL=		helloworld
 
 all:		${ALL}

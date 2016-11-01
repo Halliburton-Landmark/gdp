@@ -153,7 +153,7 @@ G=		-g
 O=		-O
 STD=
 COPTS=		${PG} ${WALL} $G $O ${STD}
-CFLAGS=		${COPTS} ${INCS} -fPIC
+CFLAGS+=	${COPTS} ${INCS} -fPIC
 
 LN=		ln
 MV=		mv

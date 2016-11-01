@@ -51,7 +51,7 @@ G=		-g
 O=		-O
 STD=
 COPTS=		${PG} ${WALL} $G $O ${STD}
-CFLAGS=		${COPTS} ${INCS}
+CFLAGS+=	${COPTS} ${INCS}
 MKDIR=		mkdir -p
 
 all:	${ALL}

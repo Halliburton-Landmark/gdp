@@ -197,7 +197,7 @@ LIBSEARCH=	${LIBLOCAL} \
 		-L${LOCAL1}/lib \
 		-L${LOCAL2}/lib
 INCS=		${INCSEARCH}
-CFLAGS=		${COPTS} ${INCS} -I${CURDIR} -I.. -fPIC
+CFLAGS+=	${COPTS} ${INCS} -I${CURDIR} -I.. -fPIC
 RM=		rm
 LD=		ld
 LIBCRYPTO=	-lcrypto
