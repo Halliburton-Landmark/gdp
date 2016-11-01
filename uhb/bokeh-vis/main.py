@@ -49,10 +49,6 @@ logs = []
 plots = []  # A list of utils.GDPPlot objects
 
 
-class NoDataFound(Exception):
-    def __init__(self, arg):
-        self.msg = arg
-
 
 def updateData():
     # this function gets called every once in a while.
@@ -61,27 +57,30 @@ def updateData():
     current_time = time.time()
     try:
         newdata = utils.getGDPdata(logs, last_update_time, current_time)
-    except EP_STAT_Exception as e:
+    except (EP_STAT_Exception, utils.NoDataException) as e:
         return
+
     last_update_time = current_time
 
     # update the sources for the data
     for p in plots:
         p.updateData(newdata)
 
-
 try:
 
     ### Initialize things and parse the URL arguments
     utils.init()
-    common_args = utils.parseCommonArgs()
+    common_args, plot_args = utils.parseArgs()
+
+    if len(plot_args)==0:
+        raise utils.NoPlotsSpecifiedException
 
     logs = common_args['log']
     start = common_args['start']
     end = common_args['end']
 
     # populate the list of plots
-    plots = utils.parsePlots(common_args)
+    plots = utils.initPlots(plot_args, common_args)
 
     ### Now get data out of GDP (raw data, no filtering on keys yet)
     if common_args['end'] > 0.0:
@@ -91,45 +90,21 @@ try:
         _end = time.time()
         # Also set up things for the periodic callback
         last_update_time = _end
-        curdoc().add_periodic_callback(updateData, 500)
+        curdoc().add_periodic_callback(updateData, 1000)
 
     alldata = utils.getGDPdata(logs, start, _end)
 
 
-    # Do we have at least one record? If not, probably tell the
-    #   user that they did not chioose properly
-    sampleRecord = None
-    try:
-        assert len(alldata.keys())>0   # We should have at least one log
-        for l in alldata.keys():
-            if len(alldata[l][1])>0:
-                sampleRecord = alldata[l][1][0] # Get the Y value
-        assert sampleRecord is not None
-    except AssertionError as e:
-        print alldata
-        raise NoDataFound("No data found for the selected time range")
-
-
-    ### If the user didn't specify a list of keys, we try to plot all the
-    ###     keys. This is as general as it can be
-    if len(plots)==0:
-        # The user didn't tell us what keys to plot. We are going to plot
-        #   everything that we can using some heuristics from data
-        plottable_types = [int, float]
-        for k in sampleRecord.keys():
-            if type(sampleRecord[k]) in plottable_types:
-                plots.append(utils.GDPPlot(logs, start, end, k, [k]))
-    
     ### Here's the cool stuff, where we actually generate plots from data
     for p in plots:
 
         # initialize the high level figure
-        p.initFigure(common_args['width'], common_args['height'])
+        p.initFigure()
 
         # initialize indvidual lines with dat
         p.initData(alldata)
 
-    
+
     ### Put the generated plots into a document now, bokeh will take care
     ### of plotting them for us.
     _figures = [p.figure for p in plots]

@@ -68,6 +68,7 @@ class GDPcache:
         """
 
         gdp.gdp_init()      # No side-effects of calling this multiple times
+        # gdp.dbg_set("*=20")
         self.logname = logname
         self.lh = gdp.GDP_GCL(gdp.GDP_NAME(logname), gdp.GDP_MODE_RO)
         self.limit = limit
@@ -125,20 +126,36 @@ class GDPcache:
         return datum
 
 
-    def __multiread(self, start, num):
+    def __multiread(self, start, num, step=1):
         """ same as read, but efficient for a range. Use carefully, because
         I don't check for already-cached entries """
-        self.lh.multiread(start, num)
+
+        numRecords = 0
+        usingMultiread = False
+        if step == 1:
+            self.lh.multiread(start, num)
+            usingMultiread = True
+        else:
+            # do lots of multireads of size 1
+            for i in xrange(start, start+num, step):
+                self.lh.read_async(i)
+                numRecords += 1
         ret = []
-        while True:
+        while usingMultiread or numRecords>0:
             event = self.lh.get_next_event(None)
-            if event['type'] == gdp.GDP_EVENT_EOS: break
+            if event['type'] == gdp.GDP_EVENT_EOS and usingMultiread:
+                break
+            if event["type"] not in [gdp.GDP_EVENT_EOS, gdp.GDP_EVENT_DATA]:
+                print "Unknown event type", event
+            numRecords -= 1
             datum = event['datum']
             recno = datum['recno']
             self.cache[recno] = datum
             self.atime[recno] = time.time()
             ret.append(datum)
         self.__cleanup()
+        # Sort the keys. In case of async read, they can arrive out of order
+        ret.sort(key=lambda datum: datum['recno'])
         return ret
 
 
@@ -171,17 +188,11 @@ class GDPcache:
         _startR = self.__findRec(tStart)+1
         _endR = self.__findRec(tEnd)
 
-        # can we use multiread?
-        if _endR+1-_startR<4*numPoints and (_endR+1)-_startR>0:
-            return self.__multiread(_startR, (_endR+1)-_startR)
-
-        # if not, let's read one by one
-        ret = []
-        step = max((_endR+1-_startR)/numPoints,1)
-        for r in xrange(_startR, _endR+1, step):
-            ret.append(self.__read(r))
-
-        return ret
+        if not (_startR<=_endR):
+            return []
+        # Calculate step size
+        stepSize = max((_endR+1-_startR)/numPoints, 1)
+        return self.__multiread(_startR, (_endR+1)-_startR, stepSize)
 
     def mostRecent(self):
         return self.__read(-1)

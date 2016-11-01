@@ -14,7 +14,7 @@ class GDPWriterResource(Resource):
 
     isLeaf = True
 
-    def __init__(self, logname, keyfile, nolist, allow_nop):
+    def __init__(self, logname, keyfile, nolist, allow_nop, convert_num):
 
         Resource.__init__(self)
 
@@ -22,6 +22,7 @@ class GDPWriterResource(Resource):
         self.logname = logname
         self.nolist = nolist
         self.allow_nop = allow_nop
+        self.convert_num = convert_num
         open_info = {}
 
         if keyfile is not None:
@@ -41,6 +42,14 @@ class GDPWriterResource(Resource):
         if self.nolist == True:
             for k in d.keys():
                 d[k] = d[k][0]
+
+        if self.convert_num == True:
+            for k in d.keys():
+                try:
+                    d[k] = float(d[k])
+                except (TypeError, ValueError):
+                    pass
+
         try:
             d["_meta"] = uri
             self.gcl.append({"data": json.dumps(d)})
@@ -75,6 +84,11 @@ if __name__ == "__main__":
                             "like a key-value pair. By default, any " + \
                             "requests that don't have a key=value pair " + \
                             "are ignored")
+    parser.add_argument("--convert-num", action="store_true", default=False,
+                            help="Do a best effort attempt to convert " + \
+                            "values to numbers. Everything is a string, " + \
+                            "otherwise. Does not make very much sense " + \
+                            "without --nolist. Default: False")
     parser.add_argument("-k", "--keyfile",
                         help="Path to a signature key file for the log")
     parser.add_argument("logname", help="Name of log")
@@ -84,7 +98,7 @@ if __name__ == "__main__":
 
     # Create a 'site' object to serve requests on 
     site = Site(GDPWriterResource(args.logname, args.keyfile,
-                        args.nolist, args.allow_nop))
+                        args.nolist, args.allow_nop, args.convert_num))
     # Setup the reactor with the port
     reactor.listenTCP(args.port, site)
     print "Starting REST interface on port %d, appending data to log %s" % \
