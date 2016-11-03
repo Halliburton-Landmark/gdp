@@ -100,7 +100,7 @@ public class GDP_GCL {
 			  gclhByReference + ") failed.");
 
         // Associate the C pointer to this object.
-        this.gclh = gclhByReference.getValue();
+        gclh = gclhByReference.getValue();
         assert this.gclh != null;
 
         // Add ourselves to the global map of pointers=>objects 
@@ -158,7 +158,8 @@ public class GDP_GCL {
         Object data = datum_dict.get("data");
         datum.setbuf((byte[]) data);
         
-        estat = Gdp07Library.INSTANCE.gdp_gcl_append(this.gclh,
+        _checkGclh(gclh);
+        estat = Gdp07Library.INSTANCE.gdp_gcl_append(gclh,
                                 datum.gdp_datum_ptr);
         GDP.check_EP_STAT(estat, "gdp_gcl_append(" + gclh + ", " + datum.gdp_datum_ptr + ") failed.");
 
@@ -195,7 +196,8 @@ public class GDP_GCL {
         Object data = datum_dict.get("data");
         datum.setbuf((byte[]) data);
         
-        estat = Gdp07Library.INSTANCE.gdp_gcl_append_async(this.gclh, 
+        _checkGclh(gclh);
+        estat = Gdp07Library.INSTANCE.gdp_gcl_append_async(gclh, 
                                 datum.gdp_datum_ptr, null, null);
         GDP.check_EP_STAT(estat, "gdp_gcl_append_async(" + gclh + ", " + datum.gdp_datum_ptr + "null, null) failed.");
 
@@ -219,12 +221,16 @@ public class GDP_GCL {
     /** Close the GCL.
      */
     public void close() {
-        System.out.println("GDP_GCL.close()");
-        // Remove ourselves from the global list.
-        _allGclhs.remove(gclh);
+        // If close() is called twice, then the C code aborts the process.
+        // See https://gdp.cs.berkeley.edu/redmine/issues/83
+        if (gclh != null) {
+            // Remove ourselves from the global list.
+            _allGclhs.remove(gclh);
         
-        // Free the associated gdp_gcl_t.
-        Gdp07Library.INSTANCE.gdp_gcl_close(gclh);
+            // Free the associated gdp_gcl_t.
+            Gdp07Library.INSTANCE.gdp_gcl_close(gclh);
+            gclh = null;
+        }
     }
 
     /**
@@ -308,8 +314,9 @@ public class GDP_GCL {
     public void multiread(long firstrec, int numrecs) throws GDPException {
 
         EP_STAT estat;
+        _checkGclh(gclh);
         estat = Gdp07Library.INSTANCE
-                    .gdp_gcl_multiread(this.gclh, firstrec, numrecs,
+                    .gdp_gcl_multiread(gclh, firstrec, numrecs,
                                         null, null);
 
         GDP.check_EP_STAT(estat, "gdp_gcl_multiread() failed.");
@@ -363,8 +370,9 @@ public class GDP_GCL {
         EP_STAT estat;
         GDP_DATUM datum = new GDP_DATUM();
                 
-        // get the datum populated
-        estat = Gdp07Library.INSTANCE.gdp_gcl_read(this.gclh, recno, 
+        // Get the datum populated.
+        _checkGclh(gclh);
+        estat = Gdp07Library.INSTANCE.gdp_gcl_read(gclh, recno, 
                                 datum.gdp_datum_ptr);
         GDP.check_EP_STAT(estat, "gdp_gcl_read() failed.");
 
@@ -397,8 +405,9 @@ public class GDP_GCL {
     public void subscribe(long firstrec, int numrecs, EP_TIME_SPEC timeout) throws GDPException {
 
         EP_STAT estat;
+        _checkGclh(gclh);
         estat = Gdp07Library.INSTANCE
-                    .gdp_gcl_subscribe(this.gclh, firstrec, numrecs,
+                    .gdp_gcl_subscribe(gclh, firstrec, numrecs,
                                         timeout, null, null);
 
         GDP.check_EP_STAT(estat, "gdp_gcl_subscribe() failed.");
@@ -434,6 +443,7 @@ public class GDP_GCL {
         if (obj == null) {
             return _helper_get_next_event(null, timeout);
         } else {
+            _checkGclh(obj.gclh);
             HashMap<String, Object> tmp = _helper_get_next_event(
                     obj.gclh, timeout);
             assert tmp.get("gcl_handle") == obj;
@@ -558,6 +568,21 @@ public class GDP_GCL {
 
     //     return ev;
     // }
+
+    ///////////////////////////////////////////////////////////////////
+    ////                   private methods                         ////
+
+    /** If gclh is null, then throw an exception stating that close()
+     *  was probably called.
+     */   
+    private static void _checkGclh(Pointer gclh) {
+        if (gclh == null) {
+            throw new NullPointerException("The pointer to the C gdp_gcl_t structure was null."
+                                           + "Perhaps close() was called?  " +
+                                           + "See https://gdp.cs.berkeley.edu/redmine/issues/83");
+        }
+    }
+
 
     ///////////////////////////////////////////////////////////////////
     ////                   private variables                       ////
