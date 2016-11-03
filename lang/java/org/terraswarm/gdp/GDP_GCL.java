@@ -578,7 +578,7 @@ public class GDP_GCL {
     private static void _checkGclh(Pointer gclh) {
         if (gclh == null) {
             throw new NullPointerException("The pointer to the C gdp_gcl_t structure was null."
-                                           + "Perhaps close() was called?  " +
+                                           + "Perhaps close() was called?  "
                                            + "See https://gdp.cs.berkeley.edu/redmine/issues/83");
         }
     }
