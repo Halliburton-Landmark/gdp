@@ -53,12 +53,14 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.gcl.ops", "GCL operations for GDP");
 **	CREATE_GCL_NAME -- create a name for a new GCL
 */
 
-void
+EP_STAT
 _gdp_gcl_newname(gdp_gcl_t *gcl)
 {
-	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
+	if (!GDP_GCL_ISGOOD(gcl))
+		return GDP_STAT_GCL_NOT_OPEN;
 	_gdp_newname(gcl->name, gcl->gclmd);
 	gdp_printable_name(gcl->name, gcl->pname);
+	return EP_STAT_OK;
 }
 
 
@@ -120,7 +122,11 @@ void
 _gdp_gcl_freehandle(gdp_gcl_t *gcl)
 {
 	ep_dbg_cprintf(Dbg, 28, "_gdp_gcl_freehandle(%p)\n", gcl);
-	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
+	if (gcl == NULL)
+		return;
+
+	// this is a forced free, so ignore existing refcnts, etc.
+	gcl->refcnt = 0;
 
 	// release any remaining requests
 	_gdp_req_freeall(&gcl->reqs, NULL);
@@ -151,7 +157,7 @@ _gdp_gcl_freehandle(gdp_gcl_t *gcl)
 	}
 
 	// finally release the memory for the handle itself
-	gcl->flags &= ~GCLF_INUSE;
+	gcl->flags = 0;
 	ep_mem_free(gcl);
 }
 
@@ -450,8 +456,8 @@ _gdp_gcl_close(gdp_gcl_t *gcl,
 	int nrefs;
 
 	errno = 0;				// avoid spurious messages
-	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
-					return EP_STAT_ASSERT_ABORT);
+	if (!GDP_GCL_ISGOOD(gcl))
+		return GDP_STAT_GCL_NOT_OPEN;
 
 	if (ep_dbg_test(Dbg, 38))
 	{
@@ -509,8 +515,10 @@ append_common(gdp_gcl_t *gcl,
 
 	errno = 0;				// avoid spurious messages
 
-	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
-					return EP_STAT_ASSERT_ABORT);
+	if (!GDP_GCL_ISGOOD(gcl))
+		return GDP_STAT_GCL_NOT_OPEN;
+	if (!GDP_DATUM_ISGOOD(datum))
+		return GDP_STAT_DATUM_REQUIRED;
 	EP_ASSERT_POINTER_VALID(datum);
 	if (!EP_UT_BITSET(GDP_MODE_AO, gcl->iomode))
 		goto fail0;
@@ -658,9 +666,10 @@ _gdp_gcl_read(gdp_gcl_t *gcl,
 
 	errno = 0;				// avoid spurious messages
 
-	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
-					return EP_STAT_ASSERT_ABORT);
-	EP_ASSERT_POINTER_VALID(datum);
+	if (!GDP_GCL_ISGOOD(gcl))
+		return GDP_STAT_GCL_NOT_OPEN;
+	if (!GDP_DATUM_ISGOOD(datum))
+		return GDP_STAT_DATUM_REQUIRED;
 	if (!EP_UT_BITSET(GDP_MODE_RO, gcl->iomode))
 		goto fail0;
 	estat = _gdp_req_new(GDP_CMD_READ, gcl, chan, NULL, reqflags, &req);
@@ -701,21 +710,21 @@ _gdp_gcl_read_async(gdp_gcl_t *gcl,
 			void *cbarg,
 			gdp_chan_t *chan)
 {
-	EP_STAT estat = GDP_STAT_BAD_IOMODE;
+	EP_STAT estat;
 	gdp_req_t *req;
 	gdp_datum_t datumbuf;
 
 	errno = 0;				// avoid spurious messages
 
 	// sanity checks
-	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
-					return EP_STAT_ASSERT_ABORT);
+	if (!GDP_GCL_ISGOOD(gcl))
+		return GDP_STAT_GCL_NOT_OPEN;
 	if (!EP_UT_BITSET(GDP_MODE_RO, gcl->iomode))
-		goto fail0;
+		return GDP_STAT_BAD_IOMODE;
 
 	// create a new READ request (don't need a special command)
 	estat = _gdp_req_new(GDP_CMD_READ, gcl, chan, NULL, GDP_REQ_ASYNCIO, &req);
-	EP_STAT_CHECK(estat, goto fail0);
+	EP_STAT_CHECK(estat, return estat);
 	_gdp_event_setcb(req, cbfunc, cbarg);
 
 	// set up fake datum solely to send record number
@@ -738,7 +747,6 @@ _gdp_gcl_read_async(gdp_gcl_t *gcl,
 	}
 
 	// ok, done!
-fail0:
 	return estat;
 }
 
@@ -756,8 +764,8 @@ _gdp_gcl_getmetadata(gdp_gcl_t *gcl,
 	EP_STAT estat;
 	gdp_req_t *req;
 
-	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
-					return EP_STAT_ASSERT_ABORT);
+	if (!GDP_GCL_ISGOOD(gcl))
+		return GDP_STAT_GCL_NOT_OPEN;
 
 	errno = 0;				// avoid spurious messages
 	estat = _gdp_req_new(GDP_CMD_GETMETADATA, gcl, chan, NULL, reqflags, &req);
@@ -788,16 +796,14 @@ _gdp_gcl_newsegment(gdp_gcl_t *gcl,
 	EP_STAT estat;
 	gdp_req_t *req;
 
-	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
-					return EP_STAT_ASSERT_ABORT);
+	if (!GDP_GCL_ISGOOD(gcl))
+		return GDP_STAT_GCL_NOT_OPEN;
 	estat = _gdp_req_new(GDP_CMD_NEWSEGMENT, gcl, chan, NULL, reqflags, &req);
-	EP_STAT_CHECK(estat, goto fail0);
+	EP_STAT_CHECK(estat, return estat);
 
 	estat = _gdp_invoke(req);
 
 	_gdp_req_free(&req);
-
-fail0:
 	return estat;
 }
 
@@ -835,6 +841,8 @@ _gdp_gcl_fwd_append(
 	gdp_req_t *req;
 
 	// sanity checks
+	if (!GDP_GCL_ISGOOD(gcl))
+		return GDP_STAT_GCL_NOT_OPEN;
 	if (memcmp(to_server, _GdpMyRoutingName, sizeof _GdpMyRoutingName) == 0)
 	{
 		// forwarding to ourselves: bad idea

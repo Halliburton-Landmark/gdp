@@ -56,7 +56,7 @@ static struct ep_stat_to_string Stats[] =
 	{ GDP_STAT_PDU_VERSION_MISMATCH,	"protocol version mismatch",		},
 	{ GDP_STAT_PDU_NO_SEQ,				"no sequence number",				},
 	{ GDP_STAT_KEEP_READING,			"more input needed",				},
-	{ GDP_STAT_NOT_OPEN,				"GCL is not open",					},
+	{ GDP_STAT_GCL_NOT_OPEN,			"GCL is not open",					},
 	{ GDP_STAT_UNKNOWN_RID,				"request id unknown",				},
 	{ GDP_STAT_INTERNAL_ERROR,			"GDP internal error",				},
 	{ GDP_STAT_BAD_IOMODE,				"GDP bad I/O mode",					},
@@ -81,6 +81,7 @@ static struct ep_stat_to_string Stats[] =
 	{ GDP_STAT_BAD_REFCNT,				"invalid reference count",			},
 	{ GDP_STAT_RECORD_MISSING,			"record missing (look elsewhere)",	},
 	{ GDP_STAT_RECORD_DUPLICATED,		"record duplicated",				},
+	{ GDP_STAT_DATUM_REQUIRED,			"missing required datum",			},
 
 	{ GDP_STAT_NAK_BADREQ,				"400 bad request",					},
 	{ GDP_STAT_NAK_UNAUTH,				"401 unauthorized",					},

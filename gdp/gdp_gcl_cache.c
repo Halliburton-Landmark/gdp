@@ -266,6 +266,13 @@ void
 _gdp_gcl_cache_drop(gdp_gcl_t *gcl)
 {
 	EP_ASSERT_ELSE(gcl != NULL, return);
+
+	if (!EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
+	{
+		ep_dbg_cprintf(Dbg, 8, "_gdp_gcl_cache_drop(%p): uncached\n", gcl);
+		return;
+	}
+
 	if (EP_ASSERT_TEST(GDP_GCL_ISGOOD(gcl)))
 	{
 		// GCL is in some random state --- we need the name at least
@@ -276,13 +283,6 @@ _gdp_gcl_cache_drop(gdp_gcl_t *gcl)
 	ep_thr_mutex_lock(&GclCacheMutex);
 	if (ep_thr_mutex_trylock(&gcl->mutex) != 0)
 		EP_ASSERT_PRINT("_gdp_gcl_cache_drop: gcl locked (%d)", errno);
-
-	if (!EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
-	{
-		ep_dbg_cprintf(Dbg, 8, "_gdp_gcl_cache_drop(%p): uncached\n", gcl);
-		ep_thr_mutex_unlock(&GclCacheMutex);
-		return;
-	}
 
 	// error if we're dropping something that's referenced from the cache
 	if (gcl->refcnt != 0)
@@ -442,7 +442,6 @@ _gdp_gcl_cache_shutdown(void (*shutdownfunc)(gdp_req_t *))
 		g2 = LIST_NEXT(g1, ulist);
 		LIST_REMOVE(g1, ulist);
 		_gdp_req_freeall(&g1->reqs, shutdownfunc);
-		g1->refcnt = 0;
 		_gdp_gcl_freehandle(g1);
 	}
 }

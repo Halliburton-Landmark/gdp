@@ -65,6 +65,16 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.api", "C API for GDP");
 static EP_THR_MUTEX		OpenMutex		EP_THR_MUTEX_INITIALIZER;
 
 
+// simplify debugging
+#define PRSTAT(estat, where)												\
+			if (ep_dbg_test(Dbg, EP_STAT_ISOK(estat) ? 39 : 1))				\
+			{																\
+				char ebuf[100];												\
+				ep_dbg_printf("<<< %s: %s\\n",								\
+						where, ep_stat_tostr(estat, ebuf, sizeof ebuf));	\
+			}
+
+
 
 /*
 **	GDP_GCL_GETNAME --- get the name of a GCL
@@ -409,7 +419,6 @@ gdp_gcl_open(gdp_name_t name,
 		if (gcl->refcnt > 0)
 		{
 			gcl->refcnt = 0;			// avoid errors in _gdp_gcl_cache_drop
-			gcl->flags |= GCLF_INUSE;	// avoid errors in _gdp_gcl_freehandle
 			_gdp_gcl_freehandle(gcl);
 		}
 		else
@@ -471,8 +480,12 @@ gdp_gcl_append_async(gdp_gcl_t *gcl,
 			gdp_event_cbfunc_t cbfunc,
 			void *udata)
 {
+	EP_STAT estat;
+
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_append_async\n");
-	return _gdp_gcl_append_async(gcl, datum, cbfunc, udata, _GdpChannel, 0);
+	estat = _gdp_gcl_append_async(gcl, datum, cbfunc, udata, _GdpChannel, 0);
+	PRSTAT(estat, "gdp_gcl_append_async");
+	return estat;
 }
 
 
@@ -494,12 +507,16 @@ gdp_gcl_read(gdp_gcl_t *gcl,
 			gdp_recno_t recno,
 			gdp_datum_t *datum)
 {
+	EP_STAT estat;
+
 	EP_ASSERT_POINTER_VALID(datum);
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_read\n");
 	datum->recno = recno;
 	EP_TIME_INVALIDATE(&datum->ts);
 
-	return _gdp_gcl_read(gcl, datum, _GdpChannel, 0);
+	estat = _gdp_gcl_read(gcl, datum, _GdpChannel, 0);
+	PRSTAT(estat, "gdp_gcl_read");
+	return estat;
 }
 
 
@@ -521,12 +538,16 @@ gdp_gcl_read_ts(gdp_gcl_t *gcl,
 			EP_TIME_SPEC *ts,
 			gdp_datum_t *datum)
 {
+	EP_STAT estat;
+
 	EP_ASSERT_POINTER_VALID(datum);
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_read_ts\n");
 	memcpy(&datum->ts, ts, sizeof datum->ts);
 	datum->recno = GDP_PDU_NO_RECNO;
 
-	return _gdp_gcl_read(gcl, datum, _GdpChannel, 0);
+	estat = _gdp_gcl_read(gcl, datum, _GdpChannel, 0);
+	PRSTAT(estat, "gdp_gcl_read_ts");
+	return estat;
 }
 
 
@@ -543,8 +564,12 @@ gdp_gcl_read_async(gdp_gcl_t *gcl,
 			gdp_event_cbfunc_t cbfunc,
 			void *cbarg)
 {
+	EP_STAT estat;
+
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_read_async\n");
-	return _gdp_gcl_read_async(gcl, recno, cbfunc, cbarg, _GdpChannel);
+	estat = _gdp_gcl_read_async(gcl, recno, cbfunc, cbarg, _GdpChannel);
+	PRSTAT(estat, "gdp_gcl_read_async");
+	return estat;
 }
 
 
@@ -578,6 +603,7 @@ gdp_gcl_subscribe(gdp_gcl_t *gcl,
 	// now do the hard work
 	estat = _gdp_gcl_subscribe(req, numrecs, timeout, cbfunc, cbarg);
 fail0:
+	PRSTAT(estat, "gdp_gcl_subscribe");
 	return estat;
 }
 
@@ -611,6 +637,7 @@ gdp_gcl_subscribe_ts(gdp_gcl_t *gcl,
 	// now do the hard work
 	estat = _gdp_gcl_subscribe(req, numrecs, timeout, cbfunc, cbarg);
 fail0:
+	PRSTAT(estat, "gdp_gcl_subscribe_ts");
 	return estat;
 }
 
@@ -646,6 +673,7 @@ gdp_gcl_multiread(gdp_gcl_t *gcl,
 	// now do the hard work
 	estat = _gdp_gcl_subscribe(req, numrecs, NULL, cbfunc, cbarg);
 fail0:
+	PRSTAT(estat, "gdp_gcl_multiread");
 	return estat;
 }
 
@@ -681,6 +709,7 @@ gdp_gcl_multiread_ts(gdp_gcl_t *gcl,
 	// now do the hard work
 	estat = _gdp_gcl_subscribe(req, numrecs, NULL, cbfunc, cbarg);
 fail0:
+	PRSTAT(estat, "gdp_gcl_multiread_ts");
 	return estat;
 }
 
@@ -693,8 +722,12 @@ EP_STAT
 gdp_gcl_getmetadata(gdp_gcl_t *gcl,
 		gdp_gclmd_t **gmdp)
 {
+	EP_STAT estat;
+
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_getmetadata\n");
-	return _gdp_gcl_getmetadata(gcl, gmdp, _GdpChannel, 0);
+	estat = _gdp_gcl_getmetadata(gcl, gmdp, _GdpChannel, 0);
+	PRSTAT(estat, "gdp_gcl_getmetadata");
+	return estat;
 }
 
 
@@ -708,8 +741,12 @@ gdp_gcl_getmetadata(gdp_gcl_t *gcl,
 EP_STAT
 gdp_gcl_newsegment(gdp_gcl_t *gcl)
 {
+	EP_STAT estat;
+
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_newsegment\n");
-	return _gdp_gcl_newsegment(gcl, _GdpChannel, 0);
+	estat = _gdp_gcl_newsegment(gcl, _GdpChannel, 0);
+	PRSTAT(estat, "gdp_gcl_newsegment");
+	return estat;
 }
 
 

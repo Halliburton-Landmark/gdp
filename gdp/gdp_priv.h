@@ -141,6 +141,11 @@ struct gdp_datum
 	bool				inuse:1;		// the datum is in use (for debugging)
 };
 
+#define GDP_DATUM_ISGOOD(datum)											\
+				((datum) != NULL &&										\
+				 (datum)->dbuf != NULL &&								\
+				 (datum)->inuse)
+
 // dump data record (for debugging)
 extern void		_gdp_datum_dump(
 					const gdp_datum_t *datum,	// message to print
@@ -187,7 +192,8 @@ struct gdp_gcl
 #define GCLF_DEFER_FREE		0x0010		// defer actual free until reclaim
 
 #define GDP_GCL_ISGOOD(gcl)												\
-				((gcl) != NULL && EP_UT_BITSET(GCLF_INUSE, (gcl)->flags))
+				((gcl) != NULL &&										\
+				 EP_UT_BITSET(GCLF_INUSE, (gcl)->flags))
 #define GDP_ASSERT_GCL_ISGOOD(gcl)										\
 				(EP_ASSERT(GDP_GCL_ISGOOD(gcl))
 
@@ -266,7 +272,7 @@ EP_STAT			_gdp_gcl_newhandle(			// create new in-mem handle
 void			_gdp_gcl_freehandle(		// free in-memory handle
 						gdp_gcl_t *gcl);
 
-void			_gdp_gcl_newname(			// create new name based on metadata
+EP_STAT			_gdp_gcl_newname(			// create new name based on metadata
 						gdp_gcl_t *gcl);
 
 void			_gdp_gcl_dump(				// dump for debugging
