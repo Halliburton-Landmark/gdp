@@ -42,7 +42,7 @@ LIBEVENT2=	-levent -levent_pthreads -pthread
 LIBCRYPTO=	-lcrypto
 LIBAVAHI=	-lavahi-client -lavahi-common
 INCS=		${INCSEARCH} ${INCGDP} ${INCEP}
-LDFLAGS=	${LIBSEARCH} ${LIBGDP} ${LIBEP} \
+LDFLAGS+=	${LIBSEARCH} ${LIBGDP} ${LIBEP} \
 		${LIBJANSSON} ${LIBEVENT2} ${LIBCRYPTO} ${LIBAVAHI}
 CC=		cc
 PG=

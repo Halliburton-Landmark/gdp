@@ -103,7 +103,7 @@ LIBCRYPTO=	-lcrypto
 LIBAVAHI=	-lavahi-client -lavahi-common
 LIBADD=		`sh ../adm/add-libs.sh`
 INCS=		${INCSEARCH} ${INCGDP} ${INCEP}
-LDFLAGS=	${LIBSEARCH}
+LDFLAGS+=	${LIBSEARCH}
 LDLIBS=		${LIBGDP} \
 		${LIBEP} \
 		${LIBJANSSON} \

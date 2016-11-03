@@ -38,57 +38,57 @@ CLEANEXTRA=	gdp-client*.deb gdp-server*.deb python-gdp*.deb \
 all: all-nodoc
 
 all-nodoc:
-	(cd ep;		make all)
-	(cd gdp;	make all)
-	(cd scgilib;	make all)
-	(cd gdplogd;	make all)
-	(cd apps;	make all)
-	(cd util;	make all)
-	(cd examples;	make all)
+	(cd ep;		${MAKE} all)
+	(cd gdp;	${MAKE} all)
+	(cd scgilib;	${MAKE} all)
+	(cd gdplogd;	${MAKE} all)
+	(cd apps;	${MAKE} all)
+	(cd util;	${MAKE} all)
+	(cd examples;	${MAKE} all)
 
 all-withdoc: all-nodoc
-	(cd doc;	make all)	# needs pandoc
+	(cd doc;	${MAKE} all)	# needs pandoc
 
 all-clientonly:
-	(cd ep;		make all)
-	(cd gdp;	make all)
-	(cd apps;	make all)
+	(cd ep;		${MAKE} all)
+	(cd gdp;	${MAKE} all)
+	(cd apps;	${MAKE} all)
 
 # Build without avahi, the zero-conf facility that
 # can be tricky to compile under Mac OS X.
 all_noavahi:
-	(cd ep;		make all)
-	(cd gdp;	make all_noavahi)
-	(cd scgilib;	make all)
-	(cd gdplogd;	make all_noavahi)
-	(cd apps;	make all_noavahi)
-	(cd util;	make all)
-	(cd examples;	make all_noavahi)
-	(cd lang/js;	make all_noavahi)
+	(cd ep;		${MAKE} all)
+	(cd gdp;	${MAKE} all_noavahi)
+	(cd scgilib;	${MAKE} all)
+	(cd gdplogd;	${MAKE} all_noavahi)
+	(cd apps;	${MAKE} all_noavahi)
+	(cd util;	${MAKE} all)
+	(cd examples;	${MAKE} all_noavahi)
+	(cd lang/js;	${MAKE} all_noavahi)
 
 clean:
-	(cd doc;	make clean)
-	(cd ep;		make clean)
-	(cd gdp;	make clean)
-	(cd scgilib;	make clean)
-	(cd gdplogd;	make clean)
-	(cd apps;	make clean)
-	(cd util;	make clean)
-	(cd examples;	make clean)
+	(cd doc;	${MAKE} clean)
+	(cd ep;		${MAKE} clean)
+	(cd gdp;	${MAKE} clean)
+	(cd scgilib;	${MAKE} clean)
+	(cd gdplogd;	${MAKE} clean)
+	(cd apps;	${MAKE} clean)
+	(cd util;	${MAKE} clean)
+	(cd examples;	${MAKE} clean)
 	rm -f ${CLEANEXTRA}
 
 install-client:
-	(cd ep;		make install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
-	(cd gdp;	make install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
-	(cd apps;	make install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
+	(cd ep;		${MAKE} install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
+	(cd gdp;	${MAKE} install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
+	(cd apps;	${MAKE} install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
 
 # Should util be part of this subtarget?
 install-gdplogd:
-	(cd gdplogd;	make install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
-	(cd util;	make install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
+	(cd gdplogd;	${MAKE} install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
+	(cd util;	${MAKE} install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
 
 install-doc:
-	(cd doc;	make install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
+	(cd doc;	${MAKE} install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
 
 # Split it into sub-targets to mimic our distribution, also
 #   used by the debian packaging scripts. So if you change it here,
@@ -98,8 +98,8 @@ install: install-client install-gdplogd install-doc
 	cp -rp examples ${DOCDIR}
 
 install-local:
-	(cd ep;		make install-local)
-	(cd gdp;	make install-local)
+	(cd ep;		${MAKE} install-local)
+	(cd gdp;	${MAKE} install-local)
 
 GDPROOT=	~gdp
 GDPALL=		adm/start-* \
@@ -130,21 +130,21 @@ tags: .FORCE
 
 # Build the Java interface to the GDP. Optional for the GDP per se.
 all_Java:
-	(cd lang/java; make clean all)
+	(cd lang/java; ${MAKE} clean all)
 
 install_Java:
-	(cd lang/java; make clean install)
+	(cd lang/java; ${MAKE} clean install)
 
 clean_Java:
-	(cd lang/java; make clean)
+	(cd lang/java; ${MAKE} clean)
 
 # Build the Node.js/JavaScript GDP accessing apps and the Node.js/JS
 # RESTful GDP interface.  Optional for the GDP per se.
 all_JavaScript:
-	(cd lang/js; make clean all)
+	(cd lang/js; ${MAKE} clean all)
 
 clean_JavaScript:
-	(cd lang/js; make clean)
+	(cd lang/js; ${MAKE} clean)
 
 # Build the debian-style package.  Must be done on the oldest system
 # around because of dependencies.
@@ -160,10 +160,10 @@ UPDATE_LICENSE=	${ADM}/update-license.sh
 
 update-license:
 	${UPDATE_LICENSE} Makefile *.[ch]
-	(cd ep;		 make update-license)
-	(cd gdp;	 make update-license)
-	(cd gdplogd;	 make update-license)
-	(cd apps;	 make update-license)
+	(cd ep;		 ${MAKE} update-license)
+	(cd gdp;	 ${MAKE} update-license)
+	(cd gdplogd;	 ${MAKE} update-license)
+	(cd apps;	 ${MAKE} update-license)
 
 # Not made by default
 READMES_HTML= \

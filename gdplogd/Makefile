@@ -86,7 +86,7 @@ LIBCRYPTO=	-lcrypto
 LIBAVAHI=	-lavahi-client -lavahi-common
 LIBADD=		`sh ../adm/add-libs.sh gdplogd`
 INCS=		${INCSEARCH} ${INCGDP} ${INCEP}
-LDFLAGS=	${LIBSEARCH}
+LDFLAGS+=	${LIBSEARCH}
 LDLIBS=		${LIBGDP} \
 		${LIBEP} \
 		${LIBEVENT2} \
