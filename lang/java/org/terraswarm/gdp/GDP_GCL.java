@@ -221,6 +221,8 @@ public class GDP_GCL {
     /** Close the GCL.
      */
     public void close() {
+        // Print out a stack trace of where close() is being called.
+        new Exception("gdp/lang/java/org/terraswarm/gdp/GDP_GCL.java: close() was called. gclh: " + gclh).printStackTrace();
         // If close() is called twice, then the C code aborts the process.
         // See https://gdp.cs.berkeley.edu/redmine/issues/83
         if (gclh != null) {
