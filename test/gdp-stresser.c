@@ -1,0 +1,779 @@
+/* vim: set ai sw=4 sts=4 ts=4 : */
+
+
+/*
+**  You'll need to get INIH from Github for this:
+**		git clone https://github.com/benhoyt/inih
+*/
+
+
+
+#include <gdp/gdp.h>
+#include <gdp/gdp_event.h>
+
+#include <ep/ep_app.h>
+#include <ep/ep_dbg.h>
+#include <ep/ep_hash.h>
+#include <ep/ep_string.h>
+
+#include <sysexits.h>
+
+
+/*
+**  OVERVIEW: A stress test consists of one or more _jobs_.
+**
+**  Each job represents some number of threads, each of which
+**  runs a _batch_.  Batches can be _read batches_ or _write
+**  batches_.
+**
+**  A write batch is a single thread that produces synthetic data
+**  using a _datagen_ and writes to an associated log using a
+**  method, e.g., synchronous versus asynchronous writes.
+**
+**  A read batch reads data using some method (e.g., synchronous
+**  read, asynchronous read, multiread, or subscribe).  Ideally
+**  it would compare the data against the expected data.
+**
+**  It's possible for each thread to write to a separate log,
+**  or to have all threads in a job write to a single log.
+**
+**  There are many parameters to tweak the process.  For
+**  example, if using an asynchronous write method, you can
+**  set how often to check for responses (e.g., does each
+**  write operation try to collect prior results, or should it
+**  write N records before polling for results?).
+*/
+
+
+typedef struct datagen		datagen_t;		// datagen instance
+
+typedef struct batch		batch_t;		// batch instance
+
+
+/*
+**  Data Generator
+**
+**		Produces a stream of data.  The `next` function does the
+**		heavy lifting.
+**
+**		This keeps track of the number of records returned so far.
+**		`max_gen` can be set to put an absolute maximum on the
+**		number of records this can generate.
+*/
+
+struct datagen
+{
+	EP_THR_MUTEX	mutex;
+	EP_STAT			(*init)(			// initialize data generator
+							datagen_t *dg,
+							batch_t *bi);
+	EP_STAT			(*next)(			// get next datum from generator
+							datagen_t *dg,
+							batch_t *bi,
+							gdp_datum_t *datum);
+	long			payload_size;		// size of payload
+	long			max_gen;			// max # recs to produce
+	long			n_gen;				// # recs already produced
+};
+
+
+/*
+**  Log Controller
+**
+**		This pairs 1::1 with GCLs.  It is primarily responsible for
+**		collecting responses to asynchronous writes.  We can't do
+**		this in the Batch Instance since multiple BIs might write a
+**		single log.
+*/
+
+typedef struct logctl		logctl_t;
+struct logctl
+{
+	EP_THR_MUTEX	mutex;
+	const char		*gclxname;			// external name for log
+	gdp_gcl_t		*gcl;				// underlying log
+	long			n_out;				// number of records written
+	long			n_resp;				// number of responses read
+};
+
+
+/*
+**  Batches
+**
+**		Each batch represents a thread.  For writes, each thread reads
+**		from a datagen and writes to a logctl.
+**
+**		Since these match 1::1 with threads, we don't need locks.
+*/
+
+struct batch
+{
+	EP_STAT			(*run)(				// run the batch
+							batch_t *batch);
+	long			batch_size;			// number of records in this batch
+
+	datagen_t		*dg;				// data generator for this batch
+	logctl_t		*lc;				// log controller
+	int				threadno;			// thread number (integer)
+	int				results_interval;	// how often to get async results
+};
+
+//typedef struct job		job_t;
+//struct job
+//{
+//	int				n_threads;			// # of threads (batches) in this job
+//	batch_t			*batch;				// XXX
+//};
+
+
+//run_batch(batch_t *batch, gdp_gcl_t *gcl, datagen_t *datagen);
+
+
+/**********************************************************************
+**
+**  Batch methods
+*/
+
+
+/*
+**  Synchronous writes
+*/
+
+EP_STAT
+write_batch_synchronous(batch_t *bi)
+{
+	EP_STAT estat;
+	datagen_t *dg = bi->dg;
+	logctl_t *lc = bi->lc;
+	long n_gen = 0;
+	gdp_datum_t *datum = gdp_datum_new();
+
+	while (EP_STAT_ISOK(estat = (*dg->next)(dg, bi, datum)))
+	{
+		ep_thr_mutex_lock(&lc->mutex);
+		estat = gdp_gcl_append(lc->gcl, datum);
+		if (EP_STAT_ISOK(estat))
+		{
+			lc->n_out++;
+			lc->n_resp++;
+		}
+		ep_thr_mutex_unlock(&lc->mutex);
+		if (!EP_STAT_ISOK(estat))
+		{
+			char ebuf[100];
+			printf("gdp_gcl_append error: %s\n",
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
+			break;
+		}
+		if (++n_gen >= bi->batch_size)
+			break;
+	}
+
+	// end of data is not an error
+	if (EP_STAT_ISWARN(estat))
+		estat = EP_STAT_OK;
+
+	gdp_datum_free(datum);
+	return estat;
+}
+
+
+/*
+**  Asynchronous writes
+*/
+
+void
+collect_async_results(logctl_t *lc)
+{
+	int n_to_collect = lc->n_out - lc->n_resp;
+	EP_TIME_SPEC zero_timeout;
+	ep_time_from_nsec(0, &zero_timeout);
+
+	while (n_to_collect-- > 0)
+	{
+		gdp_event_t *ev;
+
+		// poll to see if there are any events available
+		ev = gdp_event_next(lc->gcl, &zero_timeout);
+		if (ev == NULL)
+			break;
+		lc->n_resp++;
+
+		//XXX should decode event and print possible errors
+	}
+}
+
+EP_STAT
+write_batch_asynchronous(batch_t *bi)
+{
+	EP_STAT estat;
+	datagen_t *dg = bi->dg;
+	logctl_t *lc = bi->lc;
+	long n_gen = 0;
+	gdp_datum_t *datum = gdp_datum_new();
+
+	while (EP_STAT_ISOK(estat = (*dg->next)(dg, bi, datum)))
+	{
+		ep_thr_mutex_lock(&lc->mutex);
+		estat = gdp_gcl_append_async(lc->gcl, datum, NULL, NULL);
+		if (EP_STAT_ISOK(estat))
+		{
+			lc->n_out++;
+			if ((lc->n_out - lc->n_resp) > bi->results_interval)
+			{
+				collect_async_results(lc);
+			}
+		}
+		ep_thr_mutex_unlock(&lc->mutex);
+
+		if (!EP_STAT_ISOK(estat))
+		{
+			char ebuf[100];
+			printf("gdp_gcl_append_async error: %s\n",
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
+			break;
+		}
+		if (++n_gen >= bi->batch_size)
+			break;
+	}
+
+	ep_thr_mutex_lock(&lc->mutex);
+	if (lc->n_out > lc->n_resp)
+		collect_async_results(lc);
+	ep_thr_mutex_unlock(&lc->mutex);
+
+	gdp_datum_free(datum);
+	if (EP_STAT_ISWARN(estat))
+		estat = EP_STAT_OK;
+	return estat;
+}
+
+
+/**********************************************************************
+**
+**  Modules to read from logs
+*/
+
+
+#if 0
+/*
+**  Synchronous reads
+*/
+
+EP_STAT
+read_batch_synchronous(gdp_gcl_t *gcl,
+					datagen_t *dg,
+					batch_t *bi)
+{
+	EP_STAT estat;
+	gdp_datum_t *datum = gdp_datum_new();
+
+	//XXX
+
+	gdp_datum_free(datum);
+	return estat;
+}
+
+
+/*
+**  Asynchronous reads
+*/
+
+EP_STAT
+read_batch_asynchronous(gdp_gcl_t *gcl,
+					datagen_t *dg,
+					batch_t *bi)
+{
+	EP_STAT estat;
+	gdp_datum_t *datum = gdp_datum_new();
+
+	//XXX
+
+	gdp_datum_free(datum);
+	return estat;
+}
+
+
+/*
+**  Subscription
+*/
+
+EP_STAT
+read_batch_subscription(gdp_gcl_t *gcl,
+					datagen_t *dg,
+					batch_t *bi)
+{
+	EP_STAT estat;
+	gdp_datum_t *datum = gdp_datum_new();
+
+	//XXX
+
+	gdp_datum_free(datum);
+	return estat;
+}
+#endif // 0
+
+
+
+/**********************************************************************
+**
+**  Data generators
+*/
+
+EP_STAT
+dg_sequential_init(datagen_t *dg, batch_t *bi)
+{
+	return EP_STAT_OK;
+}
+
+
+EP_STAT
+dg_sequential_next(datagen_t *dg, batch_t *bi, gdp_datum_t *datum)
+{
+	// check to see if we should stop generating records
+	ep_thr_mutex_lock(&dg->mutex);
+	if (dg->n_gen >= dg->max_gen)
+	{
+		ep_thr_mutex_unlock(&dg->mutex);
+		return EP_STAT_END_OF_FILE;
+	}
+	long recno = ++dg->n_gen;
+	ep_thr_mutex_unlock(&dg->mutex);
+
+	gdp_buf_t *db = gdp_datum_getbuf(datum);
+	gdp_buf_reset(db);
+	gdp_buf_printf(db, "%8d %3d  ", recno, bi->threadno);
+	int nleft = dg->payload_size - gdp_buf_getlength(db);
+	while (nleft > 0)
+	{
+		// filler can be most anything
+		const char filler[] = "*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_";
+		int chunksize = sizeof filler - 1;
+		if (chunksize > nleft)
+			chunksize = nleft;
+
+		gdp_buf_printf(db, "%.*s", chunksize, filler);
+		nleft -= chunksize;
+	}
+
+	return EP_STAT_OK;
+}
+
+
+
+/**********************************************************************
+**
+**  Log controller support
+*/
+
+
+/*
+**  Create a new name with interpolations.
+**
+**		Intended for use building log names, but could be more generic.
+**
+**		The template name is copied as is except for "$" escapes,
+**		which are interpolated as follows:
+**
+**			$$	literal $
+**			$T	thread id (as an integer)
+**
+**		Other escapes silently disappear.
+**
+**		"%" might be a better escape character if this is used from the
+**		command line.
+*/
+
+#define ESCAPE_CHAR		'$'
+
+const char *
+xlate_name(const char *template, batch_t *bi)
+{
+	char nbuf[1024];
+	char *np = nbuf;
+	const char *tp = template;
+
+	while (*tp != '\0' && np < &nbuf[sizeof nbuf - 1])
+	{
+		char tidbuf[20];
+		if (*tp != ESCAPE_CHAR)
+		{
+			*np++ = *tp++;
+			continue;
+		}
+
+		// it's some interpolation
+		switch (*++tp)
+		{
+		case ESCAPE_CHAR:
+			*np++ = ESCAPE_CHAR;
+			break;
+
+		case 'T':
+			snprintf(tidbuf, sizeof tidbuf, "%d", bi->threadno);
+			char *p = tidbuf;
+			while (*p != '\0' && np < &nbuf[sizeof nbuf - 1])
+				*np++ = *p++;
+			break;
+		}
+	}
+	if (np > &nbuf[sizeof nbuf - 1])
+		np = &nbuf[sizeof nbuf - 1];
+	*np = '\0';
+
+	return ep_mem_strdup(nbuf);
+}
+
+
+/*
+**  Get a log controller for this log
+**
+**		Given a log name (as a template) and a batch instance,
+**		get the corresponding log controller structure with the
+**		log already opened.
+**		If two log names are the same, we'll get the same
+**		log controller.
+*/
+
+#define LOGCTL_INIT_ATTEMPTS		5	// 100ms intervals
+
+EP_HASH			*LogControllers;
+EP_THR_MUTEX	LogControllersMutex		EP_THR_MUTEX_INITIALIZER;
+
+
+/*
+**  Get the log controller struct (with an open log) for a given log.
+**
+**		This is a bit tricky since a lot of threads might be
+**		active at once, so we have to be careful about locking.
+**		There's a global lock around the shared data structure
+**		and a lock for each log.
+*/
+
+EP_STAT
+get_logctl(const char *logtemplate, batch_t *bi, logctl_t **plc)
+{
+	EP_STAT estat;
+	const char *logname = xlate_name(logtemplate, bi);
+	gdp_name_t gname;
+
+	// we'll use the internal name since it is canonical
+	estat = gdp_parse_name(logname, gname);
+
+	EP_STAT_CHECK(estat, goto fail0);
+	// see if we already have this log
+	ep_thr_mutex_lock(&LogControllersMutex);
+
+	// initialization
+	if (LogControllers == NULL)
+		LogControllers = ep_hash_new("LogControllers", NULL, 0);
+
+	logctl_t *lc = ep_hash_search(LogControllers, sizeof gname, gname);
+	if (lc == NULL)
+	{
+		// create a new log controller
+		lc = ep_mem_zalloc(sizeof *lc);
+		ep_thr_mutex_init(&lc->mutex, EP_THR_MUTEX_DEFAULT);
+		lc->gclxname = logname;
+		ep_hash_insert(LogControllers, sizeof gname, gname, lc);
+	}
+	ep_thr_mutex_lock(&lc->mutex);
+
+	// if we are the initializing thread, get on with it
+	if (lc->gcl == NULL)
+	{
+		// try to open the log
+		estat = gdp_gcl_open(gname, GDP_MODE_ANY, NULL, &lc->gcl);
+
+		//XXX create it if it doesn't exist?
+
+		EP_STAT_CHECK(estat, goto fail1);
+	}
+
+	if (EP_STAT_ISOK(estat))
+		*plc = lc;
+fail1:
+	ep_thr_mutex_unlock(&lc->mutex);
+fail0:
+	ep_thr_mutex_unlock(&LogControllersMutex);
+	return estat;
+}
+
+
+/**********************************************************************
+**
+**  Stress run startup.
+*/
+
+void *
+do_run(void *bi_)
+{
+	batch_t *bi = bi_;
+	EP_STAT estat = bi->run(bi);
+
+	ep_app_message(estat, "batch %d terminated", bi->threadno);
+	return NULL;
+}
+
+EP_STAT
+start_run(batch_t *bi_template, int nthreads, EP_THR *threads)
+{
+	EP_STAT estat = EP_STAT_OK;
+	int i;
+
+	for (i = 0; i < nthreads; i++)
+	{
+		batch_t *bi;
+		int istat;
+
+		// create a per-thread version of the batch info
+		bi = ep_mem_malloc(sizeof *bi);
+		memcpy(bi, bi_template, sizeof *bi);
+		bi->threadno = i + 1;
+		istat = ep_thr_spawn(&threads[i], do_run, bi);
+		if (istat != 0 && EP_STAT_ISOK(estat))
+		{
+			estat = ep_stat_from_errno(istat);
+			ep_app_message(estat, "could not spawn batch %d", bi->threadno);
+		}
+	}
+
+	return estat;
+}
+
+
+
+/**********************************************************************
+**
+**  Configuration setup.
+*/
+
+#if 0
+int
+batch_config_handler(void *batch_,
+		const char *sect,
+		const char *name,
+		const char *val)
+{
+	batch_t *batch = batch_;
+
+	if (strcasecmp(name, "class") == 0)
+		batch->class = get_batch_class(val);
+	else if (strcasecmp(name, "n-recs") == 0)
+		batch->n_recs = atol(val);
+	else if (strcasecmp(name, "pause") == 0)
+		batch->pause = atol(val);
+	else if (strcasecmp(name, "results-interval") == 0)
+		batch->results_interval = atol(val);
+	else if (strcasecmp(name, "log-name") == 0)
+		batch->logname = ep_mem_strdup(val);
+	else
+	{
+		ep_app_error("Unknown batch configuration field \"%s\"", name);
+		return 0;
+	}
+	return 1;
+}
+
+
+batch_t *
+read_batch_config(const char *bfile)
+{
+	batch_t *batch = ep_mem_zalloc(sizeof *batch);
+
+	ini_parse(bfile, &batch_file_handler, batch);
+	return batch;
+}
+
+
+int
+run_config_field_handler(void *cf_,
+		const char *sect,
+		const char *name,
+		const char *val)
+{
+	config_t *cf = cf_;
+
+	if (strcasecmp(sect, "") == 0)
+	{
+		// global values
+		if (strcasecmp(name, "log-root") == 0)
+			cf->log_root = ep_mem_strdup(val);
+		else
+		{
+			ep_app_error("Unknown global run-config field \"%s\"", name);
+			return 0;
+		}
+		return 1;
+	}
+
+	job_t *job = get_job(cf, sect);
+	if (job == NULL)
+		return 0;
+
+	if (strcasecmp(name, "batch") == 0)
+	{
+		if ((batch = get_batch(cf, val)) == NULL)
+			return 0;
+		else
+			job->batch = batch;
+	}
+	else if (strcasecmp(name, "instance") == 0)
+		job->instance = ep_mem_strdup(val);
+	else if (strcasecmp(name, "create-logs") == 0)
+		job->create_logs = get_bool(val);		//XXX maybe global?
+	else if (strcasecmp(name, "nthreads") == 0)
+		job->nthreads = atol(val);
+	else
+	{
+		ep_app_error("Unknown job field \"%s\"", name);
+		return 0;
+	}
+	return 1;
+}
+
+
+config_t *
+read_run_config(const char *cfile)
+{
+	config_t *cf = ep_mem_zalloc(sizeof *cf);
+
+	ini_parse(cfile, &config_field_handler, cf);
+	return cf;
+}
+
+#endif // 0
+
+
+/**********************************************************************
+**
+**  Setup, configuration, etc.
+*/
+
+
+void
+usage(void)
+{
+	fprintf(stderr, "Usage error\n");
+	exit(EX_USAGE);
+	fprintf(stderr,
+			"Usage: %s [-a] [-D dbgspec] [-G router_addr] [-n nthreads]\n"
+			"       [-p payload-size] [-r results-collection-interval\n"
+			"       log_name_template\n"
+			"    -a  write asynchronously\n"
+			"    -D  turn on debugging flags\n"
+			"    -G  IP host to contact for gdp_router\n"
+			"    -n  set number of threads\n"
+			"    -p  set payload size\n"
+			"    -r  set async results collection interval\n"
+			"    -s  set number of records in run\n",
+			ep_app_getprogname());
+	exit(EX_USAGE);
+}
+
+
+int
+main(int argc, char **argv)
+{
+	bool async = false;
+	long payload_size = 32;
+	long async_batch_size = 8;
+	long batch_size = 32;
+	long nbatches = 1;
+	char *router_addr = NULL;
+	char *logname_template;
+	EP_STAT estat = EP_STAT_OK;
+	int opt;
+	bool show_usage = false;
+	const char *phase;
+
+	while ((opt = getopt(argc, argv, "aD:G:p:n:r:s:")) > 0)
+	{
+		switch (opt)
+		{
+		case 'a':
+			async = true;
+			break;
+
+		case 'D':
+			ep_dbg_set(optarg);
+			break;
+
+		case 'G':
+			router_addr = optarg;
+			break;
+
+		case 'n':
+			nbatches = atol(optarg);
+			break;
+
+		case 'p':
+			payload_size = atol(optarg);
+			break;
+
+		case 'r':
+			async_batch_size = atol(optarg);
+			break;
+
+		case 's':
+			batch_size = atol(optarg);
+			break;
+		}
+	}
+	argc -= optind;
+	argv += optind;
+
+	if (show_usage || argc != 1)
+		usage();
+	logname_template = argv[0];
+
+	// initialize GDP library
+	phase = "gdp_init";
+	estat = gdp_init(router_addr);
+	if (!EP_STAT_ISOK(estat))
+		goto fail0;
+
+	/*
+	**  This should be in some sort of configuration file.
+	*/
+
+	phase = "configuration";
+
+	// create a single data generator
+	datagen_t *dg = ep_mem_zalloc(sizeof *dg);
+	dg->max_gen = INT32_MAX;
+	dg->payload_size = payload_size;
+	dg->init = dg_sequential_init;
+	dg->next = dg_sequential_next;
+
+	// this is the template for the batch
+	batch_t *bi = ep_mem_zalloc(sizeof *bi);
+
+	bi->results_interval = async_batch_size;
+	bi->dg = dg;
+	bi->batch_size = batch_size;
+	if (async)
+		bi->run = &write_batch_asynchronous;
+	else
+		bi->run = write_batch_synchronous;
+	estat = get_logctl(logname_template, bi, &bi->lc);
+	EP_STAT_CHECK(estat, goto fail0);
+
+	/*
+	**  Run that configuration (note: only runs one batch set)
+	*/
+
+	phase = "batch run";
+	EP_THR *threads = ep_mem_malloc(nbatches * sizeof *threads);
+	estat = start_run(bi, nbatches, threads);
+	EP_STAT_CHECK(estat, goto fail0);
+
+	// wait for threads to complete
+	int i;
+	for (i = 0; i < nbatches; i++)
+		pthread_join(threads[i], NULL);
+
+fail0:
+	ep_app_message(estat, "during %s", phase);
+	exit(EP_STAT_ISOK(estat) ? EX_OK : EX_UNAVAILABLE);
+}
