@@ -246,7 +246,7 @@ const EVP_MD		*_ep_crypto_md_getalg_byid(
 **	Note that these operate on EP_CRYPTO_MD structures.
 */
 
-# define EP_CRYPTO_MAX_SIG	(1024 / 8)	// in bytes
+# define EP_CRYPTO_MAX_SIG	(16384 / 8)	// in bytes
 
 EP_CRYPTO_MD		*ep_crypto_sign_new(
 				EP_CRYPTO_KEY *skey,
