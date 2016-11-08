@@ -277,7 +277,13 @@ find_req_in_channel_list(
 
 	// request should be locked for symmetry with _gdp_req_find
 	if (req != NULL)
-		estat = _gdp_req_lock(req);
+    {
+		//kaz//estat = _gdp_req_lock(req);
+
+		char ebuf[200];
+		ep_dbg_cprintf(Dbg, 1, "find_req_in_channel_list: %s\n",
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
+    }
 	*reqp = req;
 	return estat;
 }

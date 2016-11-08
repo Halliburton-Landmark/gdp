@@ -86,7 +86,7 @@ _gdp_gcl_newhandle(gdp_name_t gcl_name, gdp_gcl_t **pgcl)
 	ep_thr_mutex_init(&gcl->mutex, EP_THR_MUTEX_DEFAULT);
 	LIST_INIT(&gcl->reqs);
     LIST_INIT(&gcl->rplsvr);
-    _rpl_init(gcl);
+    EP_STAT_CHECK(estat, goto fail1);
 	gcl->refcnt = 1;
 
 	// create a name if we don't have one passed in
@@ -126,9 +126,6 @@ _gdp_gcl_freehandle(gdp_gcl_t *gcl)
 
 	// release any remaining requests
 	_gdp_req_freeall(&gcl->reqs, NULL);
-
-    // release any remaining log server candidates
-    _rpl_rplsvr_freeall(&gcl->rplsvr);
 
 	// drop it from the name -> handle cache
 	_gdp_gcl_cache_drop(gcl);
@@ -562,7 +559,7 @@ _gdp_gcl_append(gdp_gcl_t *gcl,
 	// send the request to the log server
 	estat = _gdp_invoke(req);
 	if (EP_STAT_ISOK(estat))
-		gcl->nrecs = datum->recno;
+		gcl->nrecs++;
 
 	req->pdu->datum = NULL;			// owned by caller
 	_gdp_req_free(&req);

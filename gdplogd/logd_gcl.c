@@ -29,6 +29,7 @@
 */
 
 #include "logd.h"
+#include <gdplogd/logd_rpl.h>
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.gcl", "GDP Log Daemon GCL handling");
 
@@ -47,6 +48,7 @@ gcl_alloc(gdp_name_t gcl_name, gdp_iomode_t iomode, gdp_gcl_t **pgcl)
 	// get the standard handle
 	estat = _gdp_gcl_newhandle(gcl_name, &gcl);
 	EP_STAT_CHECK(estat, goto fail0);
+    _rpl_init(gcl);
 	gcl->iomode = GDP_MODE_ANY;		// might change mode later: be permissive
 
 	// add the gdpd-specific information
@@ -119,6 +121,9 @@ gcl_close(gdp_gcl_t *gcl)
 	// close the underlying files and free memory as needed
 	if (gcl->x->physimpl->close != NULL)
 		gcl->x->physimpl->close(gcl);
+
+    // release any remaining log server candidates
+    _rpl_rplsvr_freeall(&gcl->rplsvr);
 
 	ep_mem_free(gcl->x);
 	gcl->x = NULL;

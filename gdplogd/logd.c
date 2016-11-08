@@ -30,6 +30,7 @@
 
 #include "logd.h"
 #include "logd_pubsub.h"
+#include "logd_rpl.h"
 
 #include <ep/ep_string.h>
 
@@ -408,6 +409,10 @@ main(int argc, char **argv)
 	// advertise all of our GCLs
 	phase = "advertise GCLs";
 	estat = logd_advertise_all(GDP_CMD_ADVERTISE);
+	EP_STAT_CHECK(estat, goto fail0);
+
+    // initialize the synchronization protocol
+    estat = _rpl_periodic_sync_init();
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// arrange for clean shutdown

@@ -652,26 +652,4 @@ EP_STAT			_gdp_evloop_init(void);		// start event loop
 #define MILLISECONDS	* INT64_C(1000000)
 #define SECONDS			* INT64_C(1000000000)
 
-/*
-**  Replication Services
-*/
-
-extern void     _rpl_init(gdp_gcl_t *pgcl);
-extern EP_STAT  _rpl_fwd_append(gdp_req_t *req);
-extern void     _rpl_resp_cb(gdp_event_t *gev);
-extern void     _rpl_resp_proc(gdp_event_t *gev);
-extern void     _rpl_reply_ack(gdp_req_t *t, uint8_t cmd);
-extern void     _rpl_add_ackedsvr(
-                    gdp_req_t *req,
-                    const gdp_name_t svrname,
-                    const int type);
-extern void     _rpl_rplsvr_freeall(struct rplsvr_head *rplsvr);
-extern void     _rpl_ackedsvr_freeall(struct rplsvr_head *acksvr);
-extern void     _rpl_rplcbarg_free(gdp_rplcb_t *rplcbarg);
-extern uint16_t _rpl_get_number_ackedsvr(
-                    const gdp_req_t *req);
-extern uint16_t _rpl_get_number_acksuccess(
-                    const gdp_req_t *req);
-
-
 #endif // _GDP_PRIV_H_

@@ -112,12 +112,14 @@ OBJS=	\
 		logd_proto.o \
 		logd_pubsub.o \
 		logd_version.o \
+		logd_rpl.o \
 
 HDEPS=	\
 		logd.h \
 		logd_admin.h \
 		logd_disklog.h \
 		logd_pubsub.h \
+		logd_rpl.h \
 		${INCROOT}/gdp/gdp.h \
 		${INCROOT}/gdp/gdp_pdu.h \
 

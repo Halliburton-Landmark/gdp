@@ -31,6 +31,7 @@
 #include "logd.h"
 #include "logd_admin.h"
 #include "logd_pubsub.h"
+#include "logd_rpl.h"
 
 #include <gdp/gdp_gclmd.h>
 #include <gdp/gdp_priv.h>
@@ -723,6 +724,12 @@ post_subscribe(gdp_req_t *req)
 	// make sure the request has the right command
 	req->pdu->cmd = GDP_ACK_CONTENT;
 
+
+    estat = _rpl_reactive_sync(req->nextrec, req->numrecs, req->gcl, req->pdu->datum);
+    if (!EP_STAT_ISOK(estat))
+        ep_dbg_cprintf(Dbg, 4,
+				"post_subscribe: _rpl_reactive_sync is incompleted.\n");
+
 	while (req->numrecs >= 0)
 	{
 		EP_ASSERT_INSIST(req->gcl != NULL);
@@ -1133,6 +1140,215 @@ cmd_fwd_append(gdp_req_t *req)
 }
 
 
+/*
+**  CMD_REACTVE_SYNC --- reactive(fetching) synchronization command
+**
+**		Used for replica synchronization. This reactive synchronization
+**		handles a forwarded query for missing log entries. This log server
+**      replies these log entries if there are.
+*/
+
+EP_STAT
+cmd_reactive_sync(gdp_req_t *req)
+{
+	EP_STAT estat;
+	gdp_name_t gclname;
+
+	// must be addressed to me
+	if (memcmp(req->pdu->dst, _GdpMyRoutingName, sizeof _GdpMyRoutingName) != 0)
+	{
+		// this is directed to a GCL, not to the daemon
+		return gdpd_gcl_error(req->pdu->dst,
+							"cmd_reactive_sync: log name required",
+							GDP_STAT_NAK_CONFLICT,
+							GDP_STAT_NAK_BADREQ);
+	}
+
+	// get the name of the GCL into current PDU
+	{
+		int i;
+		gdp_pname_t pbuf;
+
+		i = gdp_buf_read(req->pdu->datum->dbuf, gclname, sizeof gclname);
+		if (i < sizeof req->pdu->dst)
+		{
+			return gdpd_gcl_error(req->pdu->dst,
+								"cmd_reactive_sync: gclname required",
+								GDP_STAT_GCL_NAME_INVALID,
+								GDP_STAT_NAK_INTERNAL);
+		}
+		memcpy(req->pdu->dst, gclname, sizeof req->pdu->dst);
+
+		ep_dbg_cprintf(Dbg, 14, "cmd_reactive_sync: %s\n",
+				gdp_printable_name(req->pdu->dst, pbuf));
+	}
+
+	// actually do the read
+	estat = cmd_read(req);
+
+	// make response seem to come from log
+	memcpy(req->pdu->dst, gclname, sizeof req->pdu->dst);
+
+	return estat;
+}
+
+
+/*
+**  CMD_PERIODIC_SYNC --- periodic synchronization command
+**
+**		Used for replica synchronization. This periodic synchronization
+**		runs periodically and checks consistency with replica log servers.
+**		A log server periodically notifies a randomly chosen replica server
+**      of log entries which it stores. The log server receiving notification
+**      finds and replies missing log entries.
+**      Log entries are composed of set of log chains. Each log chain is
+**      represented by (a, b). "a" and "b" are a start and end hash of chained
+**      log entries.
+*/
+
+EP_STAT
+cmd_periodic_sync(gdp_req_t *req)
+{
+	EP_STAT estat;
+	gdp_name_t gclname;
+
+	// must be addressed to me
+	if (memcmp(req->pdu->dst, _GdpMyRoutingName, sizeof _GdpMyRoutingName) != 0)
+	{
+		// this is directed to a GCL, not to the daemon
+		return gdpd_gcl_error(req->pdu->dst,
+							"cmd_periodic_sync: log name required",
+							GDP_STAT_NAK_CONFLICT,
+							GDP_STAT_NAK_BADREQ);
+	}
+
+	// get the name of the GCL into current PDU
+	{
+		int i;
+		gdp_pname_t pbuf;
+
+		i = gdp_buf_read(req->pdu->datum->dbuf, gclname, sizeof gclname);
+		if (i < sizeof req->pdu->dst)
+		{
+			return gdpd_gcl_error(req->pdu->dst,
+								"cmd_periodic_sync: gclname required",
+								GDP_STAT_GCL_NAME_INVALID,
+								GDP_STAT_NAK_INTERNAL);
+		}
+		memcpy(req->pdu->dst, gclname, sizeof req->pdu->dst);
+
+		ep_dbg_cprintf(Dbg, 14, "cmd_periodic_sync: %s\n",
+				gdp_printable_name(req->pdu->dst, pbuf));
+	}
+
+    estat = get_open_handle(req, GDP_MODE_RO);
+	if (!EP_STAT_ISOK(estat))
+	{
+		return gdpd_gcl_error(req->pdu->dst, "cmd_periodic_sync: GCL open failure",
+							estat, GDP_STAT_NAK_INTERNAL);
+	}
+
+    //Get the number of log chains first//
+    int32_t the_num_chains;
+    int32_t len = gdp_buf_read(req->pdu->datum->dbuf, &the_num_chains, sizeof the_num_chains);
+    if (len != sizeof(int))
+        return gdpd_gcl_error(req->pdu->dst,
+							"cmd_periodic_sync: the number of log chains required",
+							GDP_STAT_NAK_CONFLICT,
+							GDP_STAT_NAK_BADREQ); //failed.
+
+    //Get the log chains//--->
+    gdp_recno_t log_chain[the_num_chains][2];
+    gdp_recno_t initial_recno;
+    gdp_recno_t last_recno;
+    gdp_recno_t missing_recno[the_num_chains-1][2];
+
+    int32_t cnt;
+    for (cnt = 1; cnt <= the_num_chains; cnt++) {
+        int32_t len_start = gdp_buf_read(req->pdu->datum->dbuf, &log_chain[cnt-1][0], sizeof (gdp_recno_t));
+        int32_t len_end = gdp_buf_read(req->pdu->datum->dbuf, &log_chain[cnt-1][1], sizeof (gdp_recno_t));
+
+        if ( ((len_start != sizeof(gdp_recno_t)) && (len_start < 0)) ||
+             ((len_end != sizeof(gdp_recno_t)) && (len_end < 0)) )
+            return gdpd_gcl_error(req->pdu->dst,
+                                  "cmd_periodic_sync: the start or end of recno is wrong",
+                                  GDP_STAT_NAK_CONFLICT,
+                                  GDP_STAT_NAK_BADREQ); //failed.
+    }
+    //<---
+
+    //Find missing log entries for the other log server//--->
+    _rpl_find_missing_log_entries(req->gcl, req->pdu->src, log_chain, the_num_chains);
+    //<---
+
+	// make response seem to come from log
+	memcpy(req->pdu->dst, gclname, sizeof req->pdu->dst);
+
+
+    if (req->gcl == NULL)
+        _gdp_gcl_decref(&req->gcl);
+
+	return estat;
+}
+
+/*
+**  CMD_SYNC_REPLY --- it handles replies of periodic synchronization
+**
+**		Used for periodic synchronization. This receives a reply containing
+**		log entries which this log server does not have presumably.
+**      Received log entries are appended into local disk as usual(cmd_append).
+**		This message does not require an acknowledgement response.
+*/
+
+
+EP_STAT
+cmd_sync_reply(gdp_req_t *req)
+{
+	EP_STAT estat;
+	gdp_name_t gclname;
+
+	// must be addressed to me
+	if (memcmp(req->pdu->dst, _GdpMyRoutingName, sizeof _GdpMyRoutingName) != 0)
+	{
+		// this is directed to a GCL, not to the daemon
+		return gdpd_gcl_error(req->pdu->dst,
+							"cmd_sync_reply: log name required",
+							GDP_STAT_NAK_CONFLICT,
+							GDP_STAT_NAK_BADREQ);
+	}
+
+	// get the name of the GCL into current PDU
+	{
+		int i;
+		gdp_pname_t pbuf;
+
+		i = gdp_buf_read(req->pdu->datum->dbuf, gclname, sizeof gclname);
+        gdp_pname_t gclpname;
+		if (i < sizeof req->pdu->dst)
+		{
+			return gdpd_gcl_error(req->pdu->dst,
+								"cmd_sync_reply: gclname required",
+								GDP_STAT_GCL_NAME_INVALID,
+								GDP_STAT_NAK_INTERNAL);
+		}
+		memcpy(req->pdu->dst, gclname, sizeof req->pdu->dst);
+
+		ep_dbg_cprintf(Dbg, 14, "cmd_sync_reply: %s\n",
+				gdp_printable_name(req->pdu->dst, pbuf));
+	}
+
+    req->fwdflag = 1; //This sync reply should not be forwarded.
+	// actually do the read
+	estat = cmd_append(req);
+
+    req->fwdflag = 0;
+	// make response seem to come from log
+	//no need//memcpy(req->pdu->dst, gclname, sizeof req->pdu->dst);
+
+	return estat;
+}
+
+
 /**************** END OF COMMAND IMPLEMENTATIONS ****************/
 
 
@@ -1229,6 +1445,9 @@ static struct cmdfuncs	CmdFuncs[] =
 	{ GDP_CMD_OPEN_RA,		cmd_open				},
 	{ GDP_CMD_NEWSEGMENT,	cmd_newsegment			},
 	{ GDP_CMD_FWD_APPEND,	cmd_fwd_append			},
+	{ GDP_CMD_REACTIVESYNC,	cmd_reactive_sync  		},
+	{ GDP_CMD_PERIODICSYNC,	cmd_periodic_sync  		},
+	{ GDP_CMD_SYNC_REPLY,	cmd_sync_reply  		},
 	{ 0,					NULL					}
 };
 

@@ -59,6 +59,9 @@
 #define LOG_CHECK	1
 #include "../gdplogd/logd_disklog.c"
 #undef Dbg
+#define Dbg			DbgLogdRpl
+#include "../gdplogd/logd_rpl.c"
+#undef Dbg
 
 #include <signal.h>
 #include <sysexits.h>
