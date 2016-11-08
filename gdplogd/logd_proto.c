@@ -32,6 +32,7 @@
 #include "logd_admin.h"
 #include "logd_pubsub.h"
 #include "logd_rpl.h"
+#include "logd_disklog.h"
 
 #include <gdp/gdp_gclmd.h>
 #include <gdp/gdp_priv.h>
@@ -986,7 +987,7 @@ cmd_multiread(gdp_req_t *req)
 		req->postproc = &post_subscribe;
 
 		// make this a "snapshot", i.e., don't read additional records
-		int32_t nrec = req->gcl->nrecs - req->nextrec;
+		int32_t nrec = req->gcl->x->physinfo->max_recno - req->nextrec;
 		if (nrec < req->numrecs || req->numrecs == 0)
 			req->numrecs = nrec + 1;
 

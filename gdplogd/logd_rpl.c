@@ -2,7 +2,6 @@
 #include <gdp/gdp_priv.h>
 #include <gdplogd/logd.h>
 #include <gdplogd/logd_disklog.h>
-
 #include <gdplogd/logd_rpl.h>
 
 #include <ep/ep_dbg.h>
@@ -76,7 +75,7 @@ _rpl_num_log_chain(
     gdp_recno_t recno;
     EP_STAT estat = EP_STAT_OK;
 
-	//ep_thr_rwlock_rdlock(&phys->lock);
+	//kaz//ep_thr_rwlock_rdlock(&phys->lock);
     for (recno = phys->min_recno; recno <= phys->max_recno; recno++)
     {
         EP_ASSERT_POINTER_VALID(gcl);
@@ -106,7 +105,7 @@ _rpl_num_log_chain(
             // do nothing
         }
     }
-	//ep_thr_rwlock_unlock(&phys->lock);
+	//kaz//ep_thr_rwlock_unlock(&phys->lock);
 
     return num_chains;
 }
@@ -150,8 +149,8 @@ _rpl_periodic_sync(gdp_name_t gclname, void *arg)
         cnt++;
     }
 
-    if (gcl != NULL)
-        _gdp_gcl_decref(&gcl);
+    //kaz//if (gcl != NULL)
+    //kaz//    _gdp_gcl_decref(&gcl);
 }
 
 static void
@@ -180,7 +179,6 @@ EP_STAT
 _rpl_periodic_sync_init()
 {
     int err = ep_thr_spawn(&_GdpRplSyncLoopThread, _rpl_sync_thread, NULL);
-    printf("kaz. _rpl_periodic_sync_init\n");
 
     if (err != 0)
     {
@@ -216,7 +214,6 @@ _rpl_periodic_sync_reply(
     gdp_pname_t dst_name;
     gdp_printable_name(_GdpMyRoutingName, src_name);
     gdp_printable_name(to_server, dst_name);
-    printf("_rpl_periodic_sync_reply. send recno %lld to %s\n", recno, dst_name);
 
 	// create a new request and point it at the routing layer
 	estat = _gdp_req_new(GDP_CMD_SYNC_REPLY, gcl, NULL, NULL, reqflags, &req);
@@ -502,6 +499,11 @@ _rpl_fetch_missing_entries(
     gdp_rplsvr_t *currentsvr;
     gdp_rplsvr_t *nextsvr;
 
+    // make gdp_req temporary for cmd_append
+    gdp_req_t *req;
+    estat = _gdp_req_new(GDP_CMD_APPEND, pgcl, NULL, NULL, NULL, &req); // make temporarily for cmd_append
+    EP_STAT_CHECK(estat, goto fail0);
+
     char ebuf[200];
 
     ep_thr_mutex_lock(&pgcl->mutex);
@@ -559,13 +561,12 @@ _rpl_fetch_missing_entries(
                         cnt++;
                     }
                     total_missing--;
-                    // copy the record to the new log
 
-                    //Verifications required here//--->
-
+                    // append missing log entries into the disk//--->
+                    req->pdu->datum = datum;
+                    req->fwdflag = 1; // not to forward this request
+                    cmd_append(req);
                     //<---
-                    estat = pgcl->x->physimpl->append(pgcl, datum);
-                    EP_STAT_CHECK(estat, goto fail1);
                 }
                 break;
 
@@ -573,13 +574,12 @@ _rpl_fetch_missing_entries(
             case GDP_EVENT_SHUTDOWN:
                 ep_app_error("unexpected end of fwd_read");
                 estat = EP_STAT_END_OF_FILE;
-                goto fail2;
+                goto fail1;
 
             default:
                 // ignore
                 break;
             }
-
             gdp_event_free(gev);
         }
 
@@ -590,13 +590,19 @@ _rpl_fetch_missing_entries(
         }
         fwdcnt++;
     }
+    //_gdp_req_free(&req); //This calls gdp_gcl_decref then does not work
 
-
-fail2:
+fail0:
+	if (ep_dbg_test(Dbg, 10))
+	{
+		ep_dbg_printf("_rpl_fetch_missing_entries => %s\n",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
+fail1:
     if (false)
     {
-fail1:
-        ep_app_error("could not foward read to %s", lname);
+fail2:
+        ep_app_error("could not forward read request to %s", lname);
     }
 
     return estat;
@@ -628,13 +634,11 @@ _rpl_check_missing_entries(
         if (EP_STAT_ISOK(estat))
         {
             //do nothing.
-            printf("kaz. _rpl_reactive_sync. IS_OK. recno %d\n", datum->recno);
         }
         else if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOTFOUND))
         {
             //Store record number for a following fetching process.
             //This log entry is for data freshness.
-            printf("kaz. _rpl_reactive_sync. NAK_NOTFOUND. recno %d\n", datum->recno);
         }
         else if (EP_STAT_IS_SAME(estat, GDP_STAT_RECORD_MISSING))
         {
@@ -642,11 +646,9 @@ _rpl_check_missing_entries(
             //This log entry is for a log hole.
             missing[total_missing] = datum->recno;
             total_missing++;
-            printf("kaz. _rpl_reactive_sync. RECORD_MISSING. recno %d total %d\n", datum->recno, total_missing);
         }
         else
         {
-            printf("kaz. _rpl_reactive_sync. SOMETHING_ELSE. recno %d\n", datum->recno);
             //ep_log(estat, "_rpl_reactive_sync(%s): this log entry is not supposed to be. recno %" PRIgdp_recno,
             //        pgcl->pname, datum->recno);
             //Not supported now.
@@ -708,11 +710,9 @@ _rpl_periodic_beacon(
 
     //Put log chain information//--->
     int cnt;
-    printf("rpl_periodic_beacon. num_chains %d\n", the_num_chains);
     for (cnt = 1; cnt <= the_num_chains; cnt++) {
         gdp_buf_write(req->pdu->datum->dbuf, &log_chain[cnt-1][0], sizeof(gdp_recno_t));
         gdp_buf_write(req->pdu->datum->dbuf, &log_chain[cnt-1][1], sizeof(gdp_recno_t));
-        printf("%d: start %lld end %lld\n", cnt, log_chain[cnt-1][0], log_chain[cnt-1][1]);
     }
     //<---
 

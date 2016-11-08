@@ -39,7 +39,6 @@ SBINALL_ZC= 	gdp-zcpublish
 SBINALL=	gdp-rest \
 		log-view \
 		gdp-find-xname \
-		gdp-log-check \
 		gdp-name-xlate \
 		gdp-newsegment \
 		$(SBINALL_ZC) \
@@ -56,7 +55,6 @@ MAN5ALL=
 MAN7ALL=
 
 MAN8ALL=	gcl-create.8 \
-		gdp-log-check.8 \
 
 MANALL=		${MAN1ALL} ${MAN3ALL} ${MAN5ALL} ${MAN7ALL} ${MAN8ALL}
 
@@ -127,7 +125,7 @@ all:	${ALL}
 all_noavahi:
 	${MAKE}	STD=-DGDP_OSCF_USE_ZEROCONF=0 LIBAVAHI= BINALL_ZC= SBINALL_ZC= all
 
-gdp-log-check.o: ../gdplogd/logd_disklog.c ../gdplogd/logd_gcl.c
+#gdp-log-check.o: ../gdplogd/logd_disklog.c ../gdplogd/logd_gcl.c
 
 gdp-rest:	gdp-rest.o ../scgilib/scgilib.o
 	${CC} -o $@ ${LDFLAGS} gdp-rest.o ${LDLIBS} ../scgilib/scgilib.o
