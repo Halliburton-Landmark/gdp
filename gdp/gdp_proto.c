@@ -777,8 +777,10 @@ cmd_not_implemented(gdp_req_t *req)
 	// just ignore unknown commands
 	if (ep_dbg_test(Dbg, 1))
 	{
+		flockfile(ep_dbg_getfile());
 		ep_dbg_printf("_gdp_req_dispatch: Unknown cmd, req:\n");
 		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+		funlockfile(ep_dbg_getfile());
 	}
 
 	return GDP_STAT_NOT_IMPLEMENTED;
@@ -804,6 +806,7 @@ _gdp_req_dispatch(gdp_req_t *req)
 
 	if (ep_dbg_test(Dbg, 18))
 	{
+		flockfile(ep_dbg_getfile());
 		ep_dbg_printf("_gdp_req_dispatch >>> %s (%d)",
 				_gdp_proto_cmd_name(cmd), cmd);
 		if (req->gcl != NULL)
@@ -819,6 +822,7 @@ _gdp_req_dispatch(gdp_req_t *req)
 		{
 			ep_dbg_printf("\n");
 		}
+		funlockfile(ep_dbg_getfile());
 	}
 
 	d = &DispatchTable[cmd];
@@ -831,6 +835,7 @@ _gdp_req_dispatch(gdp_req_t *req)
 	{
 		char ebuf[200];
 
+		flockfile(ep_dbg_getfile());
 		ep_dbg_printf("_gdp_req_dispatch <<< %s",
 				_gdp_proto_cmd_name(cmd));
 		if (req->gcl != NULL)
@@ -841,6 +846,7 @@ _gdp_req_dispatch(gdp_req_t *req)
 			ep_dbg_printf("    ");
 			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 		}
+		funlockfile(ep_dbg_getfile());
 	}
 
 	return estat;
