@@ -512,6 +512,7 @@ _rpl_fetch_missing_entries(
 
     const char *lname;
     int fwdcnt = 1;
+    int32_t current_missing = total_missing;
     for (; currentsvr != NULL; currentsvr = nextsvr)
     {
         nextsvr = LIST_NEXT(currentsvr, svrlist);
@@ -537,7 +538,8 @@ _rpl_fetch_missing_entries(
         gdp_event_t *gev;
         //TBD//EP_TIME_SPEC timeout = { 0, 100000000, 0.1 }; //Need to set timeout.
         //TBD//while ( ((gev = gdp_event_next(pgcl, &timeout)) != NULL)
-        while ( (total_missing != 0)
+
+        while ( (current_missing != 0)
                 && ((gev = gdp_event_next(pgcl, NULL)) != NULL) )
         {
             gdp_datum_t *datum = gdp_event_getdatum(gev);
@@ -547,7 +549,7 @@ _rpl_fetch_missing_entries(
             switch (gdp_event_gettype(gev))
             {
 		    case GDP_EVENT_DATA:
-                for (cnt = 0; cnt < total_missing; cnt++) {
+                for (cnt = 0; cnt < current_missing; cnt++) {
                     if (missing_recno[cnt] = datum->recno)
                     {
                         missing_recno[cnt] = 0; //Set 0 because it is filled in.
@@ -556,11 +558,11 @@ _rpl_fetch_missing_entries(
                     }
                 }
                 if (match) {
-                    while (cnt < total_missing) {
+                    while (cnt < current_missing) {
                         missing_recno[cnt] = missing_recno[cnt + 1];
                         cnt++;
                     }
-                    total_missing--;
+                    current_missing--;
 
                     // append missing log entries into the disk//--->
                     req->pdu->datum = datum;
@@ -583,7 +585,7 @@ _rpl_fetch_missing_entries(
             gdp_event_free(gev);
         }
 
-        if (total_missing == 0)
+        if (current_missing == 0)
         {
             estat = EP_STAT_OK;
             break; //No need to continue
@@ -591,6 +593,7 @@ _rpl_fetch_missing_entries(
         fwdcnt++;
     }
     //_gdp_req_free(&req); //This calls gdp_gcl_decref then does not work
+
 
 fail0:
 	if (ep_dbg_test(Dbg, 10))
@@ -716,14 +719,8 @@ _rpl_periodic_beacon(
     }
     //<---
 
-
-
 	// change the destination to be the final server, not the GCL
 	memcpy(req->pdu->dst, to_server, sizeof req->pdu->dst);
-
-	//req->pdu->datum->recno = recno;
-
-	// XXX should we take a callback function?
 
 	estat = _gdp_req_send(req);
 	// unlike append_async, we leave the datum intact
