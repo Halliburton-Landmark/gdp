@@ -36,21 +36,32 @@ class Node:
         self.eui64 = _eui64.encode('ascii', 'ignore').translate(None, '-')
         self.ipv6 = _ipv6.encode('ascii', 'ignore')
         self.prefix = prefix
-    
-        # Make a named pipe where data from the coap-client will go. It's
+        self.logname = "%s.%s" % (self.prefix, self.eui64)
+
+        # Make a temp file where data from the coap-client will go. It's
         #    a cleaner approach than redirecting STDOUT, since restarting
         #    the writer or reader individually is possible.
         tmpdir = tempfile.gettempdir()
         _fifo = "i3mesh-" + self.eui64
         self.fifo = os.path.join(tmpdir, _fifo)
+        # Make sure there's no old file that a reader will get confused with
         try:
-            os.mkfifo(self.fifo)
+            os.unlink(self.fifo)
         except OSError as e:
-            print e
+            pass
 
         # Setup threads
         self.coap_thr = None
         self.reader_thr = None
+        self.exit_lock = threading.Lock()
+        self.exit_reader_thr = False
+        self.POLLING_INTERVAL = 0.5   # polling interval for read thread
+
+        self.g = gdp.GDP_GCL(gdp.GDP_NAME(self.logname), gdp.GDP_MODE_AO)
+
+        print ">>> Node (%s), \n\tIPV6 (%s), \n\ttmpfile (%s), \n\tlog(%s)" %\
+                         (self.eui64, self.ipv6, self.fifo, self.logname)
+
 
     def poke_threads(self):
         """
@@ -58,62 +69,87 @@ class Node:
             fix them
         """
 
+        self.exit_lock.acquire()
+
         if (self.coap_thr is None) or (self.coap_thr.is_alive()==False):
             self.coap_thr = threading.Thread(target=self.CoAPThread)
             self.coap_thr.start()
 
         if (self.reader_thr is None) or (self.reader_thr.is_alive()==False):
+            self.exit_reader_thr = False
             self.reader_thr = threading.Thread(target=self.ReaderThread)
             self.reader_thr.start()
 
-    
+        self.exit_lock.release()
+
     def CoAPThread(self):
         """
         Get COAP data from the specified ipv6 address, which represents
-            a sensor with EUI64. Write this to a fifo at the
+            a sensor with EUI64. Write this to a temp file at the
             specified location.
         """
-    
-        coap_args = [COAP_BINARY, '-v', '9', '-B', '3600', '-s', '60',
+
+        coap_args = [COAP_BINARY, '-v', '7', '-B', '120', '-s', '60',
                             '-o', self.fifo, '-m', 'get',
                             "coap://[%s]/sensors" % self.ipv6]
         subprocess.call(coap_args)
 
+        # signal the reader thread to terminate when this exits
+        # The reader thread will exit at most in polling interval
+        self.exit_lock.acquire()
+        try:
+           os.unlink(self.fifo)
+        except OSError:
+            pass
+        self.exit_reader_thr = True
+        self.exit_lock.release()
+
 
     def ReaderThread(self):
         """
-        Read data from the fifo written to by CoAP, parse it to JSON
+        Read data from the temp file written to by CoAP, parse it to JSON
             and append it to a GDP log (name derived from parameters)
+        Write everything that hasn't been written yet
         """
-    
-        logname = "%s.%s" % (self.prefix, self.eui64)
-        print logname
+
         time.sleep(2)
-    
-        g = gdp.GDP_GCL(gdp.GDP_NAME(logname), gdp.GDP_MODE_AO)
-    
-        with open(self.fifo) as fh:
-    
-            data = ""
-            while True:
-                data += fh.read(BUFSIZE)
-                if len(data)<BUFSIZE:
-                    time.sleep(0.1)
-                    continue
-                json_string = self.parseCOAP(data[:50])
-                data = data[50:]
-                g.append({'data': json_string})
-        
- 
-    @staticmethod 
+
+        try:
+            with open(self.fifo) as fh:
+
+                seekptr = 0
+                while True:
+
+                    # there may be unread data, but we need to move on
+                    if self.exit_reader_thr: break
+
+                    assert seekptr%BUFSIZE == 0
+                    fh.seek(seekptr)
+
+                    # ugly
+                    data = fh.read(BUFSIZE)
+                    if len(data)<BUFSIZE:
+                        time.sleep(self.POLLING_INTERVAL)
+                        continue
+
+                    json_string = self.parseCOAP(data[:50])
+                    print "## %s>> %s" % (self.eui64, json_string)
+                    self.g.append({'data': json_string})
+                    seekptr += BUFSIZE
+
+        except IOError as e:
+            print "## %s >>" % self.eui64, e,
+            print "\tIt's ok; writer hasn't wrote anything since last restart"
+
+    @staticmethod
     def parseCOAP(buf):
         """
         Read a TI COAP message and convert it to JSON string
         """
-       
+
         # This is from `app.js` provided by TI
         assert len(buf) == BUFSIZE
-    
+
         parsed = struct.unpack(FORMAT, buf)
         message = { "tamb"              : parsed[0]/100.0,
                     "rhum"              : parsed[1]/100.0,
@@ -141,9 +177,9 @@ class Node:
                     "msp432_sleep"      : parsed[23]/100.0,
                     "others"            : parsed[24]/100.0 }
         return json.dumps(message)
-     
-   
-       
+
+
+
 
 def fetch_nodes():
     """ Fetches the list of nodes from http://localhost/nodes """
@@ -170,14 +206,14 @@ def main(coap, prefix):
 
     while True:
         for node in nodes: node.poke_threads()
-        time.sleep(10)
+        time.sleep(1)
 
 if __name__ == "__main__":
 
     if len(sys.argv)<3:
-        print "Usage: %s <full-path-to-coap-client> <log-prefix>" % sys.argv[0] 
+        print "Usage: %s <full-path-to-coap-client> <log-prefix>" % sys.argv[0]
         print "    coap-client is the libcoap binary for your platform"
         print "    log-prefix could be 'edu.berkeley.eecs.swarmlab.device'"
         sys.exit(1)
 
-    main(sys.argv[1], sys.argv[2]) 
+    main(sys.argv[1], sys.argv[2])
