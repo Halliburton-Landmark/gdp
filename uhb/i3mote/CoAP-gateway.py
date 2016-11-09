@@ -50,6 +50,9 @@ class Node:
         except OSError as e:
             pass
 
+        print ">>> Node (%s), \n\tIPV6 (%s), \n\ttmpfile (%s), \n\tlog(%s)" %\
+                         (self.eui64, self.ipv6, self.fifo, self.logname)
+
         # Setup threads
         self.coap_thr = None
         self.reader_thr = None
@@ -58,9 +61,6 @@ class Node:
         self.POLLING_INTERVAL = 0.5   # polling interval for read thread
 
         self.g = gdp.GDP_GCL(gdp.GDP_NAME(self.logname), gdp.GDP_MODE_AO)
-
-        print ">>> Node (%s), \n\tIPV6 (%s), \n\ttmpfile (%s), \n\tlog(%s)" %\
-                         (self.eui64, self.ipv6, self.fifo, self.logname)
 
 
     def poke_threads(self):
