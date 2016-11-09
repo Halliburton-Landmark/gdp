@@ -845,6 +845,10 @@ main(int argc, char **argv)
 		usage("Must specify one log name");
 	if (n_readers + n_writers <= 0)
 		usage("Must specify at least one reader or writer thread");
+	if (async && multiread)
+		usage("-a and -m are mutually incompatible");
+	if ((async || multiread) && n_readers <= 0)
+		usage("-a and -m must be used with -r");
 	logname_template = argv[0];
 
 	// initialize GDP library
