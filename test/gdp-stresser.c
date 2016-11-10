@@ -116,6 +116,7 @@ struct batch
 	logctl_t		*lc;				// log controller
 	int				threadno;			// thread number (integer)
 	int				results_interval;	// how often to get async results
+	int				record_interval;	// time between writing records (msec)
 };
 
 
@@ -167,6 +168,9 @@ write_batch_synchronous(batch_t *bi)
 		}
 		if (++n_gen >= bi->batch_size)
 			break;
+
+		if (bi->record_interval > 0)
+			ep_time_nanosleep(bi->record_interval * INT64_C(1000000));
 	}
 
 	// end of data is not an error
@@ -183,12 +187,12 @@ write_batch_synchronous(batch_t *bi)
 */
 
 void
-collect_async_results(logctl_t *lc)
+collect_async_results(logctl_t *lc, long timeout)
 {
 	int prflags = GDP_DATUM_PRTEXT;
 	//int n_to_collect = lc->n_out - lc->n_resp;
-	EP_TIME_SPEC zero_timeout;
-	ep_time_from_nsec(0, &zero_timeout);
+	EP_TIME_SPEC event_timeout;
+	ep_time_from_nsec(timeout * INT64_C(1000000), &event_timeout);
 
 	//while (n_to_collect-- > 0)
 	for (;;)
@@ -196,7 +200,7 @@ collect_async_results(logctl_t *lc)
 		gdp_event_t *ev;
 
 		// poll to see if there are any events available
-		ev = gdp_event_next(lc->gcl, &zero_timeout);
+		ev = gdp_event_next(lc->gcl, &event_timeout);
 		if (ev == NULL)
 			break;
 		lc->n_resp++;
@@ -235,7 +239,7 @@ write_batch_asynchronous(batch_t *bi)
 		{
 			lc->n_out++;
 			if ((lc->n_out - lc->n_resp) > bi->results_interval)
-				collect_async_results(lc);
+				collect_async_results(lc, 0);
 		}
 		ep_thr_mutex_unlock(&lc->mutex);
 
@@ -248,13 +252,16 @@ write_batch_asynchronous(batch_t *bi)
 		}
 		if (++n_gen >= bi->batch_size)
 			break;
+
+		if (bi->record_interval > 0)
+			ep_time_nanosleep(bi->record_interval * INT64_C(1000000));
 	}
 
 	ep_thr_mutex_lock(&lc->mutex);
 	if (lc->n_out > lc->n_resp)
 	{
 		ep_time_nanosleep(INT64_C(200000000));
-		collect_async_results(lc);
+		collect_async_results(lc, 0);
 	}
 	if (lc->n_out > lc->n_resp)
 	{
@@ -326,7 +333,7 @@ read_batch_asynchronous(batch_t *bi)
 		{
 			lc->n_out++;
 			if ((lc->n_out - lc->n_resp) > bi->results_interval)
-				collect_async_results(lc);
+				collect_async_results(lc, 0);
 		}
 		ep_thr_mutex_unlock(&lc->mutex);
 
@@ -342,7 +349,7 @@ read_batch_asynchronous(batch_t *bi)
 	if (lc->n_out > lc->n_resp)
 	{
 		ep_time_nanosleep(INT64_C(200000000));
-		collect_async_results(lc);
+		collect_async_results(lc, 0);
 	}
 	if (lc->n_out > lc->n_resp)
 	{
@@ -381,7 +388,7 @@ read_batch_multiread(batch_t *bi)
 
 	ep_time_nanosleep(INT64_C(200000000));
 	ep_thr_mutex_lock(&lc->mutex);
-	collect_async_results(lc);
+	collect_async_results(lc, 10);
 
 	if (bi->batch_size > lc->n_resp)
 	{
@@ -396,23 +403,47 @@ fail0:
 }
 
 
-#if 0
 /*
 **  Subscription
 */
 
 EP_STAT
-read_batch_subscription(batch_t *bi)
+read_batch_subscribe(batch_t *bi)
 {
 	EP_STAT estat;
-	gdp_datum_t *datum = gdp_datum_new();
+	logctl_t *lc = bi->lc;
 
-	//XXX
+	ep_thr_mutex_lock(&lc->mutex);
+	estat = gdp_gcl_subscribe(lc->gcl, 0, bi->batch_size,
+							NULL, NULL, (void *) (long) bi->threadno);
+	ep_thr_mutex_unlock(&lc->mutex);
 
-	gdp_datum_free(datum);
+	if (!EP_STAT_ISOK(estat))
+	{
+		char ebuf[100];
+		printf("gdp_gcl_subscribe error: %s\n",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		goto fail0;
+	}
+
+	ep_time_nanosleep(INT64_C(200000000));
+	ep_thr_mutex_lock(&lc->mutex);
+	long results_timeout = 1000;
+	if (bi->record_interval > 0)
+		results_timeout = bi->record_interval * 2;
+	collect_async_results(lc, results_timeout);
+
+	if (bi->batch_size > lc->n_resp)
+	{
+		printf("read_batch_subscribe: asked for %ld, got %ld results\n",
+				lc->n_out, lc->n_resp);
+		estat = STAT_LOST_RESPONSE;
+	}
+	ep_thr_mutex_unlock(&lc->mutex);
+
+fail0:
 	return estat;
 }
-#endif // 0
 
 
 
@@ -757,19 +788,25 @@ usage(const char *msg)
 {
 	fprintf(stderr, "%s\n", msg);
 	fprintf(stderr,
-			"Usage: %s [-a] [-A results-collection-interval] [-D dbgspec]\n"
-			"       [-G router_addr] [-m] [-p payload-size]\n"
-			"       [-r n-readers] [-s run-size] [-w n-writers]\n"
+			"Usage: %s [-a] [-A results-collection-interval] [-d w-delay]\n"
+			"       [-D dbgspec] [-G router_addr] [-m] [-n run-size]\n"
+			"       [-p payload-size] [-r n-readers] [-s] [-w n-writers]\n"
 			"       log_name_template\n"
-			"    -a  write asynchronously\n"
+			"    -a  read or write asynchronously\n"
 			"    -A  set async results collection interval\n"
+			"    -d  delay after writing records (msec)\n"
 			"    -D  turn on debugging flags\n"
 			"    -G  IP host to contact for gdp_router\n"
 			"    -m  use multiread for read batches\n"
+			"    -n  set number of records in run\n"
 			"    -p  set payload size\n"
 			"    -r  set number of reader threads\n"
-			"    -s  set number of records in run\n"
-			"    -w  set number of writer threads\n",
+			"    -s  use subscriptions for reading\n"
+			"    -w  set number of writer threads\n"
+			"-m and -s are invalid without at least one reader thread (-r)\n"
+			"-m and -s are mutually inconsistent\n"
+			"-m and -s override -a for reads\n"
+			"\n",
 			ep_app_getprogname());
 	exit(EX_USAGE);
 }
@@ -782,18 +819,20 @@ main(int argc, char **argv)
 {
 	bool async = false;
 	bool multiread = false;
+	bool subscribe = false;
 	long payload_size = 32;
 	long async_batch_size = 8;
 	long batch_size = 32;
 	long n_writers = 0;
 	long n_readers = 0;
+	long record_interval = 0;
 	char *router_addr = NULL;
 	char *logname_template;
 	EP_STAT estat = EP_STAT_OK;
 	int opt;
 	const char *phase;
 
-	while ((opt = getopt(argc, argv, "aA:D:G:mp:r:s:w:")) > 0)
+	while ((opt = getopt(argc, argv, "aA:d:D:G:mn:p:r:sw:")) > 0)
 	{
 		switch (opt)
 		{
@@ -803,6 +842,10 @@ main(int argc, char **argv)
 
 		case 'A':
 			async_batch_size = atol(optarg);
+			break;
+
+		case 'd':
+			record_interval = atol(optarg);
 			break;
 
 		case 'D':
@@ -817,6 +860,10 @@ main(int argc, char **argv)
 			multiread = true;
 			break;
 
+		case 'n':
+			batch_size = atol(optarg);
+			break;
+
 		case 'p':
 			payload_size = atol(optarg);
 			break;
@@ -826,7 +873,7 @@ main(int argc, char **argv)
 			break;
 
 		case 's':
-			batch_size = atol(optarg);
+			subscribe = true;
 			break;
 
 		case 'v':
@@ -845,10 +892,10 @@ main(int argc, char **argv)
 		usage("Must specify one log name");
 	if (n_readers + n_writers <= 0)
 		usage("Must specify at least one reader or writer thread");
-	if (async && multiread)
-		usage("-a and -m are mutually incompatible");
-	if ((async || multiread) && n_readers <= 0)
-		usage("-a and -m must be used with -r");
+	if (multiread && n_readers <= 0)
+		usage("-m must be used with -r");
+	if (multiread && subscribe)
+		usage("-m and -s are incompatible");
 	logname_template = argv[0];
 
 	// initialize GDP library
@@ -873,10 +920,12 @@ main(int argc, char **argv)
 
 		r_bi->results_interval = async_batch_size;
 		r_bi->batch_size = batch_size;
-		if (async)
-			r_bi->run = &read_batch_asynchronous;
+		if (subscribe)
+			r_bi->run = &read_batch_subscribe;
 		else if (multiread)
-			r_bi->run = read_batch_multiread;
+			r_bi->run = &read_batch_multiread;
+		else if (async)
+			r_bi->run = &read_batch_asynchronous;
 		else
 			r_bi->run = read_batch_synchronous;
 		estat = get_logctl(logname_template, r_bi, &r_bi->lc);
@@ -902,10 +951,11 @@ main(int argc, char **argv)
 		w_bi->results_interval = async_batch_size;
 		w_bi->dg = dg;
 		w_bi->batch_size = batch_size;
+		w_bi->record_interval = record_interval;
 		if (async)
 			w_bi->run = &write_batch_asynchronous;
 		else
-			w_bi->run = write_batch_synchronous;
+			w_bi->run = &write_batch_synchronous;
 		estat = get_logctl(logname_template, w_bi, &w_bi->lc);
 		EP_STAT_CHECK(estat, goto fail0);
 	}
