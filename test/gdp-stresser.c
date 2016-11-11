@@ -655,7 +655,7 @@ do_run(void *bi_)
 	EP_STAT estat = bi->run(bi);
 
 	ep_app_message(estat, "batch %s terminated", bi->bname);
-	return NULL;
+	return (void *) (uintptr_t) EP_STAT_TO_INT(estat);
 }
 
 EP_STAT
@@ -995,18 +995,9 @@ main(int argc, char **argv)
 
 	/*
 	**  Run that configuration (note: only runs one batch set)
+	**
+	**		Do readers first so subscribers will be ready.
 	*/
-
-	EP_THR *w_threads;
-	if (n_writers > 0)
-	{
-		phase = "writer batch run";
-		ep_app_info("Running %s", phase);
-
-		w_threads = ep_mem_malloc(n_writers * sizeof *w_threads);
-		estat = start_run(w_bi, n_writers, w_threads);
-		EP_STAT_CHECK(estat, goto fail0);
-	}
 
 	EP_THR *r_threads;
 	if (n_readers > 0)
@@ -1019,14 +1010,49 @@ main(int argc, char **argv)
 		EP_STAT_CHECK(estat, goto fail0);
 	}
 
+	EP_THR *w_threads;
+	if (n_writers > 0)
+	{
+		phase = "writer batch run";
+		ep_app_info("Running %s", phase);
+
+		w_threads = ep_mem_malloc(n_writers * sizeof *w_threads);
+		estat = start_run(w_bi, n_writers, w_threads);
+		EP_STAT_CHECK(estat, goto fail0);
+	}
+
 	// wait for threads to complete
 	phase = "wait for thread completion";
 	ep_app_info("Waiting for thread completion");
 	int i;
 	for (i = 0; i < n_writers; i++)
-		pthread_join(w_threads[i], NULL);
+	{
+		void *vstat;
+		int istat;
+		istat = pthread_join(w_threads[i], &vstat);
+		if (istat != 0)
+		{
+			EP_STAT tstat = ep_stat_from_errno(istat);
+			ep_app_message(tstat, "pthread_join");
+			if (EP_STAT_ISOK(estat))
+				estat = tstat;
+		} else if (EP_STAT_ISOK(estat))
+			estat = EP_STAT_FROM_INT((uint32_t) vstat);
+	}
 	for (i = 0; i < n_readers; i++)
-		pthread_join(r_threads[i], NULL);
+	{
+		void *vstat;
+		int istat;
+		istat = pthread_join(r_threads[i], &vstat);
+		if (istat != 0)
+		{
+			EP_STAT tstat = ep_stat_from_errno(istat);
+			ep_app_message(tstat, "pthread_join");
+			if (EP_STAT_ISOK(estat))
+				estat = tstat;
+		} else if (EP_STAT_ISOK(estat))
+			estat = EP_STAT_FROM_INT((uint32_t) vstat);
+	}
 
 fail0:
 	if (EP_STAT_ISOK(estat))
