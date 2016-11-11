@@ -970,6 +970,7 @@ main(int argc, char **argv)
 		dg->payload_size = payload_size;
 		dg->init = dg_sequential_init;
 		dg->next = dg_sequential_next;
+		ep_thr_mutex_init(&dg->mutex, EP_THR_MUTEX_DEFAULT);
 
 		// this is the template for the batch
 		w_bi = ep_mem_zalloc(sizeof *w_bi);
