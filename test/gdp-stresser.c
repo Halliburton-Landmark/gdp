@@ -108,6 +108,8 @@ struct logctl
 
 struct batch
 {
+	const char		*btype;				// printable batch type
+	const char		*bname;				// for printing
 	EP_STAT			(*run)(				// run the batch
 							batch_t *batch);
 	long			batch_size;			// number of records in this batch
@@ -134,6 +136,46 @@ static struct ep_stat_to_string	UserStats[] =
 **
 **  Batch methods
 */
+
+
+/*
+**  Helper routine for collecting all asynchronous results
+*/
+
+void
+collect_async_results(logctl_t *lc, long timeout)
+{
+	int prflags = GDP_DATUM_PRTEXT;
+	int n_to_collect = lc->n_out - lc->n_resp;
+	EP_TIME_SPEC event_timeout;
+	ep_time_from_nsec(timeout * INT64_C(1000000), &event_timeout);
+
+	while (n_to_collect > 0)
+	{
+		gdp_event_t *ev;
+
+		// poll to see if there are any events available
+		ev = gdp_event_next(lc->gcl, &event_timeout);
+		if (ev == NULL)
+			break;
+		lc->n_resp++;
+
+		int evtype = gdp_event_gettype(ev);
+		const char *bname = (const char *) gdp_event_getudata(ev);
+		switch (evtype)
+		{
+		case GDP_EVENT_DATA:
+			printf("%s: ", bname);
+			gdp_datum_print(gdp_event_getdatum(ev), stdout, prflags);
+			break;
+
+		default:
+			n_to_collect--;
+			gdp_event_print(ev, stdout, GDP_PR_BASIC + 2);
+			break;
+		}
+	}
+}
 
 
 /*
@@ -186,41 +228,6 @@ write_batch_synchronous(batch_t *bi)
 **  Asynchronous writes
 */
 
-void
-collect_async_results(logctl_t *lc, long timeout)
-{
-	int prflags = GDP_DATUM_PRTEXT;
-	//int n_to_collect = lc->n_out - lc->n_resp;
-	EP_TIME_SPEC event_timeout;
-	ep_time_from_nsec(timeout * INT64_C(1000000), &event_timeout);
-
-	//while (n_to_collect-- > 0)
-	for (;;)
-	{
-		gdp_event_t *ev;
-
-		// poll to see if there are any events available
-		ev = gdp_event_next(lc->gcl, &event_timeout);
-		if (ev == NULL)
-			break;
-		lc->n_resp++;
-
-		int evtype = gdp_event_gettype(ev);
-		int batchno = (int) gdp_event_getudata(ev);
-		switch (evtype)
-		{
-		case GDP_EVENT_DATA:
-			printf("B%d: ", batchno);
-			gdp_datum_print(gdp_event_getdatum(ev), stdout, prflags);
-			break;
-
-		default:
-			gdp_event_print(ev, stdout, GDP_PR_BASIC + 2);
-			break;
-		}
-	}
-}
-
 EP_STAT
 write_batch_asynchronous(batch_t *bi)
 {
@@ -234,7 +241,7 @@ write_batch_asynchronous(batch_t *bi)
 	{
 		ep_thr_mutex_lock(&lc->mutex);
 		estat = gdp_gcl_append_async(lc->gcl, datum,
-								NULL, (void *) (long) bi->threadno);
+								NULL, (void *) bi->bname);
 		if (EP_STAT_ISOK(estat))
 		{
 			lc->n_out++;
@@ -304,7 +311,7 @@ read_batch_synchronous(batch_t *bi)
 		ep_thr_mutex_unlock(&lc->mutex);
 		if (!EP_STAT_ISOK(estat))
 			break;
-		printf("B%d: ", bi->threadno);
+		printf("%s: ", bi->bname);
 		gdp_datum_print(datum, stdout, prflags);
 	}
 
@@ -328,7 +335,7 @@ read_batch_asynchronous(batch_t *bi)
 	{
 		ep_thr_mutex_lock(&lc->mutex);
 		estat = gdp_gcl_read_async(lc->gcl, n_read,
-								NULL, (void *) (long) bi->threadno);
+								NULL, (void *) bi->bname);
 		if (EP_STAT_ISOK(estat))
 		{
 			lc->n_out++;
@@ -374,8 +381,9 @@ read_batch_multiread(batch_t *bi)
 	logctl_t *lc = bi->lc;
 
 	ep_thr_mutex_lock(&lc->mutex);
-	estat = gdp_gcl_multiread(lc->gcl, 1, bi->batch_size,
-							NULL, (void *) (long) bi->threadno);
+	estat = gdp_gcl_multiread(lc->gcl, -bi->batch_size, bi->batch_size,
+							NULL, (void *) bi->bname);
+	lc->n_out += bi->batch_size;
 	ep_thr_mutex_unlock(&lc->mutex);
 
 	if (!EP_STAT_ISOK(estat))
@@ -415,7 +423,8 @@ read_batch_subscribe(batch_t *bi)
 
 	ep_thr_mutex_lock(&lc->mutex);
 	estat = gdp_gcl_subscribe(lc->gcl, 0, bi->batch_size,
-							NULL, NULL, (void *) (long) bi->threadno);
+							NULL, NULL, (void *) bi->bname);
+	lc->n_out += bi->batch_size;		// assume we'll get results for all
 	ep_thr_mutex_unlock(&lc->mutex);
 
 	if (!EP_STAT_ISOK(estat))
@@ -432,11 +441,13 @@ read_batch_subscribe(batch_t *bi)
 	if (bi->record_interval > 0)
 		results_timeout = bi->record_interval * 2;
 	collect_async_results(lc, results_timeout);
+	//sleep(2);
+	//collect_async_results(lc, results_timeout);
 
 	if (bi->batch_size > lc->n_resp)
 	{
-		printf("read_batch_subscribe: asked for %ld, got %ld results\n",
-				lc->n_out, lc->n_resp);
+		printf("read_batch_subscribe: expected %ld results, got %ld\n",
+				bi->batch_size, lc->n_resp);
 		estat = STAT_LOST_RESPONSE;
 	}
 	ep_thr_mutex_unlock(&lc->mutex);
@@ -643,7 +654,7 @@ do_run(void *bi_)
 	batch_t *bi = bi_;
 	EP_STAT estat = bi->run(bi);
 
-	ep_app_message(estat, "batch %d terminated", bi->threadno);
+	ep_app_message(estat, "batch %s terminated", bi->bname);
 	return NULL;
 }
 
@@ -657,11 +668,14 @@ start_run(batch_t *bi_template, int nthreads, EP_THR *threads)
 	{
 		batch_t *bi;
 		int istat;
+		char bnamebuf[100];
 
 		// create a per-thread version of the batch info
 		bi = ep_mem_malloc(sizeof *bi);
 		memcpy(bi, bi_template, sizeof *bi);
 		bi->threadno = i + 1;
+		snprintf(bnamebuf, sizeof bnamebuf, "%s-%d", bi->btype, bi->threadno);
+		bi->bname = ep_mem_strdup(bnamebuf);
 		istat = ep_thr_spawn(&threads[i], do_run, bi);
 		if (istat != 0 && EP_STAT_ISOK(estat))
 		{
@@ -921,13 +935,25 @@ main(int argc, char **argv)
 		r_bi->results_interval = async_batch_size;
 		r_bi->batch_size = batch_size;
 		if (subscribe)
+		{
+			r_bi->btype = "SUB";
 			r_bi->run = &read_batch_subscribe;
+		}
 		else if (multiread)
+		{
+			r_bi->btype = "RM";
 			r_bi->run = &read_batch_multiread;
+		}
 		else if (async)
+		{
+			r_bi->btype = "RA";
 			r_bi->run = &read_batch_asynchronous;
+		}
 		else
+		{
+			r_bi->btype = "RS";
 			r_bi->run = read_batch_synchronous;
+		}
 		estat = get_logctl(logname_template, r_bi, &r_bi->lc);
 		EP_STAT_CHECK(estat, goto fail0);
 	}
@@ -953,9 +979,15 @@ main(int argc, char **argv)
 		w_bi->batch_size = batch_size;
 		w_bi->record_interval = record_interval;
 		if (async)
+		{
+			w_bi->btype = "WA";
 			w_bi->run = &write_batch_asynchronous;
+		}
 		else
+		{
+			w_bi->btype = "WS";
 			w_bi->run = &write_batch_synchronous;
+		}
 		estat = get_logctl(logname_template, w_bi, &w_bi->lc);
 		EP_STAT_CHECK(estat, goto fail0);
 	}
