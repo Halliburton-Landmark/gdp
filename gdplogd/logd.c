@@ -31,6 +31,7 @@
 #include "logd.h"
 #include "logd_pubsub.h"
 
+#include <ep/ep_sd.h>
 #include <ep/ep_string.h>
 
 #include <event2/event.h>
@@ -85,6 +86,7 @@ gdpd_reclaim_resources(int fd, short what, void *ctx)
 void
 renew_advertisements(int fd, short what, void *u)
 {
+	ep_sd_notifyf("WATCHDOG=1\n");
 	(void) logd_advertise_all(GDP_CMD_ADVERTISE);
 }
 
@@ -155,6 +157,7 @@ void
 sigterm(int sig)
 {
 	signal(sig, SIG_DFL);
+	ep_sd_notifyf("STOPPING=1\nSTATUS=Terminating on signal %d\n", sig);
 	ep_log(EP_STAT_OK, "Terminating on signal %d", sig);
 	if (ep_dbg_test(Dbg, 1))
 		dump_state(GDP_PR_DETAILED);
@@ -170,8 +173,8 @@ void
 sigabort(int sig)
 {
 	signal(sig, SIG_DFL);
+	ep_sd_notifyf("STOPPING=1\nSTATUS=Aborting on signal %d\n", sig);
 	ep_log(EP_STAT_ABORT, "Aborting on signal %d", sig);
-	dump_state(GDP_PR_DETAILED);
 	kill(getpid(), sig);		// this will not do cleanup
 }
 
@@ -183,7 +186,7 @@ sigabort(int sig)
 static void
 assertion_dump(void)
 {
-	sigabort(SIGABRT);
+	dump_state(GDP_PR_DETAILED);
 }
 
 
@@ -388,7 +391,7 @@ main(int argc, char **argv)
 	signal(SIGABRT, sigabort);
 
 	// dump state on assertion failure
-	EpAbortFunc = assertion_dump;
+	EpAssertInfo = assertion_dump;
 
 	// arrange to clean up resources periodically
 	{
@@ -439,9 +442,12 @@ main(int argc, char **argv)
 	**  At this point we should be running
 	*/
 
+	ep_sd_notifyf("READY=1\n");
+
 	pthread_join(_GdpIoEventLoopThread, NULL);
 
 	// should never get here
+	ep_sd_notifyf("STOPPING=1\n");
 	ep_app_fatal("Fell out of GdpIoEventLoopThread");
 
 fail0:

@@ -122,7 +122,9 @@ _gdp_req_new(int cmd,
 	if (EP_UT_BITSET(GDP_REQ_ASYNCIO, flags))
 		flags |= GDP_REQ_PERSIST | GDP_REQ_ALLOC_RID;
 
-	EP_ASSERT_REQUIRE(gcl == NULL || EP_UT_BITSET(GCLF_INUSE, gcl->flags));
+	// if assertion fails, may be working with an unallocated GCL
+	EP_ASSERT_ELSE(gcl == NULL || GDP_GCL_ISGOOD(gcl),
+			return EP_STAT_ASSERT_ABORT);
 
 	// simplify the simple case
 	if (chan == NULL)
@@ -130,10 +132,11 @@ _gdp_req_new(int cmd,
 
 	// get memory, off free list if possible
 	ep_thr_mutex_lock(&ReqFreeListMutex);
-	if ((req = LIST_FIRST(&ReqFreeList)) != NULL)
+	while ((req = LIST_FIRST(&ReqFreeList)) != NULL)
 	{
 		LIST_REMOVE(req, gcllist);
-		EP_ASSERT(req->state == GDP_REQ_FREE);
+		EP_ASSERT_ELSE(req->state == GDP_REQ_FREE,
+						req = NULL);
 	}
 	ep_thr_mutex_unlock(&ReqFreeListMutex);
 	if (req == NULL)
@@ -280,43 +283,51 @@ _gdp_req_free(gdp_req_t **reqp)
 /*
 **  _GDP_REQ_FREEALL --- free all requests for a given GCL
 **
-**		If _gdp_req_lock fails, we start over.
+**		The data structure that reqlist is in should be locked.
+**		This will normally be a GCL (and in fact, the loop does not
+**		handle failures properly if _gdp_req_free doesn't remove
+**		req from the list).
 */
 
 void
 _gdp_req_freeall(struct req_head *reqlist, void (*shutdownfunc)(gdp_req_t *))
 {
-	EP_STAT estat;
+	EP_STAT rstat = EP_STAT_OK;
+	gdp_req_t *req;
+	gdp_req_t *nextreq;
 
 	ep_dbg_cprintf(Dbg, 49, ">>> _gdp_req_freeall(%p)\n", reqlist);
-	do
+
+	for (req = LIST_FIRST(reqlist); req != NULL; req = nextreq)
 	{
-		gdp_req_t *req;
-		gdp_req_t *nextreq;
-
-		estat = EP_STAT_OK;
-		for (req = LIST_FIRST(reqlist); req != NULL; req = nextreq)
+		EP_STAT estat = _gdp_req_lock(req);
+		nextreq = LIST_NEXT(req, gcllist);
+		if (!EP_STAT_ISOK(estat))
 		{
-			estat = _gdp_req_lock(req);
-			if (!EP_STAT_ISOK(estat))
-			{
-				ep_log(estat, "_gdp_req_freeall: couldn't acquire req lock");
-				goto fail0;
-			}
-
-			nextreq = LIST_NEXT(req, gcllist);
+			// couldn't lock the request, so skip it
+			ep_log(estat, "_gdp_req_freeall: couldn't acquire req lock");
+			LIST_REMOVE(req, gcllist);
+			rstat = estat;
+		}
+		else
+		{
 			if (shutdownfunc != NULL)
 				(*shutdownfunc)(req);
+
+			// this will remove req from the GCL reqlist
 			_gdp_req_free(&req);
 		}
-	} while (!EP_STAT_ISOK(estat));
+	}
 
-fail0:
+	// if there were errors, it's possible that there are still some
+	// items on reqlist.  Abandon those to avoid cascading errors.
+	LIST_INIT(reqlist);
+
+	if (ep_dbg_test(Dbg, EP_STAT_ISOK(rstat) ? 49 : 1))
 	{
 		char ebuf[100];
-		ep_dbg_cprintf(Dbg, EP_STAT_ISOK(estat) ? 49 : 1,
-					"<<< _gdp_req_freeall(%p): %s\n",
-					reqlist, ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		ep_dbg_printf("<<< _gdp_req_freeall(%p): %s\n",
+					reqlist, ep_stat_tostr(rstat, ebuf, sizeof ebuf));
 	}
 }
 
@@ -332,13 +343,14 @@ _gdp_req_lock(gdp_req_t *req)
 	ep_thr_mutex_lock(&req->mutex);
 
 	// if this request was being freed, the reference might be dead now
-	if (req->state != GDP_REQ_FREE)
-		return EP_STAT_OK;
-
-	// oops, unlock it and return failure
-	ep_dbg_cprintf(Dbg, 10, "_gdp_req_lock: req @ %p freed\n", req);
-	ep_thr_mutex_unlock(&req->mutex);
-	return GDP_STAT_DEAD_REQ;
+	if (EP_ASSERT_TEST(req->state != GDP_REQ_FREE))
+	{
+		// oops, unlock it and return failure
+		ep_dbg_cprintf(Dbg, 1, "_gdp_req_lock: req @ %p is free\n", req);
+		ep_thr_mutex_unlock(&req->mutex);
+		return GDP_STAT_USING_FREE_REQ;
+	}
+	return EP_STAT_OK;
 }
 
 void
@@ -465,7 +477,8 @@ _gdp_req_find(gdp_gcl_t *gcl, gdp_rid_t rid)
 
 	ep_dbg_cprintf(Dbg, 50, "_gdp_req_find(gcl=%p, rid=%" PRIgdp_rid")\n",
 			gcl, rid);
-	GDP_ASSERT_GOOD_GCL(gcl);
+	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
+					return NULL);
 
 	for (;;)
 	{
@@ -491,7 +504,9 @@ _gdp_req_find(gdp_gcl_t *gcl, gdp_rid_t rid)
 		if (req == NULL)
 			break;				// nothing to find
 
-		EP_ASSERT(req->state != GDP_REQ_FREE);
+		// if we find a free request, just ignore it
+		EP_ASSERT_ELSE(req->state != GDP_REQ_FREE,
+						continue);
 		if (req->state != GDP_REQ_ACTIVE)
 			break;				// this is what we are looking for!
 
