@@ -132,13 +132,22 @@ _gdp_req_new(int cmd,
 
 	// get memory, off free list if possible
 	ep_thr_mutex_lock(&ReqFreeListMutex);
-	while ((req = LIST_FIRST(&ReqFreeList)) != NULL)
-	{
+	req = LIST_FIRST(&ReqFreeList);
+	if (req != NULL)
 		LIST_REMOVE(req, gcllist);
-		EP_ASSERT_ELSE(req->state == GDP_REQ_FREE,
-						req = NULL);
-	}
 	ep_thr_mutex_unlock(&ReqFreeListMutex);
+
+	// sanity: make sure "free" request isn't on a live list
+	if (req != NULL)
+	{
+		if (EP_ASSERT_TEST(req->state == GDP_REQ_FREE) ||
+			EP_ASSERT_TEST(!EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags)) ||
+			EP_ASSERT_TEST(!EP_UT_BITSET(GDP_REQ_ON_CHAN_LIST, req->flags)))
+		{
+			// just abandon the bogus request on free list
+			req = NULL;
+		}
+	}
 	if (req == NULL)
 	{
 		// nothing on free list; allocate another
@@ -146,12 +155,6 @@ _gdp_req_new(int cmd,
 		ep_thr_mutex_init(&req->mutex, EP_THR_MUTEX_DEFAULT);
 		ep_thr_cond_init(&req->cond);
 		STAILQ_INIT(&req->events);
-	}
-	else
-	{
-		// sanity checks
-		EP_ASSERT(!EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags));
-		EP_ASSERT(!EP_UT_BITSET(GDP_REQ_ON_CHAN_LIST, req->flags));
 	}
 
 	// make it active so that _gdp_req_lock doesn't object
