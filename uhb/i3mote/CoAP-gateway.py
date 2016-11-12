@@ -57,6 +57,7 @@ class Node:
         self.coap_thr = None
         self.reader_thr = None
         self.exit_lock = threading.Lock()
+        self.total_exit = False
         self.exit_reader_thr = False
         self.POLLING_INTERVAL = 0.5   # polling interval for read thread
 
@@ -69,7 +70,7 @@ class Node:
             fix them
         """
 
-        self.exit_lock.acquire()
+        # self.exit_lock.acquire()
 
         if (self.coap_thr is None) or (self.coap_thr.is_alive()==False):
             self.coap_thr = threading.Thread(target=self.CoAPThread)
@@ -80,7 +81,8 @@ class Node:
             self.reader_thr = threading.Thread(target=self.ReaderThread)
             self.reader_thr.start()
 
-        self.exit_lock.release()
+        # self.exit_lock.release()
+
 
     def CoAPThread(self):
         """
@@ -89,20 +91,20 @@ class Node:
             specified location.
         """
 
-        coap_args = [COAP_BINARY, '-v', '7', '-B', '120', '-s', '60',
-                            '-o', self.fifo, '-m', 'get',
+        coap_args = [COAP_BINARY, '-v', '7', '-B', '600', '-s', '600',
+                            '-N', '-o', self.fifo, '-m', 'get',
                             "coap://[%s]/sensors" % self.ipv6]
         subprocess.call(coap_args)
 
         # signal the reader thread to terminate when this exits
         # The reader thread will exit at most in polling interval
-        self.exit_lock.acquire()
+        # self.exit_lock.acquire()
         try:
            os.unlink(self.fifo)
         except OSError:
             pass
         self.exit_reader_thr = True
-        self.exit_lock.release()
+        # self.exit_lock.release()
 
 
     def ReaderThread(self):
@@ -112,7 +114,7 @@ class Node:
         Write everything that hasn't been written yet
         """
 
-        time.sleep(2)
+        time.sleep(1)
 
         try:
             with open(self.fifo) as fh:
@@ -138,8 +140,8 @@ class Node:
                     seekptr += BUFSIZE
 
         except IOError as e:
-            print "## %s >>" % self.eui64, e,
-            print "\tIt's ok; writer hasn't wrote anything since last restart"
+            print "## %s >> %s" % (self.eui64, "No data since last restart")
+
 
     @staticmethod
     def parseCOAP(buf):
@@ -179,8 +181,6 @@ class Node:
         return json.dumps(message)
 
 
-
-
 def fetch_nodes():
     """ Fetches the list of nodes from http://localhost/nodes """
     response = urllib2.urlopen("http://localhost/nodes")
@@ -205,8 +205,9 @@ def main(coap, prefix):
         nodes.append(node)
 
     while True:
+        print "Poking threads"
         for node in nodes: node.poke_threads()
-        time.sleep(1)
+        time.sleep(3)
 
 if __name__ == "__main__":
 
