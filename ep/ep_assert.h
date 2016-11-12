@@ -121,7 +121,7 @@
 #define EP_ASSERT_FAILURE(...)						\
 		ep_assert_failure(__FILE__, __LINE__, __VA_ARGS__)
 
-// print assertion failure and return
+// print assertion failure and continue
 #define EP_ASSERT_PRINT(...)						\
 		ep_assert_print(__FILE__, __LINE__, __VA_ARGS__)
 
