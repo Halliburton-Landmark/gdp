@@ -436,7 +436,14 @@ fail0:
 	if (use_getdate)
 	{
 		// try and use the getdate function (Linux and Darwin only)
+		int gd_err;
+
+#if EP_OSCF_HAS_GETDATE_R
+		gd_err = getdate_r(dsp, tm);
+#else
 		tm = getdate(dsp);
+		gd_err = getdate_err;
+#endif
 		if (tm != NULL)
 		{
 			estat = EP_STAT_OK;
@@ -444,15 +451,15 @@ fail0:
 		else
 		{
 			// getdate failed, fall back to internal version
-			if (getdate_err > 0 && ep_dbg_test(Dbg, 28))
+			if (gd_err > 0 && ep_dbg_test(Dbg, 28))
 			{
-				if (getdate_err < (sizeof gd_errs / sizeof gd_errs[0]))
+				if (gd_err < (sizeof gd_errs / sizeof gd_errs[0]))
 					ep_dbg_printf("Cannot convert date; getdate says:\n"
 							"    %s\n",
-							gd_errs[getdate_err]);
+							gd_errs[gd_err]);
 				else
 					ep_dbg_printf("Cannot convert date, getdate code %d\n",
-								getdate_err);
+								gd_err);
 			}
 		}
 	}

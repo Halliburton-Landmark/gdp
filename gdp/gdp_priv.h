@@ -56,10 +56,8 @@ extern gdp_name_t	_GdpMyRoutingName;	// source name for PDUs
 extern bool			_GdpLibInitialized;	// are we initialized?
 
 #define GDP_CHECK_INITIALIZED											\
-				{														\
-					if (!_GdpLibInitialized)							\
-						(void) gdp_init(NULL);							\
-				}
+					(_GdpLibInitialized ? EP_STAT_OK					\
+										: gdp_init(NULL))
 
 #include "gdp_pdu.h"
 
@@ -143,6 +141,11 @@ struct gdp_datum
 	bool				inuse:1;		// the datum is in use (for debugging)
 };
 
+#define GDP_DATUM_ISGOOD(datum)											\
+				((datum) != NULL &&										\
+				 (datum)->dbuf != NULL &&								\
+				 (datum)->inuse)
+
 // dump data record (for debugging)
 extern void		_gdp_datum_dump(
 					const gdp_datum_t *datum,	// message to print
@@ -188,15 +191,29 @@ struct gdp_gcl
 #define GCLF_INUSE			0x0008		// handle is allocated
 #define GCLF_DEFER_FREE		0x0010		// defer actual free until reclaim
 
-#define GDP_ASSERT_GOOD_GCL(gcl)	\
-				(EP_ASSERT_REQUIRE((gcl) != NULL &&	\
-				EP_UT_BITSET(GCLF_INUSE, (gcl)->flags)))
-#if GDP_EXTENDED_LOCKING_CHECK
-#define GDP_ASSERT_LOCKED(x)											\
-				(EP_ASSERT_REQUIRE((x) != NULL &&						\
-					ep_thr_mutex_trylock(&(x)->mutex) != 0))
+#define GDP_GCL_ISGOOD(gcl)												\
+				((gcl) != NULL &&										\
+				 EP_UT_BITSET(GCLF_INUSE, (gcl)->flags))
+#define GDP_ASSERT_GCL_ISGOOD(gcl)										\
+				(EP_ASSERT(GDP_GCL_ISGOOD(gcl))
+
+#if GDP_EXTENDED_LOCKING_CHECK		// these don't work on recursive mutexes
+
+// don't use "do { } while(false)" so r can use break and continue
+#define GDP_ASSERT_MUTEX_ISLOCKED(m, r)									\
+				if (EP_ASSERT_TEST(ep_thr_mutex_trylock(m) != 0))		\
+				{														\
+					ep_thr_mutex_unlock(m);								\
+					r;													\
+				}
+
+#define GDP_ASSERT_MUTEX_ISUNLOCKED(m, r)			//XXX IMPLEMENT ME
+
 #else
-#define GDP_ASSERT_LOCKED(x)
+
+#define GDP_ASSERT_MUTEX_ISLOCKED(m, r)
+#define GDP_ASSERT_MUTEX_ISUNLOCKED(m, r)
+
 #endif
 
 /*
@@ -255,7 +272,7 @@ EP_STAT			_gdp_gcl_newhandle(			// create new in-mem handle
 void			_gdp_gcl_freehandle(		// free in-memory handle
 						gdp_gcl_t *gcl);
 
-void			_gdp_gcl_newname(			// create new name based on metadata
+EP_STAT			_gdp_gcl_newname(			// create new name based on metadata
 						gdp_gcl_t *gcl);
 
 void			_gdp_gcl_dump(				// dump for debugging

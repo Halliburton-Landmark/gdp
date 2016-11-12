@@ -27,6 +27,7 @@
 #
 
 BINALL= \
+		gdp-stresser \
 		t_fwd_append \
 		t_multimultiread \
 		t_sub_and_append \
@@ -88,7 +89,7 @@ LIBEVENT2=	-levent -levent_pthreads -pthread
 LIBCRYPTO=	-lcrypto
 LIBAVAHI=	-lavahi-client -lavahi-common
 INCS=		${INCSEARCH} ${INCGDP} ${INCEP}
-LDFLAGS=	t_common_support.o \
+LDFLAGS+=	t_common_support.o \
 		${LIBSEARCH} ${LIBGDP} ${LIBEP} \
 		${LIBJANSSON} ${LIBEVENT2} ${LIBCRYPTO} ${LIBAVAHI}
 CC=		cc
@@ -98,7 +99,7 @@ G=		-g
 O=		-O
 STD=
 COPTS=		${PG} ${WALL} $G $O ${STD}
-CFLAGS=		${COPTS} ${INCS}
+CFLAGS+=	${COPTS} ${INCS}
 MKDIR=		mkdir -p
 
 all:	${ALL}

@@ -121,8 +121,8 @@ void
 _gdp_gcl_cache_add(gdp_gcl_t *gcl, gdp_iomode_t mode)
 {
 	// sanity checks
-	GDP_ASSERT_GOOD_GCL(gcl);
-	EP_ASSERT_REQUIRE(gdp_name_is_valid(gcl->name));
+	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
+	EP_ASSERT_ELSE(gdp_name_is_valid(gcl->name), return);
 
 	if (EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
 	{
@@ -164,10 +164,10 @@ void
 _gdp_gcl_cache_changename(gdp_gcl_t *gcl, gdp_name_t newname)
 {
 	// sanity checks
-	GDP_ASSERT_GOOD_GCL(gcl);
-	EP_ASSERT_REQUIRE(gdp_name_is_valid(gcl->name));
-	EP_ASSERT_REQUIRE(gdp_name_is_valid(newname));
-	EP_ASSERT_REQUIRE(EP_UT_BITSET(GCLF_INCACHE, gcl->flags));
+	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
+	EP_ASSERT_ELSE(gdp_name_is_valid(gcl->name), return);
+	EP_ASSERT_ELSE(gdp_name_is_valid(newname), return);
+	EP_ASSERT_ELSE(EP_UT_BITSET(GCLF_INCACHE, gcl->flags), return);
 
 	ep_thr_mutex_lock(&GclCacheMutex);
 	(void) ep_hash_delete(OpenGCLCache, sizeof (gdp_name_t), gcl->name);
@@ -208,8 +208,15 @@ _gdp_gcl_cache_get(gdp_name_t gcl_name, gdp_iomode_t mode)
 	ep_thr_mutex_lock(&gcl->mutex);
 
 	// sanity checking
-	EP_ASSERT_INSIST(EP_UT_BITSET(GCLF_INUSE, gcl->flags));
-	EP_ASSERT_INSIST(EP_UT_BITSET(GCLF_INCACHE, gcl->flags));
+	if (EP_ASSERT_TEST(EP_UT_BITSET(GCLF_INUSE, gcl->flags)) ||
+	    EP_ASSERT_TEST(EP_UT_BITSET(GCLF_INCACHE, gcl->flags)))
+	{
+		// remove GCL from cache and pretend it was never there
+		ep_thr_mutex_unlock(&gcl->mutex);
+		ep_hash_delete(OpenGCLCache, sizeof (gdp_name_t), (void *) gcl_name);
+		gcl = NULL;
+		goto done;
+	}
 
 	// see if someone snuck in and deallocated this
 	if (EP_UT_BITSET(GCLF_DROPPING, gcl->flags))
@@ -258,19 +265,24 @@ done:
 void
 _gdp_gcl_cache_drop(gdp_gcl_t *gcl)
 {
-	GDP_ASSERT_GOOD_GCL(gcl);
-
-	// lock the GCL cache and the GCL for the duration
-	ep_thr_mutex_lock(&GclCacheMutex);
-	if (ep_thr_mutex_trylock(&gcl->mutex) != 0)
-		EP_ASSERT_FAILURE("_gdp_gcl_cache_drop: gcl locked");
+	EP_ASSERT_ELSE(gcl != NULL, return);
 
 	if (!EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
 	{
 		ep_dbg_cprintf(Dbg, 8, "_gdp_gcl_cache_drop(%p): uncached\n", gcl);
-		ep_thr_mutex_unlock(&GclCacheMutex);
 		return;
 	}
+
+	if (EP_ASSERT_TEST(GDP_GCL_ISGOOD(gcl)))
+	{
+		// GCL is in some random state --- we need the name at least
+		EP_ASSERT_ELSE(gdp_name_is_valid(gcl->name), return);
+	}
+
+	// lock the GCL cache and the GCL for the duration
+	ep_thr_mutex_lock(&GclCacheMutex);
+	if (ep_thr_mutex_trylock(&gcl->mutex) != 0)
+		EP_ASSERT_PRINT("_gdp_gcl_cache_drop: gcl locked (%d)", errno);
 
 	// error if we're dropping something that's referenced from the cache
 	if (gcl->refcnt != 0)
@@ -307,8 +319,8 @@ _gdp_gcl_touch(gdp_gcl_t *gcl)
 {
 	struct timeval tv;
 
-	GDP_ASSERT_GOOD_GCL(gcl);
-	GDP_ASSERT_LOCKED(gcl);
+	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
+	GDP_ASSERT_MUTEX_ISLOCKED(&gcl->mutex, return);
 
 	if (!EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
 	{
@@ -430,7 +442,6 @@ _gdp_gcl_cache_shutdown(void (*shutdownfunc)(gdp_req_t *))
 		g2 = LIST_NEXT(g1, ulist);
 		LIST_REMOVE(g1, ulist);
 		_gdp_req_freeall(&g1->reqs, shutdownfunc);
-		g1->refcnt = 0;
 		_gdp_gcl_freehandle(g1);
 	}
 }
@@ -445,8 +456,10 @@ _gdp_gcl_cache_shutdown(void (*shutdownfunc)(gdp_req_t *))
 void
 _gdp_gcl_incref(gdp_gcl_t *gcl)
 {
-	GDP_ASSERT_GOOD_GCL(gcl);
+	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
+	GDP_ASSERT_MUTEX_ISUNLOCKED(gcl, goto fail0);
 	ep_thr_mutex_lock(&gcl->mutex);
+//fail0:
 	gcl->refcnt++;
 	_gdp_gcl_touch(gcl);
 	ep_dbg_cprintf(Dbg, 51, "_gdp_gcl_incref(%p): %d\n", gcl, gcl->refcnt);
@@ -463,7 +476,8 @@ _gdp_gcl_decref(gdp_gcl_t **gclp)
 {
 	gdp_gcl_t *gcl = *gclp;
 	ep_dbg_cprintf(Dbg, 70, "_gdp_gcl_decref(%p)...\n", gcl);
-	GDP_ASSERT_GOOD_GCL(gcl);
+	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
+	GDP_ASSERT_MUTEX_ISUNLOCKED(gcl->mutex, goto fail0);
 	ep_thr_mutex_lock(&gcl->mutex);
 	if (gcl->refcnt > 0)
 	{

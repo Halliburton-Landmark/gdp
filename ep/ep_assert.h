@@ -28,73 +28,145 @@
 **  ----- END LICENSE BLOCK -----
 ***********************************************************************/
 
-////////////////////////////////////////////////////////////////////////
-//
-//  ASSERTIONS
-//
-//	There are several types of assertions.  This is all based on
-//	the ISC library.
-//
-//	Semantics are as follows:
-//	    require	Assertions about input to routines
-//	    ensure	Assertions about output from routines
-//	    invariant	Assertions about loop invariants
-//	    insist	General otherwise unclassified stuff
-//
-//	There's also an "EP_ASSERT" for back compatibility
-//
-////////////////////////////////////////////////////////////////////////
+
+/*
+**  ASSERTIONS
+**
+**	There are two types of assertions, designed to make recovery
+**	possible under some circumstances.  The first are fatal
+**	assertions:
+**
+**		EP_ASSERT(condition)
+**
+**	If condition is not satisfied, a message is printed and the
+**	process exits.
+**
+**		EP_ASSERT_TEST(condition)
+**
+**	If condition is not satisfied, a message is printed and the
+**	assertion call returns true, otherwise false.  The intent is
+**	so it can be used as follows:
+**
+**		if (EP_ASSERT_TEST(condition))
+**			do cleanup;
+**
+**	A bit of syntactic sugar permits us to include:
+**
+**		EP_ASSERT_ELSE(condition, recovery)
+**
+**	If condition is not satisfied, a message is printed and the
+**	recovery action (which may be limited C code) is executed.  It
+**	is nearly equivalent to:
+**
+**		if (EP_ASSERT_TEST(condition))
+**			recovery;
+**
+**	If the condition test is inapppriate, just the error action
+**	can be performed using EP_ASSERT_FAILURE or EP_ASSERT_PRINT;
+**	the first aborts the process and the second returns, both
+**	after printing an assertion failure message.
+**
+**	If the EpAssertInfo function pointer is set, that function
+**	will be called as part of the process of printing the error.
+**	It can be used to dump global state.
+**
+**	If EpAssertAbort is set, that function is called immediately
+**	before the process exits.  If it returns, abort(3) is called.
+**	It could, for example, kill the current thread as opposed to
+**	the current process.
+**
+**	If _EP_CCCF_ASSERT_ALL_ABORT is set during compilation, then
+**	all assertions (actually all calls to _ep_assert_printv) cause
+**	immediate death.  This is to simplify debugging, where
+**	ignoring an assertion could result in cascading failures.
+**
+**	If _EP_CCCF_ASSERT_NONE is set during compilation, then all
+**	assertions are compiled out.
+*/
+
 
 #ifndef _EP_ASSERT_H_
 #define _EP_ASSERT_H_
 
 #include "ep_conf.h"
 
+#if !_EP_CCCF_ASSERT_NONE
+
 // assert that an expression must be true
-#define EP_ASSERT_REQUIRE(e)			\
-		((e)				\
-			? ((void) 0)		\
-			: ep_assert_failure("require", __FILE__, __LINE__, \
+#define EP_ASSERT(e)							\
+		((e)							\
+			? ((void) 0)					\
+			: ep_assert_failure(__FILE__, __LINE__,		\
 					"%s", #e))
 
-#define EP_ASSERT_ENSURE(e)			\
-		((e)				\
-			? ((void) 0)		\
-			: ep_assert_failure("ensure", __FILE__, __LINE__, \
-					"%s", #e))
+// test for condition
+#define EP_ASSERT_TEST(e)						\
+		((e)							\
+			? (false)					\
+			: (ep_assert_print(__FILE__, __LINE__,		\
+					"%s", #e), true))
 
-#define EP_ASSERT_INSIST(e)			\
-		((e)				\
-			? ((void) 0)		\
-			: ep_assert_failure("insist", __FILE__, __LINE__, \
-					"%s", #e))
+// assert condition with recovery (note: doesn't use do ... while (false)
+// paradigm to allow break & continue in recovery actions)
+#define EP_ASSERT_ELSE(e, r)						\
+		if (!(e))						\
+		{							\
+			ep_assert_print(__FILE__, __LINE__,		\
+					"%s", #e);			\
+			r;						\
+		}
 
-#define EP_ASSERT_INVARIANT(e)			\
-		((e)				\
-			? ((void) 0)		\
-			: ep_assert_failure("invariant", __FILE__, __LINE__, \
-					"%s", #e))
 
-#define EP_ASSERT(e)				\
-		((e)				\
-			? ((void) 0)		\
-			: ep_assert_failure("assert", __FILE__, __LINE__, \
-					"%s", #e))
+// force assertion failure and abort
+#define EP_ASSERT_FAILURE(...)						\
+		ep_assert_failure(__FILE__, __LINE__, __VA_ARGS__)
 
-#define EP_ASSERT_FAILURE(...)		\
-			ep_assert_failure("failure", __FILE__, __LINE__, \
-					__VA_ARGS__)
+// print assertion failure and return
+#define EP_ASSERT_PRINT(...)						\
+		ep_assert_print(__FILE__, __LINE__, __VA_ARGS__)
 
 // called if the assertion failed
 extern void	ep_assert_failure(
-			const char *type,
 			const char *file,
 			int line,
 			const char *msg,
 			...)
 			EP_ATTR_NORETURN;
 
-// can optionally be called before exit
-extern void	(*EpAbortFunc)(void);
+// print an assertion failure, but do not abort
+extern void	ep_assert_printv(
+			const char *file,
+			int line,
+			const char *msg,
+			va_list av);
+
+extern void	ep_assert_print(
+			const char *file,
+			int line,
+			const char *msg,
+			...);
+
+#else // _EP_CCCF_ASSERT_NONE
+
+#define EP_ASSERT(e)
+#define EP_ASSERT_TEST(e)		false
+#define EP_ASSERT_ELSE(e, r)
+#define EP_ASSERT_FAILURE(...)
+#define EP_ASSERT_PRINT(...)
+#define ep_assert_failure(f, l, m, ...)
+#define ep_assert_printv(f, l, m, av)
+#define ep_assert_print(f, l, m, ...)
+
+#endif // _EP_CCCF_ASSERT_NONE
+
+// callback functions
+extern void	(*EpAssertInfo)(void);		// show additional info
+extern void	(*EpAssertAbort)(void);		// abort the thread/process
+
+// back compatibility --- these are deprecated
+#define EP_ASSERT_REQUIRE(e)		EP_ASSERT(e)
+#define EP_ASSERT_ENSURE(e)		EP_ASSERT(e)
+#define EP_ASSERT_INSIST(e)		EP_ASSERT(e)
+#define EP_ASSERT_INVARIANT(e)		EP_ASSERT(e)
 
 #endif /*_EP_ASSERT_H_*/
