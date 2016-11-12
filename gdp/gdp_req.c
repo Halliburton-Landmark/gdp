@@ -268,7 +268,8 @@ _gdp_req_free(gdp_req_t **reqp)
 	req->pdu = req->rpdu = NULL;
 
 	// dereference the gcl
-	if (req->gcl != NULL)
+	// (refcnt may be zero if called from _gdp_gcl_freehandle)
+	if (req->gcl != NULL && req->gcl->refcnt > 0)
 		_gdp_gcl_decref(&req->gcl);
 
 	req->state = GDP_REQ_FREE;
