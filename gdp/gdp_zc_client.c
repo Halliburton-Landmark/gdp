@@ -612,10 +612,8 @@ init_config(config_t *c)
 	c->resolve = 1;
 	c->terminate_on_all_for_now = 1;
 
-	c->stype = avahi_strdup(ep_adm_getstrparam("swarm.gdp.zeroconf.proto",
-				"_gdp._tcp"));
-	c->domain = avahi_strdup(ep_adm_getstrparam("swarm.gdp.zeroconf.domain",
-				"local"));
+	c->stype = ep_adm_getstrparam("swarm.gdp.zeroconf.proto", "_gdp._tcp");
+	c->domain = ep_adm_getstrparam("swarm.gdp.zeroconf.domain", "local");
 
 	return 0;
 }
