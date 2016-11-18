@@ -62,8 +62,8 @@ typedef struct config
 	int verbose;
 	int terminate_on_all_for_now;
 	int terminate_on_cache_exhausted;
-	char *domain;
-	char *stype;
+	const char *domain;
+	const char *stype;
 	int ignore_local;
 	command comm;
 	int resolve;
