@@ -74,13 +74,18 @@ _rpl_num_log_chain(
     int initialize = 1;
     gdp_recno_t recno;
     EP_STAT estat = EP_STAT_OK;
+    gdp_recno_t min_recno = phys->min_recno;
+    gdp_recno_t max_recno = phys->max_recno;
+    gdp_datum_t *datum = gdp_datum_new();
 
-	//kaz//ep_thr_rwlock_rdlock(&phys->lock);
-    for (recno = phys->min_recno; recno <= phys->max_recno; recno++)
+    for (recno = min_recno; recno <= max_recno; recno++)
     {
         EP_ASSERT_POINTER_VALID(gcl);
-        gdp_datum_t *datum = gdp_datum_new();
         datum->recno = recno;
+
+        // This is not a straightforwar and efficient way but
+        // I hope this is only a possible way to check whether
+        // this log entry with recno is presence or not.
         estat = gcl->x->physimpl->read_by_recno(gcl, datum);
 
         if (EP_STAT_IS_SAME(estat, EP_STAT_OK)) {
@@ -105,7 +110,9 @@ _rpl_num_log_chain(
             // do nothing
         }
     }
-	//kaz//ep_thr_rwlock_unlock(&phys->lock);
+
+    // clean up
+    gdp_datum_free(datum);
 
     return num_chains;
 }
@@ -208,8 +215,8 @@ _rpl_periodic_sync_reply(
     gdp_name_t to_server)
 {
     EP_STAT estat = EP_STAT_OK;
-    gdp_req_t *req;
-    uint32_t reqflags = 0; // no need to wait for ACK/NAK
+    gdp_req_t *req = NULL;
+    uint32_t reqflags = GDP_REQ_ASYNCIO; // no need to wait for ACK/NAK
     gdp_pname_t src_name;
     gdp_pname_t dst_name;
     gdp_printable_name(_GdpMyRoutingName, src_name);
@@ -230,33 +237,36 @@ _rpl_periodic_sync_reply(
     datum->recno = recno;
     estat = gcl->x->physimpl->read_by_recno(gcl, datum);
 
-	// copy the existing datum, including metadata
-    // read_by_recno is now calling gdp_buf_reset, which prevents from writing gclname before it.
-	size_t l = gdp_buf_getlength(datum->dbuf);
-	gdp_buf_write(req->pdu->datum->dbuf, gdp_buf_getptr(datum->dbuf, l), l);
-	req->pdu->datum->recno = datum->recno;
-	req->pdu->datum->ts = datum->ts;
-	req->pdu->datum->sigmdalg = datum->sigmdalg;
-	req->pdu->datum->siglen = datum->siglen;
-	if (req->pdu->datum->sig != NULL)
-		gdp_buf_free(req->pdu->datum->sig);
-	req->pdu->datum->sig = NULL;
-	if (datum->sig != NULL)
-	{
-		l = gdp_buf_getlength(datum->sig);
-		req->pdu->datum->sig = gdp_buf_new();
-		gdp_buf_write(req->pdu->datum->sig, gdp_buf_getptr(datum->sig, l), l);
-	}
+    if (EP_STAT_ISOK(estat)) {
+        // copy the existing datum, including metadata
+        // read_by_recno is now calling gdp_buf_reset, which prevents from writing gclname before it.
+        size_t l = gdp_buf_getlength(datum->dbuf);
+        gdp_buf_write(req->pdu->datum->dbuf, gdp_buf_getptr(datum->dbuf, l), l);
+        req->pdu->datum->recno = datum->recno;
+        req->pdu->datum->ts = datum->ts;
+        req->pdu->datum->sigmdalg = datum->sigmdalg;
+        req->pdu->datum->siglen = datum->siglen;
+        if (req->pdu->datum->sig != NULL)
+            gdp_buf_free(req->pdu->datum->sig);
+        req->pdu->datum->sig = NULL;
+        if (datum->sig != NULL)
+        {
+            l = gdp_buf_getlength(datum->sig);
+            req->pdu->datum->sig = gdp_buf_new();
+            gdp_buf_write(req->pdu->datum->sig, gdp_buf_getptr(datum->sig, l), l);
+        }
 
-    // send the request
-    estat = _gdp_req_send(req);
+        // send the request
+        estat = _gdp_req_send(req);
 
+    }
+
+    // Clean up
     gdp_datum_free(datum);
     req->pdu->datum = NULL;
-    if (!EP_STAT_ISOK(estat))
-    {
-        _gdp_req_free(&req);
-    }
+
+    // This is only one time trial. If it fails, try it at a next round
+    _gdp_req_free(&req);
 
 fail0:
 	if (ep_dbg_test(Dbg, 10))
@@ -338,11 +348,7 @@ _rpl_fwd_append(gdp_req_t *req)
     void (*cbfunc)(gdp_event_t *) = NULL;
     cbfunc = _rpl_resp_cb;
 
-    ep_thr_mutex_lock(&req->gcl->mutex);
     currentsvr = LIST_FIRST(&req->gcl->rplsvr);
-    ep_thr_mutex_unlock(&req->gcl->mutex);
-
-
     for (; currentsvr != NULL; currentsvr = nextsvr)
     {
         nextsvr = LIST_NEXT(currentsvr, svrlist);
@@ -351,7 +357,10 @@ _rpl_fwd_append(gdp_req_t *req)
             gdp_rplcb_t *cbarg = ep_mem_zalloc(sizeof (*cbarg));
             cbarg->req = req;
             memcpy(cbarg->svrname, currentsvr->svrname, sizeof cbarg->svrname);
+
+            ep_thr_mutex_lock(&req->chan->mutex);
             LIST_INSERT_HEAD(&req->rplcb, cbarg, cblist);
+            ep_thr_mutex_unlock(&req->chan->mutex);
             estat = _gdp_gcl_fwd_append(req->gcl, req->pdu->datum, currentsvr->svrname, cbfunc, cbarg, NULL, reqflags);
             if (!EP_STAT_ISOK(estat))
             {
@@ -501,18 +510,15 @@ _rpl_fetch_missing_entries(
 
     // make gdp_req temporary for cmd_append
     gdp_req_t *req;
-    estat = _gdp_req_new(GDP_CMD_APPEND, pgcl, NULL, NULL, NULL, &req); // make temporarily for cmd_append
+    estat = _gdp_req_new(GDP_CMD_APPEND, pgcl, NULL, NULL, GDP_REQ_ASYNCIO, &req); // make temporarily for cmd_append
     EP_STAT_CHECK(estat, goto fail0);
 
     char ebuf[200];
-
-    ep_thr_mutex_lock(&pgcl->mutex);
-    currentsvr = LIST_FIRST(&pgcl->rplsvr);
-    ep_thr_mutex_unlock(&pgcl->mutex);
-
     const char *lname;
     int fwdcnt = 1;
     int32_t current_missing = total_missing;
+
+    currentsvr = LIST_FIRST(&pgcl->rplsvr);
     for (; currentsvr != NULL; currentsvr = nextsvr)
     {
         nextsvr = LIST_NEXT(currentsvr, svrlist);
@@ -684,7 +690,7 @@ _rpl_periodic_beacon(
     gdp_chan_t *chan)
 {
 	EP_STAT estat = EP_STAT_OK;
-	gdp_req_t *req;
+	gdp_req_t *req = NULL;
 
 	// sanity checks
 	if (memcmp(to_server, _GdpMyRoutingName, sizeof _GdpMyRoutingName) == 0)
@@ -722,21 +728,16 @@ _rpl_periodic_beacon(
 	// change the destination to be the final server, not the GCL
 	memcpy(req->pdu->dst, to_server, sizeof req->pdu->dst);
 
+
 	estat = _gdp_req_send(req);
-	// unlike append_async, we leave the datum intact
 
 	// cleanup
+    int i = gdp_buf_drain(req->pdu->datum->dbuf, SIZE_MAX);
+	if (i < 0 && ep_dbg_test(Dbg, 1))
+		ep_dbg_printf("_rpl_periodic_beacon: gdp_buf_drain failure\n");
+
 	req->pdu->datum = NULL;			// owned by caller
-	if (!EP_STAT_ISOK(estat))
-	{
-		_gdp_req_free(&req);
-	}
-	else
-	{
-		req->state = GDP_REQ_IDLE;
-		ep_thr_cond_signal(&req->cond);
-		_gdp_req_unlock(req);
-	}
+    _gdp_req_free(&req);
 
 fail0:
 	if (ep_dbg_test(Dbg, 10))
