@@ -64,6 +64,12 @@ assert_abort(void)
 	abort();
 }
 
+static void
+ep_assert_breakpoint(void)
+{
+	// the only reason for this function is to be able to set a breakpoint
+}
+
 
 /***********************************************************************
 **
@@ -91,6 +97,9 @@ ep_assert_printv(
 		(*EpAssertInfo)();
 
 	funlockfile(stderr);
+
+	// for debugging
+	ep_assert_breakpoint();
 
 #if _EP_CCCF_ASSERT_ALL_ABORT	//DEBUG: abort on all exceptions
 	assert_abort();
