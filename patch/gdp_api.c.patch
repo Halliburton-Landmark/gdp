@@ -1,0 +1,15 @@
+--- gdp/gdp_api.c	2016-11-21 01:43:08.641050456 -0800
++++ temp/gdp_api.c	2016-09-30 12:18:10.528251633 -0700
+@@ -431,7 +431,11 @@ EP_STAT
+ gdp_gcl_append(gdp_gcl_t *gcl, gdp_datum_t *datum)
+ {
+ 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_append\n");
+-	return _gdp_gcl_append(gcl, datum, _GdpChannel, 0);
++    EP_STAT estat;
++    do {
++        estat = _gdp_gcl_append(gcl, datum, _GdpChannel, 0);
++    } while (EP_STAT_DETAIL(estat) == EP_STAT_DETAIL(GDP_STAT_NAK_REPLICATE_FAIL));
++    return estat;
+ }
+ 
+ 

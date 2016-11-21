@@ -1,0 +1,47 @@
+--- gdplogd/logd_rpl.c	2016-11-21 01:46:16.753058144 -0800
++++ temp/logd_rpl.c	2016-11-18 17:28:45.487934281 -0800
+@@ -504,6 +504,13 @@ _rpl_fetch_missing_entries(
+     gdp_gcl_t *pgcl,
+     gdp_datum_t *datum)
+ {
++    //kaz. time measure--->
++    struct timespec prev_ts;
++    struct timespec curr_ts;
++    long long time = 0;
++    clock_gettime(CLOCK_MONOTONIC, &prev_ts);
++    //<---
++
+     EP_STAT estat = EP_STAT_OK;
+     gdp_rplsvr_t *currentsvr;
+     gdp_rplsvr_t *nextsvr;
+@@ -600,6 +607,16 @@ _rpl_fetch_missing_entries(
+     }
+     //_gdp_req_free(&req); //This calls gdp_gcl_decref then does not work
+ 
++    //kaz. time measure--->
++    clock_gettime(CLOCK_MONOTONIC, &curr_ts);
++    time = (curr_ts.tv_sec * 1000000000 + curr_ts.tv_nsec) - (prev_ts.tv_sec * 1000000000 + prev_ts.tv_nsec);
++    printf("kaz. duration %lld _rpl_fetch_missing_entries. called %lld finish %lld total_missing %d current_missing %d\n",
++           time,
++           (long long) prev_ts.tv_sec * 1000000000 + prev_ts.tv_nsec,
++           (long long) curr_ts.tv_sec * 1000000000 + curr_ts.tv_nsec,
++           total_missing,
++           current_missing);
++    //<---
+ 
+ fail0:
+ 	if (ep_dbg_test(Dbg, 10))
+@@ -728,6 +745,13 @@ _rpl_periodic_beacon(
+ 	// change the destination to be the final server, not the GCL
+ 	memcpy(req->pdu->dst, to_server, sizeof req->pdu->dst);
+ 
++    //kaz. time measure--->
++    struct timespec curr_ts;
++    clock_gettime(CLOCK_MONOTONIC, &curr_ts);
++    printf("kaz. _rpl_periodic_beacon. called %lld num_chains %d\n",
++           (long long) curr_ts.tv_sec * 1000000000 + curr_ts.tv_nsec,
++           the_num_chains);
++    //<---
+ 
+ 	estat = _gdp_req_send(req);
+ 

@@ -1,0 +1,167 @@
+--- gdplogd/logd_proto.c	2016-11-21 01:46:04.537057644 -0800
++++ temp/logd_proto.c	2016-11-08 18:11:25.322037568 -0800
+@@ -549,6 +549,12 @@ nopubkey:
+ EP_STAT
+ cmd_append(gdp_req_t *req)
+ {
++    //kaz. time measure--->
++    struct timespec prev_ts;
++    struct timespec curr_ts;
++    long long time = 0;
++    clock_gettime(CLOCK_MONOTONIC, &prev_ts);
++    //<---
+ 	EP_STAT estat;
+ 
+ 	req->pdu->cmd = GDP_ACK_CREATED;
+@@ -626,6 +632,12 @@ cmd_append(gdp_req_t *req)
+ 	}
+ 	else
+ 	{
++        //kaz. time measure--->
++        struct timespec sig_prev_ts;
++        struct timespec sig_curr_ts;
++        long long sig_time = 0;
++        clock_gettime(CLOCK_MONOTONIC, &sig_prev_ts);
++        //<---
+ 		// check the signature
+ 		uint8_t recnobuf[8];		// 64 bits
+ 		uint8_t *pbp = recnobuf;
+@@ -635,10 +647,47 @@ cmd_append(gdp_req_t *req)
+ 
+ 		PUT64(datum->recno);
+ 		ep_crypto_vrfy_update(md, &recnobuf, sizeof recnobuf);
++
++        //kaz. time measure--->
++        clock_gettime(CLOCK_MONOTONIC, &sig_curr_ts);
++        sig_time = (sig_curr_ts.tv_sec * 1000000000 + sig_curr_ts.tv_nsec) - (sig_prev_ts.tv_sec * 1000000000 + sig_prev_ts.tv_nsec);
++        printf("kaz. duration %lld crypto_vrfy_update. called %lld finish %lld recno %d\n",
++               sig_time,
++               (long long) sig_prev_ts.tv_sec * 1000000000 + sig_prev_ts.tv_nsec,
++               (long long) sig_curr_ts.tv_sec * 1000000000 + sig_curr_ts.tv_nsec,
++               datum->recno);
++        sig_prev_ts.tv_sec = sig_curr_ts.tv_sec;
++        sig_prev_ts.tv_nsec = sig_curr_ts.tv_nsec;
++        //<---
++
+ 		len = gdp_buf_getlength(datum->dbuf);
+ 		ep_crypto_vrfy_update(md, gdp_buf_getptr(datum->dbuf, len), len);
++
++        //kaz. time measure--->
++        clock_gettime(CLOCK_MONOTONIC, &sig_curr_ts);
++        sig_time = (sig_curr_ts.tv_sec * 1000000000 + sig_curr_ts.tv_nsec) - (sig_prev_ts.tv_sec * 1000000000 + sig_prev_ts.tv_nsec);
++        printf("kaz. duration %lld crypto_vrfy_update2. called %lld finish %lld recno %d\n",
++               sig_time,
++               (long long) sig_prev_ts.tv_sec * 1000000000 + sig_prev_ts.tv_nsec,
++               (long long) sig_curr_ts.tv_sec * 1000000000 + sig_curr_ts.tv_nsec,
++               datum->recno);
++        sig_prev_ts.tv_sec = sig_curr_ts.tv_sec;
++        sig_prev_ts.tv_nsec = sig_curr_ts.tv_nsec;
++        //<---
++
+ 		len = gdp_buf_getlength(datum->sig);
+ 		estat = ep_crypto_vrfy_final(md, gdp_buf_getptr(datum->sig, len), len);
++
++        //kaz. time measure--->
++        clock_gettime(CLOCK_MONOTONIC, &sig_curr_ts);
++        sig_time = (sig_curr_ts.tv_sec * 1000000000 + sig_curr_ts.tv_nsec) - (sig_prev_ts.tv_sec * 1000000000 + sig_prev_ts.tv_nsec);
++        printf("kaz. duration %lld crypto_vrfy_final. called %lld finish %lld recno %d\n",
++               sig_time,
++               (long long) sig_prev_ts.tv_sec * 1000000000 + sig_prev_ts.tv_nsec,
++               (long long) sig_curr_ts.tv_sec * 1000000000 + sig_curr_ts.tv_nsec,
++               datum->recno);
++        //<---
++
+ 		ep_crypto_md_free(md);
+ 		if (!EP_STAT_ISOK(estat))
+ 		{
+@@ -659,9 +708,26 @@ cmd_append(gdp_req_t *req)
+ 	// make sure the timestamp is current
+ 	estat = ep_time_now(&req->pdu->datum->ts);
+ 
++    //kaz. time measure--->
++    struct timespec disk_prev_ts;
++    struct timespec disk_curr_ts;
++    long long disk_time = 0;
++    clock_gettime(CLOCK_MONOTONIC, &disk_prev_ts);
++    //<---
++
+ 	// create the message
+ 	estat = req->gcl->x->physimpl->append(req->gcl, req->pdu->datum);
+ 
++    //kaz. time measure--->
++    clock_gettime(CLOCK_MONOTONIC, &disk_curr_ts);
++    disk_time = (disk_curr_ts.tv_sec * 1000000000 + disk_curr_ts.tv_nsec) - (disk_prev_ts.tv_sec * 1000000000 + disk_prev_ts.tv_nsec);
++    printf("kaz. duration %lld disk_append. called %lld finish %lld recno %d\n",
++           disk_time,
++           (long long) disk_prev_ts.tv_sec * 1000000000 + disk_prev_ts.tv_nsec,
++           (long long) disk_curr_ts.tv_sec * 1000000000 + curr_ts.tv_nsec,
++           req->pdu->datum->recno);
++    //<---
++
+     //replication service start here.--->
+     if (req->fwdflag != 1)
+     {
+@@ -697,6 +763,15 @@ fail0:
+ 	// we're no longer using this handle
+ 	_gdp_gcl_decref(&req->gcl);
+ 
++    //kaz. time measure--->
++    clock_gettime(CLOCK_MONOTONIC, &curr_ts);
++    time = (curr_ts.tv_sec * 1000000000 + curr_ts.tv_nsec) - (prev_ts.tv_sec * 1000000000 + prev_ts.tv_nsec);
++    printf("kaz. duration %lld crypto_vrfy_total. called %lld finish %lld\n",
++           time,
++           (long long) prev_ts.tv_sec * 1000000000 + prev_ts.tv_nsec,
++           (long long) curr_ts.tv_sec * 1000000000 + curr_ts.tv_nsec);
++    //<---
++
+ 	return estat;
+ }
+ 
+@@ -742,6 +817,16 @@ post_subscribe(gdp_req_t *req)
+ 			break;
+ 		}
+ 
++        //kaz. time measure--->
++        struct timespec prev_ts;
++        struct timespec curr_ts;
++        long long duration = 0;
++        clock_gettime(CLOCK_MONOTONIC, &prev_ts);
++        printf("kaz. post_subscribe. called %lld recno %d\n",
++               (long long) prev_ts.tv_sec * 1000000000 + prev_ts.tv_nsec,
++               req->nextrec);
++        //<---
++
+ 		// get the next record and return it as an event
+ 		req->pdu->datum->recno = req->nextrec;
+ 		estat = req->gcl->x->physimpl->read_by_recno(req->gcl, req->pdu->datum);
+@@ -773,6 +858,16 @@ post_subscribe(gdp_req_t *req)
+ 			ep_log(estat, "post_subscribe: read EOF");
+ 		}
+ 
++        //kaz. time measure--->
++        clock_gettime(CLOCK_MONOTONIC, &curr_ts);
++        duration = (curr_ts.tv_sec * 1000000000 + curr_ts.tv_nsec) - (prev_ts.tv_sec * 1000000000 + prev_ts.tv_nsec);
++        printf("kaz. duration %lld post_subscribe. called %lld finish %lld recno %d\n",
++               duration,
++               (long long) prev_ts.tv_sec * 1000000000 + prev_ts.tv_nsec,
++               (long long) curr_ts.tv_sec * 1000000000 + curr_ts.tv_nsec,
++               req->nextrec - 1);
++        //<---
++
+ 		// if we didn't successfully send a record, terminate
+ 		EP_STAT_CHECK(estat, break);
+ 
+@@ -1338,6 +1433,13 @@ cmd_sync_reply(gdp_req_t *req)
+ 				gdp_printable_name(req->pdu->dst, pbuf));
+ 	}
+ 
++    //kaz. time measure--->
++    struct timespec curr_ts;
++    clock_gettime(CLOCK_MONOTONIC, &curr_ts);
++    printf("kaz. _cmd_sync_reply. called %lld\n",
++           (long long) curr_ts.tv_sec * 1000000000 + curr_ts.tv_nsec);
++    //<---
++
+     req->fwdflag = 1; //This sync reply should not be forwarded.
+ 	// actually do the read
+ 	estat = cmd_append(req);

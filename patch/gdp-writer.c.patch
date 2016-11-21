@@ -1,0 +1,117 @@
+--- apps/gdp-writer.c	2016-11-21 01:45:58.329057391 -0800
++++ temp/gdp-writer.c	2016-09-08 15:09:52.868266251 -0700
+@@ -54,6 +54,9 @@ bool	Quiet = false;			// be silent (no c
+ bool	Hexdump = false;		// echo input in hex instead of ASCII
+ bool	KeepGoing = false;		// keep going on append errors
+ 
++EP_THR_MUTEX mutex;
++int num_pipeline = 1; //For aynchronous write to control the number of flight msg
++
+ /*
+ **  DO_LOG --- log a timestamp (for performance checking).
+ */
+@@ -109,6 +112,17 @@ showstat(gdp_event_t *gev)
+ 			gdp_datum_getrecno(d),
+ 			ep_stat_tostr(estat, ebuf, sizeof ebuf));
+ 
++    ep_thr_mutex_lock(&mutex);
++    num_pipeline++;
++    ep_thr_mutex_unlock(&mutex);
++    //kaz. time measure--->
++    struct timespec curr_ts;
++    clock_gettime(CLOCK_MONOTONIC, &curr_ts);
++    printf("kaz. ack_for_async. recno %ld time %ld\n",
++           gdp_datum_getrecno(d),
++           curr_ts.tv_sec * 1000000000 + curr_ts.tv_nsec);
++    //<---
++
+ 	gdp_event_free(gev);
+ }
+ 
+@@ -136,8 +150,14 @@ write_record(gdp_datum_t *datum, gdp_gcl
+ 	LOG("W");
+ 	if (AsyncIo)
+ 	{
+-		estat = gdp_gcl_append_async(gcl, datum, showstat, NULL);
+-		EP_STAT_CHECK(estat, return estat);
++        while (num_pipeline == 0) {
++            usleep(1000);
++        }
++        if (num_pipeline >= 1) {
++            estat = gdp_gcl_append_async(gcl, datum, showstat, NULL);
++            EP_STAT_CHECK(estat, return estat);
++            num_pipeline--;
++        }
+ 
+ 		// return value will be printed asynchronously
+ 	}
+@@ -194,9 +214,10 @@ main(int argc, char **argv)
+ 	char *log_file_name = NULL;
+ 	char *signing_key_file = NULL;
+ 	gdp_gcl_open_info_t *info;
++    ep_thr_mutex_init(&mutex, EP_THR_MUTEX_DEFAULT);
+ 
+ 	// collect command-line arguments
+-	while ((opt = getopt(argc, argv, "1aD:G:iK:L:q")) > 0)
++	while ((opt = getopt(argc, argv, "1aD:G:iK:L:qn:")) > 0)
+ 	{
+ 		switch (opt)
+ 		{
+@@ -233,6 +254,10 @@ main(int argc, char **argv)
+ 			Quiet = true;
+ 			break;
+ 
++		 case 'n':
++            num_pipeline = atoi(optarg);
++			break;
++
+ 		 default:
+ 			show_usage = true;
+ 			break;
+@@ -328,10 +353,17 @@ main(int argc, char **argv)
+ 	else
+ 	{
+ 		// write lines into multiple datums
+-		char buf[200];
++		char buf[2000000];
++        long long count = 1;
+ 
+ 		while (fgets(buf, sizeof buf, stdin) != NULL)
+ 		{
++            //kaz. time measure--->
++            struct timespec prev_ts;
++            struct timespec curr_ts;
++            long long time = 0;
++            clock_gettime(CLOCK_MONOTONIC, &prev_ts);
++            //<---
+ 			// strip off newlines
+ 			char *p = strchr(buf, '\n');
+ 			if (p != NULL)
+@@ -344,6 +376,13 @@ main(int argc, char **argv)
+ 			estat = write_record(datum, gcl);
+ 			if (!EP_STAT_ISOK(estat) && !KeepGoing)
+ 				break;
++            //kaz. time measure--->
++            clock_gettime(CLOCK_MONOTONIC, &curr_ts);
++            time = (curr_ts.tv_sec * 1000000000 + curr_ts.tv_nsec) - (prev_ts.tv_sec * 1000000000 + prev_ts.tv_nsec);
++            printf("kaz. write an entry %lld count %lld time %lld\n",
++                    time, count, curr_ts.tv_sec * 1000000000 + curr_ts.tv_nsec);
++            count++;
++            //<---
+ 		}
+ 	}
+ 
+@@ -352,11 +391,12 @@ main(int argc, char **argv)
+ 
+ 	// give a chance to collect async results
+ 	if (AsyncIo)
+-		sleep(1);
++		sleep(20);
+ 
+ 	// tell the GDP that we are done
+ 	gdp_gcl_close(gcl);
+ 
++    ep_thr_mutex_destroy(&mutex);
+ fail1:
+ 	if (info != NULL)
+ 		gdp_gcl_open_info_free(info);
