@@ -76,7 +76,11 @@ bool	_EpThrUsePthreads = false;	// also used by ep_dbg_*
 */
 
 static void
-diagnose_thr_err(int err, const char *where)
+diagnose_thr_err(int err,
+		const char *where,
+		const char *file,
+		int line,
+		const char *name)
 {
 	// timed out is not unexpected, so put it at a high debug level
 	if (ep_dbg_test(Dbg, err == ETIMEDOUT ? 90 : 4))
@@ -84,7 +88,9 @@ diagnose_thr_err(int err, const char *where)
 		char nbuf[40];
 
 		strerror_r(err, nbuf, sizeof nbuf);
-		ep_dbg_printf("ep_thr_%s: %s\n", where, nbuf);
+		if (name == NULL)
+			name = "???";
+		ep_dbg_printf("ep_thr_%s: %s: %s\n", where, name, nbuf);
 	}
 	if (ep_dbg_test(Dbg, 101))
 		EP_ASSERT_FAILURE("exiting on thread error");
@@ -117,13 +123,15 @@ _ep_thr_init(void)
 */
 
 int
-ep_thr_spawn(EP_THR *thidp, void *(*thfunc)(void *), void *arg)
+_ep_thr_spawn(EP_THR *thidp,
+		void *(*thfunc)(void *),
+		void *arg,
+		const char *file,
+		int line)
 {
 	int r;
 
-	// to make it compile
-	const char *file = NULL;
-	int line = 0;
+	// to make the TRACE call compile
 	const char *name = NULL;
 
 	TRACE(NULL, "spawn");
@@ -131,24 +139,22 @@ ep_thr_spawn(EP_THR *thidp, void *(*thfunc)(void *), void *arg)
 		return EPERM;
 	r = pthread_create(thidp, NULL, thfunc, arg);
 	if (r != 0)
-		diagnose_thr_err(errno, "spawn");
+		diagnose_thr_err(errno, "spawn", file, line, NULL);
 	return r;
 }
 
 
 void
-ep_thr_yield(void)
+_ep_thr_yield(const char *file, int line)
 {
-	// to make it compile
-	const char *file = NULL;
-	int line = 0;
+	// to make the TRACE call compile
 	const char *name = NULL;
 
 	TRACE(NULL, "yield");
 	if (!_EpThrUsePthreads)
 		return;
 	if (sched_yield() < 0)
-		diagnose_thr_err(errno, "yield");
+		diagnose_thr_err(errno, "yield", file, line, NULL);
 }
 
 
@@ -190,7 +196,7 @@ _ep_thr_mutex_init(EP_THR_MUTEX *mtx, int type,
 	}
 	pthread_mutexattr_settype(&attr, type);
 	if ((err = pthread_mutex_init(mtx, &attr)) != 0)
-		diagnose_thr_err(err, "mutex_init");
+		diagnose_thr_err(err, "mutex_init", file, line, name);
 	pthread_mutexattr_destroy(&attr);
 	CHECKMTX(mtx, "init <<<");
 	return err;
@@ -207,7 +213,7 @@ _ep_thr_mutex_destroy(EP_THR_MUTEX *mtx,
 		return 0;
 	CHECKMTX(mtx, "destroy >>>");
 	if ((err = pthread_mutex_destroy(mtx)) != 0)
-		diagnose_thr_err(err, "mutex_destroy");
+		diagnose_thr_err(err, "mutex_destroy", file, line, name);
 	return err;
 }
 
@@ -222,7 +228,7 @@ _ep_thr_mutex_lock(EP_THR_MUTEX *mtx,
 		return 0;
 	CHECKMTX(mtx, "lock >>>");
 	if ((err = pthread_mutex_lock(mtx)) != 0)
-		diagnose_thr_err(err, "mutex_lock");
+		diagnose_thr_err(err, "mutex_lock", file, line, name);
 	CHECKMTX(mtx, "lock <<<");
 	return err;
 }
@@ -242,7 +248,7 @@ _ep_thr_mutex_trylock(EP_THR_MUTEX *mtx,
 		// ignore "resource busy" and "resource deadlock avoided" errors
 		// (EDEADLK should only occur if libep.thr.mutex.type=errorcheck)
 		if (err != EBUSY && err != EDEADLK)
-			diagnose_thr_err(err, "mutex_trylock");
+			diagnose_thr_err(err, "mutex_trylock", file, line, name);
 	}
 	CHECKMTX(mtx, "trylock <<<");
 	return err;
@@ -259,7 +265,7 @@ _ep_thr_mutex_unlock(EP_THR_MUTEX *mtx,
 		return 0;
 	CHECKMTX(mtx, "unlock >>>");
 	if ((err = pthread_mutex_unlock(mtx)) != 0)
-		diagnose_thr_err(err, "mutex_unlock");
+		diagnose_thr_err(err, "mutex_unlock", file, line, name);
 	CHECKMTX(mtx, "unlock <<<");
 	return err;
 }
@@ -286,7 +292,7 @@ _ep_thr_cond_init(EP_THR_COND *cv,
 	if (!_EpThrUsePthreads)
 		return 0;
 	if ((err = pthread_cond_init(cv, NULL)) != 0)
-		diagnose_thr_err(err, "cond_init");
+		diagnose_thr_err(err, "cond_init", file, line, name);
 	CHECKCOND(cv, "init <<<");
 	return err;
 }
@@ -302,7 +308,7 @@ _ep_thr_cond_destroy(EP_THR_COND *cv,
 		return 0;
 	CHECKCOND(cv, "destroy >>>");
 	if ((err = pthread_cond_destroy(cv)) != 0)
-		diagnose_thr_err(err, "cond_destroy");
+		diagnose_thr_err(err, "cond_destroy", file, line, name);
 	return err;
 }
 
@@ -317,7 +323,7 @@ _ep_thr_cond_signal(EP_THR_COND *cv,
 		return 0;
 	CHECKCOND(cv, "signal >>>");
 	if ((err = pthread_cond_signal(cv)) != 0)
-		diagnose_thr_err(err, "cond_signal");
+		diagnose_thr_err(err, "cond_signal", file, line, name);
 	CHECKCOND(cv, "signal <<<");
 	return err;
 }
@@ -346,7 +352,7 @@ _ep_thr_cond_wait(EP_THR_COND *cv, EP_THR_MUTEX *mtx, EP_TIME_SPEC *timeout,
 		err = pthread_cond_timedwait(cv, mtx, &ts);
 	}
 	if (err != 0)
-		diagnose_thr_err(err, "cond_wait");
+		diagnose_thr_err(err, "cond_wait", file, line, name);
 	CHECKMTX(mtx, "wait <<<");
 	CHECKCOND(cv, "wait <<<");
 	return err;
@@ -363,7 +369,7 @@ _ep_thr_cond_broadcast(EP_THR_COND *cv,
 		return 0;
 	CHECKCOND(cv, "broadcast >>>");
 	if ((err = pthread_cond_broadcast(cv)) != 0)
-		diagnose_thr_err(err, "cond_broadcast");
+		diagnose_thr_err(err, "cond_broadcast", file, line, name);
 	CHECKCOND(cv, "broadcast <<<");
 	return err;
 }
@@ -383,7 +389,7 @@ _ep_thr_rwlock_init(EP_THR_RWLOCK *rwl,
 	if (!_EpThrUsePthreads)
 		return 0;
 	if ((err = pthread_rwlock_init(rwl, NULL)) != 0)
-		diagnose_thr_err(err, "rwlock_init");
+		diagnose_thr_err(err, "rwlock_init", file, line, name);
 	return err;
 }
 
@@ -397,7 +403,7 @@ _ep_thr_rwlock_destroy(EP_THR_RWLOCK *rwl,
 	if (!_EpThrUsePthreads)
 		return 0;
 	if ((err = pthread_rwlock_destroy(rwl)) != 0)
-		diagnose_thr_err(err, "rwlock_destroy");
+		diagnose_thr_err(err, "rwlock_destroy", file, line, name);
 	return err;
 }
 
@@ -411,7 +417,7 @@ _ep_thr_rwlock_rdlock(EP_THR_RWLOCK *rwl,
 	if (!_EpThrUsePthreads)
 		return 0;
 	if ((err = pthread_rwlock_rdlock(rwl)) != 0)
-		diagnose_thr_err(err, "rwlock_rdlock");
+		diagnose_thr_err(err, "rwlock_rdlock", file, line, name);
 	return err;
 }
 
@@ -425,7 +431,7 @@ _ep_thr_rwlock_tryrdlock(EP_THR_RWLOCK *rwl,
 	if (!_EpThrUsePthreads)
 		return 0;
 	if ((err = pthread_rwlock_tryrdlock(rwl)) != 0)
-		diagnose_thr_err(err, "rwlock_tryrdlock");
+		diagnose_thr_err(err, "rwlock_tryrdlock", file, line, name);
 	return err;
 }
 
@@ -439,7 +445,7 @@ _ep_thr_rwlock_wrlock(EP_THR_RWLOCK *rwl,
 	if (!_EpThrUsePthreads)
 		return 0;
 	if ((err = pthread_rwlock_wrlock(rwl)) != 0)
-		diagnose_thr_err(err, "rwlock_wrlock");
+		diagnose_thr_err(err, "rwlock_wrlock", file, line, name);
 	return err;
 }
 
@@ -453,7 +459,7 @@ _ep_thr_rwlock_trywrlock(EP_THR_RWLOCK *rwl,
 	if (!_EpThrUsePthreads)
 		return 0;
 	if ((err = pthread_rwlock_trywrlock(rwl)) != 0)
-		diagnose_thr_err(err, "rwlock_trywrlock");
+		diagnose_thr_err(err, "rwlock_trywrlock", file, line, name);
 	return err;
 }
 
@@ -467,7 +473,7 @@ _ep_thr_rwlock_unlock(EP_THR_RWLOCK *rwl,
 	if (!_EpThrUsePthreads)
 		return 0;
 	if ((err = pthread_rwlock_unlock(rwl)) != 0)
-		diagnose_thr_err(err, "rwlock_unlock");
+		diagnose_thr_err(err, "rwlock_unlock", file, line, name);
 	return err;
 }
 

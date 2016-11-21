@@ -79,9 +79,12 @@
 
 typedef pthread_t		EP_THR;
 
-extern int	ep_thr_spawn(EP_THR *th, void *(*thfunc)(void *), void *arg);
-extern void	ep_thr_yield(void);
 extern EP_THR	ep_thr_gettid(void);
+extern int	_ep_thr_spawn(EP_THR *th, void *(*thfunc)(void *), void *arg, const char *file, int line);
+extern void	_ep_thr_yield(const char *file, int line);
+#define		ep_thr_spawn(thr, thfunc, arg)	_ep_thr_spawn(thr, thfunc, arg, \
+				__FILE__, __LINE__)
+#define		ep_thr_yield()			_ep_thr_yield(__FILE__, __LINE__)
 
 typedef pthread_mutex_t		EP_THR_MUTEX;
 #  define	EP_THR_MUTEX_INITIALIZER	= PTHREAD_MUTEX_INITIALIZER
