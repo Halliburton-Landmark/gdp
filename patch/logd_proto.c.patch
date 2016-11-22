@@ -94,7 +94,7 @@
 +    printf("kaz. duration %lld disk_append. called %lld finish %lld recno %d\n",
 +           disk_time,
 +           (long long) disk_prev_ts.tv_sec * 1000000000 + disk_prev_ts.tv_nsec,
-+           (long long) disk_curr_ts.tv_sec * 1000000000 + curr_ts.tv_nsec,
++           (long long) disk_curr_ts.tv_sec * 1000000000 + disk_curr_ts.tv_nsec,
 +           req->pdu->datum->recno);
 +    //<---
 +
