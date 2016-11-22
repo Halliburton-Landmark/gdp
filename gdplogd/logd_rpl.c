@@ -476,11 +476,14 @@ _rpl_reactive_sync(
     gdp_datum_t *datum)
 {
     EP_STAT estat = EP_STAT_OK;
-    gdp_recno_t missing[1000];
+    int32_t num_at_once = 1000; // It limits the number of log entries synchronized at once.
+    gdp_recno_t missing[num_at_once];
     int32_t total_missing = 0;
 
     // check missing log entries here//
-    total_missing = _rpl_check_missing_entries(missing, start_recno, numrecs, pgcl, datum);
+    if (num_at_once < numrecs)
+        numrecs = num_at_once;
+    total_missing = _rpl_check_missing_entries(missing, start_recno, num_at_once, pgcl, datum);
 
     // fetch missing log entries from other servers//
     if (total_missing > 0)
@@ -634,6 +637,7 @@ _rpl_check_missing_entries(
 {
     EP_STAT estat;
     int32_t total_missing = 0;
+    int32_t max_num = numrecs;
     datum->recno = start_recno;
 
     while (numrecs >= 0) {
@@ -655,6 +659,9 @@ _rpl_check_missing_entries(
             //This log entry is for a log hole.
             missing[total_missing] = datum->recno;
             total_missing++;
+
+            if (total_missing >= max_num)
+                break;
         }
         else
         {
