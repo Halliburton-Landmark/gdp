@@ -1,5 +1,7 @@
---- gdplogd/logd_proto.c	2016-11-21 01:46:04.537057644 -0800
-+++ temp/logd_proto.c	2016-11-08 18:11:25.322037568 -0800
+diff --git gdplogd/logd_proto.c gdplogd/logd_proto.c
+index d5e15f3..61988f6 100644
+--- gdplogd/logd_proto.c
++++ gdplogd/logd_proto.c
 @@ -549,6 +549,12 @@ nopubkey:
  EP_STAT
  cmd_append(gdp_req_t *req)
@@ -101,23 +103,28 @@
      //replication service start here.--->
      if (req->fwdflag != 1)
      {
-@@ -697,6 +763,15 @@ fail0:
- 	// we're no longer using this handle
- 	_gdp_gcl_decref(&req->gcl);
+@@ -688,6 +754,20 @@ fail0:
+ 	// return the actual last record number (even on error)
+ 	req->pdu->datum->recno = req->gcl->nrecs;
  
-+    //kaz. time measure--->
++    //kaz. time measure---
++    gdp_recno_t max_recno = req->gcl->x->physinfo->max_recno;
++    gdp_recno_t missing[max_recno];
++    int32_t total_missing = _rpl_check_missing_entries(missing, 1, max_recno, req->gcl, req->pdu->datum);
 +    clock_gettime(CLOCK_MONOTONIC, &curr_ts);
 +    time = (curr_ts.tv_sec * 1000000000 + curr_ts.tv_nsec) - (prev_ts.tv_sec * 1000000000 + prev_ts.tv_nsec);
-+    printf("kaz. duration %lld crypto_vrfy_total. called %lld finish %lld\n",
++    printf("kaz. duration %lld crypto_vrfy_total. called %lld finish %lld max_recno %d missing %d\n",
 +           time,
 +           (long long) prev_ts.tv_sec * 1000000000 + prev_ts.tv_nsec,
-+           (long long) curr_ts.tv_sec * 1000000000 + curr_ts.tv_nsec);
++           (long long) curr_ts.tv_sec * 1000000000 + curr_ts.tv_nsec,
++           max_recno,
++           total_missing);
 +    //<---
 +
- 	return estat;
- }
- 
-@@ -742,6 +817,16 @@ post_subscribe(gdp_req_t *req)
+ 	// we can now drop the data and signature in the request
+ 	gdp_buf_reset(req->pdu->datum->dbuf);
+ 	if (req->pdu->datum->sig != NULL)
+@@ -742,6 +822,16 @@ post_subscribe(gdp_req_t *req)
  			break;
  		}
  
@@ -134,7 +141,7 @@
  		// get the next record and return it as an event
  		req->pdu->datum->recno = req->nextrec;
  		estat = req->gcl->x->physimpl->read_by_recno(req->gcl, req->pdu->datum);
-@@ -773,6 +858,16 @@ post_subscribe(gdp_req_t *req)
+@@ -773,6 +863,16 @@ post_subscribe(gdp_req_t *req)
  			ep_log(estat, "post_subscribe: read EOF");
  		}
  
@@ -151,17 +158,25 @@
  		// if we didn't successfully send a record, terminate
  		EP_STAT_CHECK(estat, break);
  
-@@ -1338,6 +1433,13 @@ cmd_sync_reply(gdp_req_t *req)
+@@ -1338,11 +1438,21 @@ cmd_sync_reply(gdp_req_t *req)
  				gdp_printable_name(req->pdu->dst, pbuf));
  	}
  
 +    //kaz. time measure--->
 +    struct timespec curr_ts;
 +    clock_gettime(CLOCK_MONOTONIC, &curr_ts);
-+    printf("kaz. _cmd_sync_reply. called %lld\n",
-+           (long long) curr_ts.tv_sec * 1000000000 + curr_ts.tv_nsec);
++    printf("kaz. _cmd_sync_reply. called %lld recno %d\n",
++           (long long) curr_ts.tv_sec * 1000000000 + curr_ts.tv_nsec,
++           req->pdu->datum->recno);
 +    //<---
 +
      req->fwdflag = 1; //This sync reply should not be forwarded.
  	// actually do the read
  	estat = cmd_append(req);
+ 
+     req->fwdflag = 0;
++
++
+ 	// make response seem to come from log
+ 	//no need//memcpy(req->pdu->dst, gclname, sizeof req->pdu->dst);
+ 
