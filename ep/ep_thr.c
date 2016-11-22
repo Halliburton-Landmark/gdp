@@ -90,7 +90,9 @@ diagnose_thr_err(int err,
 		strerror_r(err, nbuf, sizeof nbuf);
 		if (name == NULL)
 			name = "???";
-		ep_dbg_printf("ep_thr_%s: %s: %s\n", where, name, nbuf);
+		ep_dbg_printf("ep_thr_%s: %s: %s\n"
+				"    (call from %s:%d)\n",
+				where, name, nbuf, file, line);
 	}
 	if (ep_dbg_test(Dbg, 101))
 		EP_ASSERT_FAILURE("exiting on thread error");
