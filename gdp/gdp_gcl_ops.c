@@ -264,12 +264,14 @@ _gdp_gcl_create(gdp_name_t gclname,
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// send the name of the log to be created in the payload
+	ep_thr_mutex_lock(&req->pdu->datum->mutex);
 	gdp_buf_write(req->pdu->datum->dbuf, gclname, sizeof (gdp_name_t));
 
 	// add the metadata to the output stream
 	_gdp_gclmd_serialize(gmd, req->pdu->datum->dbuf);
 
 	estat = _gdp_invoke(req);
+	ep_thr_mutex_unlock(&req->pdu->datum->mutex);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// success --- change the GCL name to the true name
@@ -322,6 +324,7 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 	reqflags |= GDP_REQ_ROUTEFAIL;			// don't retry on router errors
 	estat = _gdp_req_new(cmd, gcl, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
+	ep_thr_mutex_lock(&req->pdu->datum->mutex);
 	estat = _gdp_invoke(req);
 	EP_STAT_CHECK(estat, goto fail0);
 	// success
@@ -410,6 +413,7 @@ fail1:
 	}
 
 fail0:
+	ep_thr_mutex_unlock(&req->pdu->datum->mutex);
 	if (req != NULL)
 	{
 		req->gcl = NULL;		// owned by caller
@@ -485,7 +489,9 @@ _gdp_gcl_close(gdp_gcl_t *gcl,
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// tell the daemon to close it
+	ep_thr_mutex_lock(&req->pdu->datum->mutex);
 	estat = _gdp_invoke(req);
+	ep_thr_mutex_unlock(&req->pdu->datum->mutex);
 
 	//XXX should probably check status (and do what with it?)
 
@@ -501,6 +507,9 @@ fail0:
 
 /*
 **  APPEND_COMMON --- common code for sync and async appends
+**
+**		datum should be locked when called.
+**		req will be locked upon return.
 */
 
 static EP_STAT
@@ -563,6 +572,7 @@ _gdp_gcl_append(gdp_gcl_t *gcl,
 	EP_STAT estat = GDP_STAT_BAD_IOMODE;
 	gdp_req_t *req = NULL;
 
+	ep_thr_mutex_lock(&datum->mutex);
 	estat = append_common(gcl, datum, chan, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
@@ -574,6 +584,7 @@ _gdp_gcl_append(gdp_gcl_t *gcl,
 	req->pdu->datum = NULL;			// owned by caller
 	_gdp_req_free(&req);
 fail0:
+	ep_thr_mutex_unlock(&datum->mutex);
 	return estat;
 }
 
@@ -601,6 +612,7 @@ _gdp_gcl_append_async(
 
 	// deliver results asynchronously
 	reqflags |= GDP_REQ_ASYNCIO;
+	ep_thr_mutex_lock(&datum->mutex);
 	estat = append_common(gcl, datum, chan, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
@@ -632,6 +644,7 @@ _gdp_gcl_append_async(
 		_gdp_req_unlock(req);
 	}
 fail0:
+	ep_thr_mutex_unlock(&datum->mutex);
 	if (ep_dbg_test(Dbg, 10))
 	{
 		char ebuf[100];
@@ -670,6 +683,7 @@ _gdp_gcl_read(gdp_gcl_t *gcl,
 		return GDP_STAT_GCL_NOT_OPEN;
 	if (!GDP_DATUM_ISGOOD(datum))
 		return GDP_STAT_DATUM_REQUIRED;
+	ep_thr_mutex_lock(&datum->mutex);
 	if (!EP_UT_BITSET(GDP_MODE_RO, gcl->iomode))
 		goto fail0;
 	estat = _gdp_req_new(GDP_CMD_READ, gcl, chan, NULL, reqflags, &req);
@@ -685,6 +699,7 @@ _gdp_gcl_read(gdp_gcl_t *gcl,
 	req->pdu->datum = NULL;			// owned by caller
 	_gdp_req_free(&req);
 fail0:
+	ep_thr_mutex_unlock(&datum->mutex);
 	return estat;
 }
 
@@ -712,7 +727,6 @@ _gdp_gcl_read_async(gdp_gcl_t *gcl,
 {
 	EP_STAT estat;
 	gdp_req_t *req;
-	gdp_datum_t datumbuf;
 
 	errno = 0;				// avoid spurious messages
 
@@ -727,14 +741,8 @@ _gdp_gcl_read_async(gdp_gcl_t *gcl,
 	EP_STAT_CHECK(estat, return estat);
 	_gdp_event_setcb(req, cbfunc, cbarg);
 
-	// set up fake datum solely to send record number
-	memset(&datumbuf, 0, sizeof datumbuf);
-	datumbuf.recno = recno;
-	EP_TIME_INVALIDATE(&datumbuf.ts);
-
-	req->pdu->datum = &datumbuf;
+	req->pdu->datum->recno = recno;
 	estat = _gdp_req_send(req);
-	req->pdu->datum = NULL;
 
 	if (EP_STAT_ISOK(estat))
 	{
@@ -771,12 +779,14 @@ _gdp_gcl_getmetadata(gdp_gcl_t *gcl,
 	estat = _gdp_req_new(GDP_CMD_GETMETADATA, gcl, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
+	ep_thr_mutex_lock(&req->pdu->datum->mutex);
 	estat = _gdp_invoke(req);
 	EP_STAT_CHECK(estat, goto fail1);
 
 	*gmdp = _gdp_gclmd_deserialize(req->pdu->datum->dbuf);
 
 fail1:
+	ep_thr_mutex_unlock(&req->pdu->datum->mutex);
 	_gdp_req_free(&req);
 
 fail0:
@@ -850,6 +860,8 @@ _gdp_gcl_fwd_append(
 		return EP_STAT_ASSERT_ABORT;
 	}
 
+	ep_thr_mutex_lock(&datum->mutex);
+
 	// deliver results asynchronously
 	reqflags |= GDP_REQ_ASYNCIO;
 
@@ -902,6 +914,7 @@ _gdp_gcl_fwd_append(
 	}
 
 fail0:
+	ep_thr_mutex_unlock(&datum->mutex);
 	if (ep_dbg_test(Dbg, 10))
 	{
 		char ebuf[100];

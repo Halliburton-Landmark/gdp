@@ -42,6 +42,8 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.pubsub",
 
 /*
 **  SUB_SEND_MESSAGE_NOTIFICATION --- inform a subscriber of a new message
+**
+**		Assumes req is locked.
 */
 
 void
@@ -76,6 +78,9 @@ sub_send_message_notification(gdp_req_t *req, gdp_datum_t *datum, int cmd)
 
 /*
 **  SUB_NOTIFY_ALL_SUBSCRIBERS --- send something to all interested parties
+**
+**		Both pubreq and pubreq->pdu->datum should be locked when
+**			this is called.
 */
 
 void
@@ -100,13 +105,15 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 		ep_time_deltanow(&sub_delta, &sub_timeout);
 	}
 
+	ep_thr_mutex_lock(&pubreq->gcl->mutex);
 	for (req = LIST_FIRST(&pubreq->gcl->reqs); req != NULL; req = nextreq)
 	{
-		nextreq = LIST_NEXT(req, gcllist);
-
 		// make sure we don't tell ourselves
 		if (req == pubreq)
 			continue;
+
+		_gdp_req_lock(req);
+		nextreq = LIST_NEXT(req, gcllist);
 
 		if (ep_dbg_test(Dbg, 59))
 		{
@@ -133,34 +140,36 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 			}
 
 			// actually remove the subscription
-			ep_thr_mutex_lock(&pubreq->gcl->mutex);
 			LIST_REMOVE(req, gcllist);
-			ep_thr_mutex_unlock(&pubreq->gcl->mutex);
 
-			// _gdp_req_free assumes the request is locked
-			(void) _gdp_req_lock(req);
 			_gdp_req_free(&req);
 		}
+		if (req != NULL)
+			_gdp_req_unlock(req);
 	}
+	ep_thr_mutex_unlock(&pubreq->gcl->mutex);
 }
 
 
 /*
 **  SUB_END_SUBSCRIPTION --- terminate a subscription
+**
+**		req and req->gcl should be locked when this is called.
 */
 
 void
 sub_end_subscription(gdp_req_t *req)
 {
+	GDP_ASSERT_MUTEX_ISLOCKED(&req->mutex, );
+	GDP_ASSERT_MUTEX_ISLOCKED(&req->gcl->mutex, );
+
 	// make it not persistent and not a subscription
 	req->flags &= ~(GDP_REQ_PERSIST | GDP_REQ_SRV_SUBSCR);
 
 	// remove the request from the work list
-	ep_thr_mutex_lock(&req->gcl->mutex);
 	if (EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
 		LIST_REMOVE(req, gcllist);
 	req->flags &= ~GDP_REQ_ON_GCL_LIST;
-	ep_thr_mutex_unlock(&req->gcl->mutex);
 	_gdp_gcl_decref(&req->gcl);
 
 	// send an "end of subscription" event

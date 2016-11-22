@@ -789,6 +789,8 @@ cmd_not_implemented(gdp_req_t *req)
 
 /*
 **  Dispatch command to implementation function.
+**
+**		The req should be locked when this is called.
 */
 
 EP_STAT

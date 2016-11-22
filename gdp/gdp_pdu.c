@@ -219,13 +219,13 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 
 	EP_ASSERT_ELSE(pdu != NULL, return EP_STAT_ASSERT_ABORT);
 
-        // avoid segfault if the daemon is not running
-        if (chan == NULL)
-        {
-            return GDP_STAT_DEAD_DAEMON;
-        }
+	// avoid segfault if the daemon is not running
+	if (chan == NULL)
+	{
+		return GDP_STAT_DEAD_DAEMON;
+	}
 
-        obuf = bufferevent_get_output(chan->bev);
+	obuf = bufferevent_get_output(chan->bev);
 
 	if (!gdp_name_is_valid(pdu->src))
 	{
@@ -381,6 +381,7 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// send data
+	EP_ASSERT_ELSE(dlen <= 0 || pdu->datum != NULL, dlen = 0);
 	if (dlen > 0)
 	{
 		uint8_t *bp;

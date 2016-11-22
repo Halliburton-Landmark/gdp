@@ -210,6 +210,82 @@ gdp_buf_move(gdp_buf_t *obuf, gdp_buf_t *ibuf, size_t sz)
 }
 
 /*
+**  Duplicate the contents of one buffer into another.
+**		Does not change ibuf.
+*/
+
+// helper routine to minimize #ifdefs
+static int
+_gdp_buf_raw_copy(gdp_buf_t *obuf, gdp_buf_t *ibuf)
+{
+	int istat = -1;
+
+#if LIBEVENT_VERSION_NUMBER > 0x02010100
+	istat = evbuffer_add_buffer_reference(ibuf, obuf);
+
+	// alternative implementation should evbuffer_add_buffer_reference not work
+	int nleft = evbuffer_get_length(ibuf);
+	struct evbuffer_ptr bufpos;
+
+	evbuffer_ptr_set(ibuf, &bufpos, 0, EVBUFFER_PTR_SET);
+	while (nleft > 0)
+	{
+		char xbuf[4096];
+		ev_ssize_t n_copied;
+
+		n_copied = evbuffer_copyout_from(ibuf, &bufpos, xbuf, sizeof xbuf);
+		if (n_copied <= 0)
+		{
+			istat = (int) n_copied;
+			break;
+		}
+
+		istat = evbuffer_add(obuf, xbuf, n_copied);
+		if (istat < 0)
+			break;
+
+		evbuffer_ptr_set(ibuf, &bufpos, (size_t) istat, EVBUFFER_PTR_ADD);
+		nleft -= istat;
+	}
+#else
+	// this implementation may be expensive if ibuf is large
+	ssize_t buflen = evbuffer_get_length(ibuf);
+	unsigned char *p = evbuffer_pullup(ibuf, buflen);
+	if (p != NULL)
+	{
+		istat = evbuffer_add(obuf, p, buflen);
+	}
+#endif
+
+	return istat;
+}
+
+int
+gdp_buf_copy(gdp_buf_t *obuf, gdp_buf_t *ibuf)
+{
+	int istat;
+
+	istat = _gdp_buf_raw_copy(obuf, ibuf);
+	DIAGNOSE("copy", istat);
+	return istat;
+}
+
+/*
+**  Create a duplicate of a buffer.
+*/
+
+gdp_buf_t *
+gdp_buf_dup(gdp_buf_t *buf)
+{
+	gdp_buf_t *nbuf = gdp_buf_new();
+	int istat;
+
+	istat = _gdp_buf_raw_copy(buf, nbuf);
+	DIAGNOSE("dup", istat);
+	return nbuf;
+}
+
+/*
 **  Dump buffer to a file (for debugging).
 */
 

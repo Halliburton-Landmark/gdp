@@ -187,6 +187,7 @@ gdp_pdu_proc_cmd(void *pdu_)
 		gdp_datum_t *datum = req->pdu->datum;
 		int siglen = 0;
 
+		ep_thr_mutex_lock(&req->pdu->datum->mutex);
 		if (datum->sig != NULL)
 			siglen = gdp_buf_getlength(datum->sig);
 		if (siglen != datum->siglen)
@@ -219,6 +220,8 @@ gdp_pdu_proc_cmd(void *pdu_)
 
 
 	// free up resources
+	if (req->pdu->datum != NULL)
+		ep_thr_mutex_unlock(&req->pdu->datum->mutex);
 	if (EP_UT_BITSET(GDP_REQ_CORE, req->flags) &&
 		!EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
 	{
@@ -316,17 +319,17 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 			rpdu, _gdp_proto_cmd_name(cmd), gcl);
 	if (gcl == NULL)
 	{
-		do
-		{
-			estat = find_req_in_channel_list(rpdu, chan, &req);
-		} while (!EP_STAT_ISOK(estat));
+		estat = find_req_in_channel_list(rpdu, chan, &req);
 
-		if (req == NULL)
+		if (!EP_STAT_ISOK(estat) || req == NULL)
 		{
-			if (ep_dbg_test(DbgProcResp, 1))
+			if (ep_dbg_test(DbgProcResp,
+						rpdu->cmd == GDP_NAK_R_NOROUTE ? 19 : 1))
 			{
 				gdp_pname_t pname;
-				ep_dbg_printf("gdp_pdu_proc_resp: discarding PDU for unknown GCL\n");
+				ep_dbg_printf("gdp_pdu_proc_resp: discarding %d (%s) PDU"
+							" for unknown GCL\n",
+							rpdu->cmd, _gdp_proto_cmd_name(rpdu->cmd));
 				if (ep_dbg_test(DbgProcResp, 24))
 					_gdp_pdu_dump(rpdu, ep_dbg_getfile());
 				else
@@ -466,6 +469,12 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 		// give _gdp_invoke a chance to run; not necessary, but
 		// avoids having to wait on condition variables
 		ep_thr_yield();
+	}
+	else if (req->pdu->cmd == GDP_NAK_R_NOROUTE)
+	{
+		// since this is common and expected, don't sully output
+		ep_dbg_cprintf(DbgProcResp, 19,
+				"gdp_pdu_proc_resp: discarding GDP_NAK_R_NOROUTE\n");
 	}
 	else if (ep_dbg_test(DbgProcResp, 1))
 	{

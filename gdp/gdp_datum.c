@@ -49,6 +49,12 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.datum", "GDP datum processing");
 static gdp_datum_t		*DatumFreeList;
 static EP_THR_MUTEX		DatumFreeListMutex EP_THR_MUTEX_INITIALIZER;
 
+
+/*
+**  Create a new datum.
+**		The datum is returned unlocked with a data buffer.
+*/
+
 gdp_datum_t *
 gdp_datum_new(void)
 {
@@ -79,6 +85,8 @@ gdp_datum_new(void)
 	datum->sigmdalg = 0;
 	if (datum->dbuf == NULL)
 		datum->dbuf = gdp_buf_new();
+	else
+		gdp_buf_reset(datum->dbuf);
 	ep_dbg_cprintf(Dbg, 48, "gdp_datum_new => %p\n", datum);
 	datum->inuse = true;
 	return datum;
@@ -104,6 +112,14 @@ gdp_datum_free(gdp_datum_t *datum)
 		gdp_buf_free(datum->sig);
 		datum->sig = NULL;
 	}
+
+	// make sure the datum is unlocked before putting on the free list
+	if (ep_thr_mutex_trylock(&datum->mutex) != 0)
+	{
+		// shouldn't happen
+		ep_dbg_cprintf(Dbg, 1, "gdp_datum_free(%p): was locked\n", datum);
+	}
+	ep_thr_mutex_unlock(&datum->mutex);
 	ep_thr_mutex_lock(&DatumFreeListMutex);
 	datum->next = DatumFreeList;
 	DatumFreeList = datum;
@@ -231,6 +247,28 @@ gdp_datum_print(const gdp_datum_t *datum, FILE *fp, uint32_t flags)
 	}
 done:
 	funlockfile(fp);
+}
+
+
+/*
+**  Duplicate a datum (internal use)
+*/
+
+gdp_datum_t *
+gdp_datum_dup(const gdp_datum_t *datum)
+{
+	gdp_datum_t *ndatum;
+
+	ndatum = gdp_datum_new();
+	ndatum->recno = datum->recno;
+	ndatum->ts = datum->ts;
+	gdp_buf_copy(ndatum->dbuf, datum->dbuf);
+	ndatum->sigmdalg = datum->sigmdalg;
+	ndatum->siglen = datum->siglen;
+	if (datum->sig != NULL)
+		ndatum->sig = gdp_buf_dup(datum->sig);
+
+	return ndatum;
 }
 
 

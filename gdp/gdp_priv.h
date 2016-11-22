@@ -146,10 +146,12 @@ struct gdp_datum
 				 (datum)->dbuf != NULL &&								\
 				 (datum)->inuse)
 
-// dump data record (for debugging)
-extern void		_gdp_datum_dump(
+extern void		_gdp_datum_dump(		// dump data record (for debugging)
 					const gdp_datum_t *datum,	// message to print
 					FILE *fp);					// file to print it to
+
+extern gdp_datum_t	*gdp_datum_dup(		// duplicate a datum
+					const gdp_datum_t *datum);
 
 
 

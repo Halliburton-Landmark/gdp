@@ -374,8 +374,7 @@ _gdp_event_add_from_req(gdp_req_t *req)
 	gev->stat = req->stat;
 	gev->udata = req->udata;
 	gev->cb = req->sub_cb;
-	gev->datum = req->pdu->datum;
-	req->pdu->datum = NULL;
+	gev->datum = gdp_datum_dup(req->pdu->datum);
 
 	// schedule the event for delivery
 	if (req->state == GDP_REQ_WAITING)

@@ -584,7 +584,7 @@ _gdp_req_dump(const gdp_req_t *req, FILE *fp, int detail, int indent)
 	fprintf(fp, "\n    flags=");
 	ep_prflags(req->flags, ReqFlags, fp);
 	fprintf(fp, "\n    ");
-	_gdp_gcl_dump(req->gcl, fp, GDP_PR_BASIC, 0);
+	_gdp_gcl_dump(req->gcl, fp, detail, indent);
 	fprintf(fp, "    ");
 	_gdp_pdu_dump(req->pdu, fp);
 	if (req->rpdu != NULL)

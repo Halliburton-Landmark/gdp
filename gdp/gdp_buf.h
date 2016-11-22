@@ -89,6 +89,13 @@ extern int			gdp_buf_move(
 						gdp_buf_t *ibuf,
 						size_t sz);
 
+extern int			gdp_buf_copy(
+						gdp_buf_t *obuf,
+						gdp_buf_t *ibuf);
+
+extern gdp_buf_t	*gdp_buf_dup(
+						gdp_buf_t *buf);
+
 extern int			gdp_buf_printf(
 						gdp_buf_t *buf,
 						const char *fmt, ...);

@@ -265,24 +265,24 @@ done:
 void
 _gdp_gcl_cache_drop(gdp_gcl_t *gcl)
 {
+	bool gcl_was_locked = false;
+
 	EP_ASSERT_ELSE(gcl != NULL, return);
-
-	if (!EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
-	{
-		ep_dbg_cprintf(Dbg, 8, "_gdp_gcl_cache_drop(%p): uncached\n", gcl);
-		return;
-	}
-
 	if (EP_ASSERT_TEST(GDP_GCL_ISGOOD(gcl)))
 	{
 		// GCL is in some random state --- we need the name at least
 		EP_ASSERT_ELSE(gdp_name_is_valid(gcl->name), return);
 	}
 
-	// lock the GCL cache and the GCL for the duration
-	ep_thr_mutex_lock(&GclCacheMutex);
+	// make sure it is locked
 	if (ep_thr_mutex_trylock(&gcl->mutex) != 0)
-		EP_ASSERT_PRINT("_gdp_gcl_cache_drop: gcl locked (%d)", errno);
+		gcl_was_locked = true;
+
+	if (!EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
+	{
+		ep_dbg_cprintf(Dbg, 8, "_gdp_gcl_cache_drop(%p): uncached\n", gcl);
+		goto fail0;
+	}
 
 	// error if we're dropping something that's referenced from the cache
 	if (gcl->refcnt != 0)
@@ -294,17 +294,19 @@ _gdp_gcl_cache_drop(gdp_gcl_t *gcl)
 	}
 
 	// remove it from the associative cache
+	ep_thr_mutex_lock(&GclCacheMutex);
 	(void) ep_hash_delete(OpenGCLCache, sizeof (gdp_name_t), gcl->name);
+	ep_thr_mutex_unlock(&GclCacheMutex);
 
 	// ... and the LRU list
 	LIST_REMOVE(gcl, ulist);
 	gcl->flags &= ~GCLF_INCACHE;
 
-	ep_thr_mutex_unlock(&gcl->mutex);
-	ep_thr_mutex_unlock(&GclCacheMutex);
-
 	ep_dbg_cprintf(Dbg, 40, "_gdp_gcl_cache_drop: %s => %p\n",
 			gcl->pname, gcl);
+fail0:
+	if (!gcl_was_locked)
+		ep_thr_mutex_unlock(&gcl->mutex);
 }
 
 
@@ -469,16 +471,22 @@ _gdp_gcl_incref(gdp_gcl_t *gcl)
 
 /*
 **  _GDP_GCL_DECREF --- decrement the reference count on a GCL
+**
+**		The GCL may be locked or unlocked.  It will be returned in the
+**		same state.  XXX This is a hack. XXX
 */
 
 void
 _gdp_gcl_decref(gdp_gcl_t **gclp)
 {
 	gdp_gcl_t *gcl = *gclp;
+	bool gcl_was_locked = true;
+
 	ep_dbg_cprintf(Dbg, 70, "_gdp_gcl_decref(%p)...\n", gcl);
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
-	GDP_ASSERT_MUTEX_ISUNLOCKED(gcl->mutex, goto fail0);
-	ep_thr_mutex_lock(&gcl->mutex);
+
+	if (ep_thr_mutex_trylock(&gcl->mutex) == 0)
+		gcl_was_locked = false;
 	if (gcl->refcnt > 0)
 	{
 		gcl->refcnt--;
@@ -491,9 +499,10 @@ _gdp_gcl_decref(gdp_gcl_t **gclp)
 
 	ep_dbg_cprintf(Dbg, 51, "_gdp_gcl_decref(%p): %d\n",
 			gcl, gcl->refcnt);
-	ep_thr_mutex_unlock(&gcl->mutex);
 	if (gcl->refcnt == 0 && !EP_UT_BITSET(GCLF_DEFER_FREE, gcl->flags))
 		_gdp_gcl_freehandle(gcl);
+	else if (!gcl_was_locked)
+		ep_thr_mutex_unlock(&gcl->mutex);
 }
 
 

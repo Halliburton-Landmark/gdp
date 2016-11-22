@@ -230,7 +230,7 @@ EP_STAT
 cmd_create(gdp_req_t *req)
 {
 	EP_STAT estat;
-	gdp_gcl_t *gcl;
+	gdp_gcl_t *gcl = NULL;
 	gdp_gclmd_t *gmd;
 	gdp_name_t gclname;
 	int i;
@@ -245,19 +245,22 @@ cmd_create(gdp_req_t *req)
 	req->pdu->cmd = GDP_ACK_CREATED;
 
 	// get the name of the new GCL
+	ep_thr_mutex_lock(&req->pdu->datum->mutex);
 	i = gdp_buf_read(req->pdu->datum->dbuf, gclname, sizeof gclname);
 	if (i < sizeof gclname)
 	{
 		ep_dbg_cprintf(Dbg, 2, "cmd_create: gclname required\n");
-		return GDP_STAT_GCL_NAME_INVALID;
+		estat = GDP_STAT_GCL_NAME_INVALID;
+		goto fail0;
 	}
 
 	// make sure we aren't creating a log with our name
 	if (memcmp(gclname, _GdpMyRoutingName, sizeof _GdpMyRoutingName) == 0)
 	{
-		return gdpd_gcl_error(gclname,
+		estat = gdpd_gcl_error(gclname,
 				"cmd_create: cannot create a log with same name as logd",
 				GDP_STAT_GCL_NAME_INVALID, GDP_STAT_NAK_FORBIDDEN);
+		goto fail0;
 	}
 
 	{
@@ -311,6 +314,8 @@ cmd_create(gdp_req_t *req)
 	_gdp_gcl_decref(&req->gcl);
 
 fail0:
+	ep_thr_mutex_unlock(&req->pdu->datum->mutex);
+	if (gcl != NULL)
 	{
 		char ebuf[60];
 
@@ -357,6 +362,7 @@ cmd_open(gdp_req_t *req)
 		return estat;
 	}
 
+	ep_thr_mutex_lock(&req->pdu->datum->mutex);
 	gcl = req->gcl;
 	gcl->flags |= GCLF_DEFER_FREE;
 	gcl->iomode = GDP_MODE_RA;
@@ -384,6 +390,7 @@ cmd_open(gdp_req_t *req)
 					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 
+	ep_thr_mutex_unlock(&req->pdu->datum->mutex);
 	_gdp_gcl_decref(&req->gcl);
 	return estat;
 }
@@ -465,7 +472,9 @@ cmd_read(gdp_req_t *req)
 	estat = get_starting_point(req);
 	EP_STAT_CHECK(estat, goto fail0);
 
+	ep_thr_mutex_lock(&req->pdu->datum->mutex);
 	estat = req->gcl->x->physimpl->read_by_recno(req->gcl, req->pdu->datum);
+	ep_thr_mutex_unlock(&req->pdu->datum->mutex);
 
 	// deliver "record expired" as "not found"
 	if (EP_STAT_IS_SAME(estat, GDP_STAT_RECORD_EXPIRED))
@@ -582,6 +591,7 @@ cmd_append(gdp_req_t *req)
 	}
 
 	// validate sequence number and signature
+	ep_thr_mutex_lock(&req->pdu->datum->mutex);
 	if (req->pdu->datum->recno != req->gcl->nrecs + 1)
 	{
 		bool random_order_ok = GdplogdForgive.allow_log_gaps &&
@@ -718,6 +728,7 @@ fail0:
 	req->pdu->datum->siglen = 0;
 
 	// we're no longer using this handle
+	ep_thr_mutex_unlock(&req->pdu->datum->mutex);
 	_gdp_gcl_decref(&req->gcl);
 
 	return estat;
@@ -801,7 +812,9 @@ post_subscribe(gdp_req_t *req)
 	if (req->numrecs < 0 || !EP_UT_BITSET(GDP_REQ_SUBUPGRADE, req->flags))
 	{
 		// no more to read: do cleanup & send termination notice
+		ep_thr_mutex_lock(&req->gcl->mutex);
 		sub_end_subscription(req);
+		ep_thr_mutex_unlock(&req->gcl->mutex);
 	}
 	else
 	{
@@ -856,6 +869,7 @@ cmd_subscribe(gdp_req_t *req)
 	}
 
 	// get the additional parameters: number of records and timeout
+	ep_thr_mutex_lock(&req->pdu->datum->mutex);
 	req->numrecs = (int) gdp_buf_get_uint32(req->pdu->datum->dbuf);
 	gdp_buf_get_timespec(req->pdu->datum->dbuf, &timeout);
 
@@ -868,6 +882,7 @@ cmd_subscribe(gdp_req_t *req)
 
 	// should have no more input data; ignore anything there
 	flush_input_data(req, "cmd_subscribe");
+	ep_thr_mutex_unlock(&req->pdu->datum->mutex);
 
 	if (req->numrecs < 0)
 	{
@@ -973,6 +988,7 @@ cmd_multiread(gdp_req_t *req)
 	}
 
 	// get the additional parameters: number of records and timeout
+	ep_thr_mutex_lock(&req->pdu->datum->mutex);
 	req->numrecs = (int) gdp_buf_get_uint32(req->pdu->datum->dbuf);
 
 	if (ep_dbg_test(Dbg, 14))
@@ -992,6 +1008,7 @@ cmd_multiread(gdp_req_t *req)
 
 	// get our starting point, which may be relative to the end
 	estat = get_starting_point(req);
+	ep_thr_mutex_unlock(&req->pdu->datum->mutex);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	ep_dbg_cprintf(Dbg, 24, "cmd_multiread: starting from %" PRIgdp_recno
@@ -1043,24 +1060,29 @@ cmd_getmetadata(gdp_req_t *req)
 	req->pdu->cmd = GDP_ACK_CONTENT;
 
 	// should have no input data; ignore anything there
+	ep_thr_mutex_lock(&req->pdu->datum->mutex);
 	flush_input_data(req, "cmd_getmetadata");
 
 	estat = get_open_handle(req, GDP_MODE_RO);
 	if (!EP_STAT_ISOK(estat))
 	{
-		return gdpd_gcl_error(req->pdu->dst, "cmd_getmetadata: GCL open failure",
+		estat = gdpd_gcl_error(req->pdu->dst, "cmd_getmetadata: GCL open failure",
 							estat, GDP_STAT_NAK_INTERNAL);
+		goto fail0;
 	}
 
 	// get the metadata into memory
 	estat = req->gcl->x->physimpl->getmetadata(req->gcl, &gmd);
-	EP_STAT_CHECK(estat, goto fail0);
+	EP_STAT_CHECK(estat, goto fail1);
 
 	// serialize it to the client
 	_gdp_gclmd_serialize(gmd, req->pdu->datum->dbuf);
+	ep_thr_mutex_unlock(&req->pdu->datum->mutex);
 
-fail0:
+fail1:
 	_gdp_gcl_decref(&req->gcl);
+fail0:
+	ep_thr_mutex_unlock(&req->pdu->datum->mutex);
 	return estat;
 }
 
@@ -1129,7 +1151,9 @@ cmd_fwd_append(gdp_req_t *req)
 		int i;
 		gdp_pname_t pbuf;
 
+		ep_thr_mutex_lock(&req->pdu->datum->mutex);
 		i = gdp_buf_read(req->pdu->datum->dbuf, gclname, sizeof gclname);
+		ep_thr_mutex_unlock(&req->pdu->datum->mutex);
 		if (i < sizeof req->pdu->dst)
 		{
 			return gdpd_gcl_error(req->pdu->dst,
