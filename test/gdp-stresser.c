@@ -132,6 +132,8 @@ static struct ep_stat_to_string	UserStats[] =
 };
 
 
+#define MILLISECONDS	* INT64_C(1000000)
+
 /**********************************************************************
 **
 **  Batch methods
@@ -148,7 +150,7 @@ collect_async_results(logctl_t *lc, long timeout)
 	int prflags = GDP_DATUM_PRTEXT;
 	int n_to_collect = lc->n_out - lc->n_resp;
 	EP_TIME_SPEC event_timeout;
-	ep_time_from_nsec(timeout * INT64_C(1000000), &event_timeout);
+	ep_time_from_nsec(timeout MILLISECONDS, &event_timeout);
 
 	while (n_to_collect > 0)
 	{
@@ -212,7 +214,7 @@ write_batch_synchronous(batch_t *bi)
 			break;
 
 		if (bi->record_interval > 0)
-			ep_time_nanosleep(bi->record_interval * INT64_C(1000000));
+			ep_time_nanosleep(bi->record_interval MILLISECONDS);
 	}
 
 	// end of data is not an error
@@ -261,13 +263,13 @@ write_batch_asynchronous(batch_t *bi)
 			break;
 
 		if (bi->record_interval > 0)
-			ep_time_nanosleep(bi->record_interval * INT64_C(1000000));
+			ep_time_nanosleep(bi->record_interval MILLISECONDS);
 	}
 
 	ep_thr_mutex_lock(&lc->mutex);
 	if (lc->n_out > lc->n_resp)
 	{
-		ep_time_nanosleep(INT64_C(200000000));
+		ep_time_nanosleep(200 MILLISECONDS);
 		collect_async_results(lc, 0);
 	}
 	if (lc->n_out > lc->n_resp)
@@ -355,7 +357,7 @@ read_batch_asynchronous(batch_t *bi)
 	ep_thr_mutex_lock(&lc->mutex);
 	if (lc->n_out > lc->n_resp)
 	{
-		ep_time_nanosleep(INT64_C(200000000));
+		ep_time_nanosleep(200 MILLISECONDS);
 		collect_async_results(lc, 0);
 	}
 	if (lc->n_out > lc->n_resp)
@@ -394,7 +396,7 @@ read_batch_multiread(batch_t *bi)
 		goto fail0;
 	}
 
-	ep_time_nanosleep(INT64_C(200000000));
+	ep_time_nanosleep(200 MILLISECONDS);
 	ep_thr_mutex_lock(&lc->mutex);
 	collect_async_results(lc, 10);
 
@@ -435,7 +437,7 @@ read_batch_subscribe(batch_t *bi)
 		goto fail0;
 	}
 
-	ep_time_nanosleep(INT64_C(200000000));
+	ep_time_nanosleep(200 MILLISECONDS);
 	ep_thr_mutex_lock(&lc->mutex);
 	long results_timeout = 1000;
 	if (bi->record_interval > 0)
