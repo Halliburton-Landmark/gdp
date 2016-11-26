@@ -35,6 +35,7 @@
 ***********************************************************************/
 
 #include <ep.h>
+#include <ep_app.h>
 #include <ep_stat.h>
 #include <ep_pcvt.h>
 #include <ep_dbg.h>
@@ -181,7 +182,7 @@ ep_stat_tostr(EP_STAT stat,
 		break;
 
 	  case EP_REGISTRY_USER:
-		rname = "USER";
+		rname = ep_app_getprogname();
 		break;
 
 	  default:
