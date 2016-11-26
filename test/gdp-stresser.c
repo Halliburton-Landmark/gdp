@@ -119,6 +119,7 @@ struct batch
 	int				threadno;			// thread number (integer)
 	int				results_interval;	// how often to get async results
 	int				record_interval;	// time between writing records (msec)
+	bool			verbose:1;			// print out progress status
 };
 
 
@@ -160,19 +161,26 @@ collect_async_results(logctl_t *lc, long timeout)
 		ev = gdp_event_next(lc->gcl, &event_timeout);
 		if (ev == NULL)
 			break;
-		lc->n_resp++;
 
 		int evtype = gdp_event_gettype(ev);
 		const char *bname = (const char *) gdp_event_getudata(ev);
 		switch (evtype)
 		{
 		case GDP_EVENT_DATA:
+			lc->n_resp++;
+			n_to_collect--;
 			printf("%s: ", bname);
 			gdp_datum_print(gdp_event_getdatum(ev), stdout, prflags);
 			break;
 
-		default:
+		case GDP_EVENT_CREATED:
+			lc->n_resp++;
 			n_to_collect--;
+			printf("%s: Data created\n", bname);
+			break;
+
+		default:
+			printf("%s: ", bname);
 			gdp_event_print(ev, stdout, GDP_PR_BASIC + 2);
 			break;
 		}
@@ -274,9 +282,10 @@ write_batch_asynchronous(batch_t *bi)
 	}
 	if (lc->n_out > lc->n_resp)
 	{
-		printf("write_batch_asynchronous: wrote %ld, got %ld results\n",
-				lc->n_out, lc->n_resp);
 		estat = STAT_LOST_RESPONSE;
+		ep_app_message(estat,
+				"write_batch_asynchronous: wrote %ld, got %ld results",
+				lc->n_out, lc->n_resp);
 	}
 	ep_thr_mutex_unlock(&lc->mutex);
 
@@ -362,9 +371,10 @@ read_batch_asynchronous(batch_t *bi)
 	}
 	if (lc->n_out > lc->n_resp)
 	{
-		printf("read_batch_asynchronous: asked for %ld, got %ld results\n",
-				lc->n_out, lc->n_resp);
 		estat = STAT_LOST_RESPONSE;
+		ep_app_message(estat,
+				"read_batch_asynchronous: asked for %ld, got %ld results",
+				lc->n_out, lc->n_resp);
 	}
 	ep_thr_mutex_unlock(&lc->mutex);
 
@@ -402,9 +412,10 @@ read_batch_multiread(batch_t *bi)
 
 	if (bi->batch_size > lc->n_resp)
 	{
-		printf("read_batch_asynchronous: asked for %ld, got %ld results\n",
-				lc->n_out, lc->n_resp);
 		estat = STAT_LOST_RESPONSE;
+		ep_app_message(estat,
+				"read_batch_asynchronous: asked for %ld, got %ld results",
+				lc->n_out, lc->n_resp);
 	}
 	ep_thr_mutex_unlock(&lc->mutex);
 
@@ -448,9 +459,10 @@ read_batch_subscribe(batch_t *bi)
 
 	if (bi->batch_size > lc->n_resp)
 	{
-		printf("read_batch_subscribe: expected %ld results, got %ld\n",
-				bi->batch_size, lc->n_resp);
 		estat = STAT_LOST_RESPONSE;
+		ep_app_message(estat,
+				"read_batch_subscribe: expected %ld results, got %ld",
+				bi->batch_size, lc->n_resp);
 	}
 	ep_thr_mutex_unlock(&lc->mutex);
 
@@ -656,7 +668,8 @@ do_run(void *bi_)
 	batch_t *bi = bi_;
 	EP_STAT estat = bi->run(bi);
 
-	ep_app_message(estat, "batch %s terminated", bi->bname);
+	if (bi->verbose)
+		ep_app_message(estat, "batch %s terminated", bi->bname);
 	return (void *) (uintptr_t) EP_STAT_TO_INT(estat);
 }
 
@@ -818,6 +831,7 @@ usage(const char *msg)
 			"    -p  set payload size\n"
 			"    -r  set number of reader threads\n"
 			"    -s  use subscriptions for reading\n"
+			"    -v  operate verbosely\n"
 			"    -w  set number of writer threads\n"
 			"-m and -s are invalid without at least one reader thread (-r)\n"
 			"-m and -s are mutually inconsistent\n"
@@ -828,14 +842,13 @@ usage(const char *msg)
 }
 
 
-bool		Verbose = false;
-
 int
 main(int argc, char **argv)
 {
 	bool async = false;
 	bool multiread = false;
 	bool subscribe = false;
+	bool verbose = false;
 	long payload_size = 32;
 	long async_batch_size = 8;
 	long batch_size = 32;
@@ -848,7 +861,7 @@ main(int argc, char **argv)
 	int opt;
 	const char *phase;
 
-	while ((opt = getopt(argc, argv, "aA:d:D:G:mn:p:r:sw:")) > 0)
+	while ((opt = getopt(argc, argv, "aA:d:D:G:mn:p:r:svw:")) > 0)
 	{
 		switch (opt)
 		{
@@ -893,7 +906,7 @@ main(int argc, char **argv)
 			break;
 
 		case 'v':
-			Verbose = true;
+			verbose = true;
 			break;
 
 		case 'w':
@@ -936,6 +949,7 @@ main(int argc, char **argv)
 
 		r_bi->results_interval = async_batch_size;
 		r_bi->batch_size = batch_size;
+		r_bi->verbose = verbose;
 		if (subscribe)
 		{
 			r_bi->btype = "SUB";
@@ -981,6 +995,7 @@ main(int argc, char **argv)
 		w_bi->dg = dg;
 		w_bi->batch_size = batch_size;
 		w_bi->record_interval = record_interval;
+		w_bi->verbose = verbose;
 		if (async)
 		{
 			w_bi->btype = "WA";
@@ -1030,30 +1045,44 @@ main(int argc, char **argv)
 	for (i = 0; i < n_writers; i++)
 	{
 		void *vstat;
+		EP_STAT tstat = EP_STAT_OK;
 		int istat;
 		istat = pthread_join(w_threads[i], &vstat);
 		if (istat != 0)
 		{
-			EP_STAT tstat = ep_stat_from_errno(istat);
+			tstat = ep_stat_from_errno(istat);
 			ep_app_message(tstat, "pthread_join");
-			if (EP_STAT_ISOK(estat))
-				estat = tstat;
-		} else if (EP_STAT_ISOK(estat))
-			estat = EP_STAT_FROM_INT((uint32_t) vstat);
+		}
+		else
+		{
+			tstat = EP_STAT_FROM_INT((uint32_t) vstat);
+//			if (verbose)
+//				ep_app_message(tstat, "batch %s-%d", w_bi->btype, i);
+		}
+		if (EP_STAT_ISOK(estat))
+			estat = tstat;
 	}
 	for (i = 0; i < n_readers; i++)
 	{
 		void *vstat;
+		EP_STAT tstat = EP_STAT_OK;
 		int istat;
 		istat = pthread_join(r_threads[i], &vstat);
 		if (istat != 0)
 		{
-			EP_STAT tstat = ep_stat_from_errno(istat);
+			tstat = ep_stat_from_errno(istat);
 			ep_app_message(tstat, "pthread_join");
 			if (EP_STAT_ISOK(estat))
 				estat = tstat;
-		} else if (EP_STAT_ISOK(estat))
-			estat = EP_STAT_FROM_INT((uint32_t) vstat);
+		}
+		else
+		{
+			tstat = EP_STAT_FROM_INT((uint32_t) vstat);
+//			if (verbose)
+//				ep_app_message(tstat, "batch %s-%d", r_bi->btype, i);
+		}
+		if (EP_STAT_ISOK(estat))
+			estat = tstat;
 	}
 
 fail0:
