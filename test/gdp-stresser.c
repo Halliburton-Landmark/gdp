@@ -119,6 +119,7 @@ struct batch
 	int				threadno;			// thread number (integer)
 	int				results_interval;	// how often to get async results
 	int				record_interval;	// time between writing records (msec)
+	int				record_ifuzz;		// fuzz factor on record_interval
 	bool			verbose:1;			// print out progress status
 };
 
@@ -188,6 +189,23 @@ collect_async_results(logctl_t *lc, long timeout)
 }
 
 
+void
+record_delay(int record_interval, int record_ifuzz)
+{
+	if (record_interval <= 0)
+		return;
+
+	int64_t delay;
+	int32_t r = random();			// 0 to 2^31-1
+	r -= INT32_MAX / 2;				// -2^30 to 2^30-1
+	float fuzz = r;
+	fuzz /= INT32_MAX / 2;			// -1 to +1
+
+	delay = (record_interval MILLISECONDS) + (record_ifuzz MILLISECONDS) * fuzz;
+	ep_time_nanosleep(delay);
+}
+
+
 /*
 **  Synchronous writes
 */
@@ -221,8 +239,7 @@ write_batch_synchronous(batch_t *bi)
 		if (++n_gen >= bi->batch_size)
 			break;
 
-		if (bi->record_interval > 0)
-			ep_time_nanosleep(bi->record_interval MILLISECONDS);
+		record_delay(bi->record_interval, bi->record_ifuzz);
 	}
 
 	// end of data is not an error
@@ -270,8 +287,7 @@ write_batch_asynchronous(batch_t *bi)
 		if (++n_gen >= bi->batch_size)
 			break;
 
-		if (bi->record_interval > 0)
-			ep_time_nanosleep(bi->record_interval MILLISECONDS);
+		record_delay(bi->record_interval, bi->record_ifuzz);
 	}
 
 	ep_thr_mutex_lock(&lc->mutex);
@@ -414,7 +430,7 @@ read_batch_multiread(batch_t *bi)
 	{
 		estat = STAT_LOST_RESPONSE;
 		ep_app_message(estat,
-				"read_batch_asynchronous: asked for %ld, got %ld results",
+				"read_batch_multiread: asked for %ld, got %ld results",
 				lc->n_out, lc->n_resp);
 	}
 	ep_thr_mutex_unlock(&lc->mutex);
@@ -855,13 +871,14 @@ main(int argc, char **argv)
 	long n_writers = 0;
 	long n_readers = 0;
 	long record_interval = 0;
+	long record_ifuzz = 0;
 	char *router_addr = NULL;
 	char *logname_template;
 	EP_STAT estat = EP_STAT_OK;
 	int opt;
 	const char *phase;
 
-	while ((opt = getopt(argc, argv, "aA:d:D:G:mn:p:r:svw:")) > 0)
+	while ((opt = getopt(argc, argv, "aA:D:G:i:I:mn:p:r:svw:")) > 0)
 	{
 		switch (opt)
 		{
@@ -873,16 +890,20 @@ main(int argc, char **argv)
 			async_batch_size = atol(optarg);
 			break;
 
-		case 'd':
-			record_interval = atol(optarg);
-			break;
-
 		case 'D':
 			ep_dbg_set(optarg);
 			break;
 
 		case 'G':
 			router_addr = optarg;
+			break;
+
+		case 'i':
+			record_interval = atol(optarg);
+			break;
+
+		case 'I':
+			record_ifuzz = atol(optarg);
 			break;
 
 		case 'm':
@@ -995,6 +1016,7 @@ main(int argc, char **argv)
 		w_bi->dg = dg;
 		w_bi->batch_size = batch_size;
 		w_bi->record_interval = record_interval;
+		w_bi->record_ifuzz = record_ifuzz;
 		w_bi->verbose = verbose;
 		if (async)
 		{
