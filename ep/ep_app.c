@@ -37,7 +37,7 @@
 #include <sys/errno.h>
 
 
-static uint32_t	OperationFlags = EP_APP_FLAG_LOGABORTS;
+static uint32_t	OperationFlags = EP_APP_FLAG_LOG_ABORT;
 
 
 ////////////////////////////////////////////////////////////////////////
@@ -70,22 +70,24 @@ struct msginfo
 };
 
 #define MSGINFO(tag, colors, logflag)	\
-		{ tag, colors, EP_APP_FLAG_LOG ## logflag ## S }
+		{ tag, colors, EP_APP_FLAG_LOG_ ## logflag }
 
-static struct msginfo	MsgInfo[9] =
+static struct msginfo	MsgInfo[10] =
 {
-	MSGINFO("OK",		"ck",		INFO	),
-	MSGINFO("OK",		"ck",		INFO	),
-	MSGINFO("OK",		"ck",		INFO	),
-	MSGINFO("OK",		"ck",		INFO	),
+	MSGINFO("OK",		"gk",		OK	),
+	MSGINFO("OK",		"gk",		OK	),
+	MSGINFO("OK",		"gk",		OK	),
+	MSGINFO("OK",		"gk",		OK	),
 	MSGINFO("WARN",		"yk",		WARNING	),
 	MSGINFO("ERROR",	"ry",		ERROR	),
 	MSGINFO("SEVERE",	"yr",		SEVERE	),
 	MSGINFO("ABORT",	"wr",		ABORT	),
 	MSGINFO("FATAL",	"wr",		FATAL	),
+	MSGINFO("INFO",		"ck",		INFO	),
 };
 
 #define EP_STAT_SEV_FATAL	8	// pseudo-value
+#define EP_STAT_SEV_INFO	9	// pseudo-value
 
 
 
@@ -210,10 +212,10 @@ ep_app_info(
 
 	errno = 0;
 	va_start(av, fmt);
-	printmessage(&MsgInfo[EP_STAT_SEV_OK], NULL, fmt, av);
+	printmessage(&MsgInfo[EP_STAT_SEV_INFO], NULL, fmt, av);
 	va_end(av);
 
-	if (EP_UT_BITSET(EP_APP_FLAG_LOGINFOS, OperationFlags))
+	if (EP_UT_BITSET(EP_APP_FLAG_LOG_INFO, OperationFlags))
 	{
 		va_start(av, fmt);
 		ep_logv(EP_STAT_OK, fmt, av);
@@ -245,7 +247,7 @@ ep_app_warn(
 	printmessage(&MsgInfo[EP_STAT_SEV_WARN], NULL, fmt, av);
 	va_end(av);
 
-	if (EP_UT_BITSET(EP_APP_FLAG_LOGWARNINGS, OperationFlags))
+	if (EP_UT_BITSET(EP_APP_FLAG_LOG_WARNING, OperationFlags))
 	{
 		va_start(av, fmt);
 		ep_logv(EP_STAT_WARN, fmt, av);
@@ -278,7 +280,7 @@ ep_app_error(
 	printmessage(&MsgInfo[EP_STAT_SEV_ERROR], NULL, fmt, av);
 	va_end(av);
 
-	if (EP_UT_BITSET(EP_APP_FLAG_LOGERRORS, OperationFlags))
+	if (EP_UT_BITSET(EP_APP_FLAG_LOG_ERROR, OperationFlags))
 	{
 		va_start(av, fmt);
 		ep_logv(EP_STAT_ERROR, fmt, av);
@@ -311,7 +313,7 @@ ep_app_severe(
 	printmessage(&MsgInfo[EP_STAT_SEV_SEVERE], NULL, fmt, av);
 	va_end(av);
 
-	if (EP_UT_BITSET(EP_APP_FLAG_LOGSEVERES, OperationFlags))
+	if (EP_UT_BITSET(EP_APP_FLAG_LOG_SEVERE, OperationFlags))
 	{
 		va_start(av, fmt);
 		ep_logv(EP_STAT_SEVERE, fmt, av);
@@ -345,7 +347,7 @@ ep_app_fatal(
 	printmessage(&MsgInfo[EP_STAT_SEV_FATAL], NULL, fmt, av);
 	va_end(av);
 
-	if (EP_UT_BITSET(EP_APP_FLAG_LOGFATALS, OperationFlags))
+	if (EP_UT_BITSET(EP_APP_FLAG_LOG_FATAL, OperationFlags))
 	{
 		va_start(av, fmt);
 		ep_logv(EP_STAT_SEVERE, fmt, av);
@@ -381,7 +383,7 @@ ep_app_abort(
 	printmessage(&MsgInfo[EP_STAT_SEV_ABORT], NULL, fmt, av);
 	va_end(av);
 
-	if (EP_UT_BITSET(EP_APP_FLAG_LOGABORTS, OperationFlags))
+	if (EP_UT_BITSET(EP_APP_FLAG_LOG_ABORT, OperationFlags))
 	{
 		va_start(av, fmt);
 		ep_logv(EP_STAT_ABORT, fmt, av);

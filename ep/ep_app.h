@@ -58,11 +58,13 @@ extern int		ep_app_numfds(int *maxfds);
 
 extern void		ep_app_setflags(uint32_t flags);
 
-#define EP_APP_FLAG_LOGABORTS		0x00000001	// log ep_app_abort
-#define EP_APP_FLAG_LOGFATALS		0x00000002	// log ep_app_fatal
-#define EP_APP_FLAG_LOGSEVERES		0x00000004	// log ep_app_severe
-#define EP_APP_FLAG_LOGERRORS		0x00000008	// log ep_app_error
-#define EP_APP_FLAG_LOGWARNINGS		0x00000010	// log ep_app_warn
-#define EP_APP_FLAG_LOGINFOS		0x00000020	// log ep_app_info
+#define EP_APP_FLAG_LOG_ABORT		0x00000001	// log ep_app_abort
+#define EP_APP_FLAG_LOG_FATAL		0x00000002	// log ep_app_fatal
+#define EP_APP_FLAG_LOG_SEVERE		0x00000004	// log ep_app_severe
+#define EP_APP_FLAG_LOG_ERROR		0x00000008	// log ep_app_error
+#define EP_APP_FLAG_LOG_WARNING		0x00000010	// log ep_app_warn
+#define EP_APP_FLAG_LOG_OK		0x00000040	// log OK messages
+	// pseudo (doesn't have an associated log severity)
+#define EP_APP_FLAG_LOG_INFO		0x00000040	// log ep_app_info
 
 #endif //_EP_APP_H_
