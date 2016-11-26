@@ -69,16 +69,20 @@ subscr_resub(gdp_req_t *req)
 	EP_STAT estat;
 
 	ep_dbg_cprintf(Dbg, 39, "subscr_resub: refreshing req@%p\n", req);
-
-	EP_ASSERT(req->gcl != NULL);
-	EP_ASSERT(req->pdu != NULL);
-	EP_ASSERT(req->pdu->datum == NULL);
+	EP_ASSERT_ELSE(req != NULL, return EP_STAT_ASSERT_ABORT);
+	GDP_ASSERT_MUTEX_ISLOCKED(&req->mutex, );
+	EP_ASSERT_ELSE(req->gcl != NULL, );
+	EP_ASSERT_ELSE(req->pdu != NULL, );
 
 	req->state = GDP_REQ_ACTIVE;
 	req->pdu->cmd = GDP_CMD_SUBSCRIBE;
 	memcpy(req->pdu->dst, req->gcl->name, sizeof req->pdu->dst);
 	memcpy(req->pdu->src, _GdpMyRoutingName, sizeof req->pdu->src);
-	req->pdu->datum = gdp_datum_new();
+	//XXX it seems like this should be in a known state
+	if (req->pdu->datum == NULL)
+		req->pdu->datum = gdp_datum_new();
+	else if (req->pdu->datum->dbuf != NULL)
+		gdp_buf_reset(req->pdu->datum->dbuf);
 	req->pdu->datum->recno = req->gcl->nrecs + 1;
 	gdp_buf_put_uint32(req->pdu->datum->dbuf, req->numrecs);
 
