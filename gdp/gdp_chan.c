@@ -40,6 +40,7 @@
 #include <ep/ep_prflags.h>
 #include <ep/ep_string.h>
 
+#include <netinet/tcp.h>
 #include <errno.h>
 #include <string.h>
 
@@ -364,6 +365,14 @@ _gdp_chan_open(const char *gdp_addr,
 			// it would be nice to have a private timeout here...
 			evutil_socket_t sock = socket(a->ai_family, SOCK_STREAM, 0);
 			if (sock < 0)
+			{
+				// bad news, but keep trying
+				estat = ep_stat_from_errno(errno);
+				ep_log(estat, "_gdp_chan_open: cannot create socket");
+				continue;
+			}
+			int enable = 1;
+			if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (void*)&enable, sizeof(enable)))
 			{
 				// bad news, but keep trying
 				estat = ep_stat_from_errno(errno);
