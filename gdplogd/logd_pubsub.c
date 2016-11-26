@@ -108,12 +108,15 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 	ep_thr_mutex_lock(&pubreq->gcl->mutex);
 	for (req = LIST_FIRST(&pubreq->gcl->reqs); req != NULL; req = nextreq)
 	{
-		// make sure we don't tell ourselves
-		if (req == pubreq)
-			continue;
-
 		_gdp_req_lock(req);
 		nextreq = LIST_NEXT(req, gcllist);
+
+		// make sure we don't tell ourselves
+		if (req == pubreq)
+		{
+			_gdp_req_unlock(req);
+			continue;
+		}
 
 		if (ep_dbg_test(Dbg, 59))
 		{
