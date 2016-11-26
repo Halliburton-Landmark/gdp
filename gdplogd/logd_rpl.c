@@ -132,6 +132,8 @@ _rpl_periodic_sync(gdp_name_t gclname, void *arg)
 
     // calculate the number of replica servers
     int num_svr = 0;
+    if (LIST_FIRST(&gcl->rplsvr) == NULL)
+        return;
     for (currentsvr = LIST_FIRST(&gcl->rplsvr); currentsvr != NULL; currentsvr = nextsvr)
     {
         nextsvr = LIST_NEXT(currentsvr, svrlist);
@@ -824,6 +826,10 @@ _rpl_resp_proc(gdp_event_t *gev)
 void
 _rpl_reply_ack(gdp_req_t *req, uint8_t cmd)
 {
+	gdp_buf_reset(req->pdu->datum->dbuf);
+	if (req->pdu->datum->sig != NULL)
+		gdp_buf_reset(req->pdu->datum->sig);
+	req->pdu->datum->siglen = 0;
     req->pdu->cmd = cmd;
     req->stat = _gdp_pdu_out(req->pdu, req->chan, NULL);
 }
