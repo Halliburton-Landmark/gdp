@@ -1596,7 +1596,12 @@ disk_create(gdp_gcl_t *gcl, gdp_gclmd_t *gmd)
 	// allocate a name
 	if (!gdp_name_is_valid(gcl->name))
 	{
-		_gdp_gcl_newname(gcl);
+		estat = _gdp_gcl_newname(gcl);
+		if (!EP_STAT_ISOK(estat))
+		{
+			physinfo_free(phys);
+			return estat;
+		}
 	}
 
 	// create an initial segment for the GCL
