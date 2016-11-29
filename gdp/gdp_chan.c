@@ -43,6 +43,8 @@
 #include <errno.h>
 #include <string.h>
 
+#include <netinet/tcp.h>
+
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.chan", "GDP channel processing");
 static EP_DBG	DemoMode = EP_DBG_INIT("_demo", "Demo Mode");
 
@@ -369,6 +371,19 @@ _gdp_chan_open(const char *gdp_addr,
 				estat = ep_stat_from_errno(errno);
 				ep_log(estat, "_gdp_chan_open: cannot create socket");
 				continue;
+			}
+
+			// shall we disable Nagle algorithm?
+			if (ep_adm_getboolparam("swarm.gdp.tcp.nodelay", false))
+			{
+				int enable = 1;
+				if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
+							(void *) &enable, sizeof enable) != 0)
+				{
+					estat = ep_stat_from_errno(errno);
+					ep_log(estat, "_gdp_chan_open: cannot set TCP_NODELAY");
+					// error not fatal, let's just go on
+				}
 			}
 			if (connect(sock, a->ai_addr, a->ai_addrlen) < 0)
 			{

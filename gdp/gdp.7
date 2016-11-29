@@ -263,6 +263,14 @@ The
 facility to which to send log messages.
 Defaults to
 .Li local4 .
+.It swarm.gdp.tcp.nodelay
+If set, the GDP attempts to set the
+.Li TCP_NODELAY
+flag on the connection to the routing layer.
+This disables the Nagle algorithm,
+and can improve performance if you are not doing big transfers.
+Defaults to
+.Li false .
 .It swarm.gdp.zeroconf.domain
 The domain used when doing Zeroconf searches.
 Defaults to
