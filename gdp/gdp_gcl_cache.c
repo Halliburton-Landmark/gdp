@@ -482,11 +482,12 @@ _gdp_gcl_decref(gdp_gcl_t **gclp)
 	gdp_gcl_t *gcl = *gclp;
 	bool gcl_was_locked = true;
 
-	ep_dbg_cprintf(Dbg, 70, "_gdp_gcl_decref(%p)...\n", gcl);
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
 
 	if (ep_thr_mutex_trylock(&gcl->mutex) == 0)
 		gcl_was_locked = false;
+	ep_dbg_cprintf(Dbg, 70, "_gdp_gcl_decref(%p, locked=%s)...\n",
+					gcl, gcl_was_locked ? "true" : "false");
 	if (gcl->refcnt > 0)
 	{
 		gcl->refcnt--;
