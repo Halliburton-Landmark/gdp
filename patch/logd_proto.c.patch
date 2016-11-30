@@ -110,7 +110,7 @@ index d5e15f3..61988f6 100644
 +    //kaz. time measure---
 +    gdp_recno_t max_recno = req->gcl->x->physinfo->max_recno;
 +    gdp_recno_t missing[max_recno];
-+    int32_t total_missing = _rpl_check_missing_entries(missing, 1, max_recno, req->gcl, req->pdu->datum);
++    int32_t total_missing = _rpl_check_missing_entries(missing, 1, max_recno, req->gcl);
 +    clock_gettime(CLOCK_MONOTONIC, &curr_ts);
 +    time = (curr_ts.tv_sec * 1000000000 + curr_ts.tv_nsec) - (prev_ts.tv_sec * 1000000000 + prev_ts.tv_nsec);
 +    printf("kaz. duration %lld crypto_vrfy_total. called %lld finish %lld max_recno %d missing %d\n",

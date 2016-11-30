@@ -106,7 +106,7 @@
  	// give a chance to collect async results
  	if (AsyncIo)
 -		sleep(1);
-+		sleep(20);
++		sleep(40);
  
  	// tell the GDP that we are done
  	gdp_gcl_close(gcl);

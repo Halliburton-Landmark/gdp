@@ -45,8 +45,7 @@ extern int32_t  _rpl_check_missing_entries(
                     gdp_recno_t *missing,
                     gdp_recno_t start_recno,
                     int32_t numrecs,
-                    gdp_gcl_t *pgcl,
-                    gdp_datum_t *datum);
+                    gdp_gcl_t *pgcl);
 extern EP_STAT  _rpl_fetch_missing_entries(
                     gdp_recno_t *missing,
                     int32_t total_missing,

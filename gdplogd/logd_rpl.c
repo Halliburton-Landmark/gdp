@@ -485,7 +485,7 @@ _rpl_reactive_sync(
     // check missing log entries here//
     if (num_at_once < numrecs)
         numrecs = num_at_once;
-    total_missing = _rpl_check_missing_entries(missing, start_recno, num_at_once, pgcl, datum);
+    total_missing = _rpl_check_missing_entries(missing, start_recno, num_at_once, pgcl);
 
     // fetch missing log entries from other servers//
     if (total_missing > 0)
@@ -634,12 +634,12 @@ _rpl_check_missing_entries(
     gdp_recno_t *missing,
     gdp_recno_t start_recno,
     int32_t numrecs,
-    gdp_gcl_t *pgcl,
-    gdp_datum_t *datum)
+    gdp_gcl_t *pgcl)
 {
     EP_STAT estat;
     int32_t total_missing = 0;
     int32_t max_num = numrecs;
+    gdp_datum_t *datum = gdp_datum_new();
     datum->recno = start_recno;
 
     while (numrecs >= 0) {
@@ -672,12 +672,10 @@ _rpl_check_missing_entries(
             //Not supported now.
         }
 
-        //required??
-        gdp_buf_reset(datum->dbuf);
-
         numrecs--;
         datum->recno++;
     }
+    gdp_datum_free(datum);
 
     return total_missing;
 }
