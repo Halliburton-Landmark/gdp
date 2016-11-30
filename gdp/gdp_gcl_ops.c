@@ -853,7 +853,7 @@ _gdp_gcl_fwd_append(
 	// sanity checks
 	if (!GDP_GCL_ISGOOD(gcl))
 		return GDP_STAT_GCL_NOT_OPEN;
-	if (memcmp(to_server, _GdpMyRoutingName, sizeof _GdpMyRoutingName) == 0)
+	if (GDP_NAME_SAME(to_server, _GdpMyRoutingName))
 	{
 		// forwarding to ourselves: bad idea
 		EP_ASSERT_PRINT("_gdp_gcl_fwd_append: forwarding to myself");

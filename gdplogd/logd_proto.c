@@ -235,7 +235,7 @@ cmd_create(gdp_req_t *req)
 	gdp_name_t gclname;
 	int i;
 
-	if (memcmp(req->pdu->dst, _GdpMyRoutingName, sizeof _GdpMyRoutingName) != 0)
+	if (!GDP_NAME_SAME(req->pdu->dst, _GdpMyRoutingName))
 	{
 		// this is directed to a GCL, not to the daemon
 		return gdpd_gcl_error(req->pdu->dst, "cmd_create: log name required",
@@ -255,7 +255,7 @@ cmd_create(gdp_req_t *req)
 	}
 
 	// make sure we aren't creating a log with our name
-	if (memcmp(gclname, _GdpMyRoutingName, sizeof _GdpMyRoutingName) == 0)
+	if (GDP_NAME_SAME(gclname, _GdpMyRoutingName))
 	{
 		estat = gdpd_gcl_error(gclname,
 				"cmd_create: cannot create a log with same name as logd",
@@ -1137,7 +1137,7 @@ cmd_fwd_append(gdp_req_t *req)
 	gdp_name_t gclname;
 
 	// must be addressed to me
-	if (memcmp(req->pdu->dst, _GdpMyRoutingName, sizeof _GdpMyRoutingName) != 0)
+	if (!GDP_NAME_SAME(req->pdu->dst, _GdpMyRoutingName))
 	{
 		// this is directed to a GCL, not to the daemon
 		return gdpd_gcl_error(req->pdu->dst,
