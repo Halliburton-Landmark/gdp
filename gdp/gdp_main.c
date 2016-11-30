@@ -285,7 +285,7 @@ find_req_in_channel_list(
 	{
 		char ebuf[100];
 		estat = _gdp_req_lock(req);
-		ep_dbg_cprintf(DbgProcResp, 44, 
+		ep_dbg_cprintf(DbgProcResp, 44,
 				"find_req_in_channel_list: _gdp_req_lock => %s\n",
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}

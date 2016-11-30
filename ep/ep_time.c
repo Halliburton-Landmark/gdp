@@ -285,7 +285,7 @@ ep_time_print(const EP_TIME_SPEC *tv, FILE *fp, uint32_t flags)
 **	Uses up to three algorithms.  The first, built in, is to parse
 **	an ISO 8601 date (including nanoseconds) in an ad-hoc way.
 **	If the string ends in "Z" it will be GMT, otherwise it will
-**	be local time.  This is the only algorithm that handles 
+**	be local time.  This is the only algorithm that handles
 **	nanoseconds, which is why it is first.
 **
 **	The second algorithm is to use strptime(3) with a set of
@@ -484,7 +484,7 @@ fail0:
 		{
 			char tbuf[60];
 
-			ep_dbg_printf("ep_time_parse: from %s\n\tto %s\n", 
+			ep_dbg_printf("ep_time_parse: from %s\n\tto %s\n",
 					dtstr,
 					ep_time_format(ts, tbuf, sizeof tbuf,
 						EP_TIME_FMT_HUMAN));

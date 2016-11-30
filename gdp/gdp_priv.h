@@ -523,7 +523,7 @@ gdp_rid_t		_gdp_rid_new(				// create new request id
 EP_STAT			_gdp_req_send(				// send request to daemon (async)
 						gdp_req_t *req);
 
-EP_STAT			_gdp_req_unsend(			// pull failed request off GCL list 
+EP_STAT			_gdp_req_unsend(			// pull failed request off GCL list
 						gdp_req_t *req);
 
 EP_STAT			_gdp_req_dispatch(			// do local req processing
