@@ -269,7 +269,7 @@ bdb_get(DB *db,
 #endif
 	estat = ep_stat_from_dbstat(dbstat);
 	if (!EP_STAT_ISOK(estat))
-		ep_log(estat, "bdb_put: dbstat %d", dbstat);
+		ep_log(estat, "bdb_get: dbstat %d", dbstat);
 	return estat;
 }
 #endif // LOG_CHECK
@@ -366,12 +366,14 @@ bdb_put(DB *db,
 
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
 	dbstat = db->put(db, NULL, key, val, 0);
+	if (dbstat != 0 && ep_dbg_test(Dbg, 6))
+		ep_dbg_printf("bdb_put: dbstat %s\n", db_strerror(dbstat));
 #else
 	dbstat = db->put(db, key, val, 0);
+	if (dbstat != 0 && ep_dbg_test(Dbg, 6))
+		ep_dbg_printf("bdb_put: dbstat %d\n", dbstat);
 #endif
 	estat = ep_stat_from_dbstat(dbstat);
-	if (!EP_STAT_ISOK(estat))
-		ep_log(estat, "bdb_put: dbstat %d", dbstat);
 	return estat;
 }
 
@@ -1534,6 +1536,12 @@ tidx_put(gdp_gcl_t *gcl, int64_t sec, int32_t nsec, gdp_recno_t recno)
 	tval_dbt.size = sizeof tvalue;
 
 	estat = bdb_put(phys->tidx.db, &tkey_dbt, &tval_dbt);
+	if (!EP_STAT_ISOK(estat) && ep_dbg_test(Dbg, 6))
+	{
+		char ebuf[120];
+		ep_dbg_printf("tidx_put(%s) failure: %s\n",
+				gcl->pname, ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
 
 	// if this is severe, we want to abandon the database
 	// XXX is ISSFAIL the correct heuristic?
