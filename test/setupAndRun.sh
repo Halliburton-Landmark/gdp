@@ -36,9 +36,13 @@ fi
 gdpRouterSource=$sourceDirectory/gdp_router
 
 if [ ! -d "$gdpRouterSource" ]; then
-   echo "#### $0: Checking out the gdp_router repo and create $gdpRouterSource."
+   echo "#### $0: Checking out the gdp_router repo with ssh and create $gdpRouterSource."
    mkdir -p `dirname $gdpRouterSource`
-   (cd `dirname "$gdpRouterSource"`; git clone https://repo.eecs.berkeley.edu/git/projects/swarmlab/gdp_router.git)
+   (cd `dirname $gdpRouterSource`; git clone repoman@repo.eecs.berkeley.edu:/projects/swarmlab/gdp_router.git)
+   if [ ! -d "$gdpRouterSource" ]; then
+       echo "#### $0: Checking out with ssh failed, so we try https and create $gdpRouterSource."
+       (cd `dirname "$gdpRouterSource"`; git clone https://repo.eecs.berkeley.edu/git/projects/swarmlab/gdp_router.git)
+   fi
 else
     echo "#### $0: Running git pull in $gdpRouterSource"
     (cd "$gdpRouterSource"; git pull)
@@ -46,6 +50,10 @@ fi
     
 if [ ! -d "${gdpRouterSource}" ]; then
     echo "$0: Could not create ${gdpRouterSource}. Exiting"
+    echo "Try running: "
+    echo "   mkdir -p $sourceDirectory"
+    echo "   (cd ~/sourceDirectory; git clone https://repo.eecs.berkeley.edu/git/projects/swarmlab/gdp_router.git)"
+    echo "and then rerun this script."
     exit 3
 fi
 
