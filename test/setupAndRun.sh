@@ -83,7 +83,8 @@ echo "    export EP_PARAM_PATH=$EP_PARAM_PATH"
 
 echo "#### $0: Starting gdp_router"
 # pkill -f matches against the full argument list.
-pkill -u $USER -f python ./src/gdp_router.py
+# RHEL: Use quotes with -f
+pkill -u $USER -f 'python ./src/gdp_router.py'
 startingDirectory=`pwd`
 echo "Command to start gdp_router (cd $gdpRouterSource; python ./src/gdp_router.py -l routerLog.txt) &"
 cd "$gdpRouterSource"
