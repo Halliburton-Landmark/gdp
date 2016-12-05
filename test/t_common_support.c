@@ -1,8 +1,5 @@
 /* vim: set ai sw=4 sts=4 ts=4 : */
 
-/*  To compile:
-cc -I. t_sub_and_append.c -Lep -Lgdp -lgdp -lep -levent -levent_pthreads -pthread -lcrypto -lavahi-client -lavahi-common
-*/
 
 #include "t_common_support.h"
 
