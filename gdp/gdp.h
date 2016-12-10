@@ -438,4 +438,9 @@ extern gdp_buf_t *gdp_datum_getsig(
 extern short	gdp_datum_getsigmdalg(
 					const gdp_datum_t *datum);
 
+// copy contents of one datum into another
+extern void		gdp_datum_copy(
+					gdp_datum_t *to,
+					const gdp_datum_t *from);
+
 #endif // _GDP_H_

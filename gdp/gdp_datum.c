@@ -251,6 +251,30 @@ done:
 
 
 /*
+**  Copy contents of one datum into another
+*/
+
+void
+gdp_datum_copy(gdp_datum_t *to, const gdp_datum_t *from)
+{
+	to->recno = from->recno;
+	to->ts = from->ts;
+	to->sigmdalg = from->sigmdalg;
+	to->siglen = from->siglen;
+	if (from->dbuf != NULL)
+	{
+		if (!EP_ASSERT_TEST(to->dbuf != NULL))
+			gdp_buf_copy(to->dbuf, from->dbuf);
+	}
+	if (from->sig != NULL)
+	{
+		if (!EP_ASSERT_TEST(to->sig != NULL))
+			gdp_buf_copy(to->sig, from->sig);
+	}
+}
+
+
+/*
 **  Duplicate a datum (internal use)
 */
 
