@@ -39,61 +39,61 @@
 
 typedef struct evbuffer	gdp_buf_t;
 
-extern gdp_buf_t	*gdp_buf_new(void);
+extern gdp_buf_t	*gdp_buf_new(void);			// create new buffer
 
-extern int			gdp_buf_reset(
+extern int			gdp_buf_reset(				// empty a buffer
 						gdp_buf_t *b);
 
-extern void			gdp_buf_free(
+extern void			gdp_buf_free(				// free buffer
 						gdp_buf_t *b);
 
-extern void			gdp_buf_setlock(
+extern void			gdp_buf_setlock(			// associate mutex with buffer
 						gdp_buf_t *buf,
 						EP_THR_MUTEX *m);
 
-extern void			gdp_buf_lock(
+extern void			gdp_buf_lock(				// lock a buffer
 						gdp_buf_t *buf);
 
-extern void			gdp_buf_unlock(
+extern void			gdp_buf_unlock(				// unlock a buffer
 						gdp_buf_t *buf);
 
-extern size_t		gdp_buf_getlength(
+extern size_t		gdp_buf_getlength(			// get length of buffer
 						const gdp_buf_t *buf);
 
-extern size_t		gdp_buf_read(
+extern size_t		gdp_buf_read(				// read data from buffer
 						gdp_buf_t *buf,
 						void *out,
 						size_t sz);
 
-extern size_t		gdp_buf_peek(
+extern size_t		gdp_buf_peek(				// peek into buffer
 						gdp_buf_t *buf,
 						void *out,
 						size_t sz);
 
-extern int			gdp_buf_drain(
+extern int			gdp_buf_drain(				// remove data from buffer
 						gdp_buf_t *buf,
 						size_t sz);
 
 extern unsigned char
-					*gdp_buf_getptr(
+					*gdp_buf_getptr(			// get pointer to buffer
 						gdp_buf_t *buf,
 						size_t sz);
 
-extern int			gdp_buf_write(
+extern int			gdp_buf_write(				// write data to buffer
 						gdp_buf_t *buf,
 						const void *in,
 						size_t sz);
 
-extern int			gdp_buf_move(
+extern int			gdp_buf_move(				// move data between buffers
 						gdp_buf_t *obuf,
 						gdp_buf_t *ibuf,
 						size_t sz);
 
-extern int			gdp_buf_copy(
+extern int			gdp_buf_copy(				// duplicate data
 						gdp_buf_t *obuf,
 						gdp_buf_t *ibuf);
 
-extern gdp_buf_t	*gdp_buf_dup(
+extern gdp_buf_t	*gdp_buf_dup(				// duplicate a buffer
 						gdp_buf_t *buf);
 
 extern int			gdp_buf_printf(
