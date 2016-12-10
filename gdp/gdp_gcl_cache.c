@@ -483,9 +483,9 @@ void
 _gdp_gcl_incref(gdp_gcl_t *gcl)
 {
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
-	GDP_ASSERT_MUTEX_ISUNLOCKED(gcl, goto fail0);
+	GDP_ASSERT_MUTEX_ISUNLOCKED(&gcl->mutex, goto fail0);
 	ep_thr_mutex_lock(&gcl->mutex);
-//fail0:
+fail0:
 	gcl->refcnt++;
 	_gdp_gcl_touch(gcl);
 	ep_dbg_cprintf(Dbg, 51, "_gdp_gcl_incref(%p): %d\n", gcl, gcl->refcnt);
