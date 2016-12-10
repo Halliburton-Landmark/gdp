@@ -450,6 +450,30 @@ _gdp_gcl_cache_shutdown(void (*shutdownfunc)(gdp_req_t *))
 
 
 /*
+**  _GDP_GCL_LOCK --- lock a GCL
+*/
+
+void
+_gdp_gcl_lock(gdp_gcl_t *gcl)
+{
+	ep_thr_mutex_lock(&gcl->mutex);
+	gcl->flags |= GCLF_ISLOCKED;
+}
+
+
+/*
+**  _GDP_GCL_UNLOCK --- unlock a GCL
+*/
+
+void
+_gdp_gcl_unlock(gdp_gcl_t *gcl)
+{
+	gcl->flags &= ~GCLF_ISLOCKED;
+	ep_thr_mutex_unlock(&gcl->mutex);
+}
+
+
+/*
 **  _GDP_GCL_INCREF --- increment the reference count on a GCL
 **
 **		Must be called with GCL unlocked.

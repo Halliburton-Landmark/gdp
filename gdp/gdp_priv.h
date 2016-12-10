@@ -199,9 +199,21 @@ struct gdp_gcl
 #define GDP_ASSERT_GCL_ISGOOD(gcl)										\
 				(EP_ASSERT(GDP_GCL_ISGOOD(gcl))
 
-#if GDP_EXTENDED_LOCKING_CHECK		// these don't work on recursive mutexes
+/*
+**  Assertions on mutex locks (for debugging).
+**
+**		These macros:
+**		* Don't work on recursive mutexes.
+**		* Don't use the "do { } while(false)" idiom so r can use
+**		  break and continue.
+**		* Try to leave the lock in the same state as it started,
+**		  even if that state violates the assertion.  However,
+**		  there will (obviously) be some side effects, particularly
+**		  when unlocking a mutex that was not supposed to be locked.
+*/
 
-// don't use "do { } while(false)" so r can use break and continue
+#if GDP_EXTENDED_LOCKING_CHECK
+
 #define GDP_ASSERT_MUTEX_ISLOCKED(m, r)									\
 				if (EP_ASSERT_TEST(ep_thr_mutex_trylock(m) != 0))		\
 				{														\
@@ -209,14 +221,19 @@ struct gdp_gcl
 					r;													\
 				}
 
-#define GDP_ASSERT_MUTEX_ISUNLOCKED(m, r)			//XXX IMPLEMENT ME
+#define GDP_ASSERT_MUTEX_ISUNLOCKED(m, r)								\
+				if (EP_ASSERT_TEST(ep_thr_mutex_tryunlock(m) != 0))		\
+				{														\
+					ep_thr_mutex_lock(m);								\
+					r;													\
+				}
 
 #else
 
 #define GDP_ASSERT_MUTEX_ISLOCKED(m, r)
 #define GDP_ASSERT_MUTEX_ISUNLOCKED(m, r)
 
-#endif
+#endif // GDP_EXTENDED_LOCKING_CHECK
 
 /*
 **  GCL cache.
@@ -252,6 +269,12 @@ void			_gdp_gcl_cache_shutdown(	// immediately shut down cache
 						void (*shutdownfunc)(gdp_req_t *));
 
 void			_gdp_gcl_touch(				// move to front of LRU list
+						gdp_gcl_t *gcl);
+
+void			_gdp_gcl_lock(				// lock the GCL mutex
+						gdp_gcl_t *gcl);
+
+void			_gdp_gcl_unlock(			// unlock the GCL mutex
 						gdp_gcl_t *gcl);
 
 void			_gdp_gcl_incref(			// increase reference count
