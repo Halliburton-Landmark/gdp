@@ -102,6 +102,8 @@ extern int	_ep_thr_mutex_trylock(EP_THR_MUTEX *mtx,
 				const char *file, int line, const char *name);
 extern int	_ep_thr_mutex_unlock(EP_THR_MUTEX *mtx,
 				const char *file, int line, const char *name);
+extern int	_ep_thr_mutex_tryunlock(EP_THR_MUTEX *mtx,
+				const char *file, int line, const char *name);
 extern int	ep_thr_mutex_check(EP_THR_MUTEX *mtx);
 #define		ep_thr_mutex_init(mtx, type)	_ep_thr_mutex_init(mtx, type, \
 				__FILE__, __LINE__, #mtx)
@@ -112,6 +114,8 @@ extern int	ep_thr_mutex_check(EP_THR_MUTEX *mtx);
 #define		ep_thr_mutex_trylock(mtx)	_ep_thr_mutex_trylock(mtx, \
 				__FILE__, __LINE__, #mtx)
 #define		ep_thr_mutex_unlock(mtx)	_ep_thr_mutex_unlock(mtx, \
+				__FILE__, __LINE__, #mtx)
+#define		ep_thr_mutex_tryunlock(mtx)	_ep_thr_mutex_tryunlock(mtx, \
 				__FILE__, __LINE__, #mtx)
 
 typedef pthread_cond_t		EP_THR_COND;

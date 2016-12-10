@@ -245,13 +245,9 @@ _ep_thr_mutex_trylock(EP_THR_MUTEX *mtx,
 	if (!_EpThrUsePthreads)
 		return 0;
 	CHECKMTX(mtx, "trylock >>>");
-	if ((err = pthread_mutex_trylock(mtx)) != 0)
-	{
-		// ignore "resource busy" and "resource deadlock avoided" errors
-		// (EDEADLK should only occur if libep.thr.mutex.type=errorcheck)
-		if (err != EBUSY && err != EDEADLK)
-			diagnose_thr_err(err, "mutex_trylock", file, line, name);
-	}
+	// EBUSY => mutex was already locked
+	if ((err = pthread_mutex_trylock(mtx)) != 0 && err != EBUSY)
+		diagnose_thr_err(err, "mutex_trylock", file, line, name);
 	CHECKMTX(mtx, "trylock <<<");
 	return err;
 }
@@ -269,6 +265,23 @@ _ep_thr_mutex_unlock(EP_THR_MUTEX *mtx,
 	if ((err = pthread_mutex_unlock(mtx)) != 0)
 		diagnose_thr_err(err, "mutex_unlock", file, line, name);
 	CHECKMTX(mtx, "unlock <<<");
+	return err;
+}
+
+int
+_ep_thr_mutex_tryunlock(EP_THR_MUTEX *mtx,
+		const char *file, int line, const char *name)
+{
+	int err;
+
+	TRACE(mtx, "mutex_tryunlock");
+	if (!_EpThrUsePthreads)
+		return 0;
+	CHECKMTX(mtx, "tryunlock >>>");
+	// EAGAIN => mutex was not locked
+	if ((err = pthread_mutex_unlock(mtx)) != 0 && err != EAGAIN)
+		diagnose_thr_err(err, "mutex_unlock", file, line, name);
+	CHECKMTX(mtx, "tryunlock <<<");
 	return err;
 }
 
