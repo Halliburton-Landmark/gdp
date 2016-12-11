@@ -189,7 +189,7 @@ struct gdp_gcl
 /* flags for GCL handles */
 #define GCLF_DROPPING		0x0001		// handle is being deallocated
 #define GCLF_INCACHE		0x0002		// handle is in cache
-#define GCLF_ISLOCKED		0x0004		// GclCacheMutex already locked
+#define GCLF_ISLOCKED		0x0004		// gcl is locked
 #define GCLF_INUSE			0x0008		// handle is allocated
 #define GCLF_DEFER_FREE		0x0010		// defer actual free until reclaim
 
@@ -214,17 +214,20 @@ struct gdp_gcl
 
 #if GDP_EXTENDED_LOCKING_CHECK
 
+bool		_gdp_mutex_check_islocked(
+				EP_THR_MUTEX *, const char *, const char *, int);
+bool		_gdp_mutex_check_isunlocked(
+				EP_THR_MUTEX *, const char *, const char *, int);
+
 #define GDP_ASSERT_MUTEX_ISLOCKED(m, r)									\
-				if (EP_ASSERT_TEST(ep_thr_mutex_trylock(m) != 0))		\
+				if (!_gdp_mutex_check_islocked(m, #m, __FILE__, __LINE__))	\
 				{														\
-					ep_thr_mutex_unlock(m);								\
 					r;													\
 				}
 
 #define GDP_ASSERT_MUTEX_ISUNLOCKED(m, r)								\
-				if (EP_ASSERT_TEST(ep_thr_mutex_tryunlock(m) == EPERM))	\
+				if (!_gdp_mutex_check_isunlocked(m, #m, __FILE__, __LINE__)) \
 				{														\
-					ep_thr_mutex_lock(m);								\
 					r;													\
 				}
 

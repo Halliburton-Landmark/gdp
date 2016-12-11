@@ -472,6 +472,83 @@ _gdp_gcl_unlock(gdp_gcl_t *gcl)
 
 
 /*
+**  Check to make sure a mutex is locked / unlocked.
+*/
+
+static int
+get_lock_type(void)
+{
+	static int locktype;
+	static bool initialized = false;
+
+	if (initialized)
+		return locktype;
+
+	const char *p = ep_adm_getstrparam("libep.thr.mutex.type", "default");
+	if (strcasecmp(p, "normal") == 0)
+		locktype = EP_THR_MUTEX_NORMAL;
+	else if (strcasecmp(p, "errorcheck") == 0)
+		locktype = EP_THR_MUTEX_ERRORCHECK;
+	else if (strcasecmp(p, "recursive") == 0)
+		locktype = EP_THR_MUTEX_RECURSIVE;
+	else
+		locktype = EP_THR_MUTEX_DEFAULT;
+
+	initialized = true;
+	return locktype;
+}
+
+bool
+_gdp_mutex_check_islocked(
+		EP_THR_MUTEX *m,
+		const char *mstr,
+		const char *file,
+		int line)
+{
+	int istat;
+
+	// if we are using recursive locks, this won't tell much
+	if (get_lock_type() == EP_THR_MUTEX_RECURSIVE)
+		return true;
+
+	// trylock should fail if the mutex is already locked
+	istat = ep_thr_mutex_trylock(m);
+	if (istat != 0)
+		return true;
+
+	// oops, must have been unlocked
+	ep_thr_mutex_unlock(m);
+	ep_assert_print(file, line, "mutex %s is not locked", mstr);
+	return false;
+}
+
+
+bool
+_gdp_mutex_check_isunlocked(
+		EP_THR_MUTEX *m,
+		const char *mstr,
+		const char *file,
+		int line)
+{
+	int istat;
+
+	// anything but error checking locks?  tryunlock doesn't work
+	if (get_lock_type() != EP_THR_MUTEX_ERRORCHECK)
+		return true;
+
+	// tryunlock should fail if the mutex is not already locked
+	istat = ep_thr_mutex_tryunlock(m);
+	if (istat == EPERM)
+		return true;
+
+	// oops, must have been locked
+	ep_thr_mutex_lock(m);
+	ep_assert_print(file, line, "mutex %s is already locked", mstr);
+	return false;
+}
+
+
+/*
 **  _GDP_GCL_INCREF --- increment the reference count on a GCL
 **
 **		Must be called with GCL unlocked.
