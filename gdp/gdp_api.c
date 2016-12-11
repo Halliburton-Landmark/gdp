@@ -597,9 +597,7 @@ gdp_gcl_subscribe(gdp_gcl_t *gcl,
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// add start and stop parameters to PDU
-	ep_thr_mutex_lock(&req->pdu->datum->mutex);
 	req->pdu->datum->recno = start;
-	ep_thr_mutex_unlock(&req->pdu->datum->mutex);
 	req->numrecs = numrecs;
 
 	// now do the hard work
@@ -633,13 +631,11 @@ gdp_gcl_subscribe_ts(gdp_gcl_t *gcl,
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// add start and stop parameters to PDU
-	ep_thr_mutex_lock(&req->pdu->datum->mutex);
 	memcpy(&req->pdu->datum->ts, start, sizeof req->pdu->datum->ts);
 	req->numrecs = numrecs;
 
 	// now do the hard work
 	estat = _gdp_gcl_subscribe(req, numrecs, timeout, cbfunc, cbarg);
-	ep_thr_mutex_unlock(&req->pdu->datum->mutex);
 fail0:
 	PRSTAT(estat, "gdp_gcl_subscribe_ts");
 	return estat;
@@ -671,13 +667,11 @@ gdp_gcl_multiread(gdp_gcl_t *gcl,
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// add start and stop parameters to PDU
-	ep_thr_mutex_lock(&req->pdu->datum->mutex);
 	req->pdu->datum->recno = start;
 	req->numrecs = numrecs;
 
 	// now do the hard work
 	estat = _gdp_gcl_subscribe(req, numrecs, NULL, cbfunc, cbarg);
-	ep_thr_mutex_unlock(&req->pdu->datum->mutex);
 fail0:
 	PRSTAT(estat, "gdp_gcl_multiread");
 	return estat;
@@ -709,13 +703,11 @@ gdp_gcl_multiread_ts(gdp_gcl_t *gcl,
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// add start and stop parameters to PDU
-	ep_thr_mutex_lock(&req->pdu->datum->mutex);
 	memcpy(&req->pdu->datum->ts, start, sizeof req->pdu->datum->ts);
 	req->numrecs = numrecs;
 
 	// now do the hard work
 	estat = _gdp_gcl_subscribe(req, numrecs, NULL, cbfunc, cbarg);
-	ep_thr_mutex_unlock(&req->pdu->datum->mutex);
 fail0:
 	PRSTAT(estat, "gdp_gcl_multiread_ts");
 	return estat;
