@@ -401,6 +401,9 @@ gdp_datum_t		*gdp_datum_new(void);
 // free a message datum
 void			gdp_datum_free(gdp_datum_t *);
 
+// reset a datum to clean state
+void			gdp_datum_reset(gdp_datum_t *);
+
 // print out data record
 extern void		gdp_datum_print(
 					const gdp_datum_t *datum,	// message to print

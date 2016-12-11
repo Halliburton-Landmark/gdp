@@ -205,14 +205,14 @@ _gdp_gcl_cache_get(gdp_name_t gcl_name, gdp_iomode_t mode)
 	gcl = ep_hash_search(OpenGCLCache, sizeof (gdp_name_t), (void *) gcl_name);
 	if (gcl == NULL)
 		goto done;
-	ep_thr_mutex_lock(&gcl->mutex);
+	_gdp_gcl_lock(gcl);
 
 	// sanity checking
 	if (EP_ASSERT_TEST(EP_UT_BITSET(GCLF_INUSE, gcl->flags)) ||
 	    EP_ASSERT_TEST(EP_UT_BITSET(GCLF_INCACHE, gcl->flags)))
 	{
 		// remove GCL from cache and pretend it was never there
-		ep_thr_mutex_unlock(&gcl->mutex);
+		_gdp_gcl_unlock(gcl);
 		ep_hash_delete(OpenGCLCache, sizeof (gdp_name_t), (void *) gcl_name);
 		gcl = NULL;
 		goto done;
@@ -222,16 +222,14 @@ _gdp_gcl_cache_get(gdp_name_t gcl_name, gdp_iomode_t mode)
 	if (EP_UT_BITSET(GCLF_DROPPING, gcl->flags))
 	{
 		// oops, dropped from cache
-		ep_thr_mutex_unlock(&gcl->mutex);
+		_gdp_gcl_unlock(gcl);
 		gcl = NULL;
 	}
 	else
 	{
 		// we're good to go
-		gcl->flags |= GCLF_ISLOCKED;
-		gcl->refcnt++;
-		_gdp_gcl_touch(gcl);
-		ep_thr_mutex_unlock(&gcl->mutex);
+		_gdp_gcl_unlock(gcl);
+		_gdp_gcl_incref(gcl);
 	}
 
 done:
@@ -484,12 +482,12 @@ _gdp_gcl_incref(gdp_gcl_t *gcl)
 {
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
 	GDP_ASSERT_MUTEX_ISUNLOCKED(&gcl->mutex, goto fail0);
-	ep_thr_mutex_lock(&gcl->mutex);
+	_gdp_gcl_lock(gcl);
 fail0:
 	gcl->refcnt++;
 	_gdp_gcl_touch(gcl);
 	ep_dbg_cprintf(Dbg, 51, "_gdp_gcl_incref(%p): %d\n", gcl, gcl->refcnt);
-	ep_thr_mutex_unlock(&gcl->mutex);
+	_gdp_gcl_unlock(gcl);
 }
 
 
@@ -527,7 +525,7 @@ _gdp_gcl_decref(gdp_gcl_t **gclp)
 	if (gcl->refcnt == 0 && !EP_UT_BITSET(GCLF_DEFER_FREE, gcl->flags))
 		_gdp_gcl_freehandle(gcl);
 	else if (!gcl_was_locked)
-		ep_thr_mutex_unlock(&gcl->mutex);
+		_gdp_gcl_unlock(gcl);
 }
 
 

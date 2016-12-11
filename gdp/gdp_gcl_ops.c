@@ -324,7 +324,7 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 	reqflags |= GDP_REQ_ROUTEFAIL;			// don't retry on router errors
 	estat = _gdp_req_new(cmd, gcl, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
-	ep_thr_mutex_lock(&req->pdu->datum->mutex);
+	//ep_thr_mutex_lock(&req->pdu->datum->mutex);
 	estat = _gdp_invoke(req);
 	EP_STAT_CHECK(estat, goto fail0);
 	// success
@@ -413,7 +413,7 @@ fail1:
 	}
 
 fail0:
-	ep_thr_mutex_unlock(&req->pdu->datum->mutex);
+	//ep_thr_mutex_unlock(&req->pdu->datum->mutex);
 	if (req != NULL)
 	{
 		req->gcl = NULL;		// owned by caller
@@ -679,27 +679,25 @@ _gdp_gcl_read(gdp_gcl_t *gcl,
 
 	errno = 0;				// avoid spurious messages
 
+	// sanity checks
 	if (!GDP_GCL_ISGOOD(gcl))
 		return GDP_STAT_GCL_NOT_OPEN;
 	if (!GDP_DATUM_ISGOOD(datum))
 		return GDP_STAT_DATUM_REQUIRED;
-	ep_thr_mutex_lock(&datum->mutex);
+	EP_ASSERT_ELSE(datum->inuse, return EP_STAT_ASSERT_ABORT);
 	if (!EP_UT_BITSET(GDP_MODE_RO, gcl->iomode))
 		goto fail0;
+
+	// create and send a new request
 	estat = _gdp_req_new(GDP_CMD_READ, gcl, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
-
-	gdp_datum_free(req->pdu->datum);
-	req->pdu->datum = datum;
-	EP_ASSERT_ELSE(datum->inuse, return EP_STAT_ASSERT_ABORT);
-
+	gdp_datum_copy(req->pdu->datum, datum);
 	estat = _gdp_invoke(req);
 
-	// ok, done!
-	req->pdu->datum = NULL;			// owned by caller
+	// ok, done!  pass the datum contents to the caller and free the request
+	gdp_datum_copy(datum, req->pdu->datum);
 	_gdp_req_free(&req);
 fail0:
-	ep_thr_mutex_unlock(&datum->mutex);
 	return estat;
 }
 

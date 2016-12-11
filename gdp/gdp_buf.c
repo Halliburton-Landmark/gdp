@@ -43,10 +43,14 @@
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.buf", "GDP buffer processing");
 
 #define DIAGNOSE(cmd, istat)										\
-			do {													\
+			do														\
+			{														\
 				if (istat < 0 && ep_dbg_test(Dbg, 10))				\
-					ep_dbg_printf("gdp_buf_%s: %s\n",				\
-								cmd, strerror(errno));				\
+				{													\
+					char ebuf[40];									\
+					strerror_r(errno, ebuf, sizeof ebuf);			\
+					ep_dbg_printf("gdp_buf_%s: %s\n", cmd, ebuf);	\
+				}													\
 			} while (false)
 
 /*
@@ -250,10 +254,18 @@ _gdp_buf_raw_copy(gdp_buf_t *obuf, gdp_buf_t *ibuf)
 #else
 	// this implementation may be expensive if ibuf is large
 	ssize_t buflen = evbuffer_get_length(ibuf);
+	if (buflen == 0)
+		return 0;
 	unsigned char *p = evbuffer_pullup(ibuf, buflen);
 	if (p != NULL)
-	{
 		istat = evbuffer_add(obuf, p, buflen);
+	else
+	{
+		ep_dbg_cprintf(Dbg, 1,
+				"_gdp_buf_raw_copy: evbuffer_pullup failed, buflen = %zd\n",
+				buflen);
+		if (errno == 0)
+			errno = ENOMEM;
 	}
 #endif
 

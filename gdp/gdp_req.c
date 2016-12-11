@@ -244,10 +244,10 @@ _gdp_req_free(gdp_req_t **reqp)
 	// remove the request from the GCL list
 	if (EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags) && req->gcl != NULL)
 	{
-		ep_thr_mutex_lock(&req->gcl->mutex);
+		_gdp_gcl_lock(req->gcl);
 		LIST_REMOVE(req, gcllist);
 		req->flags &= ~GDP_REQ_ON_GCL_LIST;
-		ep_thr_mutex_unlock(&req->gcl->mutex);
+		_gdp_gcl_unlock(req->gcl);
 	}
 
 	// remove any pending events from the request
@@ -398,10 +398,10 @@ _gdp_req_send(gdp_req_t *req)
 	if (gcl != NULL && !EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
 	{
 		// link the request to the GCL
-		ep_thr_mutex_lock(&gcl->mutex);
+		_gdp_gcl_lock(gcl);
 		LIST_INSERT_HEAD(&gcl->reqs, req, gcllist);
 		req->flags |= GDP_REQ_ON_GCL_LIST;
-		ep_thr_mutex_unlock(&gcl->mutex);
+		_gdp_gcl_unlock(gcl);
 
 		// register this handle so we can process the results
 		//		(it's likely that it's already in the cache)
@@ -446,10 +446,10 @@ _gdp_req_unsend(gdp_req_t *req)
 	}
 	else
 	{
-		ep_thr_mutex_lock(&gcl->mutex);
+		_gdp_gcl_lock(gcl);
 		LIST_REMOVE(req, gcllist);
 		req->flags &= ~GDP_REQ_ON_GCL_LIST;
-		ep_thr_mutex_unlock(&gcl->mutex);
+		_gdp_gcl_unlock(gcl);
 	}
 
 	return EP_STAT_OK;
@@ -492,7 +492,7 @@ _gdp_req_find(gdp_gcl_t *gcl, gdp_rid_t rid)
 		do
 		{
 			estat = EP_STAT_OK;
-			ep_thr_mutex_lock(&gcl->mutex);
+			_gdp_gcl_lock(gcl);
 			req = LIST_FIRST(&gcl->reqs);
 			for (; req != NULL; req = nextreq)
 			{
@@ -503,7 +503,7 @@ _gdp_req_find(gdp_gcl_t *gcl, gdp_rid_t rid)
 					break;
 				_gdp_req_unlock(req);
 			}
-			ep_thr_mutex_unlock(&gcl->mutex);
+			_gdp_gcl_unlock(gcl);
 		} while (!EP_STAT_ISOK(estat));
 		if (req == NULL)
 			break;				// nothing to find

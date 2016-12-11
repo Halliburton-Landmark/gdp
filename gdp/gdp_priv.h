@@ -222,7 +222,7 @@ struct gdp_gcl
 				}
 
 #define GDP_ASSERT_MUTEX_ISUNLOCKED(m, r)								\
-				if (EP_ASSERT_TEST(ep_thr_mutex_tryunlock(m) != 0))		\
+				if (EP_ASSERT_TEST(ep_thr_mutex_tryunlock(m) == EPERM))	\
 				{														\
 					ep_thr_mutex_lock(m);								\
 					r;													\
