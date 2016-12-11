@@ -2,7 +2,8 @@
 
 [Unit]
 Description=All mqtt-gdp-gateway instances
-After=gdplogd
+Requires=network-online.target
+After=network-online.target
 
 [Service]
 Type=oneshot
