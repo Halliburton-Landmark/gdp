@@ -833,8 +833,8 @@ usage(const char *msg)
 {
 	fprintf(stderr, "%s\n", msg);
 	fprintf(stderr,
-			"Usage: %s [-a] [-A results-collection-interval] [-d w-delay]\n"
-			"       [-D dbgspec] [-G router_addr] [-m] [-n run-size]\n"
+			"Usage: %s [-a] [-A results-collection-interval] [-D dbgspec]\n"
+			"       [-G router_addr][-i w-delay] [-m] [-n run-size]\n"
 			"       [-p payload-size] [-r n-readers] [-s] [-w n-writers]\n"
 			"       log_name_template\n"
 			"    -a  read or write asynchronously\n"
