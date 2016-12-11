@@ -61,7 +61,7 @@ test -f $MQTT_GATEWAY_LOG || cp /dev/null $MQTT_GATEWAY_LOG
 		exit $EX_CONFIG
 	fi
 
-	args="-s -M $mqtt_host -d -K$GDP_KEYS_DIR $MQTT_GATEWAY_ARGS"
+	args=""
 	gw_prog="$GDP_ROOT/bin/mqtt-gdp-gateway"
 	devices=`sed -e 's/#.*//' $GDP_ETC/mqtt-gateway.$shorthost.conf`
 	set -- $devices
@@ -80,14 +80,20 @@ test -f $MQTT_GATEWAY_LOG || cp /dev/null $MQTT_GATEWAY_LOG
 		else
 			echo "[ERROR] Log $gcl_root.device.$i does not exist!"
 			echo "[ERROR] This may be because a log server" \
-				" is down or inaccessible"
+				"is down or inaccessible"
 			echo "[ERROR] If you are sure that is not the case," \
-				" create a new log using:"
-			echo "$GDP_ROOT/bin/log-create -q -K$GDP_KEYS_DIR" \
+				"create a new log using:"
+			echo "        $GDP_ROOT/bin/log-create -q -K$GDP_KEYS_DIR" \
 				" -e none $gcl_root.device.$i"
 		fi
 	done
 
-	echo "[INFO] Running $gw_prog $args"
-	exec $gw_prog $args
+	if [ ! -z "$args" ]
+	then
+		args="-s -M $mqtt_host -d -K$GDP_KEYS_DIR $MQTT_GATEWAY_ARGS $args"
+		echo "[INFO] Running $gw_prog $args"
+		exec $gw_prog $args
+	else
+		echo "[INFO] $0: no valid logs"
+	fi
 } 2>&1 | ${LLOGGER} $MQTT_GATEWAY_LOG

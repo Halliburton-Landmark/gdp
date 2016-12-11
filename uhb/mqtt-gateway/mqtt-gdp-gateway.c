@@ -448,7 +448,8 @@ open_signed_log(const char *gdp_log_name, const char *signing_key_file)
 		fp = fopen(signing_key_file, "r");
 		if (fp == NULL)
 		{
-			ep_app_error("cannot open signing key file %s", signing_key_file);
+			ep_app_error("cannot open signing key file %s, log %s",
+					signing_key_file, gdp_log_name);
 			goto fail1;
 		}
 
@@ -456,7 +457,8 @@ open_signed_log(const char *gdp_log_name, const char *signing_key_file)
 				EP_CRYPTO_KEYFORM_PEM, EP_CRYPTO_F_SECRET);
 		if (skey == NULL)
 		{
-			ep_app_error("cannot read signing key file %s", signing_key_file);
+			ep_app_error("cannot read signing key file %s, log %s",
+					signing_key_file, gdp_log_name);
 			goto fail1;
 		}
 
