@@ -511,8 +511,8 @@ gdp_gcl_read(gdp_gcl_t *gcl,
 
 	EP_ASSERT_POINTER_VALID(datum);
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_read\n");
+	gdp_datum_reset(datum);
 	datum->recno = recno;
-	EP_TIME_INVALIDATE(&datum->ts);
 
 	estat = _gdp_gcl_read(gcl, datum, _GdpChannel, 0);
 	PRSTAT(estat, "gdp_gcl_read");
