@@ -387,6 +387,11 @@ do_async_read(gdp_gcl_t *gcl,
 		firstrec = 1;
 	if (numrecs <= 0)
 		numrecs = gdp_gcl_getnrecs(gcl);
+	if (firstrec < 0)
+	{
+		firstrec += numrecs;
+		numrecs -= firstrec;
+	}
 
 	// issue the multiread commands without reading results
 	gdp_recno_t recno = firstrec;
