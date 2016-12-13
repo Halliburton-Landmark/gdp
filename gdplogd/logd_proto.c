@@ -812,9 +812,10 @@ post_subscribe(gdp_req_t *req)
 	if (req->numrecs < 0 || !EP_UT_BITSET(GDP_REQ_SUBUPGRADE, req->flags))
 	{
 		// no more to read: do cleanup & send termination notice
-		ep_thr_mutex_lock(&req->gcl->mutex);
+		_gdp_gcl_lock(req->gcl);
 		sub_end_subscription(req);
-		ep_thr_mutex_unlock(&req->gcl->mutex);
+		// sub_end_subscription nulls out the GCL
+		//_gdp_gcl_unlock(req->gcl);
 	}
 	else
 	{
@@ -824,10 +825,11 @@ post_subscribe(gdp_req_t *req)
 		// link this request into the GCL so the subscription can be found
 		if (!EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
 		{
-			ep_thr_mutex_lock(&req->gcl->mutex);
+			_gdp_gcl_incref(req->gcl);		//DEBUG: is this appropriate?
+			_gdp_gcl_lock(req->gcl);
 			LIST_INSERT_HEAD(&req->gcl->reqs, req, gcllist);
 			req->flags |= GDP_REQ_ON_GCL_LIST;
-			ep_thr_mutex_unlock(&req->gcl->mutex);
+			_gdp_gcl_unlock(req->gcl);
 		}
 	}
 }
@@ -950,10 +952,10 @@ cmd_subscribe(gdp_req_t *req)
 		// link this request into the GCL so the subscription can be found
 		if (!EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
 		{
-			ep_thr_mutex_lock(&req->gcl->mutex);
+			_gdp_gcl_lock(req->gcl);
 			LIST_INSERT_HEAD(&req->gcl->reqs, req, gcllist);
 			req->flags |= GDP_REQ_ON_GCL_LIST;
-			ep_thr_mutex_unlock(&req->gcl->mutex);
+			_gdp_gcl_unlock(req->gcl);
 		}
 	}
 

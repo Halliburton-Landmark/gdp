@@ -264,14 +264,12 @@ _gdp_gcl_create(gdp_name_t gclname,
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// send the name of the log to be created in the payload
-	ep_thr_mutex_lock(&req->pdu->datum->mutex);
 	gdp_buf_write(req->pdu->datum->dbuf, gclname, sizeof (gdp_name_t));
 
 	// add the metadata to the output stream
 	_gdp_gclmd_serialize(gmd, req->pdu->datum->dbuf);
 
 	estat = _gdp_invoke(req);
-	ep_thr_mutex_unlock(&req->pdu->datum->mutex);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// success --- change the GCL name to the true name
@@ -324,7 +322,6 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 	reqflags |= GDP_REQ_ROUTEFAIL;			// don't retry on router errors
 	estat = _gdp_req_new(cmd, gcl, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
-	ep_thr_mutex_lock(&req->pdu->datum->mutex);
 	estat = _gdp_invoke(req);
 	EP_STAT_CHECK(estat, goto fail0);
 	// success
@@ -413,7 +410,6 @@ fail1:
 	}
 
 fail0:
-	ep_thr_mutex_unlock(&req->pdu->datum->mutex);
 	if (req != NULL)
 	{
 		req->gcl = NULL;		// owned by caller
@@ -489,9 +485,7 @@ _gdp_gcl_close(gdp_gcl_t *gcl,
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// tell the daemon to close it
-	ep_thr_mutex_lock(&req->pdu->datum->mutex);
 	estat = _gdp_invoke(req);
-	ep_thr_mutex_unlock(&req->pdu->datum->mutex);
 
 	//XXX should probably check status (and do what with it?)
 
@@ -572,7 +566,6 @@ _gdp_gcl_append(gdp_gcl_t *gcl,
 	EP_STAT estat = GDP_STAT_BAD_IOMODE;
 	gdp_req_t *req = NULL;
 
-	ep_thr_mutex_lock(&datum->mutex);
 	estat = append_common(gcl, datum, chan, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
@@ -584,7 +577,6 @@ _gdp_gcl_append(gdp_gcl_t *gcl,
 	req->pdu->datum = NULL;			// owned by caller
 	_gdp_req_free(&req);
 fail0:
-	ep_thr_mutex_unlock(&datum->mutex);
 	return estat;
 }
 
@@ -612,7 +604,6 @@ _gdp_gcl_append_async(
 
 	// deliver results asynchronously
 	reqflags |= GDP_REQ_ASYNCIO;
-	ep_thr_mutex_lock(&datum->mutex);
 	estat = append_common(gcl, datum, chan, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
@@ -644,7 +635,6 @@ _gdp_gcl_append_async(
 		_gdp_req_unlock(req);
 	}
 fail0:
-	ep_thr_mutex_unlock(&datum->mutex);
 	if (ep_dbg_test(Dbg, 10))
 	{
 		char ebuf[100];
@@ -679,27 +669,25 @@ _gdp_gcl_read(gdp_gcl_t *gcl,
 
 	errno = 0;				// avoid spurious messages
 
+	// sanity checks
 	if (!GDP_GCL_ISGOOD(gcl))
 		return GDP_STAT_GCL_NOT_OPEN;
 	if (!GDP_DATUM_ISGOOD(datum))
 		return GDP_STAT_DATUM_REQUIRED;
-	ep_thr_mutex_lock(&datum->mutex);
+	EP_ASSERT_ELSE(datum->inuse, return EP_STAT_ASSERT_ABORT);
 	if (!EP_UT_BITSET(GDP_MODE_RO, gcl->iomode))
 		goto fail0;
+
+	// create and send a new request
 	estat = _gdp_req_new(GDP_CMD_READ, gcl, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
-
-	gdp_datum_free(req->pdu->datum);
-	req->pdu->datum = datum;
-	EP_ASSERT_ELSE(datum->inuse, return EP_STAT_ASSERT_ABORT);
-
+	gdp_datum_copy(req->pdu->datum, datum);
 	estat = _gdp_invoke(req);
 
-	// ok, done!
-	req->pdu->datum = NULL;			// owned by caller
+	// ok, done!  pass the datum contents to the caller and free the request
+	gdp_datum_copy(datum, req->pdu->datum);
 	_gdp_req_free(&req);
 fail0:
-	ep_thr_mutex_unlock(&datum->mutex);
 	return estat;
 }
 
@@ -779,14 +767,12 @@ _gdp_gcl_getmetadata(gdp_gcl_t *gcl,
 	estat = _gdp_req_new(GDP_CMD_GETMETADATA, gcl, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
-	ep_thr_mutex_lock(&req->pdu->datum->mutex);
 	estat = _gdp_invoke(req);
 	EP_STAT_CHECK(estat, goto fail1);
 
 	*gmdp = _gdp_gclmd_deserialize(req->pdu->datum->dbuf);
 
 fail1:
-	ep_thr_mutex_unlock(&req->pdu->datum->mutex);
 	_gdp_req_free(&req);
 
 fail0:
@@ -860,8 +846,6 @@ _gdp_gcl_fwd_append(
 		return EP_STAT_ASSERT_ABORT;
 	}
 
-	ep_thr_mutex_lock(&datum->mutex);
-
 	// deliver results asynchronously
 	reqflags |= GDP_REQ_ASYNCIO;
 
@@ -914,7 +898,6 @@ _gdp_gcl_fwd_append(
 	}
 
 fail0:
-	ep_thr_mutex_unlock(&datum->mutex);
 	if (ep_dbg_test(Dbg, 10))
 	{
 		char ebuf[100];

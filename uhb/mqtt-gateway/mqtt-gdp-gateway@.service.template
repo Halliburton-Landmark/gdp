@@ -5,6 +5,8 @@ Description=MQTT to GDP gateway on %I
 Requires=mqtt-gdp-gateway.service
 Before=mqtt-gdp-gateway.service
 BindsTo=mqtt-gdp-gateway.service
+Requires=network-online.target
+After=network-online.target
 
 [Service]
 Type=simple

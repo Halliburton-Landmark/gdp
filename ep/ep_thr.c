@@ -279,7 +279,9 @@ _ep_thr_mutex_tryunlock(EP_THR_MUTEX *mtx,
 		return 0;
 	CHECKMTX(mtx, "tryunlock >>>");
 	// EAGAIN => mutex was not locked
-	if ((err = pthread_mutex_unlock(mtx)) != 0 && err != EAGAIN)
+	// EPERM  => mutex held by a different thread
+	if ((err = pthread_mutex_unlock(mtx)) != 0 &&
+			err != EAGAIN && err != EPERM)
 		diagnose_thr_err(err, "mutex_unlock", file, line, name);
 	CHECKMTX(mtx, "tryunlock <<<");
 	return err;

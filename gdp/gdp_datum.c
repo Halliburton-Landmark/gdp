@@ -79,14 +79,7 @@ gdp_datum_new(void)
 	EP_ASSERT(!datum->inuse);
 
 	// initialize metadata
-	datum->recno = GDP_PDU_NO_RECNO;
-	EP_TIME_INVALIDATE(&datum->ts);
-	datum->siglen = 0;
-	datum->sigmdalg = 0;
-	if (datum->dbuf == NULL)
-		datum->dbuf = gdp_buf_new();
-	else
-		gdp_buf_reset(datum->dbuf);
+	gdp_datum_reset(datum);
 	ep_dbg_cprintf(Dbg, 48, "gdp_datum_new => %p\n", datum);
 	datum->inuse = true;
 	return datum;
@@ -97,7 +90,7 @@ void
 gdp_datum_free(gdp_datum_t *datum)
 {
 	ep_dbg_cprintf(Dbg, 48, "gdp_datum_free(%p)\n", datum);
-	EP_ASSERT(datum->inuse);
+	EP_ASSERT_ELSE(datum->inuse, return);
 	datum->inuse = false;
 	if (datum->dbuf != NULL)
 	{
@@ -124,6 +117,27 @@ gdp_datum_free(gdp_datum_t *datum)
 	datum->next = DatumFreeList;
 	DatumFreeList = datum;
 	ep_thr_mutex_unlock(&DatumFreeListMutex);
+}
+
+
+/*
+**  Reset a datum
+**
+**		This is what you would get if you freed it and reallocated.
+*/
+
+void
+gdp_datum_reset(gdp_datum_t *datum)
+{
+	if (datum->dbuf == NULL)
+		datum->dbuf = gdp_buf_new();
+	else
+		gdp_buf_reset(datum->dbuf);
+	datum->siglen = datum->sigmdalg = 0;
+	if (datum->sig != NULL)
+		gdp_buf_reset(datum->sig);
+	datum->recno = GDP_PDU_NO_RECNO;
+	EP_TIME_INVALIDATE(&datum->ts);
 }
 
 
@@ -261,6 +275,7 @@ gdp_datum_copy(gdp_datum_t *to, const gdp_datum_t *from)
 	to->ts = from->ts;
 	to->sigmdalg = from->sigmdalg;
 	to->siglen = from->siglen;
+	to->inuse = from->inuse;
 	if (from->dbuf != NULL)
 	{
 		if (!EP_ASSERT_TEST(to->dbuf != NULL))

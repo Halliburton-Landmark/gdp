@@ -150,16 +150,29 @@ void
 collect_async_results(logctl_t *lc, long timeout)
 {
 	int prflags = GDP_DATUM_PRTEXT;
-	int n_to_collect = lc->n_out - lc->n_resp;
+	int n_to_collect;
+	gdp_gcl_t *gcl;
 	EP_TIME_SPEC event_timeout;
 	ep_time_from_nsec(timeout MILLISECONDS, &event_timeout);
+
+	if (lc == NULL)
+	{
+		// use some defaults (for final cleanup)
+		n_to_collect = 100;
+		gcl = NULL;
+	}
+	else
+	{
+		n_to_collect = lc->n_out - lc->n_resp;
+		gcl = lc->gcl;
+	}
 
 	while (n_to_collect > 0)
 	{
 		gdp_event_t *ev;
 
 		// poll to see if there are any events available
-		ev = gdp_event_next(lc->gcl, &event_timeout);
+		ev = gdp_event_next(gcl, &event_timeout);
 		if (ev == NULL)
 			break;
 
@@ -168,14 +181,16 @@ collect_async_results(logctl_t *lc, long timeout)
 		switch (evtype)
 		{
 		case GDP_EVENT_DATA:
-			lc->n_resp++;
+			if (lc != NULL)
+				lc->n_resp++;
 			n_to_collect--;
 			printf("%s: ", bname);
 			gdp_datum_print(gdp_event_getdatum(ev), stdout, prflags);
 			break;
 
 		case GDP_EVENT_CREATED:
-			lc->n_resp++;
+			if (lc != NULL)
+				lc->n_resp++;
 			n_to_collect--;
 			printf("%s: Data created\n", bname);
 			break;
@@ -684,6 +699,7 @@ do_run(void *bi_)
 	batch_t *bi = bi_;
 	EP_STAT estat = bi->run(bi);
 
+	collect_async_results(NULL, 2000);
 	if (bi->verbose)
 		ep_app_message(estat, "batch %s terminated", bi->bname);
 	return (void *) (uintptr_t) EP_STAT_TO_INT(estat);
@@ -833,8 +849,8 @@ usage(const char *msg)
 {
 	fprintf(stderr, "%s\n", msg);
 	fprintf(stderr,
-			"Usage: %s [-a] [-A results-collection-interval] [-d w-delay]\n"
-			"       [-D dbgspec] [-G router_addr] [-m] [-n run-size]\n"
+			"Usage: %s [-a] [-A results-collection-interval] [-D dbgspec]\n"
+			"       [-G router_addr][-i w-delay] [-m] [-n run-size]\n"
 			"       [-p payload-size] [-r n-readers] [-s] [-w n-writers]\n"
 			"       log_name_template\n"
 			"    -a  read or write asynchronously\n"

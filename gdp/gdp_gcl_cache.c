@@ -205,14 +205,14 @@ _gdp_gcl_cache_get(gdp_name_t gcl_name, gdp_iomode_t mode)
 	gcl = ep_hash_search(OpenGCLCache, sizeof (gdp_name_t), (void *) gcl_name);
 	if (gcl == NULL)
 		goto done;
-	ep_thr_mutex_lock(&gcl->mutex);
+	_gdp_gcl_lock(gcl);
 
 	// sanity checking
 	if (EP_ASSERT_TEST(EP_UT_BITSET(GCLF_INUSE, gcl->flags)) ||
 	    EP_ASSERT_TEST(EP_UT_BITSET(GCLF_INCACHE, gcl->flags)))
 	{
 		// remove GCL from cache and pretend it was never there
-		ep_thr_mutex_unlock(&gcl->mutex);
+		_gdp_gcl_unlock(gcl);
 		ep_hash_delete(OpenGCLCache, sizeof (gdp_name_t), (void *) gcl_name);
 		gcl = NULL;
 		goto done;
@@ -222,16 +222,14 @@ _gdp_gcl_cache_get(gdp_name_t gcl_name, gdp_iomode_t mode)
 	if (EP_UT_BITSET(GCLF_DROPPING, gcl->flags))
 	{
 		// oops, dropped from cache
-		ep_thr_mutex_unlock(&gcl->mutex);
+		_gdp_gcl_unlock(gcl);
 		gcl = NULL;
 	}
 	else
 	{
 		// we're good to go
-		gcl->flags |= GCLF_ISLOCKED;
-		gcl->refcnt++;
-		_gdp_gcl_touch(gcl);
-		ep_thr_mutex_unlock(&gcl->mutex);
+		_gdp_gcl_unlock(gcl);
+		_gdp_gcl_incref(gcl);
 	}
 
 done:
@@ -474,6 +472,83 @@ _gdp_gcl_unlock(gdp_gcl_t *gcl)
 
 
 /*
+**  Check to make sure a mutex is locked / unlocked.
+*/
+
+static int
+get_lock_type(void)
+{
+	static int locktype;
+	static bool initialized = false;
+
+	if (initialized)
+		return locktype;
+
+	const char *p = ep_adm_getstrparam("libep.thr.mutex.type", "default");
+	if (strcasecmp(p, "normal") == 0)
+		locktype = EP_THR_MUTEX_NORMAL;
+	else if (strcasecmp(p, "errorcheck") == 0)
+		locktype = EP_THR_MUTEX_ERRORCHECK;
+	else if (strcasecmp(p, "recursive") == 0)
+		locktype = EP_THR_MUTEX_RECURSIVE;
+	else
+		locktype = EP_THR_MUTEX_DEFAULT;
+
+	initialized = true;
+	return locktype;
+}
+
+bool
+_gdp_mutex_check_islocked(
+		EP_THR_MUTEX *m,
+		const char *mstr,
+		const char *file,
+		int line)
+{
+	int istat;
+
+	// if we are using recursive locks, this won't tell much
+	if (get_lock_type() == EP_THR_MUTEX_RECURSIVE)
+		return true;
+
+	// trylock should fail if the mutex is already locked
+	istat = ep_thr_mutex_trylock(m);
+	if (istat != 0)
+		return true;
+
+	// oops, must have been unlocked
+	ep_thr_mutex_unlock(m);
+	ep_assert_print(file, line, "mutex %s is not locked", mstr);
+	return false;
+}
+
+
+bool
+_gdp_mutex_check_isunlocked(
+		EP_THR_MUTEX *m,
+		const char *mstr,
+		const char *file,
+		int line)
+{
+	int istat;
+
+	// anything but error checking locks?  tryunlock doesn't work
+	if (get_lock_type() != EP_THR_MUTEX_ERRORCHECK)
+		return true;
+
+	// tryunlock should fail if the mutex is not already locked
+	istat = ep_thr_mutex_tryunlock(m);
+	if (istat == EPERM)
+		return true;
+
+	// oops, must have been locked
+	ep_thr_mutex_lock(m);
+	ep_assert_print(file, line, "mutex %s is already locked", mstr);
+	return false;
+}
+
+
+/*
 **  _GDP_GCL_INCREF --- increment the reference count on a GCL
 **
 **		Must be called with GCL unlocked.
@@ -484,12 +559,12 @@ _gdp_gcl_incref(gdp_gcl_t *gcl)
 {
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
 	GDP_ASSERT_MUTEX_ISUNLOCKED(&gcl->mutex, goto fail0);
-	ep_thr_mutex_lock(&gcl->mutex);
+	_gdp_gcl_lock(gcl);
 fail0:
 	gcl->refcnt++;
 	_gdp_gcl_touch(gcl);
 	ep_dbg_cprintf(Dbg, 51, "_gdp_gcl_incref(%p): %d\n", gcl, gcl->refcnt);
-	ep_thr_mutex_unlock(&gcl->mutex);
+	_gdp_gcl_unlock(gcl);
 }
 
 
@@ -527,7 +602,7 @@ _gdp_gcl_decref(gdp_gcl_t **gclp)
 	if (gcl->refcnt == 0 && !EP_UT_BITSET(GCLF_DEFER_FREE, gcl->flags))
 		_gdp_gcl_freehandle(gcl);
 	else if (!gcl_was_locked)
-		ep_thr_mutex_unlock(&gcl->mutex);
+		_gdp_gcl_unlock(gcl);
 }
 
 

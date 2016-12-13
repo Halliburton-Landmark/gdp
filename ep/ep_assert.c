@@ -29,6 +29,7 @@
 ***********************************************************************/
 
 #include <ep.h>
+#include <ep_app.h>
 #include <ep_assert.h>
 #include <ep_stat.h>
 #include <ep_string.h>
@@ -86,9 +87,9 @@ ep_assert_printv(
 	// log something here?
 
 	flockfile(stderr);
-	fprintf(stderr, "%s%sAssertion failed at %s:%d:\n\t",
+	fprintf(stderr, "%s%sAssertion failed at %s:%s:%d:\n\t",
 			EpVid->vidfgcyan, EpVid->vidbgred,
-			file, line);
+			ep_app_getprogname(), file, line);
 	vfprintf(stderr, msg, av);
 	fprintf(stderr, "%s\n", EpVid->vidnorm);
 

@@ -105,7 +105,7 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 		ep_time_deltanow(&sub_delta, &sub_timeout);
 	}
 
-	ep_thr_mutex_lock(&pubreq->gcl->mutex);
+	_gdp_gcl_lock(pubreq->gcl);
 	for (req = LIST_FIRST(&pubreq->gcl->reqs); req != NULL; req = nextreq)
 	{
 		_gdp_req_lock(req);
@@ -150,7 +150,7 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 		if (req != NULL)
 			_gdp_req_unlock(req);
 	}
-	ep_thr_mutex_unlock(&pubreq->gcl->mutex);
+	_gdp_gcl_unlock(pubreq->gcl);
 }
 
 
@@ -173,7 +173,7 @@ sub_end_subscription(gdp_req_t *req)
 	if (EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
 		LIST_REMOVE(req, gcllist);
 	req->flags &= ~GDP_REQ_ON_GCL_LIST;
-	_gdp_gcl_decref(&req->gcl);
+	_gdp_gcl_decref(&req->gcl);			//DEBUG: is this appropriate?
 
 	// send an "end of subscription" event
 	req->pdu->cmd = GDP_ACK_DELETED;
