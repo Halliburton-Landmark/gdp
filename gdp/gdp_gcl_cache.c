@@ -571,8 +571,12 @@ fail0:
 /*
 **  _GDP_GCL_DECREF --- decrement the reference count on a GCL
 **
-**		The GCL may be locked or unlocked.  It will be returned in the
-**		same state.  XXX This is a hack. XXX
+**		The GCL may be locked or unlocked.  It will be returned
+**		unlocked.  XXX This is a hack. XXX
+**
+**		XXX	We're still getting some cases where the input GCL is
+**		XXX	locked by a different thread, which gives errors when we
+**		XXX	try to unlock it.
 */
 
 void
@@ -588,20 +592,16 @@ _gdp_gcl_decref(gdp_gcl_t **gclp)
 	ep_dbg_cprintf(Dbg, 70, "_gdp_gcl_decref(%p, locked=%s)...\n",
 					gcl, gcl_was_locked ? "true" : "false");
 	if (gcl->refcnt > 0)
-	{
 		gcl->refcnt--;
-		*gclp = NULL;
-	}
 	else
-	{
 		ep_log(GDP_STAT_BAD_REFCNT, "_gdp_gcl_decref: %p: zero refcnt", gcl);
-	}
+	*gclp = NULL;
 
 	ep_dbg_cprintf(Dbg, 51, "_gdp_gcl_decref(%p): %d\n",
 			gcl, gcl->refcnt);
 	if (gcl->refcnt == 0 && !EP_UT_BITSET(GCLF_DEFER_FREE, gcl->flags))
 		_gdp_gcl_freehandle(gcl);
-	else if (!gcl_was_locked)
+	else
 		_gdp_gcl_unlock(gcl);
 }
 
