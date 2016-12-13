@@ -644,12 +644,12 @@ segment_open(gdp_gcl_t *gcl, segment_t *seg)
 	char data_pbuf[GCL_PATH_MAX];
 	segment_header_t seg_hdr;
 
-	ep_dbg_cprintf(Dbg, 20, "segment_open(seg %d, fp %p)\n",
-			seg->segno, seg->fp);
-
 	// if already open, this is a no-op
 	if (seg->fp != NULL)
 		return EP_STAT_OK;
+
+	ep_dbg_cprintf(Dbg, 20, "segment_open(seg %d, fp %p): %s\n",
+			seg->segno, seg->fp, gcl->pname);
 
 	// figure out where the segment lives on disk
 	//XXX for the moment assume that it's on our local disk
@@ -737,8 +737,8 @@ segment_close(gdp_gcl_t *gcl, uint32_t segno)
 	}
 	if (seg->fp != NULL)
 	{
-		ep_dbg_cprintf(Dbg, 39, "segment_close(%s): closing segment fp %p\n",
-				gcl->pname, seg->fp);
+		ep_dbg_cprintf(Dbg, 20, "segment_close(seg %d, fp %p): %s\n",
+				segno, seg->fp, gcl->pname);
 		if (fclose(seg->fp) != 0)
 			(void) posix_error(errno, "segment_close(%s): cannot fclose",
 					gcl->pname);
@@ -1682,6 +1682,8 @@ disk_open(gdp_gcl_t *gcl)
 	EP_STAT estat = EP_STAT_OK;
 	gcl_physinfo_t *phys;
 	const char *phase;
+
+	ep_dbg_cprintf(Dbg, 20, "disk_open(%s)\n", gcl->pname);
 
 	// allocate space for physical data
 	EP_ASSERT_REQUIRE(GETPHYS(gcl) == NULL);
