@@ -79,19 +79,19 @@ _gdp_invoke(gdp_req_t *req)
 	const char *cmdname;
 
 	EP_ASSERT_POINTER_VALID(req);
-	cmdname = _gdp_proto_cmd_name(req->pdu->cmd);
+	cmdname = _gdp_proto_cmd_name(req->cpdu->cmd);
 	if (ep_dbg_test(Dbg, 10))
 	{
 		ep_dbg_printf("\n>>> _gdp_invoke(req=%p rid=%" PRIgdp_rid "): %s (%d), gcl@%p\n",
 				req,
-				req->pdu->rid,
+				req->cpdu->rid,
 				cmdname,
-				req->pdu->cmd,
+				req->cpdu->cmd,
 				req->gcl);
 		if (ep_dbg_test(Dbg, 11))
 		{
 			ep_dbg_printf("\t");
-			_gdp_datum_dump(req->pdu->datum, ep_dbg_getfile());
+			_gdp_datum_dump(req->cpdu->datum, ep_dbg_getfile());
 		}
 	}
 	EP_ASSERT_ELSE(req->state == GDP_REQ_ACTIVE, return EP_STAT_ASSERT_ABORT);
@@ -114,7 +114,7 @@ _gdp_invoke(gdp_req_t *req)
 
 		ep_dbg_cprintf(Dbg, 36,
 				"_gdp_invoke: sending %d, retries=%d\n",
-				req->pdu->cmd, retries);
+				req->cpdu->cmd, retries);
 
 		estat = _gdp_req_send(req);
 		EP_STAT_CHECK(estat, continue);
@@ -191,7 +191,7 @@ _gdp_invoke(gdp_req_t *req)
 
 		flockfile(ep_dbg_getfile());
 		ep_dbg_printf("<<< _gdp_invoke(%p rid=%" PRIgdp_rid ") %s: %s\n",
-				req, req->pdu->rid, cmdname,
+				req, req->cpdu->rid, cmdname,
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		if (ep_dbg_test(Dbg, 22))
 		{
@@ -223,7 +223,6 @@ _gdp_invoke(gdp_req_t *req)
 **  Common code for ACKs and NAKs
 **
 **		When called, the ack/nak PDU should be in req->rpdu.
-**		Upon return, that will be in req->pdu, but with the old datum.
 */
 
 static EP_STAT
@@ -238,7 +237,7 @@ acknak(gdp_req_t *req, const char *where, bool reuse_pdu)
 
 	ep_dbg_cprintf(Dbg, 20, "%s: received %s for %s\n", where,
 			req->rpdu == NULL ? "???" : _gdp_proto_cmd_name(req->rpdu->cmd),
-			req->pdu == NULL ? "???" : _gdp_proto_cmd_name(req->pdu->cmd));
+			req->cpdu == NULL ? "???" : _gdp_proto_cmd_name(req->cpdu->cmd));
 
 	// we want to re-use caller's datum for (e.g.) read commands
 	if (req->rpdu == NULL)
@@ -249,19 +248,27 @@ acknak(gdp_req_t *req, const char *where, bool reuse_pdu)
 			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 		}
 	}
-	else if (req->rpdu != req->pdu)
+	else if (req->rpdu == req->cpdu)
 	{
-		if (req->pdu->datum != NULL && reuse_pdu)
+		if (ep_dbg_test(Dbg, 1))
+		{
+			ep_dbg_printf("acknak: req->rpdu == req->cpdu\n");
+			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+		}
+	}
+	else
+	{
+		if (req->cpdu->datum != NULL && reuse_pdu)
 		{
 			if (ep_dbg_test(Dbg, 43))
 			{
 				ep_dbg_printf("%s: reusing old datum for req %p\n   ",
 						where, req);
-				_gdp_datum_dump(req->pdu->datum, ep_dbg_getfile());
+				_gdp_datum_dump(req->cpdu->datum, ep_dbg_getfile());
 			}
 
 			// save the dbuf that the user may already hold a pointer to
-			gdp_buf_t *user_dbuf = req->pdu->datum->dbuf;
+			gdp_buf_t *user_dbuf = req->cpdu->datum->dbuf;
 
 			// move the contents of the response dbuf into the user dbuf
 			gdp_buf_reset(user_dbuf);
@@ -273,7 +280,7 @@ acknak(gdp_req_t *req, const char *where, bool reuse_pdu)
 			req->rpdu->datum->dbuf = user_dbuf;
 
 			// same for signature
-			gdp_buf_t *user_sig = req->pdu->datum->sig;
+			gdp_buf_t *user_sig = req->cpdu->datum->sig;
 			if (user_sig != NULL)
 			{
 				gdp_buf_reset(user_sig);
@@ -292,7 +299,7 @@ acknak(gdp_req_t *req, const char *where, bool reuse_pdu)
 
 			// copy the contents of the response datum over the user datum
 			// (this has the pointer to user dbuf with response contents)
-			memcpy(req->pdu->datum, req->rpdu->datum, sizeof *req->pdu->datum);
+			memcpy(req->cpdu->datum, req->rpdu->datum, sizeof *req->cpdu->datum);
 
 			// user datum now complete; can remove the response datum
 			req->rpdu->datum->dbuf = NULL;		// but not the user dbuf!
@@ -300,15 +307,10 @@ acknak(gdp_req_t *req, const char *where, bool reuse_pdu)
 			gdp_datum_free(req->rpdu->datum);
 
 			// point the new PDU at the old datum
-			req->rpdu->datum = req->pdu->datum;
+			req->rpdu->datum = req->cpdu->datum;
+			req->cpdu->datum = NULL;
 			(void) EP_ASSERT_TEST(req->rpdu->datum->inuse);
 		}
-
-		// can now drop the old pdu and switch to the new one
-		req->pdu->datum = NULL;
-		_gdp_pdu_free(req->pdu);
-		req->pdu = req->rpdu;
-		req->rpdu = NULL;
 	}
 	return EP_STAT_OK;
 }
@@ -326,14 +328,14 @@ ack(gdp_req_t *req, const char *where)
 	estat = acknak(req, where, true);
 	EP_STAT_CHECK(estat, return estat);
 
-	if (req->pdu->datum == NULL)
+	if (req->rpdu->datum == NULL)
 	{
 		ep_log(estat, "ack: null datum");
 		estat = EP_STAT_OK;
 	}
 	else
 	{
-		estat = GDP_STAT_FROM_ACK(req->pdu->cmd);
+		estat = GDP_STAT_FROM_ACK(req->rpdu->cmd);
 	}
 	return estat;
 }
@@ -356,7 +358,7 @@ ack_success(gdp_req_t *req)
 	gcl = req->gcl;
 	if (gcl != NULL && !gdp_name_is_valid(gcl->name))
 	{
-		memcpy(gcl->name, req->pdu->src, sizeof gcl->name);
+		memcpy(gcl->name, req->rpdu->src, sizeof gcl->name);
 		gdp_printable_name(gcl->name, gcl->pname);
 	}
 
@@ -374,8 +376,8 @@ ack_data_changed(gdp_req_t *req)
 	EP_STAT_CHECK(estat, return estat);
 
 	// keep track of number of records (in case we lose sync)
-	if (req->gcl != NULL && req->pdu->datum != NULL)
-		req->gcl->nrecs = req->pdu->datum->recno;
+	if (req->gcl != NULL && req->rpdu->datum != NULL)
+		req->gcl->nrecs = req->rpdu->datum->recno;
 
 	return estat;
 }
@@ -395,7 +397,7 @@ ack_data_content(gdp_req_t *req)
 
 	// do read filtering if requested
 	if (req->gcl->readfilter != NULL)
-		estat = req->gcl->readfilter(req->pdu->datum, req->gcl->readfpriv);
+		estat = req->gcl->readfilter(req->rpdu->datum, req->gcl->readfpriv);
 
 	return estat;
 }
@@ -419,7 +421,7 @@ static EP_STAT
 nak_client(gdp_req_t *req)
 {
 	nak(req, "nak_client");
-	return GDP_STAT_FROM_C_NAK(req->pdu->cmd);
+	return GDP_STAT_FROM_C_NAK(req->rpdu->cmd);
 }
 
 
@@ -427,7 +429,7 @@ static EP_STAT
 nak_server(gdp_req_t *req)
 {
 	nak(req, "nak_server");
-	return GDP_STAT_FROM_S_NAK(req->pdu->cmd);
+	return GDP_STAT_FROM_S_NAK(req->rpdu->cmd);
 }
 
 
@@ -435,7 +437,7 @@ static EP_STAT
 nak_router(gdp_req_t *req)
 {
 	acknak(req, "nak_router", false);
-	return GDP_STAT_FROM_R_NAK(req->pdu->cmd);
+	return GDP_STAT_FROM_R_NAK(req->rpdu->cmd);
 }
 
 
@@ -446,8 +448,8 @@ nak_conflict(gdp_req_t *req)
 	EP_STAT estat = nak_client(req);
 
 	// adjust nrecs to match the server's view
-	if (req->gcl != NULL && req->pdu->datum != NULL)
-		req->gcl->nrecs = req->pdu->datum->recno;
+	if (req->gcl != NULL && req->rpdu->datum != NULL)
+		req->gcl->nrecs = req->rpdu->datum->recno;
 
 	return estat;
 }
@@ -794,17 +796,10 @@ cmd_not_implemented(gdp_req_t *req)
 */
 
 EP_STAT
-_gdp_req_dispatch(gdp_req_t *req)
+_gdp_req_dispatch(gdp_req_t *req, int cmd)
 {
 	EP_STAT estat;
 	dispatch_ent_t *d;
-	int cmd;
-
-	// if this is a response, rpdu will be set
-	if (req->rpdu == NULL)
-		cmd = req->pdu->cmd;
-	else
-		cmd = req->rpdu->cmd;
 
 	if (ep_dbg_test(Dbg, 18))
 	{
@@ -872,11 +867,11 @@ _gdp_advertise(EP_STAT (*func)(gdp_buf_t *, void *, int), void *ctx, int cmd)
 	// create a new request and point it at the routing layer
 	estat = _gdp_req_new(cmd, NULL, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
-	memcpy(req->pdu->dst, RoutingLayerAddr, sizeof req->pdu->dst);
+	memcpy(req->cpdu->dst, RoutingLayerAddr, sizeof req->cpdu->dst);
 
 	// add any additional information to advertisement
 	if (func != NULL)
-		estat = func(req->pdu->datum->dbuf, ctx, cmd);
+		estat = func(req->cpdu->datum->dbuf, ctx, cmd);
 
 	// send the request
 	estat = _gdp_req_send(req);

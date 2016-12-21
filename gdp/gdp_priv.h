@@ -403,12 +403,19 @@ struct gdp_gcl_open_info
 **		A GDP request is packaged up in one of these things and
 **		submitted.  Responses are returned in the same structure.
 **
-**		There is one PDU header here that is used both for
-**		sending and receiving.  The associated gdp_buf_t does not
-**		have a write callback, so it can be used without having
-**		any side effects.  The PDU header has much of the
-**		information, including the command/response code, the rid,
-**		the record number, the timestamp, and the data buffer.
+**		There are two PDU pointers:
+**		* cpdu is the PDU with the command.  Generally this is
+**			kept around until the response is read in case you
+**			need to retransmit the command PDU.
+**		* rpdu is the PDU with the response.
+**
+**		PDUs have an associated gdp_buf_t to store the actual
+**		data.  That buffer does not have a write callback, so
+**		it can be used without having any side effects.
+**
+**		The PDU includes the command/response code, the rid,
+**		the record number, the timestamp, the data buffer,
+**		and an optional signature buffer.
 **
 **		There can be mulitple requests active on a single GCL at
 **		any time, but they should have unique rids.  Rids can be
@@ -487,7 +494,7 @@ struct gdp_req
 	LIST_ENTRY(gdp_req)	gcllist;	// linked list for cache management
 	LIST_ENTRY(gdp_req)	chanlist;	// reqs associated with a given channel
 	gdp_gcl_t			*gcl;		// the corresponding GCL handle
-	gdp_pdu_t			*pdu;		// PDU buffer
+	gdp_pdu_t			*cpdu;		// PDU for commands
 	gdp_pdu_t			*rpdu;		// PDU for ack/nak responses
 	gdp_chan_t			*chan;		// the network channel for this req
 	EP_STAT				stat;		// status code from last operation
@@ -553,7 +560,8 @@ EP_STAT			_gdp_req_unsend(			// pull failed request off GCL list
 						gdp_req_t *req);
 
 EP_STAT			_gdp_req_dispatch(			// do local req processing
-						gdp_req_t *req);
+						gdp_req_t *req,
+						int cmd);
 
 EP_STAT			_gdp_invoke(				// send request to daemon (sync)
 						gdp_req_t *req);

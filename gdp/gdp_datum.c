@@ -90,7 +90,12 @@ void
 gdp_datum_free(gdp_datum_t *datum)
 {
 	ep_dbg_cprintf(Dbg, 48, "gdp_datum_free(%p)\n", datum);
+
+	// sanity
+	if (datum == NULL)
+		return;
 	EP_ASSERT_ELSE(datum->inuse, return);
+
 	datum->inuse = false;
 	if (datum->dbuf != NULL)
 	{

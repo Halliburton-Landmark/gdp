@@ -163,8 +163,19 @@ _gdp_req_new(int cmd,
 
 	// initialize request
 	if (pdu == NULL)
+	{
 		pdu = _gdp_pdu_new();
-	req->pdu = pdu;
+		ep_dbg_cprintf(Dbg, 1, "_gdp_req_new: allocated new pdu @ 0x%p\n",
+					pdu);
+	}
+	if (GDP_CMD_IS_COMMAND(cmd))
+	{
+		req->cpdu = pdu;
+	}
+	else
+	{
+		req->rpdu = pdu;
+	}
 	req->gcl = gcl;
 	req->stat = EP_STAT_OK;
 	req->flags = flags;
@@ -182,26 +193,26 @@ _gdp_req_new(int cmd,
 	// if we're not passing in a PDU, initialize the new one
 	if (newpdu)
 	{
-		req->pdu->cmd = cmd;
+		pdu->cmd = cmd;
 		if (gcl != NULL)
-			memcpy(req->pdu->dst, gcl->name, sizeof req->pdu->dst);
+			memcpy(pdu->dst, gcl->name, sizeof pdu->dst);
 		if ((gcl == NULL || !EP_UT_BITSET(GDP_REQ_PERSIST, flags)) &&
 				!EP_UT_BITSET(GDP_REQ_ALLOC_RID, flags))
 		{
 			// just use constant zero; any value would be fine
-			req->pdu->rid = GDP_PDU_NO_RID;
+			pdu->rid = GDP_PDU_NO_RID;
 		}
 		else
 		{
 			// allocate a new unique request id
-			req->pdu->rid = _gdp_rid_new(gcl, chan);
+			pdu->rid = _gdp_rid_new(gcl, chan);
 		}
 	}
 
 	// success
 	*reqp = req;
 	ep_dbg_cprintf(Dbg, 48, "_gdp_req_new(gcl=%p, cmd=%s) => %p (rid=%d)\n",
-			gcl, _gdp_proto_cmd_name(cmd), req, req->pdu->rid);
+			gcl, _gdp_proto_cmd_name(cmd), req, pdu->rid);
 	return estat;
 }
 
@@ -261,11 +272,11 @@ _gdp_req_free(gdp_req_t **reqp)
 	_gdp_req_unlock(req);
 
 	// free the associated PDU(s)
-	if (req->rpdu != NULL && req->rpdu != req->pdu)
+	if (req->rpdu != NULL && req->rpdu != req->cpdu)
 		_gdp_pdu_free(req->rpdu);
-	if (req->pdu != NULL)
-		_gdp_pdu_free(req->pdu);
-	req->pdu = req->rpdu = NULL;
+	if (req->cpdu != NULL)
+		_gdp_pdu_free(req->cpdu);
+	req->rpdu = req->cpdu = NULL;
 
 	// dereference the gcl
 	// (refcnt may be zero if called from _gdp_gcl_freehandle)
@@ -409,7 +420,7 @@ _gdp_req_send(gdp_req_t *req)
 	}
 
 	// write the message out
-	estat = _gdp_pdu_out(req->pdu, req->chan, req->md);
+	estat = _gdp_pdu_out(req->cpdu, req->chan, req->md);
 
 	// done
 	return estat;
@@ -499,7 +510,7 @@ _gdp_req_find(gdp_gcl_t *gcl, gdp_rid_t rid)
 				estat = _gdp_req_lock(req);
 				EP_STAT_CHECK(estat, break);
 				nextreq = LIST_NEXT(req, gcllist);
-				if (req->pdu->rid == rid)
+				if (req->cpdu->rid == rid)
 					break;
 				_gdp_req_unlock(req);
 			}
@@ -508,7 +519,7 @@ _gdp_req_find(gdp_gcl_t *gcl, gdp_rid_t rid)
 		if (req == NULL)
 			break;				// nothing to find
 
-		// if we find a free request, just ignore it
+		// if we find a free request (we shouldn't), just ignore it
 		EP_ASSERT_ELSE(req->state != GDP_REQ_FREE,
 						continue);
 		if (req->state != GDP_REQ_ACTIVE)
@@ -585,8 +596,11 @@ _gdp_req_dump(const gdp_req_t *req, FILE *fp, int detail, int indent)
 	ep_prflags(req->flags, ReqFlags, fp);
 	fprintf(fp, "\n    ");
 	_gdp_gcl_dump(req->gcl, fp, detail, indent);
-	fprintf(fp, "    ");
-	_gdp_pdu_dump(req->pdu, fp);
+	if (req->cpdu != NULL)
+	{
+		fprintf(fp, "    c");
+		_gdp_pdu_dump(req->cpdu, fp);
+	}
 	if (req->rpdu != NULL)
 	{
 		fprintf(fp, "    r");

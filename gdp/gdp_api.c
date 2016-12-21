@@ -597,7 +597,7 @@ gdp_gcl_subscribe(gdp_gcl_t *gcl,
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// add start and stop parameters to PDU
-	req->pdu->datum->recno = start;
+	req->cpdu->datum->recno = start;
 	req->numrecs = numrecs;
 
 	// now do the hard work
@@ -631,7 +631,7 @@ gdp_gcl_subscribe_ts(gdp_gcl_t *gcl,
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// add start and stop parameters to PDU
-	memcpy(&req->pdu->datum->ts, start, sizeof req->pdu->datum->ts);
+	memcpy(&req->cpdu->datum->ts, start, sizeof req->cpdu->datum->ts);
 	req->numrecs = numrecs;
 
 	// now do the hard work
@@ -667,7 +667,7 @@ gdp_gcl_multiread(gdp_gcl_t *gcl,
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// add start and stop parameters to PDU
-	req->pdu->datum->recno = start;
+	req->cpdu->datum->recno = start;
 	req->numrecs = numrecs;
 
 	// now do the hard work
@@ -703,7 +703,7 @@ gdp_gcl_multiread_ts(gdp_gcl_t *gcl,
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// add start and stop parameters to PDU
-	memcpy(&req->pdu->datum->ts, start, sizeof req->pdu->datum->ts);
+	memcpy(&req->cpdu->datum->ts, start, sizeof req->cpdu->datum->ts);
 	req->numrecs = numrecs;
 
 	// now do the hard work
