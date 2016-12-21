@@ -227,6 +227,7 @@ ep_dbg_printf(const char *fmt, ...)
 	vfprintf(DebugFile, fmt, av);
 	va_end(av);
 	fprintf(DebugFile, "%s", EpVid->vidnorm);
+	fflush(DebugFile);
 	funlockfile(DebugFile);
 }
 
