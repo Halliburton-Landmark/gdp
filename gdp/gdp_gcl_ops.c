@@ -264,10 +264,10 @@ _gdp_gcl_create(gdp_name_t gclname,
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// send the name of the log to be created in the payload
-	gdp_buf_write(req->pdu->datum->dbuf, gclname, sizeof (gdp_name_t));
+	gdp_buf_write(req->cpdu->datum->dbuf, gclname, sizeof (gdp_name_t));
 
 	// add the metadata to the output stream
-	_gdp_gclmd_serialize(gmd, req->pdu->datum->dbuf);
+	_gdp_gclmd_serialize(gmd, req->cpdu->datum->dbuf);
 
 	estat = _gdp_invoke(req);
 	EP_STAT_CHECK(estat, goto fail0);
@@ -327,10 +327,10 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 	// success
 
 	// save the number of records
-	gcl->nrecs = req->pdu->datum->recno;
+	gcl->nrecs = req->rpdu->datum->recno;
 
 	// read in the metadata to internal format
-	gcl->gclmd = _gdp_gclmd_deserialize(req->pdu->datum->dbuf);
+	gcl->gclmd = _gdp_gclmd_deserialize(req->rpdu->datum->dbuf);
 
 	// if read-only, we're done
 	if (cmd != GDP_CMD_OPEN_AO && cmd != GDP_CMD_OPEN_RA)
@@ -531,10 +531,6 @@ append_common(gdp_gcl_t *gcl,
 	EP_STAT_CHECK(estat, goto fail0);
 	req = *reqp;
 
-	// ignore the new datum: use the one passed in
-	gdp_datum_free(req->pdu->datum);
-	req->pdu->datum = datum;
-
 	// if the assertion fails, we may be using an already freed datum
 	EP_ASSERT_ELSE(datum->inuse, return EP_STAT_ASSERT_ABORT);
 
@@ -545,6 +541,9 @@ append_common(gdp_gcl_t *gcl,
 	// if doing append filtering (e.g., encryption), call it now.
 	if (gcl->apndfilter != NULL)
 		estat = gcl->apndfilter(datum, gcl->apndfpriv);
+
+	// caller owns datum
+	gdp_datum_copy(req->cpdu->datum, datum);
 
 fail0:
 	return estat;
@@ -574,7 +573,9 @@ _gdp_gcl_append(gdp_gcl_t *gcl,
 	if (EP_STAT_ISOK(estat))
 		gcl->nrecs = datum->recno;
 
-	req->pdu->datum = NULL;			// owned by caller
+	gdp_buf_reset(datum->dbuf);
+	if (datum->sig != NULL)
+		gdp_buf_reset(datum->sig);
 	_gdp_req_free(&req);
 fail0:
 	return estat;
@@ -618,12 +619,15 @@ _gdp_gcl_append_async(
 		gcl->nrecs++;
 
 	// synchronous calls clear the data in the datum, so be consistent
-	i = gdp_buf_drain(req->pdu->datum->dbuf, SIZE_MAX);
+	i = gdp_buf_drain(req->cpdu->datum->dbuf, SIZE_MAX);
 	if (i < 0 && ep_dbg_test(Dbg, 1))
 		ep_dbg_printf("_gdp_gcl_append_async: gdp_buf_drain failure\n");
 
+	gdp_buf_reset(datum->dbuf);
+	if (datum->sig != NULL)
+		gdp_buf_reset(datum->sig);
+
 	// cleanup and return
-	req->pdu->datum = NULL;			// owned by caller
 	if (!EP_STAT_ISOK(estat))
 	{
 		_gdp_req_free(&req);
@@ -681,11 +685,11 @@ _gdp_gcl_read(gdp_gcl_t *gcl,
 	// create and send a new request
 	estat = _gdp_req_new(GDP_CMD_READ, gcl, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
-	gdp_datum_copy(req->pdu->datum, datum);
+	gdp_datum_copy(req->cpdu->datum, datum);
 	estat = _gdp_invoke(req);
 
 	// ok, done!  pass the datum contents to the caller and free the request
-	gdp_datum_copy(datum, req->pdu->datum);
+	gdp_datum_copy(datum, req->rpdu->datum);
 	_gdp_req_free(&req);
 fail0:
 	return estat;
@@ -729,7 +733,7 @@ _gdp_gcl_read_async(gdp_gcl_t *gcl,
 	EP_STAT_CHECK(estat, return estat);
 	_gdp_event_setcb(req, cbfunc, cbarg);
 
-	req->pdu->datum->recno = recno;
+	req->cpdu->datum->recno = recno;
 	estat = _gdp_req_send(req);
 
 	if (EP_STAT_ISOK(estat))
@@ -770,7 +774,7 @@ _gdp_gcl_getmetadata(gdp_gcl_t *gcl,
 	estat = _gdp_invoke(req);
 	EP_STAT_CHECK(estat, goto fail1);
 
-	*gmdp = _gdp_gclmd_deserialize(req->pdu->datum->dbuf);
+	*gmdp = _gdp_gclmd_deserialize(req->rpdu->datum->dbuf);
 
 fail1:
 	_gdp_req_free(&req);
@@ -856,26 +860,26 @@ _gdp_gcl_fwd_append(
 	_gdp_event_setcb(req, cbfunc, cbarg);
 
 	// add the actual target GDP name to the data
-	gdp_buf_write(req->pdu->datum->dbuf, req->pdu->dst, sizeof req->pdu->dst);
+	gdp_buf_write(req->cpdu->datum->dbuf, req->cpdu->dst, sizeof req->cpdu->dst);
 
 	// change the destination to be the final server, not the GCL
-	memcpy(req->pdu->dst, to_server, sizeof req->pdu->dst);
+	memcpy(req->cpdu->dst, to_server, sizeof req->cpdu->dst);
 
 	// copy the existing datum, including metadata
 	size_t l = gdp_buf_getlength(datum->dbuf);
-	gdp_buf_write(req->pdu->datum->dbuf, gdp_buf_getptr(datum->dbuf, l), l);
-	req->pdu->datum->recno = datum->recno;
-	req->pdu->datum->ts = datum->ts;
-	req->pdu->datum->sigmdalg = datum->sigmdalg;
-	req->pdu->datum->siglen = datum->siglen;
-	if (req->pdu->datum->sig != NULL)
-		gdp_buf_free(req->pdu->datum->sig);
-	req->pdu->datum->sig = NULL;
+	gdp_buf_write(req->cpdu->datum->dbuf, gdp_buf_getptr(datum->dbuf, l), l);
+	req->cpdu->datum->recno = datum->recno;
+	req->cpdu->datum->ts = datum->ts;
+	req->cpdu->datum->sigmdalg = datum->sigmdalg;
+	req->cpdu->datum->siglen = datum->siglen;
+	if (req->cpdu->datum->sig != NULL)
+		gdp_buf_free(req->cpdu->datum->sig);
+	req->cpdu->datum->sig = NULL;
 	if (datum->sig != NULL)
 	{
 		l = gdp_buf_getlength(datum->sig);
-		req->pdu->datum->sig = gdp_buf_new();
-		gdp_buf_write(req->pdu->datum->sig, gdp_buf_getptr(datum->sig, l), l);
+		req->cpdu->datum->sig = gdp_buf_new();
+		gdp_buf_write(req->cpdu->datum->sig, gdp_buf_getptr(datum->sig, l), l);
 	}
 
 	// XXX should we take a callback function?
@@ -885,7 +889,7 @@ _gdp_gcl_fwd_append(
 	// unlike append_async, we leave the datum intact
 
 	// cleanup
-	req->pdu->datum = NULL;			// owned by caller
+	req->cpdu->datum = NULL;			// owned by caller
 	if (!EP_STAT_ISOK(estat))
 	{
 		_gdp_req_free(&req);
