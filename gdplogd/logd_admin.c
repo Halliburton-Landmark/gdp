@@ -327,6 +327,8 @@ post_one_log(gdp_name_t gdpname, void *ctx)
 				"in-cache", "false",
 				NULL, NULL);
 	}
+
+	_gdp_gcl_decref(&gcl);
 }
 
 
