@@ -142,13 +142,13 @@ get_open_handle(gdp_req_t *req, gdp_iomode_t iomode)
 	// if we already got this (e.g., in _gdp_pdu_process or in cache)
 	//		just let it be
 	if (req->gcl != NULL ||
-		(req->gcl = _gdp_gcl_cache_get(req->pdu->dst, iomode)) != NULL)
+		(req->gcl = _gdp_gcl_cache_get(req->cpdu->dst, iomode)) != NULL)
 	{
 		if (ep_dbg_test(Dbg, 40))
 		{
 			gdp_pname_t pname;
 
-			gdp_printable_name(req->pdu->dst, pname);
+			gdp_printable_name(req->cpdu->dst, pname);
 			ep_dbg_printf("get_open_handle: using existing GCL:\n\t%s => %p\n",
 					pname, req->gcl);
 		}
@@ -160,11 +160,11 @@ get_open_handle(gdp_req_t *req, gdp_iomode_t iomode)
 	{
 		gdp_pname_t pname;
 
-		gdp_printable_name(req->pdu->dst, pname);
+		gdp_printable_name(req->cpdu->dst, pname);
 		ep_dbg_printf("get_open_handle: opening %s\n", pname);
 	}
 
-	estat = gcl_open(req->pdu->dst, iomode, &req->gcl);
+	estat = gcl_open(req->cpdu->dst, iomode, &req->gcl);
 	if (EP_STAT_ISOK(estat))
 		_gdp_gcl_cache_add(req->gcl, iomode);
 	if (req->gcl != NULL)
@@ -175,7 +175,7 @@ get_open_handle(gdp_req_t *req, gdp_iomode_t iomode)
 		gdp_pname_t pname;
 		char ebuf[60];
 
-		gdp_printable_name(req->pdu->dst, pname);
+		gdp_printable_name(req->cpdu->dst, pname);
 		ep_stat_tostr(estat, ebuf, sizeof ebuf);
 		ep_dbg_printf("get_open_handle: %s:\n\t@%p: %s\n",
 				pname, req->gcl, ebuf);

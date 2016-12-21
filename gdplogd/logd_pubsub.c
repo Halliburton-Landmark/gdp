@@ -51,8 +51,8 @@ sub_send_message_notification(gdp_req_t *req, gdp_datum_t *datum, int cmd)
 {
 	EP_STAT estat;
 
-	req->pdu->cmd = cmd;
-	req->pdu->datum = datum;
+	req->rpdu->cmd = cmd;
+	req->rpdu->datum = datum;
 
 	if (ep_dbg_test(Dbg, 33))
 	{
@@ -60,13 +60,13 @@ sub_send_message_notification(gdp_req_t *req, gdp_datum_t *datum, int cmd)
 		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
-	estat = _gdp_pdu_out(req->pdu, req->chan, NULL);
+	estat = _gdp_pdu_out(req->rpdu, req->chan, NULL);
 	if (!EP_STAT_ISOK(estat))
 	{
 		ep_dbg_cprintf(Dbg, 1,
 				"sub_send_message_notification: couldn't write PDU!\n");
 	}
-	req->pdu->datum = NULL;				// we just borrowed the datum
+	req->rpdu->datum = NULL;				// we just borrowed the datum
 
 	// XXX: This won't really work in case of holes.
 	req->nextrec++;
@@ -92,7 +92,7 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 
 	if (ep_dbg_test(Dbg, 32))
 	{
-		ep_dbg_printf("sub_notify_all_subscribers(%s) of ",
+		ep_dbg_printf("sub_notify_all_subscribers(%s) of pub",
 				_gdp_proto_cmd_name(cmd));
 		_gdp_req_dump(pubreq, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
@@ -127,11 +127,11 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 		// notify subscribers
 		if (!EP_UT_BITSET(GDP_REQ_SRV_SUBSCR, req->flags))
 		{
-			ep_dbg_cprintf(Dbg, 59, "   ... not a subscription\n");
+			ep_dbg_cprintf(Dbg, 59, "   ... not a subscription (flags = 0x%x)\n", req->flags);
 		}
 		else if (!ep_time_before(&req->act_ts, &sub_timeout))
 		{
-			sub_send_message_notification(req, pubreq->pdu->datum, cmd);
+			sub_send_message_notification(req, pubreq->cpdu->datum, cmd);
 		}
 		else
 		{
@@ -176,7 +176,7 @@ sub_end_subscription(gdp_req_t *req)
 	_gdp_gcl_decref(&req->gcl);			//DEBUG: is this appropriate?
 
 	// send an "end of subscription" event
-	req->pdu->cmd = GDP_ACK_DELETED;
+	req->rpdu->cmd = GDP_ACK_DELETED;
 
 	if (ep_dbg_test(Dbg, 61))
 	{
@@ -184,5 +184,5 @@ sub_end_subscription(gdp_req_t *req)
 		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
-	(void) _gdp_pdu_out(req->pdu, req->chan, NULL);
+	(void) _gdp_pdu_out(req->rpdu, req->chan, NULL);
 }

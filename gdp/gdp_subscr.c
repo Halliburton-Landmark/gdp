@@ -72,19 +72,19 @@ subscr_resub(gdp_req_t *req)
 	EP_ASSERT_ELSE(req != NULL, return EP_STAT_ASSERT_ABORT);
 	GDP_ASSERT_MUTEX_ISLOCKED(&req->mutex, );
 	EP_ASSERT_ELSE(req->gcl != NULL, );
-	EP_ASSERT_ELSE(req->pdu != NULL, );
+	EP_ASSERT_ELSE(req->cpdu != NULL, );
 
 	req->state = GDP_REQ_ACTIVE;
-	req->pdu->cmd = GDP_CMD_SUBSCRIBE;
-	memcpy(req->pdu->dst, req->gcl->name, sizeof req->pdu->dst);
-	memcpy(req->pdu->src, _GdpMyRoutingName, sizeof req->pdu->src);
+	req->cpdu->cmd = GDP_CMD_SUBSCRIBE;
+	memcpy(req->cpdu->dst, req->gcl->name, sizeof req->cpdu->dst);
+	memcpy(req->cpdu->src, _GdpMyRoutingName, sizeof req->cpdu->src);
 	//XXX it seems like this should be in a known state
-	if (req->pdu->datum == NULL)
-		req->pdu->datum = gdp_datum_new();
-	else if (req->pdu->datum->dbuf != NULL)
-		gdp_buf_reset(req->pdu->datum->dbuf);
-	req->pdu->datum->recno = req->gcl->nrecs + 1;
-	gdp_buf_put_uint32(req->pdu->datum->dbuf, req->numrecs);
+	if (req->cpdu->datum == NULL)
+		req->cpdu->datum = gdp_datum_new();
+	else if (req->cpdu->datum->dbuf != NULL)
+		gdp_buf_reset(req->cpdu->datum->dbuf);
+	req->cpdu->datum->recno = req->gcl->nrecs + 1;
+	gdp_buf_put_uint32(req->cpdu->datum->dbuf, req->numrecs);
 
 	estat = _gdp_invoke(req);
 
@@ -98,8 +98,9 @@ subscr_resub(gdp_req_t *req)
 	}
 
 	req->state = GDP_REQ_IDLE;
-	gdp_datum_free(req->pdu->datum);
-	req->pdu->datum = NULL;
+	if (req->rpdu->datum != NULL)
+		gdp_datum_free(req->rpdu->datum);
+	req->rpdu->datum = NULL;
 
 	return estat;
 }
@@ -206,7 +207,6 @@ _gdp_gcl_subscribe(gdp_req_t *req,
 		void *cbarg)
 {
 	EP_STAT estat = EP_STAT_OK;
-	int orig_cmd = req->pdu->cmd;
 
 	errno = 0;				// avoid spurious messages
 
@@ -215,7 +215,7 @@ _gdp_gcl_subscribe(gdp_req_t *req,
 	// arrange for responses to appear as events or callbacks
 	_gdp_event_setcb(req, cbfunc, cbarg);
 
-	gdp_buf_put_uint32(req->pdu->datum->dbuf, req->numrecs);
+	gdp_buf_put_uint32(req->cpdu->datum->dbuf, req->numrecs);
 
 	// issue the subscription --- no data returned
 	estat = _gdp_invoke(req);
@@ -232,16 +232,18 @@ _gdp_gcl_subscribe(gdp_req_t *req,
 
 		// now waiting for other events; go ahead and unlock
 		req->state = GDP_REQ_IDLE;
-		if (req->pdu->datum != NULL)
-			gdp_datum_free(req->pdu->datum);
-		req->pdu->datum = NULL;
+		if (req->rpdu != NULL)
+			_gdp_pdu_free(req->rpdu);
+		req->rpdu = NULL;
+		if (req->cpdu->datum != NULL)
+			gdp_buf_reset(req->cpdu->datum->dbuf);
 		ep_thr_cond_signal(&req->cond);
 		_gdp_req_unlock(req);
 
 		// the req is still on the channel list
 
 		// start a subscription poker thread if needed
-		if (orig_cmd == GDP_CMD_SUBSCRIBE)
+		if (req->cpdu->cmd == GDP_CMD_SUBSCRIBE)
 		{
 			long poke = ep_adm_getlongparam("swarm.gdp.subscr.pokeintvl", 60L);
 			bool spawnthread = false;
@@ -291,7 +293,7 @@ _gdp_gcl_unsubscribe(
 			estat = _gdp_req_lock(req);
 			EP_STAT_CHECK(estat, break);
 			nextreq = LIST_NEXT(req, gcllist);
-			if (!GDP_NAME_SAME(req->pdu->dst, dest))
+			if (!GDP_NAME_SAME(req->cpdu->dst, dest))
 			{
 				_gdp_req_unlock(req);
 				continue;

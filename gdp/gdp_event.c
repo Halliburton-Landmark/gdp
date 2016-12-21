@@ -316,7 +316,7 @@ _gdp_event_add_from_req(gdp_req_t *req)
 	ep_time_now(&req->act_ts);
 
 	// for the moment we only understand data responses (for subscribe)
-	switch (req->pdu->cmd)
+	switch (req->rpdu->cmd)
 	{
 	  case GDP_ACK_SUCCESS:
 		// success with no further information (many commands)
@@ -344,23 +344,23 @@ _gdp_event_add_from_req(gdp_req_t *req)
 		break;
 
 	  default:
-		if (req->pdu->cmd >= GDP_ACK_MIN && req->pdu->cmd <= GDP_ACK_MAX)
+		if (req->rpdu->cmd >= GDP_ACK_MIN && req->rpdu->cmd <= GDP_ACK_MAX)
 		{
 			// some sort of success
 			evtype = GDP_EVENT_SUCCESS;
-			req->stat = _gdp_stat_from_acknak(req->pdu->cmd);
+			req->stat = _gdp_stat_from_acknak(req->rpdu->cmd);
 			break;
 		}
-		if (req->pdu->cmd >= GDP_NAK_C_MIN && req->pdu->cmd <= GDP_NAK_R_MAX)
+		if (req->rpdu->cmd >= GDP_NAK_C_MIN && req->rpdu->cmd <= GDP_NAK_R_MAX)
 		{
 			// some sort of failure
 			evtype = GDP_EVENT_FAILURE;
-			req->stat = _gdp_stat_from_acknak(req->pdu->cmd);
+			req->stat = _gdp_stat_from_acknak(req->rpdu->cmd);
 			break;
 		}
 		ep_dbg_cprintf(Dbg, 1,
 				"_gdp_event_add_from_req: unexpected ack/nak %d\n",
-				req->pdu->cmd);
+				req->rpdu->cmd);
 		estat = GDP_STAT_PROTOCOL_FAIL;
 		return estat;
 	}
@@ -374,7 +374,7 @@ _gdp_event_add_from_req(gdp_req_t *req)
 	gev->stat = req->stat;
 	gev->udata = req->udata;
 	gev->cb = req->sub_cb;
-	gev->datum = gdp_datum_dup(req->pdu->datum);
+	gev->datum = gdp_datum_dup(req->rpdu->datum);
 
 	// schedule the event for delivery
 	if (req->state == GDP_REQ_WAITING)
