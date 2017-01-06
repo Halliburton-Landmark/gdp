@@ -207,7 +207,7 @@ def main(coap, prefix):
     while True:
         print "Poking threads"
         for node in nodes: node.poke_threads()
-        time.sleep(3)
+        time.sleep(1)
 
 if __name__ == "__main__":
 

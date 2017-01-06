@@ -1,0 +1,10 @@
+#!/bin/sh
+
+while :
+do
+    echo "Starting '$@'"
+    "$@" &
+    sleep 1200 && kill -9 $!
+    echo "Killed process '$@'"
+
+done
