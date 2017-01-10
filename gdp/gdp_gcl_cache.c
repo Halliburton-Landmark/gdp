@@ -228,8 +228,8 @@ _gdp_gcl_cache_get(gdp_name_t gcl_name, gdp_iomode_t mode)
 	else
 	{
 		// we're good to go
-		_gdp_gcl_unlock(gcl);
 		_gdp_gcl_incref(gcl);
+		_gdp_gcl_unlock(gcl);
 	}
 
 done:
@@ -551,20 +551,18 @@ _gdp_mutex_check_isunlocked(
 /*
 **  _GDP_GCL_INCREF --- increment the reference count on a GCL
 **
-**		Must be called with GCL unlocked.
+**		Must be called with GCL locked.
 */
 
 void
 _gdp_gcl_incref(gdp_gcl_t *gcl)
 {
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
-	GDP_ASSERT_MUTEX_ISUNLOCKED(&gcl->mutex, goto fail0);
-	_gdp_gcl_lock(gcl);
+	GDP_ASSERT_MUTEX_ISLOCKED(&gcl->mutex, goto fail0);
 fail0:
 	gcl->refcnt++;
 	_gdp_gcl_touch(gcl);
 	ep_dbg_cprintf(Dbg, 51, "_gdp_gcl_incref(%p): %d\n", gcl, gcl->refcnt);
-	_gdp_gcl_unlock(gcl);
 }
 
 
