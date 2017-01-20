@@ -108,7 +108,7 @@ gdp.GDP_NAME = class GDP_NAME
 
 Help on class GDP_GCL in gdp:
 
-gdp.GDP_GCL = class GDP_GCL
+gdp.GDP_GCL = class GDP_GCL(__builtin__.object)
  |  A class that represents a GCL handle. A GCL handle resembles an open
  |      file handle in various ways. However, it is still different in
  |      certain ways
@@ -122,21 +122,6 @@ gdp.GDP_GCL = class GDP_GCL
  |  
  |  __del__(self)
  |      close this GCL handle, and free the allocated resources
- |  
- |  __new__(self, name, iomode, open_info={})
- |      Open a GCL with given name and io-mode
- |      Creating new GCL's is no longer supported.
- |      
- |      name=<name-of-gcl>, iomode=<mode>
- |      name is a GDP_NAME object
- |      mode is one of the following: GDP_MODE_ANY, GDP_MODE_RO, GDP_MODE_AO,
- |                                    GDP_MODE_RA
- |      open_info is a dictionary. It contains extra information, such as the
- |          private signature key, etc. The key may be optional, depending on
- |          how the log was created and if a log-server is set up to reject 
- |          unsigned appends, for example.
- |          Here is the (incomplete) list of keys and their description:
- |          'skey': an instance of EP_CRYPTO_KEY containing the signature key
  |  
  |  append(self, datum_dict)
  |      Write a datum to the GCL. The datum should be a dictionary, with
@@ -175,6 +160,9 @@ gdp.GDP_GCL = class GDP_GCL
  |                      being tv_sec, tv_nsec, tv_accuracy
  |          - data : the actual data associated with this datum.
  |  
+ |  read_async(self, recno)
+ |      Same as 'read', but aysnchoronous version. Returns events
+ |  
  |  read_ts(self, tsdict)
  |      Same as 'read', but takes a time-stamp dictionary instead of
  |      a record number. The time-stamp dictionary has the following
@@ -182,9 +170,6 @@ gdp.GDP_GCL = class GDP_GCL
  |          - tv_sec: seconds since epoch (an integer)
  |          - tv_nsec: nano seconds (an integer)
  |          - tv_accuracy: accuracy (a float)
- |  
- |  read_async(self, recno)
- |      Same as 'read', but aysnchoronous version. Returns events  
  |  
  |  subscribe(self, start, numrecs, timeout)
  |      Subscriptions. Refer to the C-API for more details
@@ -199,12 +184,43 @@ gdp.GDP_GCL = class GDP_GCL
  |  ----------------------------------------------------------------------
  |  Class methods defined here:
  |  
- |  create(cls, name, logd_name, metadata) from __builtin__.classobj
+ |  create(cls, name, logd_name, metadata) from __builtin__.type
  |      create a new GCL with 'name' on 'logd_name'
  |      metadata is a dictionary with keys as 32-bit unsigned integers
  |  
- |  get_next_event(cls, timeout) from __builtin__.classobj
+ |  get_next_event(cls, timeout) from __builtin__.type
  |      Get events for ANY open gcl
+ |  
+ |  ----------------------------------------------------------------------
+ |  Static methods defined here:
+ |  
+ |  __new__(cls, name, iomode, open_info={})
+ |      Open a GCL with given name and io-mode. The reason to do custom
+ |          initialization in __new__ (rather than __init__) is because
+ |          we'd like a one-to-one correspondence between the underlying
+ |          C pointer for an open GCL and Python objects representing
+ |          a GCL. However, the C library can return an existing pointer
+ |          when an already open GCL is opened again.
+ |      
+ |      name=<name-of-gcl>, iomode=<mode>
+ |      name is a GDP_NAME object
+ |      mode is one of the following: GDP_MODE_ANY, GDP_MODE_RO, GDP_MODE_AO,
+ |                                    GDP_MODE_RA
+ |      open_info is a dictionary. It contains extra information, such as the
+ |          private signature key, etc. The key may be optional, depending on
+ |          how the log was created and if a log-server is set up to reject 
+ |          unsigned appends, for example.
+ |          Here is the (incomplete) list of keys and their description:
+ |          'skey': an instance of EP_CRYPTO_KEY containing the signature key
+ |  
+ |  ----------------------------------------------------------------------
+ |  Data descriptors defined here:
+ |  
+ |  __dict__
+ |      dictionary for instance variables (if defined)
+ |  
+ |  __weakref__
+ |      list of weak references to the object (if defined)
  |  
  |  ----------------------------------------------------------------------
  |  Data and other attributes defined here:
