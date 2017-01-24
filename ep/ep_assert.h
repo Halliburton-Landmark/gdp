@@ -88,7 +88,7 @@
 #ifndef _EP_ASSERT_H_
 #define _EP_ASSERT_H_
 
-#include "ep_conf.h"
+#include "ep.h"
 
 #if !_EP_CCCF_ASSERT_NONE
 
@@ -162,6 +162,9 @@ extern void	ep_assert_print(
 // callback functions
 extern void	(*EpAssertInfo)(void);		// show additional info
 extern void	(*EpAssertAbort)(void);		// abort the thread/process
+
+// control flags
+extern bool	EpAssertAllAbort;		// abort on all assertions
 
 // back compatibility --- these are deprecated
 #define EP_ASSERT_REQUIRE(e)		EP_ASSERT(e)
