@@ -199,6 +199,17 @@ are considered dead and are removed from the subscription list.
 Should be greater than two times
 .Va swarm.gdp.subscr.pokeintvl .
 Defaults to 600 (ten minutes).
+.
+.It swarm.gdplogd.assert.maxasserts
+If more than this number of assertions occur,
+the process will abort,
+even if the assertion has a recovery action.
+If zero, non-fatal assertions will never abort.
+Defaults to 0.
+.
+.It swarm.gdplogd.assert.resetinterval
+The assertion count is set to zero after this time interval (in seconds).
+Defaults to 60 (one minute).
 .El
 .
 .Sh SEE ALSO
