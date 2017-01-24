@@ -1742,7 +1742,8 @@ EP_STAT                 ep_crypto_cipher_final(
             ...)                           // arguments to message
 
     void    (*EpAssertInfo)(void)       // if set, call to print additional information
-    void    (*EpAssertAbort)(void)      // function to call before aborting</programlisting>
+    void    (*EpAssertAbort)(void)      // function to call before aborting
+    bool    EpAssertAllAbort            // if set, all assertions are immediately fatal</programlisting>
 
     <para>Processes can abort as though they got an assertion failure by
     calling <function>ep_assert_failure</function>. The macro
