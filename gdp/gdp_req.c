@@ -165,7 +165,7 @@ _gdp_req_new(int cmd,
 	if (pdu == NULL)
 	{
 		pdu = _gdp_pdu_new();
-		ep_dbg_cprintf(Dbg, 1, "_gdp_req_new: allocated new pdu @ 0x%p\n",
+		ep_dbg_cprintf(Dbg, 11, "_gdp_req_new: allocated new pdu @ %p\n",
 					pdu);
 	}
 	if (GDP_CMD_IS_COMMAND(cmd))

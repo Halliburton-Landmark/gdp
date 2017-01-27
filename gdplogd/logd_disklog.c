@@ -1869,9 +1869,9 @@ disk_read_by_recno(gdp_gcl_t *gcl,
 	}
 	else
 	{
+		ep_dbg_cprintf(Dbg, 14, "reading\n");
 		xent = &ridx_entry;
 		estat = ridx_entry_read(gcl, datum->recno, gcl->pname, xent);
-		ep_dbg_cprintf(Dbg, 14, "\n");
 	}
 
 	EP_STAT_CHECK(estat, goto fail0);
