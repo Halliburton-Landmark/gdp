@@ -382,7 +382,7 @@ cmd_open(gdp_req_t *req)
 	}
 	req->rpdu->datum->recno = gcl->nrecs;
 
-	if (ep_dbg_test(Dbg, 20))
+	if (ep_dbg_test(Dbg, 10))
 	{
 		char ebuf[100];
 		ep_dbg_printf("<<< cmd_open(%s): gcl %p nrecs %" PRIgdp_recno ":\n    %s\n",
@@ -431,7 +431,7 @@ cmd_close(gdp_req_t *req)
 	//return number of records
 	req->rpdu->datum->recno = req->gcl->nrecs;
 
-	if (ep_dbg_test(Dbg, 20))
+	if (ep_dbg_test(Dbg, 10))
 	{
 		char ebuf[100];
 		ep_dbg_printf("<<< cmd_close(%s): %s\n", req->gcl->pname,

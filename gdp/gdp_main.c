@@ -140,7 +140,7 @@ gdp_pdu_proc_cmd(void *cpdu_)
 	int resp;
 
 	ep_dbg_cprintf(Dbg, 40,
-			"gdp_pdu_proc_cmd(%s, thread 0x%p)\n",
+			"gdp_pdu_proc_cmd(%s, thread %p)\n",
 			_gdp_proto_cmd_name(cmd), ep_thr_gettid());
 
 	gcl = _gdp_gcl_cache_get(cpdu->dst, 0);
