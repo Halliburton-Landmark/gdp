@@ -322,10 +322,7 @@ gdp_gcl_create(gdp_name_t gclname,
 	if (gclname == NULL)
 	{
 		gclname = namebuf;
-		gdp_buf_t *buf = gdp_buf_new();
-		size_t mdlen = _gdp_gclmd_serialize(gmd, buf);
-		ep_crypto_md_sha256(gdp_buf_getptr(buf, mdlen), mdlen, gclname);
-		gdp_buf_free(buf);
+		_gdp_newname(gclname, gmd);
 	}
 
 	estat = _gdp_gcl_create(gclname, logdname, gmd, _GdpChannel,
