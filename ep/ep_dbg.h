@@ -86,6 +86,9 @@ extern void EP_TYPE_PRINTFLIKE(1, 2)
 #define ep_dbg_cprintf(f, l, ...)	{if (ep_dbg_test(f, l)) \
 						ep_dbg_printf(__VA_ARGS__);}
 
+// stack backtrace to debug output
+extern void	ep_dbg_backtrace(void);
+
 // crackarg parsing
 extern EP_STAT	epCavDebug(const char *vp, void *rp);
 
