@@ -188,7 +188,7 @@ extern void		_gdp_stat_init(void);
 **  Create EP_STAT from protocol command codes for acks and naks
 */
 
-#define GDP_STAT_FROM_ACK(c)		GDP_STAT_NEW(OK, (c) - GDP_ACK_MIN + 200)
+#define GDP_STAT_FROM_ACK(c)		EP_STAT_NEW(OK, 0, 0, (c) - GDP_ACK_MIN + 200)
 #define GDP_STAT_FROM_C_NAK(c)		GDP_STAT_NEW(ERROR, (c) - GDP_NAK_C_MIN + 400)
 #define GDP_STAT_FROM_S_NAK(c)		GDP_STAT_NEW(SEVERE, (c) - GDP_NAK_S_MIN + 500)
 #define GDP_STAT_FROM_R_NAK(c)		GDP_STAT_NEW(ERROR, (c) - GDP_NAK_R_MIN + 600)
