@@ -237,6 +237,8 @@ ep_time_format(const EP_TIME_SPEC *tv, char *tbuf, size_t tbsiz, uint32_t flags)
 	tvsec = tv->tv_sec;	// may overflow if time_t is 32 bits!
 	gmtime_r(&tvsec, &tm);
 	strftime(xbuf, sizeof xbuf, "%Y-%m-%dT%H:%M:%S", &tm);
+	if (human)
+		xbuf[10] = ' ';		// change "T" to " " for humans
 	if (tv->tv_accuracy != 0.0 && showfuzz)
 	{
 		if (human)
