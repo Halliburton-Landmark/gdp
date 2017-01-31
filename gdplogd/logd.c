@@ -136,6 +136,8 @@ dump_state(int plev)
 	_gdp_gcl_cache_dump(plev, stderr);
 	fprintf(stderr, "\n<<< Open file descriptors >>>\n");
 	ep_app_dumpfds(stderr);
+	fprintf(stderr, "\n<<< Stack backtrace >>>\n");
+	ep_dbg_backtrace();
 }
 
 

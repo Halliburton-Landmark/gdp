@@ -301,3 +301,18 @@ ep_cvt_txt_to_debug(
 
 	return EP_STAT_OK;
 }
+
+
+#include <execinfo.h>
+
+#define NFRAMES		128
+
+void
+ep_dbg_backtrace(void)
+{
+	void *frames[NFRAMES];
+	int nframes;
+
+	nframes = backtrace(frames, NFRAMES);
+	backtrace_symbols_fd(frames, nframes, fileno(DebugFile));
+}
