@@ -72,6 +72,8 @@ _gdp_gcl_newname(gdp_gcl_t *gcl)
 **	Parameters:
 **		gcl_name --- internal (256-bit) name of the GCL
 **		pgcl --- location to store the resulting GCL handle
+**
+**		gcl is returned unlocked.
 */
 
 EP_STAT
@@ -146,6 +148,8 @@ _gdp_gcl_freehandle(gdp_gcl_t *gcl)
 	gcl->digest = NULL;
 
 	// release the locks and cache entry
+	// note that pthread_mutex_destroy is undefined if mutex is locked
+	ep_thr_mutex_unlock(&gcl->mutex);
 	ep_thr_mutex_destroy(&gcl->mutex);
 
 	// if there is any "extra" data, drop that

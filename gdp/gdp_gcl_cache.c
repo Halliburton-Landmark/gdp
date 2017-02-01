@@ -192,6 +192,11 @@ _gdp_gcl_cache_changename(gdp_gcl_t *gcl, gdp_name_t newname)
 **		If found, the refcnt is bumped for the returned GCL,
 **		i.e., the caller is responsible for calling
 **		_gdp_gcl_decref(&gcl) when it is finished with it.
+**
+**		gcl is returned unlocked.
+**		NOTE: is this a good idea?  Problem is that steps (5) and
+**			(6) must be in that order to avoid priority inversion,
+**			but the lock could be re-acquired.
 */
 
 gdp_gcl_t *
