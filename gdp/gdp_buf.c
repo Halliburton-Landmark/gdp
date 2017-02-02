@@ -45,7 +45,7 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.buf", "GDP buffer processing");
 #define DIAGNOSE(cmd, istat)										\
 			do														\
 			{														\
-				if (istat < 0 && ep_dbg_test(Dbg, 10))				\
+				if (istat < 0 && ep_dbg_test(Dbg, 9))				\
 				{													\
 					char ebuf[40];									\
 					strerror_r(errno, ebuf, sizeof ebuf);			\

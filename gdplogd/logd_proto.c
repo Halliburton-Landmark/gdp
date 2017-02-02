@@ -325,7 +325,7 @@ fail0:
 				NULL, NULL);
 	}
 
-	if (ep_dbg_test(Dbg, 20))
+	if (ep_dbg_test(Dbg, 9))
 	{
 		char ebuf[100];
 		ep_dbg_printf("<<< cmd_create(%s): %s\n", gcl->pname,

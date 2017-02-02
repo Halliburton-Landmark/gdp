@@ -438,7 +438,7 @@ fail0:
 	{
 		char ebuf[100];
 
-		ep_dbg_cprintf(Dbg, 10,
+		ep_dbg_cprintf(Dbg, 9,
 				"Couldn't open GCL %s:\n\t%s\n",
 				gcl->pname, ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
@@ -643,7 +643,7 @@ _gdp_gcl_append_async(
 		_gdp_req_unlock(req);
 	}
 fail0:
-	if (ep_dbg_test(Dbg, 10))
+	if (ep_dbg_test(Dbg, 11))
 	{
 		char ebuf[100];
 		ep_dbg_printf("_gdp_gcl_append_async => %s\n",
@@ -906,7 +906,7 @@ _gdp_gcl_fwd_append(
 	}
 
 fail0:
-	if (ep_dbg_test(Dbg, 10))
+	if (ep_dbg_test(Dbg, 11))
 	{
 		char ebuf[100];
 		ep_dbg_printf("_gdp_gcl_fwd_append => %s\n",

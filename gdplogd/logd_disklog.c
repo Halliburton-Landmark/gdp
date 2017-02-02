@@ -462,7 +462,7 @@ get_gcl_path(gdp_gcl_t *gcl,
 	if (stat(pbuf, &st) < 0)
 	{
 		// doesn't exist; we need to create it
-		ep_dbg_cprintf(Dbg, 10, "get_gcl_path: creating %s\n", pbuf);
+		ep_dbg_cprintf(Dbg, 11, "get_gcl_path: creating %s\n", pbuf);
 		i = mkdir(pbuf, 0775);
 		if (i < 0)
 			goto fail0;
@@ -714,7 +714,7 @@ success:
 	return estat;
 
 fail1:
-	ep_dbg_cprintf(Dbg, 10, "segment_open: closing fp %p (error)\n", seg->fp);
+	ep_dbg_cprintf(Dbg, 9, "segment_open: closing fp %p (error)\n", seg->fp);
 	fclose(seg->fp);
 fail0:
 	EP_ASSERT_ENSURE(!EP_STAT_ISOK(estat));
@@ -818,7 +818,7 @@ segment_create(gdp_gcl_t *gcl,
 	FILE *data_fp = NULL;
 	segment_t *seg;
 
-	ep_dbg_cprintf(Dbg, 10, "segment_create(%s, %d)\n",
+	ep_dbg_cprintf(Dbg, 18, "segment_create(%s, %d)\n",
 			gcl->pname, segno);
 
 	// this will allocate memory, but leave the disk untouched
@@ -935,7 +935,7 @@ segment_create(gdp_gcl_t *gcl,
 	// success!
 	seg->fp = data_fp;
 	flock(fileno(data_fp), LOCK_UN);
-	ep_dbg_cprintf(Dbg, 10, "Created GCL Segment %s-%06d\n",
+	ep_dbg_cprintf(Dbg, 11, "Created GCL Segment %s-%06d\n",
 			gcl->pname, segno);
 	return estat;
 
@@ -1374,7 +1374,7 @@ ridx_open(gdp_gcl_t *gcl, const char *suffix, int openmode)
 	gcl->nrecs = phys->max_recno;
 
 fail0:
-	if (!EP_STAT_ISOK(estat) && ep_dbg_test(Dbg, 10))
+	if (!EP_STAT_ISOK(estat) && ep_dbg_test(Dbg, 9))
 	{
 		char ebuf[100];
 
@@ -1496,7 +1496,7 @@ tidx_open(gdp_gcl_t *gcl, const char *suffix, int openmode)
 	}
 
 fail0:
-	if (!EP_STAT_ISOK(estat) && ep_dbg_test(Dbg, 10))
+	if (!EP_STAT_ISOK(estat) && ep_dbg_test(Dbg, 9))
 	{
 		char ebuf[100];
 
@@ -1631,7 +1631,7 @@ disk_create(gdp_gcl_t *gcl, gdp_gclmd_t *gmd)
 	phys->min_recno = 1;
 	phys->max_recno = 0;
 	phys->flags |= DefaultLogFlags;
-	ep_dbg_cprintf(Dbg, 10, "Created new GCL %s\n", gcl->pname);
+	ep_dbg_cprintf(Dbg, 11, "Created new GCL %s\n", gcl->pname);
 	return estat;
 
 fail0:
@@ -1789,7 +1789,7 @@ fail0:
 	physinfo_free(phys);
 	gcl->x->physinfo = phys = NULL;
 
-	if (ep_dbg_test(Dbg, 10))
+	if (ep_dbg_test(Dbg, 9))
 	{
 		char ebuf[100];
 
