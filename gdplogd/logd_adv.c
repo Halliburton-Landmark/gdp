@@ -104,7 +104,7 @@ void
 logd_advertise_one(gdp_name_t gname, int cmd)
 {
 	EP_STAT estat = _gdp_advertise(advertise_one, gname, cmd);
-	if (ep_dbg_test(Dbg, 10))
+	if (ep_dbg_test(Dbg, 11))
 	{
 		char ebuf[100];
 		gdp_pname_t pname;
