@@ -60,6 +60,7 @@ static ino_t		AdminStatsIno = -1;
 static FILE			*AdminStatsFp;
 static uint32_t		AdminRunMask = 0xffffffff;
 static char			*AdminPrefix = "";
+static bool			AdminInitialized = false;
 
 // a prefix to indicate that this is an admin message (stdout & stderr only)
 #define INDICATOR		">#<"
@@ -111,6 +112,9 @@ admin_init(void)
 			ep_adm_getstrparam("swarm.gdplogd.admin.output", NULL);
 	int fd;
 	char *endp;
+
+	// first, avoid calling this multiple times
+	AdminInitialized = true;
 
 	if (logdest == NULL || logdest[0] == '\0' ||
 			strcasecmp(logdest, "none") == 0)
@@ -202,7 +206,7 @@ admin_post_statsv(
 	static const char *forbidchars = NULL;
 	FILE *fp;
 
-	if (AdminStatsFp == NULL)
+	if (!AdminInitialized)
 		admin_init();
 	if ((mask & AdminRunMask) == 0)
 		return;
