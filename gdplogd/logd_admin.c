@@ -2,10 +2,10 @@
 
 /*
 **	----- BEGIN LICENSE BLOCK -----
-**	GDP: Global Data Plane Support Library
+**	GDPLOGD: Log Daemon for the Global Data Plane
 **	From the Ubiquitous Swarm Lab, 490 Cory Hall, U.C. Berkeley.
 **
-**	Copyright (c) 2015, Regents of the University of California.
+**	Copyright (c) 2015-2017, Regents of the University of California.
 **	All rights reserved.
 **
 **	Permission is hereby granted, without written agreement and without
