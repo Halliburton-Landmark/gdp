@@ -5,6 +5,11 @@ GLOBAL DATAPLANE
 
 This directory contains the source code for the Global Dataplane (GDP).
 
+**NOTE WELL: This is an incomplete implementation of the GDP.  There
+*will* be incompatible changes in the future.  Use in production at
+your own risk, void where prohibited by law, etc., etc.  See
+Implementation Status below.**
+
 If you are a user of the GDP you probably do not want to start from
 the source code.  See `README-deb.md` for installing from the Debian
 packages (which includes Ubuntu).
@@ -128,5 +133,63 @@ There is also a binding for Python in `lang/python` which is well
 tested, a binding for Java in `lang/java` which is lightly tested,
 and a binding for JavaScript in `lang/js` which is incomplete.
 Documentation for the Python bindings is in `lang/python/README`.
+
+Implementation Status
+---------------------
+
+There are many functions that are not yet working.  This list
+focuses primarily on items that will require incompatible changes,
+at least internally (that is, recompilation may be necessary).
+Some changes will probably require API modifications (i.e, you'll
+have to change your code).
+
+This list is probably incomplete.
+
+* The security model is minimal at this time, consisting only of
+signatures on every append request.  This is too slow for a large
+system.  An updated mechanism will probably use hash chains.
+
+* Similarly, acknowledgements (server to client) should be signed
+(or otherwise validated).
+
+* Log names, which should ultimately be the hash of the log
+metadata, are essentially random.  This means that at some point
+existing logs will become inaccessible (since the naming scheme
+will change).  This will require a log name directory service
+(to allow human-friendly names), which in turn probably requires
+the Control Plane interface.
+
+* Log Replication has not been integrated.
+
+* Log Migration does not exist.
+
+* Log Expiration is not implemented.  This means that all data in
+all logs last forever.
+
+* The current PDU (Protocol Data Unit) format has too much overhead
+for typical use.  To fix this, the protocol used between clients and
+servers to the routers will change, probably requiring recompilation
+at a minimum, and likely a flag day.
+
+* The routing background (in a different repository) is known to
+have significant scaling limitations.
+
+* The router-to-router protocol (in a different repository) is
+inadequate for a variety of reasons.  Changing this will require
+a "flag day" when all routers must be upgraded simultaneously.
+
+* There is no Control Plane interface.  This means that functions
+that should be automated (e.g., log placement, directory service)
+must be done manually.  This may change how end users and
+applications interact with the system.
+
+* The on-disk representation needs to be updated to reduce the
+overhead, include information needed for the new security model,
+log replication, log expiration, and possibly others.  This means
+that old logs will not be readable after the change.
+
+**YOU HAVE BEEN WARNED!!!**
+
+
 
 <!-- vim: set ai sw=4 sts=4 ts=4 : -->
