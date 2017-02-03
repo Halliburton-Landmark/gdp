@@ -42,7 +42,7 @@
 #include <ep/ep_stat.h>
 #include <ep/ep_xlate.h>
 #include <gdp/gdp.h>
-#include <gdp/gdp_priv.h>
+#include <gdp/gdp_priv.h>	//XXX violates the principle that gdp-rest is "just an app"
 #include <pthread.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -500,13 +500,15 @@ a_append(scgi_request *req, gdp_name_t gcliname, gdp_datum_t *datum)
 		char rbuf[SCGI_MAX_OUTBUF_SIZE];
 		json_t *j = json_object();
 		char *jbuf;
+		EP_TIME_SPEC ts;
 
-		json_object_set_nocheck(j, "recno", json_integer(datum->recno));
-		if (EP_TIME_IS_VALID(&datum->ts))
+		json_object_set_nocheck(j, "recno", json_integer(gdp_datum_getrecno(datum)));
+		gdp_datum_getts(datum, &ts);
+		if (EP_TIME_IS_VALID(&ts))
 		{
 			char tbuf[100];
 
-			ep_time_format(&datum->ts, tbuf, sizeof tbuf, EP_TIME_FMT_DEFAULT);
+			ep_time_format(&ts, tbuf, sizeof tbuf, EP_TIME_FMT_DEFAULT);
 			json_object_set_nocheck(j, "timestamp", json_string(tbuf));
 		}
 		jbuf = json_dumps(j, JSON_INDENT(4));
@@ -557,6 +559,7 @@ a_read_datum(scgi_request *req, gdp_name_t gcliname, gdp_recno_t recno)
 		{
 			FILE *fp;
 			gdp_pname_t gclpname;
+			EP_TIME_SPEC ts;
 
 			fp = ep_fopen_smem(rbuf, sizeof rbuf, "w");
 			if (fp == NULL)
@@ -574,10 +577,11 @@ a_read_datum(scgi_request *req, gdp_name_t gcliname, gdp_recno_t recno)
 						"GDP-Record-Number: %" PRIgdp_recno "\r\n",
 						gclpname,
 						recno);
-			if (EP_TIME_IS_VALID(&datum->ts))
+			gdp_datum_getts(datum, &ts);
+			if (EP_TIME_IS_VALID(&ts))
 			{
 				fprintf(fp, "GDP-Commit-Timestamp: ");
-				ep_time_print(&datum->ts, fp, EP_TIME_FMT_DEFAULT);
+				ep_time_print(&ts, fp, EP_TIME_FMT_DEFAULT);
 				fprintf(fp, "\r\n");
 			}
 			fprintf(fp, "\r\n");				// end of header
@@ -588,7 +592,7 @@ a_read_datum(scgi_request *req, gdp_name_t gcliname, gdp_recno_t recno)
 		// finish up sending the data out --- the extra copy is annoying
 		{
 			size_t rlen = strlen(rbuf);
-			size_t dlen = evbuffer_get_length(datum->dbuf);
+			size_t dlen = evbuffer_get_length(gdp_datum_getbuf(datum));
 			char obuf[1024];
 			char *obp = obuf;
 
@@ -605,7 +609,7 @@ a_read_datum(scgi_request *req, gdp_name_t gcliname, gdp_recno_t recno)
 			}
 
 			memcpy(obp, rbuf, rlen);
-			gdp_buf_read(datum->dbuf, obp + rlen, dlen);
+			gdp_buf_read(gdp_datum_getbuf(datum), obp + rlen, dlen);
 			scgi_send(req, obp, rlen + dlen);
 			if (obp != obuf)
 				ep_mem_free(obp);
@@ -740,7 +744,7 @@ pfx_gcl(scgi_request *req, char *uri)
 			{
 				gdp_datum_t *datum = gdp_datum_new();
 
-				gdp_buf_write(datum->dbuf, req->body, req->scgi_content_length);
+				gdp_buf_write(gdp_datum_getbuf(datum), req->body, req->scgi_content_length);
 				estat = a_append(req, gcliname, datum);
 				gdp_datum_free(datum);
 			}
@@ -886,7 +890,7 @@ pfx_kv(scgi_request *req, char *uri)
 	{
 		// get the datum out of the SCGI request
 		gdp_datum_t *datum = gdp_datum_new();
-		gdp_buf_write(datum->dbuf, req->body, req->scgi_content_length);
+		gdp_buf_write(gdp_datum_getbuf(datum), req->body, req->scgi_content_length);
 
 		// try to merge it into the in-memory representation
 		estat = insert_datum(datum);
