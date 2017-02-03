@@ -1,10 +1,6 @@
 #!/bin/sh
 
-if [ -e adm ]; then
-	adm=adm
-else
-	adm=../adm
-fi
+adm=`dirname $0`
 
 update_license() {
 	file=$1
@@ -16,6 +12,13 @@ update_license() {
 	} ||
 	    echo WARNING: could not update license for $file 1>&2
 }
+
+if [ ! -r LICENSE ]
+then
+	echo "[ERROR] LICENSE file must exist"
+	exit 1
+fi
+
 
 for f
 do
