@@ -23,6 +23,17 @@ then
 fi
 
 candidates=`ls \
+	/lib/libexecinfo.* \
+	/usr/lib*/libexecinfo.* \
+	/usr/lib/*/libexecinfo.* \
+	/usr/local/lib*/libexecinfo.* \
+	2>/dev/null`
+if [ ! -z "$candidates" ]
+then
+	echo "-lexecinfo"
+fi
+
+candidates=`ls \
 	/usr/lib/libsystemd.* \
 	/usr/lib/*/libsystemd.* \
 	2>/dev/null`

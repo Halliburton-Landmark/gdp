@@ -303,16 +303,22 @@ ep_cvt_txt_to_debug(
 }
 
 
+#if EP_OSCF_HAS_BACKTRACE
 #include <execinfo.h>
+#endif
 
 #define NFRAMES		128
 
 void
 ep_dbg_backtrace(void)
 {
+#if EP_OSCF_HAS_BACKTRACE
 	void *frames[NFRAMES];
 	int nframes;
 
 	nframes = backtrace(frames, NFRAMES);
 	backtrace_symbols_fd(frames, nframes, fileno(DebugFile));
+#else
+	ep_dbg_printf("No stack backtrace available\n");
+#endif
 }

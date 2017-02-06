@@ -78,6 +78,8 @@
 **		Use getdate(3) for time/date parsing
 **	EP_OSCF_HAS_SD_NOTIFY
 **		Use sd_notify(3) for system notification
+**	EP_OSCF_HAS_BACKTRACE
+**		Use backtrace(3) for printing stack backtraces
 **
 **  Configuration is probably better done using autoconf
 **
@@ -151,9 +153,11 @@
 #ifndef EP_TYPE_PRINTFLIKE
 # define EP_TYPE_PRINTFLIKE(a, b)	__printflike(a, b)
 #endif
+
 #ifndef EP_OSCF_USE_GETDATE
 # define EP_OSCF_USE_GETDATE		0	// does getdate(3) exist?
 #endif
+
 #ifndef EP_OSCF_HAS_SD_NOTIFY
 # ifdef __has_include
 #  if __has_include("systemd/sd-daemon.h")
@@ -162,6 +166,10 @@
 #   define EP_OSCF_HAS_SD_NOTIFY	0	// no sd_notify(3) (systemd)
 #  endif
 # endif
+#endif
+
+#ifndef EP_OSCF_HAS_BACKTRACE
+# define EP_OSCF_HAS_BACKTRACE		1	// exists on most platforms
 #endif
 
 
