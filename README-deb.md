@@ -29,8 +29,10 @@ infrastructure.
 Installation
 ============
 
+You can find the latest .deb files [here](https://gdp.cs.berkeley.edu/redmine/projects/gdp/files).
+
 These are standard debian package installation instructions that are included
-here for convenience. 
+here for convenience.
 
 For installing a debian package
 
