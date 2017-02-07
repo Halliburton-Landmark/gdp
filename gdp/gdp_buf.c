@@ -225,9 +225,18 @@ _gdp_buf_raw_copy(gdp_buf_t *obuf, gdp_buf_t *ibuf)
 	int istat = -1;
 
 #if LIBEVENT_VERSION_NUMBER > 0x02010100
+# ifndef LIBEVENT_USE_EVBUFFER_ADD_BUFFER_REFERENCE
+#  define LIBEVENT_USE_EVBUFFER_ADD_BUFFER_REFERENCE	1
+# endif
+# if LIBEVENT_USE_EVBUFFER_ADD_BUFFER_REFERENCE
+	// efficient, but has semantic quirks: "a buffer that has already been
+	// the outbuf of one evbuffer_add_buffer_reference call cannot be the
+	// inbuf of another"
 	istat = evbuffer_add_buffer_reference(ibuf, obuf);
+# else
 
-	// alternative implementation should evbuffer_add_buffer_reference not work
+	// Alternative implementation should evbuffer_add_buffer_reference not work.
+	// This physically copies the data (twice).
 	int nleft = evbuffer_get_length(ibuf);
 	struct evbuffer_ptr bufpos;
 
@@ -249,9 +258,10 @@ _gdp_buf_raw_copy(gdp_buf_t *obuf, gdp_buf_t *ibuf)
 			break;
 
 		evbuffer_ptr_set(ibuf, &bufpos, (size_t) istat, EVBUFFER_PTR_ADD);
-		nleft -= istat;
+		nleft -= n_copied;
 	}
-#else
+# endif // LIBEVENT_USE_EVBUFFER_ADD_BUFFER_REFERENCE
+#else // LIBEVENT_VERSION_NUMBER <= 0x02010100	(pre 2.1.1-alpha)
 	// this implementation may be expensive if ibuf is large
 	ssize_t buflen = evbuffer_get_length(ibuf);
 	if (buflen == 0)
@@ -287,12 +297,12 @@ gdp_buf_copy(gdp_buf_t *obuf, gdp_buf_t *ibuf)
 */
 
 gdp_buf_t *
-gdp_buf_dup(gdp_buf_t *buf)
+gdp_buf_dup(gdp_buf_t *ibuf)
 {
 	gdp_buf_t *nbuf = gdp_buf_new();
 	int istat;
 
-	istat = _gdp_buf_raw_copy(buf, nbuf);
+	istat = _gdp_buf_raw_copy(nbuf, ibuf);
 	DIAGNOSE("dup", istat);
 	return nbuf;
 }
