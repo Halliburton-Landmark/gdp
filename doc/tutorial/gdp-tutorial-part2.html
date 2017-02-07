@@ -78,12 +78,7 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <h1 id="software-installation-and-configuration">Software Installation and Configuration</h1>
 <p>In this section, we talk about how to get access, install and use the GDP client side library. As mentioned earlier, we have a C library for clients with wrappers in other languages around this C-library.</p>
 <p>As of now, we have packaged the GDP client-side code for Debian based systems as <code>.deb</code> packages. For other platforms, unfortunately no one-click packages exist. However, compilation from source works on Linux, BSD and Mac-OS.</p>
-<p>For now, access to GDP is granted on a case-by-case basis (email Eric <script type="text/javascript">
-<!--
-h='&#x63;&#x73;&#46;&#98;&#x65;&#114;&#x6b;&#x65;&#108;&#x65;&#x79;&#46;&#x65;&#100;&#x75;';a='&#64;';n='&#x65;&#114;&#x69;&#x63;';e=n+a+h;
-document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'" clas'+'s="em' + 'ail">'+e+'<\/'+'a'+'>');
-// -->
-</script><noscript>&#x65;&#114;&#x69;&#x63;&#32;&#x61;&#116;&#32;&#x63;&#x73;&#32;&#100;&#x6f;&#116;&#32;&#98;&#x65;&#114;&#x6b;&#x65;&#108;&#x65;&#x79;&#32;&#100;&#x6f;&#116;&#32;&#x65;&#100;&#x75;</noscript> for access). The source code for GDP client library and log-server is maintained in a git repository that can be accessed either over HTTPS (requires username, password), or over SSH (requires key setup):</p>
+<p>For now, access to GDP is granted on a case-by-case basis (email Eric <a href="mailto:eric@cs.berkeley.edu">eric@cs.berkeley.edu</a> for access). The source code for GDP client library and log-server is maintained in a git repository that can be accessed either over HTTPS (requires username, password), or over SSH (requires key setup):</p>
 <pre><code>git clone https://repo.eecs.berkeley.edu/git/projects/swarmlab/gdp.git
 git clone repoman@repo.eecs.berkeley.edu:projects/swarmlab/gdp.git</code></pre>
 <p>GDP-router is maintained in a separate repository. However, you should not need access to that for just playing around with GDP.</p>
@@ -97,8 +92,8 @@ git clone repoman@repo.eecs.berkeley.edu:projects/swarmlab/gdp.git</code></pre>
 <h2 id="creating-logs">Creating logs</h2>
 <p>Until such time as we implement automatic placement, you have to tell the GDP where a GCL should be created. By convention we are naming gdplogd instances (the daemon that implements physical log storage) by the reversed domain name followed by <code>.gdplogd</code>, for example, <code>edu.berkeley.eecs.gdp-01.gdplogd</code> is the name of the gdplogd running on the machine <code>gdp-01.eecs.berkeley.edu</code>.</p>
 <p>To create a new GCL you need to determine the node on which the log should be created and the name of the new log and pass them to <code>apps/gcl-create</code>. For example,</p>
-<pre><code>gcl-create -k none org.example.project.log17a</code></pre>
-<p>will create a log named <code>org.example.project.log17a</code> on one of the default log-servers at Berkeley. Although you can create logs with any name, please stick to this convention (with “project” being the project name or the user name, as appropriate) so we can avoid name collisions. <code>-k none</code> means that <code>gcl-create</code> will not attempt to create a new signature key for signing appended data. Although crucial to the operation, key-management is better deferred to a stage when you are familiar with the basic operations of the GDP. Also, note that <code>gcl-create</code> has several other command-line options that will be useful later on.</p>
+<pre><code>gcl-create -C you@email.com -k none org.example.project.log17a</code></pre>
+<p>will create a log named <code>org.example.project.log17a</code> on one of the default log-servers at Berkeley. Although you can create logs with any name, please stick to this convention (with “project” being the project name or the user name, as appropriate) so we can avoid name collisions. <code>-k none</code> means that <code>gcl-create</code> will not attempt to create a new signature key for signing appended data. Although crucial to the operation, key-management is better deferred to a stage when you are familiar with the basic operations of the GDP. The <code>-C</code> option specifies the creator of the log. Also, note that <code>gcl-create</code> has several other command-line options that will be useful later on.</p>
 <hr />
 <h1 id="writing-applications-in-python">Writing applications in Python</h1>
 <p>Even though the GDP library is written in C, we provide a python package <code>gdp</code> that acts as a wrapper around the C-library. This python package enables quick prototyping using an object-oriented interface to GDP. What follows is a quick how-to on writing simple GDP programs in Python. Note that this document is just a starting point and is not intended to be a comprehensive guide to the complete interface. For a more thorough API documentation, refer to <code>/lang/python/README</code>.</p>
@@ -115,14 +110,14 @@ git clone repoman@repo.eecs.berkeley.edu:projects/swarmlab/gdp.git</code></pre>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="op">&gt;&gt;&gt;</span> <span class="co"># assume that this log already exists.</span>
 <span class="op">&gt;&gt;&gt;</span> gcl_handle <span class="op">=</span> gdp.GDP_GCL(gcl_name, gdp.GDP_MODE_RA)</code></pre></div>
 <p>Next, let’s append a few records to the log. The unit of read/write to a log is called a record—data with some automatically generated metadata—represented as a python dictionary. The special key <code>data</code> represents the data we wish to append to the log, and its value should be a python (binary) string.</p>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="op">&gt;&gt;&gt;</span> <span class="cf">for</span> idx <span class="op">in</span> <span class="bu">xrange</span>(<span class="dv">10</span>):
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="op">&gt;&gt;&gt;</span> <span class="cf">for</span> idx <span class="kw">in</span> <span class="bu">xrange</span>(<span class="dv">10</span>):
 ...   datum <span class="op">=</span> {<span class="st">&quot;data&quot;</span>: <span class="st">&quot;Hello world &quot;</span> <span class="op">+</span> <span class="bu">str</span>(idx)}
 ...   gcl_handle.append(datum)</code></pre></div>
 <p>That’s it. Ideally, it should finish without throwing any errors, resulting in 10 records append to the log specified.</p>
 <p>Look at <code>/lang/python/apps/writer_test.py</code> for a full example.</p>
 <h2 id="reading-data-by-record-number">Reading data by record number</h2>
 <p>Next, let’s read some data back and see if it matches what we wrote. Note that we need to tell what record number we want to read, and record numbers start from 1. To read data, we just use <code>read</code> method of the GDP_GCL instance with the record number.</p>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="op">&gt;&gt;&gt;</span> <span class="cf">for</span> idx <span class="op">in</span> <span class="bu">xrange</span>(<span class="dv">1</span>,<span class="dv">11</span>):
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="op">&gt;&gt;&gt;</span> <span class="cf">for</span> idx <span class="kw">in</span> <span class="bu">xrange</span>(<span class="dv">1</span>,<span class="dv">11</span>):
 ...   datum <span class="op">=</span> gcl_handle.read(idx)
 ...   <span class="bu">print</span> datum
 {<span class="st">&#39;recno&#39;</span>: <span class="dv">1</span>, <span class="st">&#39;data&#39;</span>: <span class="st">&#39;Hello world 0&#39;</span>, <span class="st">&#39;ts&#39;</span>: {<span class="st">&#39;tv_sec&#39;</span>: <span class="dv">1442965633</span>, <span class="st">&#39;tv_accuracy&#39;</span>: <span class="fl">0.5</span>, <span class="st">&#39;tv_nsec&#39;</span>: 424722000L}}
