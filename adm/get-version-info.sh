@@ -12,14 +12,19 @@ then
 	rev=`git rev-parse HEAD 2> /dev/null`
 	mods=`git status -s | grep -v '??'`
 	test -z "$mods" || mods="++"
+	revmods="$rev$mods"
+	echo "$revmods" > git-version.txt
+elif test -r git-version.txt
+then
+	# git isn't installed, but we have an old version file
+	revmods=`cat git-version.txt`
 else
-	# git isn't installed
-	rev=""
-	mods=""
+	# no git information at all
+	revmods=""
 fi
-dtime=`date +'%Y-%m-%d %H:%M'`
 
 # add a leading space
-test -z "$rev" || rev=" $rev"
+test -z "$revmods" || revmods=" $revmods"
 
-echo "($dtime)$rev$mods"
+dtime=`date +'%Y-%m-%d %H:%M'`
+echo "($dtime)$revmods"
