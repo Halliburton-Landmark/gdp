@@ -30,8 +30,7 @@ As of now, we have packaged the GDP client-side code for Debian based systems
 as `.deb` packages. For other platforms, unfortunately no one-click packages
 exist. However, compilation from source works on Linux, BSD and Mac-OS.
 
-For now, access to GDP is granted on a case-by-case basis (email Eric
-<eric@cs.berkeley.edu> for access). The source code for GDP client library and
+The source code for GDP client library and
 log-server is maintained in a git repository that can be accessed either over
 HTTPS (requires username, password), or over SSH (requires key setup):
 
@@ -40,8 +39,11 @@ git clone https://repo.eecs.berkeley.edu/git/projects/swarmlab/gdp.git
 git clone repoman@repo.eecs.berkeley.edu:projects/swarmlab/gdp.git
 ```
 
-GDP-router is maintained in a separate repository. However, you should not need
-access to that for just playing around with GDP.
+GDP-router is maintained in a separate repository (gdp_router_click.git).
+However, you should not need access to that for just playing around with GDP.
+
+The repository gdp-if.git contains various interfaces to the GDP.  It is
+not really part of the GDP itself, but it may prove instructive.
 
 
 ## Compilation
@@ -73,7 +75,7 @@ created and the name of the new log and pass them to `apps/gcl-create`. For
 example,
 
 ```
-gcl-create -C you@email.com -k none org.example.project.log17a
+gcl-create -k none org.example.project.log17a
 ```
 
 will create a log named `org.example.project.log17a` on one of the default
@@ -83,7 +85,7 @@ name, as appropriate) so we can avoid name collisions. `-k none` means that
 `gcl-create` will not attempt to create a new signature key for signing
 appended data.  Although crucial to the operation, key-management is better
 deferred to a stage when you are familiar with the basic operations of the GDP.
-The `-C` option specifies the creator of the log.  Also, note that `gcl-create`
+Also, note that `gcl-create`
 has several other command-line options that will be useful later on.
 
 ---

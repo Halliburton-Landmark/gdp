@@ -28,13 +28,13 @@
 <li>Nitesh Mor, U.C. Berkeley Ubiquitous Swarm Lab, <script type="text/javascript">
 <!--
 h='&#x65;&#x65;&#x63;&#x73;&#46;&#98;&#x65;&#114;&#x6b;&#x65;&#108;&#x65;&#x79;&#46;&#x65;&#100;&#x75;';a='&#64;';n='&#x6d;&#x6f;&#114;';e=n+a+h;
-document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'" clas'+'s="em' + 'ail">'+e+'<\/'+'a'+'>');
+document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 // -->
 </script><noscript>&#x6d;&#x6f;&#114;&#32;&#x61;&#116;&#32;&#x65;&#x65;&#x63;&#x73;&#32;&#100;&#x6f;&#116;&#32;&#98;&#x65;&#114;&#x6b;&#x65;&#108;&#x65;&#x79;&#32;&#100;&#x6f;&#116;&#32;&#x65;&#100;&#x75;</noscript></li>
 <li>Eric Allman, U.C. Berkeley Ubiquitous Swarm Lab, <script type="text/javascript">
 <!--
 h='&#x63;&#x73;&#46;&#98;&#x65;&#114;&#x6b;&#x65;&#108;&#x65;&#x79;&#46;&#x65;&#100;&#x75;';a='&#64;';n='&#x65;&#114;&#x69;&#x63;';e=n+a+h;
-document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'" clas'+'s="em' + 'ail">'+e+'<\/'+'a'+'>');
+document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 // -->
 </script><noscript>&#x65;&#114;&#x69;&#x63;&#32;&#x61;&#116;&#32;&#x63;&#x73;&#32;&#100;&#x6f;&#116;&#32;&#98;&#x65;&#114;&#x6b;&#x65;&#108;&#x65;&#x79;&#32;&#100;&#x6f;&#116;&#32;&#x65;&#100;&#x75;</noscript></li>
 </ul>
@@ -47,13 +47,11 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'" clas'+'s="em' + 'ail">'+e+'<\
 <h1 id="global-data-plane-gdp">Global Data Plane (GDP)</h1>
 <p>In the GDP, we take this basic abstraction of a log and use this as a communication and storage mechanism for various entities producing/consuming data. In GDP, a log is nothing more than a place where you can write records (each called a datum) in a queue/list like fashion. Any structure in the datum is assigned by your program; a datum is just an opaque blob of data for the GDP. Other than the real data, each datum has a sequence number (starting from one), a timestamp, and potentially other metadata (TBD). Logs have some metadata that tells some general information about the log, e.g. a public key for checking signatures (Details TBD). Metadata can only be specified when the log is created.</p>
 <div class="figure">
-<img src="log-structure-1.png" alt="Logical representation of GDP log" />
-<p class="caption">Logical representation of GDP log</p>
+<img src="log-structure-1.png" alt="Logical representation of GDP log" /><p class="caption">Logical representation of GDP log</p>
 </div>
 <p>As for the different software components, there are clients (readers/writers), routers and log-servers. As a user, you probably need to know only about the client side. However, just for a little better understanding of the entire system—a log-server (gdplogd) is a server process that actually stores the data and responds to commands for reading/writing etc. A router (gdp-router), as the name implies, routes all the GDP traffic appropriately. As a client interested in a particular log, you connect to <em>any</em> router over a TCP channel. It is the job of the router to figure out what log-server hosts the log in question and then route all the communication.</p>
 <div class="figure">
-<img src="gdp-components.png" alt="GDP software components" />
-<p class="caption">GDP software components</p>
+<img src="gdp-components.png" alt="GDP software components" /><p class="caption">GDP software components</p>
 </div>
 <h2 id="writes-and-reads">Writes and Reads</h2>
 <p>The write operation for the logs is <em>append</em>. A datum written to the log can not be over-written. As of now, neither logs nor records expire (one or both may change in future). There are two versions of append available in the library provided: synchronous and asynchronous, however they are just two different ways of implementing the same underlying operation. In synchronous operation, a writer waits for an acknowledgment before commencing the next append operation. This might not be the most efficient way to go about for applications with high performance requirements, hence the asynchronous operation where the writer can have multiple append operations in transit at a time. However, note that the synchronous vs asynchronous operation is purely a difference in how the client library processes the data—internally all operations are asynchronous.</p>
@@ -74,12 +72,13 @@ will be replaced by a log creation service soon.  To have a log created,
 contact Eric (eric@cs.berkeley.edu).
 
 -->
+
 <h2 id="client-side-implementation">Client side implementation</h2>
 <p>As of now, at the core of client side distribution is a C library. There are wrappers around the C library for Python and Java. Wrappers for other languages tend to run slightly behind in features compared to the C interface, however, you might find them an easier option if you want an object oriented interface or are not comfortable programming in C.</p>
 <p>Java interface is moderately supported. Contact Nitesh (<script type="text/javascript">
 <!--
 h='&#x65;&#x65;&#x63;&#x73;&#46;&#98;&#x65;&#114;&#x6b;&#x65;&#108;&#x65;&#x79;&#46;&#x65;&#100;&#x75;';a='&#64;';n='&#x6d;&#x6f;&#114;';e=n+a+h;
-document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'" clas'+'s="em' + 'ail">'+e+'<\/'+'a'+'>');
+document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 // -->
 </script><noscript>&#x6d;&#x6f;&#114;&#32;&#x61;&#116;&#32;&#x65;&#x65;&#x63;&#x73;&#32;&#100;&#x6f;&#116;&#32;&#98;&#x65;&#114;&#x6b;&#x65;&#108;&#x65;&#x79;&#32;&#100;&#x6f;&#116;&#32;&#x65;&#100;&#x75;</noscript>) if you are in desperate need for a Java interface. There is also a REST-based interface, which is covered elsewhere.</p>
 <h2 id="security-and-privacy">Security and Privacy</h2>

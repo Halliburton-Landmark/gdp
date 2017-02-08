@@ -20,8 +20,7 @@ using one of the following commands:
 	git clone repoman@repo.eecs.berkeley.edu:projects/swarmlab/gdp.git
 
 The second is only available if you have registered your public
-ssh key with `repo.eecs.berkeley.edu`.  For the moment that repository
-is not open; contact Eric Allman <eric@cs.berkeley.edu> to get access.
+ssh key with `repo.eecs.berkeley.edu`.
 
 At the moment, compiles work on many platforms, including Debian,
 RedHat, MacOS, and FreeBSD.  However, some other GDP-related packages
