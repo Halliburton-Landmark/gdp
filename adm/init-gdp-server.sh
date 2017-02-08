@@ -30,6 +30,9 @@ cd `dirname $0`/..
 GDP_SRC_ROOT=`pwd`
 . adm/common-support.sh
 
+## compile utilities, possibly not as root
+(cd util && make)
+
 : ${GDPLOGD_LOG:=$GDP_LOG_DIR/gdplogd.log}
 
 if [ ! -x $GDP_ROOT/sbin/gdplogd ]
@@ -132,8 +135,11 @@ else
 	warn "$EP_PARAMS/gdplogd already exists; check consistency" 1>&2
 fi
 
-info "Installing gdplogd wrapper script"
+info "Installing utility programs"
 cd $GDP_SRC_ROOT
+(cd util && make install)
+
+info "Installing gdplogd wrapper script"
 install -o ${GDP_USER} adm/gdplogd-wrapper.sh $GDP_ROOT/sbin
 
 if [ -d /etc/rsyslog.d ]
