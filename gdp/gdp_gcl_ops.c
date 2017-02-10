@@ -130,6 +130,9 @@ _gdp_gcl_freehandle(gdp_gcl_t *gcl)
 	// this is a forced free, so ignore existing refcnts, etc.
 	gcl->refcnt = 0;
 
+	// make sure gcl is locked
+	ep_thr_mutex_trylock(&gcl->mutex);
+
 	// release any remaining requests
 	_gdp_req_freeall(&gcl->reqs, NULL);
 

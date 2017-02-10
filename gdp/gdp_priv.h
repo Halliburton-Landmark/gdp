@@ -39,12 +39,19 @@
 #define GDP_EXTENDED_LOCKING_CHECK		1
 #endif
 
+#include <ep/ep.h>
 #include <ep/ep_crypto.h>
 #include <ep/ep_thr.h>
 
 #include <event2/buffer.h>
 
 #include <stdio.h>
+
+#if EP_OSCF_USE_VALGRIND
+# include <valgrind/helgrind.h>
+#else
+# define VALGRIND_HG_CLEAN_MEMORY(a, b)
+#endif
 
 typedef struct gdp_chan		gdp_chan_t;
 typedef struct gdp_req		gdp_req_t;

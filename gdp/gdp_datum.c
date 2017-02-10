@@ -82,6 +82,7 @@ gdp_datum_new(void)
 	gdp_datum_reset(datum);
 	ep_dbg_cprintf(Dbg, 48, "gdp_datum_new => %p\n", datum);
 	datum->inuse = true;
+	VALGRIND_HG_CLEAN_MEMORY(datum, sizeof *datum);
 	return datum;
 }
 

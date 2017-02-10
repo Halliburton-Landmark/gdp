@@ -80,6 +80,8 @@
 **		Use sd_notify(3) for system notification
 **	EP_OSCF_HAS_BACKTRACE
 **		Use backtrace(3) for printing stack backtraces
+**	EP_OSCF_USE_VALGRIND
+**		Include hints for valgrind(1)
 **
 **  Configuration is probably better done using autoconf
 **
@@ -170,6 +172,16 @@
 
 #ifndef EP_OSCF_HAS_BACKTRACE
 # define EP_OSCF_HAS_BACKTRACE		1	// exists on most platforms
+#endif
+
+#ifndef EP_OSCF_USE_VALGRIND
+# ifdef __has_include
+#  if __has_include("valgrind/valgrind.h")
+#   define EP_OSCF_USE_VALGRIND		1	// include valgrind(1) hints
+#  else
+#   define EP_OSCF_USE_VALGRIND		0	// no valgrind headers
+#  endif
+# endif
 #endif
 
 

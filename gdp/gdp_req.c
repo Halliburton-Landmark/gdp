@@ -159,6 +159,7 @@ _gdp_req_new(int cmd,
 
 	// make it active so that _gdp_req_lock doesn't object
 	req->state = GDP_REQ_ACTIVE;
+	VALGRIND_HG_CLEAN_MEMORY(req, sizeof *req);
 	(void) _gdp_req_lock(req);
 
 	// initialize request
@@ -234,9 +235,13 @@ _gdp_req_free(gdp_req_t **reqp)
 	if (req == NULL)
 		return;
 
+	// make sure the original pointer is invalid
+	*reqp = NULL;
+
 	ep_dbg_cprintf(Dbg, 48, "_gdp_req_free(%p)  state=%d, gcl=%p\n",
 			req, req->state, req->gcl);
 
+	GDP_ASSERT_MUTEX_ISLOCKED(&req->mutex, );
 	if (req->state == GDP_REQ_FREE)
 	{
 		// req was freed after a reference was taken
@@ -268,9 +273,6 @@ _gdp_req_free(gdp_req_t **reqp)
 			STAILQ_REMOVE_HEAD(&req->events, queue);
 	}
 
-	// req should be unreferencable now
-	_gdp_req_unlock(req);
-
 	// free the associated PDU(s)
 	if (req->rpdu != NULL && req->rpdu != req->cpdu)
 		_gdp_pdu_free(req->rpdu);
@@ -290,8 +292,7 @@ _gdp_req_free(gdp_req_t **reqp)
 	LIST_INSERT_HEAD(&ReqFreeList, req, gcllist);
 	ep_thr_mutex_unlock(&ReqFreeListMutex);
 
-	// make sure the pointer is invalid
-	*reqp = NULL;
+	_gdp_req_unlock(req);
 }
 
 

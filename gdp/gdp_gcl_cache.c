@@ -183,20 +183,15 @@ _gdp_gcl_cache_changename(gdp_gcl_t *gcl, gdp_name_t newname)
 /*
 **  _GDP_GCL_CACHE_GET --- get a GCL from the cache, if it exists
 **
-**		It's annoying, but you have to lock the entire cache when
-**		searching to make sure someone doesn't (for example) sneak
-**		in and grab a GCL that you are about to lock.  The basic
-**		procedure is (1) lock cache, (2) get GCL, (3) lock GCL,
-**		(4) bump refcnt, (5) unlock GCL, (6) unlock cache.
+**		To avoid deadlock due to improper lock ordering, you can't
+**		hold GclCacheMutex while locking or unlocking a GCL, which 
+**		can cause problems.
 **
 **		If found, the refcnt is bumped for the returned GCL,
 **		i.e., the caller is responsible for calling
 **		_gdp_gcl_decref(&gcl) when it is finished with it.
 **
 **		gcl is returned unlocked.
-**		NOTE: is this a good idea?  Problem is that steps (5) and
-**			(6) must be in that order to avoid priority inversion,
-**			but the lock could be re-acquired.
 */
 
 gdp_gcl_t *
@@ -204,29 +199,19 @@ _gdp_gcl_cache_get(gdp_name_t gcl_name, gdp_iomode_t mode)
 {
 	gdp_gcl_t *gcl;
 
-	ep_thr_mutex_lock(&GclCacheMutex);
-
 	// see if we have a pointer to this GCL in the cache
+	// don't need to lock GclCacheMutex since OpenGCLCache is protected
 	gcl = ep_hash_search(OpenGCLCache, sizeof (gdp_name_t), (void *) gcl_name);
 	if (gcl == NULL)
 		goto done;
 	_gdp_gcl_lock(gcl);
 
-	// sanity checking
-	if (EP_ASSERT_TEST(EP_UT_BITSET(GCLF_INUSE, gcl->flags)) ||
-	    EP_ASSERT_TEST(EP_UT_BITSET(GCLF_INCACHE, gcl->flags)))
+	// sanity checking --- someone may have snuck in before we acquired the lock
+	if (!EP_UT_BITSET(GCLF_INUSE, gcl->flags) ||
+			!EP_UT_BITSET(GCLF_INCACHE, gcl->flags) ||
+			EP_UT_BITSET(GCLF_DROPPING, gcl->flags))
 	{
-		// remove GCL from cache and pretend it was never there
-		_gdp_gcl_unlock(gcl);
-		ep_hash_delete(OpenGCLCache, sizeof (gdp_name_t), (void *) gcl_name);
-		gcl = NULL;
-		goto done;
-	}
-
-	// see if someone snuck in and deallocated this
-	if (EP_UT_BITSET(GCLF_DROPPING, gcl->flags))
-	{
-		// oops, dropped from cache
+		// someone deallocated this in the brief window above
 		_gdp_gcl_unlock(gcl);
 		gcl = NULL;
 	}
@@ -238,8 +223,6 @@ _gdp_gcl_cache_get(gdp_name_t gcl_name, gdp_iomode_t mode)
 	}
 
 done:
-	ep_thr_mutex_unlock(&GclCacheMutex);
-
 	if (gcl == NULL)
 	{
 		if (ep_dbg_test(Dbg, 42))
@@ -252,7 +235,6 @@ done:
 	}
 	else
 	{
-		gcl->flags &= ~GCLF_ISLOCKED;
 		ep_dbg_cprintf(Dbg, 42, "gdp_gcl_cache_get: %s =>\n"
 					"\t%p refcnt %d\n",
 					gcl->pname, gcl, gcl->refcnt);
