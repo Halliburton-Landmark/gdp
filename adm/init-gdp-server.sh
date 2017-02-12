@@ -152,7 +152,7 @@ fi
 if [ -d /etc/logrotate.d ]
 then
 	info "Installing logrotate configuration"
-	cp adm/gdplogd-logrotate.conf /etc/logrotate.d/gdplogd
+	cp adm/gdp-logrotate.conf /etc/logrotate.d/gdp
 fi
 
 if [ "$INITSYS" = "systemd" ]
