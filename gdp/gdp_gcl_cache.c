@@ -337,7 +337,7 @@ _gdp_gcl_touch(gdp_gcl_t *gcl)
 **		is really more advice than a requirement.
 */
 
-void
+EP_STAT
 _gdp_gcl_cache_reclaim(time_t maxage)
 {
 	static int headroom = 0;
@@ -352,7 +352,7 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 		{
 			int maxfds;
 			(void) ep_app_numfds(&maxfds);
-			headroom = maxfds / 2;
+			headroom = maxfds - ((maxfds * 2) / 3);
 			if (headroom == 0)
 				headroom = 8;
 		}
@@ -370,10 +370,10 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 		ep_thr_mutex_lock(&GclCacheMutex);
 		for (g1 = LIST_FIRST(&GclsByUse); g1 != NULL; g1 = g2)
 		{
+			g2 = LIST_NEXT(g1, ulist);
 			if (g1->utime > mintime)
 				break;
-			g2 = LIST_NEXT(g1, ulist);
-			if (!EP_UT_BITSET(GCLF_DROPPING, g1->flags))
+			if (!EP_UT_BITSET(GCLF_DROPPING|GCLF_ISLOCKED, g1->flags))
 			{
 				if (ep_dbg_test(Dbg, 32))
 				{
@@ -383,6 +383,11 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 				LIST_REMOVE(g1, ulist);
 				g1->flags |= GCLF_ISLOCKED;
 				_gdp_gcl_freehandle(g1);
+			}
+			else if (ep_dbg_test(Dbg, 10))
+			{
+				ep_dbg_printf("_gdp_gcl_cache_reclaim: skipping:\n   ");
+				_gdp_gcl_dump(g1, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
 			}
 		}
 		ep_thr_mutex_unlock(&GclCacheMutex);
@@ -395,14 +400,14 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 			return;
 
 		// try again, shortening timeout
-		if (maxage < 4)
+		maxage -= maxage < 4 ? 1 : maxage / 4;
+		if (maxage <= 0)
 		{
 			ep_log(EP_STAT_WARN,
 					"_gdp_gcl_cache_reclaim: cannot reach headroom %d, nfds %d",
 					headroom, nfds);
 			return;
 		}
-		maxage -= maxage / 4;
 	}
 }
 
