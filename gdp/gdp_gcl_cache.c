@@ -337,7 +337,7 @@ _gdp_gcl_touch(gdp_gcl_t *gcl)
 **		is really more advice than a requirement.
 */
 
-EP_STAT
+void
 _gdp_gcl_cache_reclaim(time_t maxage)
 {
 	static int headroom = 0;
