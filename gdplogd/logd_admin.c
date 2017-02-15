@@ -218,7 +218,7 @@ admin_post_statsv(
 	{
 		struct stat st;
 
-		if (stat(AdminStatsFileName, &st) != 0 && st.st_ino != AdminStatsIno)
+		if (stat(AdminStatsFileName, &st) != 0 || st.st_ino != AdminStatsIno)
 		{
 			reopen(AdminStatsFileName, &AdminStatsFp, &AdminStatsIno);
 		}
