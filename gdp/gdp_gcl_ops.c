@@ -131,13 +131,21 @@ _gdp_gcl_freehandle(gdp_gcl_t *gcl)
 	gcl->refcnt = 0;
 
 	// make sure gcl is locked
-	ep_thr_mutex_trylock(&gcl->mutex);
-
-	// release any remaining requests
-	_gdp_req_freeall(&gcl->reqs, NULL);
+	{
+		int i = ep_thr_mutex_trylock(&gcl->mutex);
+		if (i != 0 && ep_dbg_test(Dbg, 28))
+			ep_dbg_printf("    ep_tyr_mutex_trylock => %d\n", i);
+	}
+	gcl->flags |= GCLF_DROPPING | GCLF_ISLOCKED;
 
 	// drop it from the name -> handle cache
 	_gdp_gcl_cache_drop(gcl);
+
+	// should be inacessible now
+	_gdp_gcl_unlock(gcl);
+
+	// release any remaining requests
+	_gdp_req_freeall(&gcl->reqs, NULL);
 
 	// free any additional per-GCL resources
 	if (gcl->freefunc != NULL)
@@ -150,9 +158,6 @@ _gdp_gcl_freehandle(gdp_gcl_t *gcl)
 		ep_crypto_md_free(gcl->digest);
 	gcl->digest = NULL;
 
-	// release the locks and cache entry
-	// note that pthread_mutex_destroy is undefined if mutex is locked
-	ep_thr_mutex_unlock(&gcl->mutex);
 	ep_thr_mutex_destroy(&gcl->mutex);
 
 	// if there is any "extra" data, drop that
