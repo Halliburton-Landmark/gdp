@@ -180,6 +180,10 @@ that might be cleared (in seconds).
 Defaults to 15.
 This should generally be less than
 .Va swarm.gdplogd.reclaim.age .
+.It swarm.gdplogd.reclaim.inthread
+If set, resource reclaiming is run in a worker thread
+rather than in the main event loop.
+Defaults to false.
 .
 .It swarm.gdplogd.sequencing.allowdups
 Allows duplicate numbered records.
