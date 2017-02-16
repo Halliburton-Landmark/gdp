@@ -79,7 +79,10 @@ static void
 gdpd_reclaim_resources(int fd, short what, void *ctx)
 {
 	ep_dbg_cprintf(Dbg, 69, "gdpd_reclaim_resources\n");
-	gcl_reclaim_resources();
+	if (ep_adm_getboolparam("swarm.gdplogd.reclaim.inthread", false))
+		ep_thr_pool_run(gcl_reclaim_resources, NULL);
+	else
+		gcl_reclaim_resources(NULL);
 }
 
 

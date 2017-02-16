@@ -195,7 +195,7 @@ get_open_handle(gdp_req_t *req, gdp_iomode_t iomode)
 */
 
 void
-gcl_reclaim_resources(void)
+gcl_reclaim_resources(void *null)
 {
 	// how long to leave GCLs open before reclaiming (default: 5 minutes)
 	time_t reclaim_age = ep_adm_getlongparam("swarm.gdplogd.reclaim.age",

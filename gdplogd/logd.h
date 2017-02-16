@@ -105,7 +105,8 @@ extern EP_STAT	get_open_handle(		// get open handle (pref from cache)
 					gdp_req_t *req,
 					gdp_iomode_t iomode);
 
-extern void		gcl_reclaim_resources(void);	// reclaim old GCLs
+extern void		gcl_reclaim_resources(	// reclaim old GCLs
+					void *null);			// parameter unused
 
 
 /*
