@@ -111,6 +111,8 @@ typedef enum
 #define GDP_GCLMD_PUBKEY	0x00505542	// PUB (public key)
 #define GDP_GCLMD_CTIME		0x0043544D	// CTM (creation time)
 #define GDP_GCLMD_CID		0x00434944	// CID (creator id)
+#define GDP_GCLMD_SYNTAX	0x0053594E	// SYN (data syntax: json, xml, etc.)
+#define GDP_GCLMD_LOCATION	0x004C4F43	// LOC (location: lat/long)
 
 
 /*
