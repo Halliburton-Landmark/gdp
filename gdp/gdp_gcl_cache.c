@@ -218,8 +218,11 @@ _gdp_gcl_cache_get(gdp_name_t gcl_name, gdp_iomode_t mode)
 	else
 	{
 		// we're good to go
-		_gdp_gcl_incref(gcl);
-		_gdp_gcl_unlock(gcl);
+		if (mode != _GDP_MODE_PEEK)
+		{
+			_gdp_gcl_incref(gcl);
+			_gdp_gcl_unlock(gcl);
+		}
 	}
 
 done:
