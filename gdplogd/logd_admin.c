@@ -298,16 +298,7 @@ post_one_log(gdp_name_t gdpname, void *ctx)
 
 	gdp_printable_name(gdpname, gdppname);
 
-	// if _gdp_gcl_cache_get returned the gcl locked, we wouldn't have
-	// to do this.
-	while ((gcl = _gdp_gcl_cache_get(gdpname, GDP_MODE_ANY)) != NULL)
-	{
-		_gdp_gcl_lock(gcl);
-		if (EP_UT_BITSET(GCLF_INUSE, gcl->flags))
-			break;
-		_gdp_gcl_unlock(gcl);
-	}
-
+	gcl = _gdp_gcl_cache_get(gdpname, _GDP_MODE_PEEK);
 	if (gcl != NULL)
 	{
 		if (gcl->x->physimpl->getstats != NULL)
@@ -335,7 +326,6 @@ post_one_log(gdp_name_t gdpname, void *ctx)
 		}
 
 		_gdp_gcl_unlock(gcl);
-		_gdp_gcl_decref(&gcl);
 	}
 	else
 	{
