@@ -45,6 +45,8 @@
 
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.proto", "GDP protocol processing");
+static EP_DBG	DbgCmdTrace = EP_DBG_INIT("gdp.proto.command.trace",
+							"GDP command execution tracing");
 
 static uint8_t	RoutingLayerAddr[32] =
 	{
@@ -801,24 +803,24 @@ _gdp_req_dispatch(gdp_req_t *req, int cmd)
 	EP_STAT estat;
 	dispatch_ent_t *d;
 
-	if (ep_dbg_test(Dbg, 18))
+	if (ep_dbg_test(Dbg, 18) || ep_dbg_test(DbgCmdTrace, 40))
 	{
 		flockfile(ep_dbg_getfile());
 		ep_dbg_printf("_gdp_req_dispatch >>> %s (%d)",
 				_gdp_proto_cmd_name(cmd), cmd);
-		if (req->gcl != NULL)
+		if (ep_dbg_test(Dbg, 18))
 		{
-			ep_dbg_printf(" [gcl->refcnt %d]", req->gcl->refcnt);
+			if (req->gcl != NULL)
+			{
+				ep_dbg_printf(" [gcl->refcnt %d]", req->gcl->refcnt);
+			}
+			if (ep_dbg_test(Dbg, 30))
+			{
+				ep_dbg_printf(", ");
+				_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+			}
 		}
-		if (ep_dbg_test(Dbg, 30))
-		{
-			ep_dbg_printf(", ");
-			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
-		}
-		else
-		{
-			ep_dbg_printf("\n");
-		}
+		ep_dbg_printf("\n");
 		funlockfile(ep_dbg_getfile());
 	}
 
