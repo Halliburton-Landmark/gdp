@@ -133,9 +133,12 @@ logd_shutdown(void)
 **		SIGUSR1 instead.
 */
 
+extern const char GdplogdVersion[];
+
 static void
 dump_state(int plev)
 {
+	fprintf(stderr, "\nVersion: %s\n", GdplogdVersion);
 	_gdp_gcl_cache_dump(plev, stderr);
 	fprintf(stderr, "\n<<< Open file descriptors >>>\n");
 	ep_app_dumpfds(stderr);
@@ -180,6 +183,7 @@ sigabort(int sig)
 	signal(sig, SIG_DFL);
 	ep_sd_notifyf("STOPPING=1\nSTATUS=Aborting on signal %d\n", sig);
 	ep_log(EP_STAT_ABORT, "Aborting on signal %d", sig);
+	dump_state(GDP_PR_DETAILED);
 	kill(getpid(), sig);		// this will not do cleanup
 }
 
