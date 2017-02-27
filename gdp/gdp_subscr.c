@@ -54,7 +54,7 @@ subscr_lost(gdp_req_t *req)
 	if (ep_dbg_test(Dbg, 1))
 	{
 		ep_dbg_printf("subscr_lost: ");
-		_gdp_req_dump(req, ep_dbg_getfile(), 0, 0);
+		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 }
 
