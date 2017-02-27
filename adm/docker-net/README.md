@@ -67,7 +67,7 @@ Notes:
     recommended is the 'Post-installation steps' to allow running docker
     by non-root users. See:
     https://docs.docker.com/engine/installation/linux/linux-postinstall/
-  - 'bridge-utils' and 'arping'
+  - 'bridge-utils' and 'iputils-arping'
 
 - As of version 1.7, docker lacks the ability to specify the IP address of a 
   container by the user. We need to know the IP addresses of all the router

@@ -92,6 +92,11 @@ gdp-routers: $(PIPEWORK) .gdp-router-docker-image
 		sudo $(PIPEWORK) br1 $$tmp $$IP/$(SUBNET);\
 	done
 	-@sudo ip addr add $(HOST_IP)/$(SUBNET) dev br1
+	# It is not at all apparent why the bridge calles iptables rules when forwarding.
+	# there are situations where default 'FORWARD' policy is to 'DROP'. Modifying
+	# this configuration can have unintended side-effects in some situations, but it
+	# should be fine for most
+	-@sudo iptables --policy FORWARD ACCEPT
 
 
 # Start the logd's
