@@ -27,10 +27,13 @@
 # ----- END LICENSE BLOCK -----                                               
 
 
-from MISC import *
+from __future__ import absolute_import
+from builtins import range
+from builtins import object
+from .MISC import *
 
 
-class GDP_NAME:
+class GDP_NAME(object):
 
     """
     Represents name of a GCL. Each GCL has potentially up to three kind of 
@@ -76,7 +79,7 @@ class GDP_NAME:
 
         def __parse_name(name):
 
-            buf1 = create_string_buffer(name, len(name)+1)
+            buf1 = create_string_buffer(bytes(name, 'utf-8'), len(name)+1)
             buf2 = create_string_buffer(32)
             name_t_ptr = cast(byref(buf2), POINTER(self.name_t))
 

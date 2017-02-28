@@ -42,7 +42,7 @@ ROUTER_PORT = 8007
 
 NUM_LOGDS_PER_ROUTER = 1    # max 15. Change subnet if you want more
 LOGD_IP_PREFIX = 172.30.
-LOGD_CMDLINE_ARGS = -D *=10       # this is in addition to '-G <router>'
+LOGD_CMDLINE_ARGS = -D *=50       # this is in addition to '-G <router>'
 
 ROUTER_IPS = $(foreach num,$(shell seq 1 $(NUM_ROUTERS)),$(ROUTER_IP_PREFIX)$(num))
 ROUTER_CMDLINE_ARGS_ROUTERS = $(shell echo "$(foreach router,$(ROUTER_IPS),$(router):$(ROUTER_PORT))" | sed -e 's/ /,/g')

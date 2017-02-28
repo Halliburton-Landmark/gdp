@@ -66,13 +66,16 @@ Following requests are supported:
 TODO: Make sure JSON is a good enough choice for returning binary data?
 
 """
+from __future__ import print_function
 
+from future import standard_library
+standard_library.install_aliases()
 from twisted.internet import reactor
 from twisted.web.resource import Resource
 from twisted.web.server import Site
 
 from KVstore import KVstore
-import urlparse
+import urllib.parse
 import argparse
 import time
 import json
@@ -96,11 +99,11 @@ class KVstoreResource(Resource):
 
 
     def render_GET(self, request):
-        print "Received request:", request.uri
+        print("Received request:", request.uri)
         if request.uri == "/":
-            t = self.kvstore.keys()
+            t = list(self.kvstore.keys())
         else:
-            req = urlparse.parse_qs(request.uri[1:])
+            req = urllib.parse.parse_qs(request.uri[1:])
             key = req['key'][0]
             ts = float(req.get('ts', [time.time()])[0])
             t = self.__get_to_dict(key, ts)
@@ -109,7 +112,7 @@ class KVstoreResource(Resource):
 
     def render_PUT(self, request):
         val =  request.content.read()
-        print "Received request:", request.uri, val
+        print("Received request:", request.uri, val)
         key = request.uri[1:]
         self.kvstore[key] = val
         t = self.__get_to_dict(key, time.time()+86400)
@@ -131,6 +134,6 @@ if __name__ == '__main__':
     mode = KVstore.MODE_RW if args.write else KVstore.MODE_RO
     site = Site(KVstoreResource(args.logname[0], args.keyfile[0], mode))
     reactor.listenTCP(args.port, site)
-    print "Starting REST interface on port", args.port
+    print("Starting REST interface on port", args.port)
     reactor.run()
 

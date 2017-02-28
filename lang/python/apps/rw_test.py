@@ -33,8 +33,10 @@ A simple program that:
 - verifies that what was written is exactly what is read back
 
 """
+from __future__ import print_function
 
 
+from builtins import range
 import sys
 sys.path.append("../")
                 # So that we can actually load the python_api module
@@ -48,7 +50,7 @@ def generate_random_data(N, count):
     "returns an count-sized array of N-sized alphanumeric strings"
 
     ret = []
-    for idx in xrange(count):
+    for idx in range(count):
         ret.append(''.join(random.choice(string.ascii_letters + string.digits)
                    for _ in range(N)))
 
@@ -68,8 +70,8 @@ def main(name_str, keyfile=None):
 
     gcl_name = gdp.GDP_NAME(name_str)
 
-    print "opening gcl", "".join(
-                        ["%0.2x" % ord(x) for x in gcl_name.internal_name()])
+    print("opening gcl", "".join(
+                        ["%0.2x" % ord(x) for x in gcl_name.internal_name()]))
     gcl_handle = gdp.GDP_GCL(gcl_name, gdp.GDP_MODE_RA, open_info)
 
     # the data that will be written
@@ -78,7 +80,7 @@ def main(name_str, keyfile=None):
     # writing the data
     for (idx, s) in enumerate(data):
 
-        print "writing message", idx
+        print("writing message", idx)
         datum = {"data": s}         # Create a minimalist datum object
         gcl_handle.append(datum)   # write this to the GCL
 
@@ -86,21 +88,21 @@ def main(name_str, keyfile=None):
 
     # to store the data read back from the GCL
     read_data = [] 
-    for idx in xrange(-1*len(data),0):
+    for idx in range(-1*len(data),0):
 
-        print "reading message", -1*idx, "from the end"
+        print("reading message", -1*idx, "from the end")
         datum = gcl_handle.read(idx)            # -n => n-th record from end
         read_data.append(datum["data"])         # append the data to read_data
 
     # verifying the correctness
-    for idx in xrange(len(data)):
+    for idx in range(len(data)):
         if data[idx] == read_data[idx]:
-            print "message %d matches" % idx
+            print("message %d matches" % idx)
 
 if __name__ == "__main__":
 
     if len(sys.argv) < 2:
-        print "Usage: %s <gcl_name> [<signing-key-file>]" % sys.argv[0]
+        print("Usage: %s <gcl_name> [<signing-key-file>]" % sys.argv[0])
         sys.exit(1)
 
     name_str = sys.argv[1]

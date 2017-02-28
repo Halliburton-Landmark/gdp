@@ -29,6 +29,7 @@
 """
 A simple program to demonstrate subscriptions to multiple logs
 """
+from __future__ import print_function
 
 import sys
 sys.path.append("../")
@@ -61,12 +62,12 @@ def main(*args):
                                     (datum["ts"]["tv_nsec"]*1.0/10**9))
         print_str = ">>> gcl_name: %s\n>>> recno: %d, ts: %s\n%s" % (gcl_name,
                                 datum["recno"], readable_time, datum["data"])
-        print print_str                    
+        print(print_str)                    
 
 if __name__ == "__main__":
 
     if len(sys.argv) < 2:
-        print "Usage: %s <gcl-name1> <gcl-name2> ..." % sys.argv[0]
+        print("Usage: %s <gcl-name1> <gcl-name2> ..." % sys.argv[0])
         sys.exit(1)
 
     # Change this to point to a gdp_router

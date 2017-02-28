@@ -27,11 +27,13 @@
 # ----- END LICENSE BLOCK -----                                               
 
 
-from MISC import *
-from GDP_NAME import *
-from GDP_DATUM import *
-from GDP_GCLMD import *
-from GDP_GCL_OPEN_INFO import *
+from __future__ import absolute_import
+from builtins import object
+from .MISC import *
+from .GDP_NAME import *
+from .GDP_DATUM import *
+from .GDP_GCLMD import *
+from .GDP_GCL_OPEN_INFO import *
 
 
 class GDP_GCL(object):
@@ -115,7 +117,7 @@ class GDP_GCL(object):
                             pointer(__ptr))
         check_EP_STAT(estat)
 
-        if addressof(__ptr.contents) in cls.object_dir.keys():
+        if addressof(__ptr.contents) in list(cls.object_dir.keys()):
             newobj = cls.object_dir[addressof(__ptr.contents)]
             return newobj
         else:
@@ -319,7 +321,7 @@ class GDP_GCL(object):
 
         datum = GDP_DATUM()
 
-        if "data" in datum_dict.keys():
+        if "data" in list(datum_dict.keys()):
             datum.setbuf(datum_dict["data"])
 
         __func = gdp.gdp_gcl_append
@@ -338,7 +340,7 @@ class GDP_GCL(object):
         """
         datum = GDP_DATUM()
 
-        if "data" in datum_dict.keys():
+        if "data" in list(datum_dict.keys()):
             datum.setbuf(datum_dict["data"])
 
         __func = gdp.gdp_gcl_append_async
@@ -505,7 +507,7 @@ class GDP_GCL(object):
         return self.__multiread(startdict, numrecs, None, None)
 
 
-
+    '''
     def print_to_file(self, fh, detail, indent):
         """
         Print this GDP object to a file. Could be sys.stdout
@@ -520,7 +522,7 @@ class GDP_GCL(object):
 
         __func(self.ptr, __fh, c_int(detail), c_int(indent))
         return
-
+    '''
     def getname(self):
         "Get the name of this GCL, returns a GDP_NAME object"
 

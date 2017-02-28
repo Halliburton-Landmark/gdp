@@ -31,7 +31,9 @@ Test for writer_subscriber.
 
 See README.txt for instructions.
 """
+from __future__ import print_function
 
+from builtins import str
 import sys
 sys.path.append("../")
 import gdp
@@ -47,7 +49,7 @@ def test_answer(logName):
 def main(name_str):
 
     # Create a GDP_NAME object from a python string provided as argument.
-    print "Name: " + name_str
+    print("Name: " + name_str)
     gcl_name = gdp.GDP_NAME(name_str)
     gcl_handle_writer = gdp.GDP_GCL(gcl_name, gdp.GDP_MODE_AO);
 
@@ -66,18 +68,18 @@ def main(name_str):
 
         timeout = {'tv_sec':1, 'tv_nsec':0, 'tv_accuracy':0.0}
 
-        print "About to call get_next_event()"
+        print("About to call get_next_event()")
 
         event = gcl_handle_subscriber.get_next_event(timeout)
         datum = event["datum"]
         handle = event["gcl_handle"]
-        print datum
+        print(datum)
 
 
 if __name__ == "__main__":
 
     if len(sys.argv) < 2:
-        print "Usage: %s <gcl_name>" % sys.argv[0]
+        print("Usage: %s <gcl_name>" % sys.argv[0])
         sys.exit(1)
 
     # Change this to point to a gdp_router

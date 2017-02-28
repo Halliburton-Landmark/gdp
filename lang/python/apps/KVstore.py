@@ -153,19 +153,24 @@ records covered by the current checkpoint record.
 
 
 """
+from __future__ import print_function
 
+from future import standard_library
+standard_library.install_aliases()
+from builtins import range
+from builtins import object
 import sys
 sys.path.append("../")
                 # So that we can actually load the python_api module
 
 import gdp      # load the main package
-import cPickle  # for serialization
+import pickle  # for serialization
 import threading
 import time     # for timestamping
 from collections import OrderedDict
 
 
-class KVstore:
+class KVstore(object):
 
     # checkpoint frequency
     __freq = None               # initialized in __init__
@@ -197,7 +202,7 @@ class KVstore:
         serialize a data structure to string and create a 'datum' object 
             that can be passed on to the GDP append.
         """
-        datum = {"data": cPickle.dumps(ds)}
+        datum = {"data": pickle.dumps(ds)}
         return datum
 
 
@@ -207,7 +212,7 @@ class KVstore:
         take the data out of a gdp datum, unserialize the data structure
             and return that data structure
         """
-        ds = cPickle.loads(datum["data"])
+        ds = pickle.loads(datum["data"])
         return ds
 
 
@@ -510,24 +515,24 @@ class KVstore:
 
         ret = {}
         for (metadata, data) in self.__record_iterator():
-            for key in data.keys():
+            for key in list(data.keys()):
                 if key not in ret:  # Can't just not include the 'None; keys
                     ret[key] = data[key]
 
         # Let's not return the keys that have 'None'
-        for k in ret.keys():
+        for k in list(ret.keys()):
             if ret[k] is None: ret.pop(k)
 
         return ret
 
     def keys(self):
         """ return all the keys as a single list """
-        return self.__dumpall().keys()
+        return list(self.__dumpall().keys())
 
 
     def values(self):
         """  return all the values as a single list """
-        return self.__dumpall().values()
+        return list(self.__dumpall().values())
 
 
     def __iter__(self):
@@ -535,7 +540,7 @@ class KVstore:
 
         # TODO: think of a better implementation
         d = self.__dumpall()
-        for k in d.keys():
+        for k in list(d.keys()):
             yield k
 
     def __contains__(self, item):
@@ -592,8 +597,8 @@ class KVstore:
 
                     # but let's check if there is any merit in bumping 
                     #   the level down by combining the two checkpoints
-                    ok = data.keys()            # ok => old keys
-                    nk = newdata.keys()         # nk => new keys
+                    ok = list(data.keys())            # ok => old keys
+                    nk = list(newdata.keys())         # nk => new keys
 
                     # condition when merging should be performed:
                     len_X = len(set(ok) & set(nk))
@@ -651,12 +656,12 @@ def __selftest(logname):
     kv = KVstore(logname, mode=KVstore.MODE_RW)       # create a kvstore
 
     tmp = {}
-    for idx in xrange(N):       # write N keys
+    for idx in range(N):       # write N keys
         kv[idx] = idx*idx
         tmp[idx] = idx*idx
 
     assert len(kv) == N
-    for idx in xrange(N):
+    for idx in range(N):
         assert idx in kv
 
     # get all the keys, and compare if they match
@@ -666,12 +671,12 @@ def __selftest(logname):
         tmp.pop(k)              # make sure we don't have duplicates
     assert len(tmp)==0
 
-    print "Passed selftest"
+    print("Passed selftest")
 
 
 if __name__=="__main__":
     import sys
     if len(sys.argv)<2:
-        print "Usage: %s <logname>" % sys.argv[0]
+        print("Usage: %s <logname>" % sys.argv[0])
         sys.exit(-1)
     __selftest(sys.argv[1])

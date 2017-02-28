@@ -27,10 +27,12 @@
 # ----- END LICENSE BLOCK -----                                               
 
 
-from MISC import *
+from __future__ import absolute_import
+from builtins import object
+from .MISC import *
 
 
-class GDP_GCLMD:
+class GDP_GCLMD(object):
 
     """
     GCL Metadata equivalent -- for internal use only.
@@ -76,7 +78,7 @@ class GDP_GCLMD:
 
         return
 
-
+    '''
     def print_to_file(self, fh, detail):
         """
         Print the gdp_gclmd C memory location contents to a file handle fh.
@@ -93,7 +95,7 @@ class GDP_GCLMD:
 
         __func(self.gdp_gclmd_ptr, __fh, detail)
 
-
+    '''
     def add(self, gclmd_id, data):
         """
         Add a new entry to the metadata set
@@ -105,7 +107,7 @@ class GDP_GCLMD:
         __func.restype = EP_STAT
 
         size = c_size_t(len(data))
-        tmp_buf = create_string_buffer(data, len(data))        
+        tmp_buf = create_string_buffer(bytes(data, 'utf-8'), len(data))        
         
         estat = __func(self.gdp_gclmd_ptr, c_uint32(gclmd_id),
                                 size, byref(tmp_buf))

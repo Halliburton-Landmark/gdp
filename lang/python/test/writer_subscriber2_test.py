@@ -36,7 +36,11 @@ To run this test by hand, use
   python writer_subscriber2_test.py foo
 
 """
+from __future__ import print_function
 
+from builtins import str
+from builtins import map
+from builtins import range
 import sys
 sys.path.append("../")
 import gdp
@@ -52,13 +56,13 @@ def test_answer(logName):
 def create_append_subscribe():    
     # http://stackoverflow.com/questions/2257441/random-string-generation-with-upper-case-letters-and-digits-in-python
     name_str = 'python.test.writer_subscriber2_test.' + ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(10))
-    print "Name: " + name_str;
+    print("Name: " + name_str);
     gcl_name = gdp.GDP_NAME(name_str);
 
-    print "Trying to create using " + platform.node();
+    print("Trying to create using " + platform.node());
     logd_name = gdp.GDP_NAME(platform.node());
 
-    print "About to create " + name_str 
+    print("About to create " + name_str) 
     try:
         gdp.GDP_GCL.create(gcl_name, logd_name, '');
     except :
@@ -67,19 +71,19 @@ def create_append_subscribe():
         # FIXME: Probably don't want to hardcode in the log name
         logd_name = gdp.GDP_NAME('edu.berkeley.eecs.gdp-01.gdplogd');
         gdp.GDP_GCL.create(gcl_name, logd_name, '');
-    print "Created " + name_str
+    print("Created " + name_str)
 
-    print "Get the writer"
+    print("Get the writer")
     gcl_handle_writer = gdp.GDP_GCL(gcl_name, gdp.GDP_MODE_AO);
 
-    print "Get the subscriber"
+    print("Get the subscriber")
     gcl_handle_subscriber = gdp.GDP_GCL(gcl_name, gdp.GDP_MODE_RO)
 
-    print "Make the subscribe call"
+    print("Make the subscribe call")
     # This is the actual subscribe call.
     gcl_handle_subscriber.subscribe(0, 0, None)
 
-    print "About to loop"
+    print("About to loop")
     count = 0
     outputList = []
     while count < 10:
@@ -88,24 +92,24 @@ def create_append_subscribe():
         # Create a minimalist datum dictionary
         datum = {"data": line}
 
-        print "About to append data"
+        print("About to append data")
         gcl_handle_writer.append(datum)           # Write this datum to the GCL
-        print "Done appending data"
+        print("Done appending data")
 
         timeout = {'tv_sec':1, 'tv_nsec':0, 'tv_accuracy':0.0}
 
-        print "About to call get_next_event()"
+        print("About to call get_next_event()")
 
         event = gcl_handle_subscriber.get_next_event(timeout)
         datum = event["datum"]
         handle = event["gcl_handle"]
-        print datum
+        print(datum)
         outputList.append(datum['data'])
 
     expectedList = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
     if outputList != expectedList:
         raise ValueError(', '.join(map(str, outputList)) + " was not equal to " + ', '.join(map(str, expectedList)))
-    print "OK"
+    print("OK")
 
 # To run this by hand:
 #  python writer_subscriber_test2.py
@@ -116,8 +120,8 @@ def main(name_str):
 
 if __name__ == "__main__":
     if len(sys.argv) != 1:
-        print "Usage: %s " % sys.argv[0]
-        print "Note that this test takes no arguments. %s will be ignored." % sys.argv[0]
+        print("Usage: %s " % sys.argv[0])
+        print("Note that this test takes no arguments. %s will be ignored." % sys.argv[0])
 
     # Change this to point to a gdp_router
     gdp.gdp_init()

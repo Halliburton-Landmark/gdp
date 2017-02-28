@@ -234,16 +234,22 @@ gdp_gcl_getnrecs(const gdp_gcl_t *gcl)
 
 
 /*
-**  GDP_GCL_PRINT --- print a GCL (for debugging)
+**  GDP_EP_CRYPTO_KEY_READ_FP --- print a GCL (for debugging)
 */
 
-void
-gdp_gcl_print(
-		const gdp_gcl_t *gcl,
-		FILE *fp)
+EP_CRYPTO_KEY
+*gdp_ep_crypto_key_read_fp(
+		int fd,
+		const char *filename,
+    int keyform,
+    uint32_t flags)
 {
-	_gdp_gcl_dump(gcl, fp, GDP_PR_PRETTY, 0);
+	return ep_crypto_key_read_fp(fdopen(fd, "r"), filename, keyform, flags);
 }
+
+/*
+** GDP_GCL
+*/ 
 
 
 

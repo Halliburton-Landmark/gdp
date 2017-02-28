@@ -29,6 +29,7 @@
 """
 A simple program to demonstrate subscriptions
 """
+from __future__ import print_function
 
 import sys
 sys.path.append("../")
@@ -52,12 +53,12 @@ def main(name_str):
         event = gdp.GDP_GCL.get_next_event(None)
         datum = event["datum"]
         handle = event["gcl_handle"]
-        print datum
+        print(datum)
 
 if __name__ == "__main__":
 
     if len(sys.argv) < 2:
-        print "Usage: %s <gcl-name>" % sys.argv[0]
+        print("Usage: %s <gcl-name>" % sys.argv[0])
         sys.exit(1)
 
     # Change this to point to a gdp_router

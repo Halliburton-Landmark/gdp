@@ -29,6 +29,7 @@
 """
 A simple program to read a record by timestamp in a given log
 """
+from __future__ import print_function
 
 import sys
 sys.path.append("../")
@@ -39,7 +40,7 @@ def main(name_str, tv_sec, tv_nsec, tv_accuracy=0.5):
 
     # create a python object
     gcl_name = gdp.GDP_NAME(name_str)
-    print gcl_name.printable_name()
+    print(gcl_name.printable_name())
 
     # Assume that the GCL already exists
     gcl_handle = gdp.GDP_GCL(gcl_name, gdp.GDP_MODE_RO)
@@ -50,12 +51,12 @@ def main(name_str, tv_sec, tv_nsec, tv_accuracy=0.5):
 
     # query by time stamp
     datum = gcl_handle.read_ts(ts)
-    print datum
+    print(datum)
 
 if __name__ == "__main__":
 
     if len(sys.argv) < 4:
-        print "Usage: %s <gcl-name> <tv_sec> <tv_nsec>" % sys.argv[0]
+        print("Usage: %s <gcl-name> <tv_sec> <tv_nsec>" % sys.argv[0])
         sys.exit(1)
 
     # Change this to point to a gdp_router

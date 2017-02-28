@@ -26,12 +26,17 @@
 #   OR MODIFICATIONS.                                                           
 # ----- END LICENSE BLOCK -----      
 
+from __future__ import print_function
+from __future__ import division
+from builtins import range
+from builtins import object
+from past.utils import old_div
 import sys
 sys.path.append("../")
 import gdp
 import time
 
-class GDPcache:
+class GDPcache(object):
     """
     A caching + query-by-time layer for GDP. We don't need a lock here,
         since all our opreations are atomic (at least for now)
@@ -94,7 +99,7 @@ class GDPcache:
         max_recno = max(self.cache.keys())
 
         # get an ordered list of keys based on inverse LRU
-        iLRUorder = sorted(self.cache.keys(), key=lambda x:self.atime[x],
+        iLRUorder = sorted(list(self.cache.keys()), key=lambda x:self.atime[x],
                                              reverse=True )
         if min_recno in iLRUorder: iLRUorder.remove(min_recno)
         if max_recno in iLRUorder: iLRUorder.remove(max_recno)
@@ -115,7 +120,7 @@ class GDPcache:
 
     def __read(self, recno):        # cache for, of course, records
         """ read a single record by recno, but add to cache """
-        if recno in self.cache.keys():
+        if recno in list(self.cache.keys()):
             self.atime[recno] = time.time()
             return self.cache[recno]
         datum = self.lh.read(recno)
@@ -137,7 +142,7 @@ class GDPcache:
             usingMultiread = True
         else:
             # do lots of multireads of size 1
-            for i in xrange(start, start+num, step):
+            for i in range(start, start+num, step):
                 self.lh.read_async(i)
                 numRecords += 1
         ret = []
@@ -146,7 +151,7 @@ class GDPcache:
             if event['type'] == gdp.GDP_EVENT_EOS and usingMultiread:
                 break
             if event["type"] not in [gdp.GDP_EVENT_EOS, gdp.GDP_EVENT_DATA]:
-                print "Unknown event type", event
+                print("Unknown event type", event)
             numRecords -= 1
             datum = event['datum']
             recno = datum['recno']
@@ -171,7 +176,7 @@ class GDPcache:
 
         # t lies in range [_startR, _endR)
         while _startR < _endR-1:
-            p = (_startR + _endR)/2
+            p = old_div((_startR + _endR),2)
             if t<self.__time(p): _endR = p
             else: _startR = p
 
@@ -191,7 +196,7 @@ class GDPcache:
         if not (_startR<=_endR):
             return []
         # Calculate step size
-        stepSize = max((_endR+1-_startR)/numPoints, 1)
+        stepSize = max(old_div((_endR+1-_startR),numPoints), 1)
         return self.__multiread(_startR, (_endR+1)-_startR, stepSize)
 
     def mostRecent(self):

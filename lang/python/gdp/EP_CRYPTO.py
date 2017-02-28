@@ -27,7 +27,11 @@
 # ----- END LICENSE BLOCK -----                                               
 
 
-from MISC import *
+from __future__ import absolute_import
+from __future__ import division
+from builtins import object
+from past.utils import old_div
+from .MISC import *
 
 
 ## EP Crypto stuff, primarily key management
@@ -39,7 +43,7 @@ from MISC import *
 
 EP_CRYPTO_MAX_PUB_KEY = (1024 * 8)
 EP_CRYPTO_MAX_SEC_KEY = (1024 * 8)
-EP_CRYPTO_MAX_DIGEST = (512 / 8)
+EP_CRYPTO_MAX_DIGEST = (old_div(512, 8))
 EP_CRYPTO_MAX_DER = (1024 * 8)  # //XXX should add a slop factor
 
 # define EP_CRYPTO_KEY      EVP_PKEY
@@ -93,7 +97,7 @@ EP_CRYPTO_SYMKEY_MASK = 0xff
 EP_CRYPTO_KEY_MINLEN_RSA = 1024
 
 
-class EP_CRYPTO_KEY:
+class EP_CRYPTO_KEY(object):
     """ 
     A generic class to represent a priavte/public encryption/signature key
 
@@ -125,7 +129,7 @@ class EP_CRYPTO_KEY:
         self.keyform = kwargs.get("keyform", EP_CRYPTO_KEYFORM_UNKNOWN)
         self.flags = c_uint32(kwargs.get("flags", 0x0000))
 
-        if "buf" in kwargs.keys():
+        if "buf" in list(kwargs.keys()):
 
             # we have a binary string that represents the key
             # XXX: do we need null terminated strings? Probably not
@@ -139,21 +143,22 @@ class EP_CRYPTO_KEY:
             self.key_ptr = __func(mbuf, len(mbuf), self.keyform, self.flags)
 
 
-        elif "fp" in kwargs.keys():
+        elif "fp" in list(kwargs.keys()):
 
             # we are passed an open file pointer (Python)
-            __func = gdp.ep_crypto_key_read_fp
+            __func = gdp.gdp_ep_crypto_key_read_fd
             __func.argtypes = [FILE_P, c_char_p, c_int, c_unit32]
             __func.restype = POINTER(self.EP_CRYPTO_KEY) 
 
             # "filename" is an optional parameter if we are passed a file
             #   pointer. The C interface uses it only for debugging info
             fbuf = create_string_buffer(kwargs.get('filename', ""))
-            fp = PyFile_AsFile(kwargs['fp'])
-            self.key_ptr = __func(fp, fbuf, self.keyform, self.flags)
+            fd = PyObject_AsFileDescriptor(kwargs['fp'])
+            #fp = PyFile_AsFile(kwargs['fp'])
+            self.key_ptr = __func(fd, fbuf, self.keyform, self.flags)
 
 
-        elif "filename" in kwargs.keys(): 
+        elif "filename" in list(kwargs.keys()): 
 
             # we read the filename to initialize
             __func = gdp.ep_crypto_key_read_file

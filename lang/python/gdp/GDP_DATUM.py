@@ -27,10 +27,12 @@
 # ----- END LICENSE BLOCK -----                                               
 
 
-from MISC import *
+from __future__ import absolute_import
+from builtins import object
+from .MISC import *
 
 
-class GDP_DATUM:
+class GDP_DATUM(object):
 
     """
     A class only for internal use. The C datum equivalent exposed to python
@@ -96,6 +98,7 @@ class GDP_DATUM:
             __func(self.gdp_datum)
         return
 
+    '''
     def print_to_file(self, fh):
         """
         Print the GDP datum C memory location contents to a file handle fh.
@@ -112,7 +115,7 @@ class GDP_DATUM:
 
         __func(self.gdp_datum, __fh)
         return
-
+    '''
     def getrecno(self):
         """
         Get the corresponding record number associated with this datum
@@ -195,7 +198,7 @@ class GDP_DATUM:
         __func_write.restype = c_int
 
         size = c_size_t(len(data))
-        tmp_buf = create_string_buffer(data, len(data))
+        tmp_buf = create_string_buffer(bytes(data, 'utf-8'), len(data))
         written_bytes = __func_write(gdp_buf_ptr, byref(tmp_buf), size)
         return
 

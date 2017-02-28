@@ -63,9 +63,11 @@ except OSError:
 class FILE(Structure):
     pass
 FILE_P = POINTER(FILE)
+'''
 PyFile_AsFile = pythonapi.PyFile_AsFile  # problem here
 PyFile_AsFile.argtypes = [py_object]
 PyFile_AsFile.restype = FILE_P
+'''
 # Now use the following to create the file pointer
 # fp = open(filename, "w")
 # corresponding FILE* is obtained by PyFile_AsFile(fp)

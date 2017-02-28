@@ -27,10 +27,12 @@
 # ----- END LICENSE BLOCK -----                                               
 
 
-from MISC import *
-from EP_CRYPTO import *
+from __future__ import absolute_import
+from builtins import object
+from .MISC import *
+from .EP_CRYPTO import *
 
-class GDP_GCL_OPEN_INFO:
+class GDP_GCL_OPEN_INFO(object):
 
     """
     Information that is required to open a GCL -- for internal use only.
@@ -65,7 +67,7 @@ class GDP_GCL_OPEN_INFO:
         # read the open_info dictionary and set appropriate fields
         #   based on the key name.
 
-        if 'skey' in open_info.keys():
+        if 'skey' in list(open_info.keys()):
             skey = open_info['skey']
             __func2 = gdp.gdp_gcl_open_info_set_signing_key
             __func2.argtypes = [POINTER(self.gdp_gcl_open_info_t),

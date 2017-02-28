@@ -31,6 +31,7 @@ This is just an example program that can be used as a starting point.
 
 ** Requires python-psutil to be installed **
 """
+from __future__ import print_function
 
 import sys
 sys.path.append("../")
@@ -155,7 +156,7 @@ def main(name_str, keyfile):
 if __name__ == "__main__":
 
     if len(sys.argv) < 3:
-        print "Usage: %s <gcl_name> <signing-keyfile>" % sys.argv[0]
+        print("Usage: %s <gcl_name> <signing-keyfile>" % sys.argv[0])
         sys.exit(1)
 
     # Change this to point to a gdp_router
