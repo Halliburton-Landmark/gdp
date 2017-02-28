@@ -60,6 +60,15 @@ Some basic docker commands:
 Notes:
 =====
 
+- Make sure you have all the required packages:
+  - 'fakeroot' and 'checkinstall'. These are needed to build a debian
+    package that gets added to the docker containers.
+  - Docker (see https://docs.docker.com/engine/installation/linux/ ). Also
+    recommended is the 'Post-installation steps' to allow running docker
+    by non-root users. See:
+    https://docs.docker.com/engine/installation/linux/linux-postinstall/
+  - 'bridge-utils' and 'iputils-arping'
+
 - As of version 1.7, docker lacks the ability to specify the IP address of a 
   container by the user. We need to know the IP addresses of all the router
   instances in advance, thus functionality of pre-determined IP addresses is a 
@@ -69,6 +78,11 @@ Notes:
   - Launch a docker container from a given image
   - Use pipework to attach another virual network interface in the container
     just launched, which is connected to a separate virual bridge.
+
+- If you are running this docker local network in a virtualized environment, it
+  may or may not work depending on the settings for your virtual network card.
+  In particular, see 'https://github.com/jpetazzo/pipework#virtualbox' for
+  a workaround for virtual-box.
 
 - The convention used for IP address allocation is: 
   - Host has IP address 172.30.0.255

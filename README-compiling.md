@@ -138,6 +138,21 @@ entirely using:
 Be aware that this will increase the need for manual configuration
 at all user sites.
 
+If make fails because openssl/evp.h is not found, then find evp.h
+with:
+
+   find /usr/local/Cellar -name "evp.h"
+
+For example:
+
+   bash-3.2$ find /usr/local/Cellar -name "evp.h"
+   /usr/local/Cellar/openssl/1.0.2k/include/openssl/evp.h
+
+Use the directory above the include directory for the value
+of LOCAL2:
+
+   make LOCAL2=/usr/local/Cellar/openssl/1.0.2k all_noavahi
+
 ### Red Hat
 
 Debian is the preferred Linux distribution for the GDP, though
