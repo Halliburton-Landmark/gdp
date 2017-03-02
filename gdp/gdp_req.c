@@ -241,7 +241,7 @@ _gdp_req_free(gdp_req_t **reqp)
 	ep_dbg_cprintf(Dbg, 48, "_gdp_req_free(%p)  state=%d, gcl=%p\n",
 			req, req->state, req->gcl);
 
-	GDP_ASSERT_MUTEX_ISLOCKED(&req->mutex, );
+	EP_ASSERT_MUTEX_ISLOCKED(&req->mutex, );
 	if (req->state == GDP_REQ_FREE)
 	{
 		// req was freed after a reference was taken

@@ -310,7 +310,7 @@ _gdp_gcl_touch(gdp_gcl_t *gcl)
 	struct timeval tv;
 
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
-	GDP_ASSERT_MUTEX_ISLOCKED(&gcl->mutex, return);
+	EP_ASSERT_MUTEX_ISLOCKED(&gcl->mutex, return);
 
 	if (!EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
 	{
@@ -553,8 +553,8 @@ void
 _gdp_gcl_incref(gdp_gcl_t *gcl)
 {
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
-	GDP_ASSERT_MUTEX_ISLOCKED(&gcl->mutex, goto fail0);
-fail0:
+	EP_ASSERT_MUTEX_ISLOCKED(&gcl->mutex, );
+
 	gcl->refcnt++;
 	_gdp_gcl_touch(gcl);
 	ep_dbg_cprintf(Dbg, 51, "_gdp_gcl_incref(%p): %d\n", gcl, gcl->refcnt);

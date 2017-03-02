@@ -160,8 +160,8 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 void
 sub_end_subscription(gdp_req_t *req)
 {
-	GDP_ASSERT_MUTEX_ISLOCKED(&req->mutex, );
-	GDP_ASSERT_MUTEX_ISLOCKED(&req->gcl->mutex, );
+	EP_ASSERT_MUTEX_ISLOCKED(&req->mutex, );
+	EP_ASSERT_MUTEX_ISLOCKED(&req->gcl->mutex, );
 
 	// make it not persistent and not a subscription
 	req->flags &= ~(GDP_REQ_PERSIST | GDP_REQ_SRV_SUBSCR);

@@ -77,6 +77,12 @@
 **	went for simplicity.
 */
 
+#if EP_OPT_EXTENDED_MUTEX_CHECK && !defined(__linux__)
+# warning EP_OPT_EXTENDED_MUTEX_CHECK only works on Linux
+# undef EP_OPT_EXTENDED_MUTEX_CHECK
+#endif
+
+
 typedef pthread_t		EP_THR;
 
 extern EP_THR	ep_thr_gettid(void);
@@ -86,8 +92,24 @@ extern void	_ep_thr_yield(const char *file, int line);
 				__FILE__, __LINE__)
 #define		ep_thr_yield()			_ep_thr_yield(__FILE__, __LINE__)
 
+#if EP_OPT_EXTENDED_MUTEX_CHECK_NEW
+struct pthread_mutex
+{
+	pthread_mutex_t		mutex;		// the actual mutex
+	pthread_mutex_t		guard;		// guard for this mutex
+	EP_THR			tid;		// owning thread
+};
+typedef struct pthread_mutex	EP_THR_MUTEX;
+#  define	EP_THR_MUTX_INITIALIZER		=			\
+			{						\
+				PTHREAD_MUTEX_INITIALIZER,		\
+				PTHREAD_MUTEX_INITIALIZER,		\
+				0					\
+			}
+#else
 typedef pthread_mutex_t		EP_THR_MUTEX;
 #  define	EP_THR_MUTEX_INITIALIZER	= PTHREAD_MUTEX_INITIALIZER
+#endif
 extern int	_ep_thr_mutex_init(EP_THR_MUTEX *mtx, int type,
 				const char *file, int line, const char *name);
 #define		EP_THR_MUTEX_NORMAL		PTHREAD_MUTEX_NORMAL
@@ -117,6 +139,22 @@ extern int	ep_thr_mutex_check(EP_THR_MUTEX *mtx);
 				__FILE__, __LINE__, #mtx)
 #define		ep_thr_mutex_tryunlock(mtx)	_ep_thr_mutex_tryunlock(mtx, \
 				__FILE__, __LINE__, #mtx)
+
+#if EP_OPT_EXTENDED_MUTEX_CHECK
+extern bool	_ep_thr_mutex_check_islocked(
+				EP_THR_MUTEX *, const char *, const char *, int);
+extern bool	_ep_thr_mutex_check_isunlocked(
+				EP_THR_MUTEX *, const char *, const char *, int);
+# define	EP_ASSERT_MUTEX_ISLOCKED(m, r)				\
+			if (!_ep_thr_mutex_check_islocked(m, #m, __FILE__, __LINE__))	\
+			{	r;	}
+# define	EP_ASSERT_MUTEX_ISUNLOCKED(m, r)			\
+			if (!_ep_thr_mutex_check_isunlocked(m, #m, __FILE__, __LINE__))	\
+			{	r;	}
+#else
+# define	EP_ASSERT_MUTEX_ISLOCKED(m, r)
+# define	EP_ASSERT_MUTEX_ISUNLOCKED(m, r)
+#endif
 
 typedef pthread_cond_t		EP_THR_COND;
 #  define	EP_THR_COND_INITIALIZER		= PTHREAD_COND_INITIALIZER
