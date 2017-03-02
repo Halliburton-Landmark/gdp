@@ -129,7 +129,7 @@
 # endif // __APPLE__
 
 #ifdef __linux__
-# define EP_TYPE_PRINTFLIKE(a, b)
+# define EP_TYPE_PRINTFLIKE(a, b)	__attribute__((format(printf, a, b)))
 # define EP_OSCF_HAS_STRLCPY		0	// no strlcpy on linux
 # ifndef EP_OSCF_USE_GETDATE
 #  if _XOPEN_SOURCE >= 500 || _XOPEN_SOURCE && _XOPEN_SOURCE_EXTENDED

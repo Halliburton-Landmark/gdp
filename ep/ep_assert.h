@@ -126,7 +126,8 @@
 		ep_assert_print(__FILE__, __LINE__, __VA_ARGS__)
 
 // called if the assertion failed
-extern void	ep_assert_failure(
+extern void EP_TYPE_PRINTFLIKE(3, 4)
+		ep_assert_failure(
 			const char *file,
 			int line,
 			const char *msg,
@@ -140,7 +141,8 @@ extern void	ep_assert_printv(
 			const char *msg,
 			va_list av);
 
-extern void	ep_assert_print(
+extern void EP_TYPE_PRINTFLIKE(3, 4)
+		ep_assert_print(
 			const char *file,
 			int line,
 			const char *msg,

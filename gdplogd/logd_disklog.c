@@ -258,7 +258,7 @@ bdb_get(DB *db,
 
 	if (ep_dbg_test(Dbg, 47))
 	{
-		ep_dbg_printf("bdb_get: len = %ld, key =\n", key->size);
+		ep_dbg_printf("bdb_get: len = %zd, key =\n", (size_t) key->size);
 		ep_hexdump(key->data, key->size, ep_dbg_getfile(), 0, 0);
 	}
 
@@ -285,8 +285,8 @@ bdb_get_first_after_key(DB *db,
 
 	if (ep_dbg_test(Dbg, 47))
 	{
-		ep_dbg_printf("bdb_get_first_after_key: len = %ld, key =\n",
-				key->size);
+		ep_dbg_printf("bdb_get_first_after_key: len = %zd, key =\n",
+				(size_t) key->size);
 		ep_hexdump(key->data, key->size, ep_dbg_getfile(), 0, 0);
 	}
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
@@ -359,8 +359,8 @@ bdb_put(DB *db,
 
 	if (ep_dbg_test(Dbg, 47))
 	{
-		ep_dbg_printf("bdb_put: len = %ld, key =\n",
-				key->size);
+		ep_dbg_printf("bdb_put: len = %zd, key =\n",
+				(size_t) key->size);
 		ep_hexdump(key->data, key->size, ep_dbg_getfile(), 0, 0);
 	}
 
@@ -2263,7 +2263,7 @@ disk_getmetadata(gdp_gcl_t *gcl,
 				fread(&t32, sizeof t32, 1, seg->fp));
 		gmd->mds[i].md_len = ep_net_ntoh32(t32);
 		tlen += ep_net_ntoh32(t32);
-		ep_dbg_cprintf(Dbg, 34, "\tid = %08x, len = %zd\n",
+		ep_dbg_cprintf(Dbg, 34, "\tid = %08x, len = %" PRIu32 "\n",
 				gmd->mds[i].md_id, gmd->mds[i].md_len);
 	}
 
