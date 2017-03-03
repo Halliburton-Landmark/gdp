@@ -138,12 +138,15 @@ extern const char GdplogdVersion[];
 static void
 dump_state(int plev)
 {
-	fprintf(stderr, "\nVersion: %s\n", GdplogdVersion);
+	flockfile(stderr);
+	fprintf(stderr, "\n<<< GDPLOGD STATE >>>\nVersion: %s\n",
+			GdplogdVersion);
 	_gdp_gcl_cache_dump(plev, stderr);
 	fprintf(stderr, "\n<<< Open file descriptors >>>\n");
 	ep_app_dumpfds(stderr);
 	fprintf(stderr, "\n<<< Stack backtrace >>>\n");
 	ep_dbg_backtrace();
+	funlockfile(stderr);
 }
 
 
