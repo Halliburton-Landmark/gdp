@@ -49,29 +49,25 @@ bool	_EpThrUsePthreads = false;	// also used by ep_dbg_*
 #  define CHECKMTX(m, e) \
     do	\
     {								\
-	if (m->__data.__owner < 0 ||				\
-	    m->__data.__lock > 1 || m->__data.__nusers > 1)	\
+	if (ep_dbg_test(Dbg, 98) &&				\
+	    ((m)->__data.__lock > 1 ||				\
+	     (m)->__data.__nusers > 1))				\
+	{							\
 		fprintf(stderr,					\
-		    "%smutex_%s(%p): __lock=%d, __owner=%d, __nusers=%d%s\n",	\
+		    "%smutex_%s(%p): __lock=%x, __owner=%d, __nusers=%d%s\n", \
 		    EpVid->vidfgred, e, m,			\
-		    m->__data.__lock, m->__data.__owner,	\
-		    m->__data.__nusers,	EpVid->vidnorm);	\
-    } while (false)
-#  define CHECKCOND(c, e)						\
-    do									\
-    {									\
-	if (ep_dbg_test(Dbg, 10))					\
-	    fprintf(stderr,						\
-		    "%scond_%s(%p): __lock=%d, __futex=%d, __nwaiters=%d%s\n",	\
-		    EpVid->vidfgred, e, c,				\
-		    c->__data.__lock, c->__data.__futex,		\
-		    c->__data.__nwaiters, EpVid->vidnorm);		\
+		    (m)->__data.__lock, (m)->__data.__owner,	\
+		    (m)->__data.__nusers, EpVid->vidnorm);	\
+	}							\
     } while (false)
 # endif
 #endif
 
 #ifndef CHECKMTX
 # define CHECKMTX(m, e)
+#endif
+
+#ifndef CHECKCOND
 # define CHECKCOND(c, e)
 #endif
 
@@ -103,8 +99,39 @@ diagnose_thr_err(int err,
 		EP_ASSERT_FAILURE("exiting on thread error");
 }
 
+# if EP_OPT_EXTENDED_MUTEX_CHECK
 static void
-printtrace(void *lock, const char *where,
+mtx_printtrace(pthread_mutex_t *m, const char *where,
+		const char *file, int line, const char *name)
+{
+	int my_tid = gettid();
+
+	ep_dbg_printf("ep_thr_%s %s:%d %p (%s) [%d] __lock=%x __owner=%d, __nusers=%d%s\n",
+			where, file, line, m, name, my_tid,
+			(m)->__data.__lock, (m)->__data.__owner,
+			(m)->__data.__nusers,
+			_EpThrUsePthreads ? "" : " (ignored)");
+}
+
+static void
+lock_printtrace(void *lock, const char *where,
+		const char *file, int line, const char *name)
+{
+	int my_tid = gettid();
+
+	ep_dbg_printf("ep_thr_%s %s:%d %p (%s) [%d]%s\n",
+			where, file, line, lock, name, my_tid,
+			_EpThrUsePthreads ? "" : " (ignored)");
+}
+
+#define TRACEMTX(m, where)	\
+		if (ep_dbg_test(Dbg, 99))	\
+			mtx_printtrace(m, where, file, line, name)
+
+#else
+
+static void
+lock_printtrace(void *lock, const char *where,
 		const char *file, int line, const char *name)
 {
 	pthread_t self = pthread_self();
@@ -113,10 +140,13 @@ printtrace(void *lock, const char *where,
 			where, file, line, lock, name, (void *) self,
 			_EpThrUsePthreads ? "" : " (ignored)");
 }
+#define TRACEMTX	TRACE
+
+#endif
 
 #define TRACE(lock, where)	\
 		if (ep_dbg_test(Dbg, 99))	\
-			printtrace(lock, where, file, line, name)
+			lock_printtrace(lock, where, file, line, name)
 
 void
 _ep_thr_init(void)
@@ -183,7 +213,6 @@ _ep_thr_mutex_init(EP_THR_MUTEX *mtx, int type,
 	int err;
 	pthread_mutexattr_t attr;
 
-	TRACE(mtx, "mutex_init");
 	if (!_EpThrUsePthreads)
 		return 0;
 	pthread_mutexattr_init(&attr);
@@ -205,6 +234,7 @@ _ep_thr_mutex_init(EP_THR_MUTEX *mtx, int type,
 	if ((err = pthread_mutex_init(mtx, &attr)) != 0)
 		diagnose_thr_err(err, "mutex_init", file, line, name, mtx);
 	pthread_mutexattr_destroy(&attr);
+	TRACEMTX(mtx, "mutex_init");
 	CHECKMTX(mtx, "init <<<");
 	return err;
 }
@@ -215,7 +245,7 @@ _ep_thr_mutex_destroy(EP_THR_MUTEX *mtx,
 {
 	int err;
 
-	TRACE(mtx, "mutex_destroy");
+	TRACEMTX(mtx, "mutex_destroy");
 	if (!_EpThrUsePthreads)
 		return 0;
 	CHECKMTX(mtx, "destroy >>>");
@@ -230,7 +260,7 @@ _ep_thr_mutex_lock(EP_THR_MUTEX *mtx,
 {
 	int err;
 
-	TRACE(mtx, "mutex_lock");
+	TRACEMTX(mtx, "mutex_lock");
 	if (!_EpThrUsePthreads)
 		return 0;
 	CHECKMTX(mtx, "lock >>>");
@@ -246,7 +276,7 @@ _ep_thr_mutex_trylock(EP_THR_MUTEX *mtx,
 {
 	int err;
 
-	TRACE(mtx, "mutex_trylock");
+	TRACEMTX(mtx, "mutex_trylock");
 	if (!_EpThrUsePthreads)
 		return 0;
 	CHECKMTX(mtx, "trylock >>>");
@@ -263,7 +293,7 @@ _ep_thr_mutex_unlock(EP_THR_MUTEX *mtx,
 {
 	int err;
 
-	TRACE(mtx, "mutex_unlock");
+	TRACEMTX(mtx, "mutex_unlock");
 	if (!_EpThrUsePthreads)
 		return 0;
 	CHECKMTX(mtx, "unlock >>>");
@@ -309,14 +339,14 @@ _ep_thr_mutex_check_islocked(
 #if ! EP_OPT_EXTENDED_MUTEX_CHECK
 	return true;
 #else
-	if (m->__data.__lock > 0 && m->__data.__owner == gettid())
+	if (m->__data.__lock != 0 && m->__data.__owner == gettid())
 	{
 		// OK, this is locked (by me)
 		return true;
 	}
 
 	// oops, not locked or not locked by me
-	if (m->__data.__lock <= 0)
+	if (m->__data.__lock == 0)
 		ep_assert_print(file, line, "mutex %s (%p) is not locked",
 				mstr, m);
 	else
@@ -337,7 +367,7 @@ _ep_thr_mutex_check_isunlocked(
 #if ! EP_OPT_EXTENDED_MUTEX_CHECK
 	return true;
 #else
-	if (m->__data.__lock <= 0)
+	if (m->__data.__lock != 0)
 		return true;
 	ep_assert_print(file, line,
 			"mutex %s (%p) is locked by %d (should be unlocked)",
@@ -404,7 +434,7 @@ _ep_thr_cond_wait(EP_THR_COND *cv, EP_THR_MUTEX *mtx, EP_TIME_SPEC *timeout,
 	int err;
 
 	TRACE(cv, "cond_wait-cv");
-	TRACE(mtx, "cond-wait-mtx");
+	TRACEMTX(mtx, "cond-wait-mtx");
 	if (!_EpThrUsePthreads)
 		return 0;
 	CHECKMTX(mtx, "wait >>>");
