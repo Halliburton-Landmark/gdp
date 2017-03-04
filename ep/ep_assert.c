@@ -92,7 +92,7 @@ ep_assert_printv(
 	// log something here?
 
 	flockfile(stderr);
-	fprintf(stderr, "%s%sAssertion failed at %s:%s:%d:\n\t",
+	fprintf(stderr, "%s%sAssertion failed at %s:%s:%d: ",
 			EpVid->vidfgcyan, EpVid->vidbgred,
 			ep_app_getprogname(), file, line);
 	vfprintf(stderr, msg, av);
