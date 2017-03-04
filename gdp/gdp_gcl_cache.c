@@ -447,9 +447,14 @@ _gdp_gcl_cache_shutdown(void (*shutdownfunc)(gdp_req_t *))
 */
 
 void
-_gdp_gcl_lock(gdp_gcl_t *gcl)
+_gdp_gcl_lock_trace(
+		gdp_gcl_t *gcl,
+		const char *file,
+		int line,
+		const char *id)
 {
-	ep_thr_mutex_lock(&gcl->mutex);
+	//XXX cheat: using internal interface
+	_ep_thr_mutex_lock(&gcl->mutex, file, line, id);
 	gcl->flags |= GCLF_ISLOCKED;
 }
 
@@ -459,10 +464,15 @@ _gdp_gcl_lock(gdp_gcl_t *gcl)
 */
 
 void
-_gdp_gcl_unlock(gdp_gcl_t *gcl)
+_gdp_gcl_unlock_trace(
+		gdp_gcl_t *gcl,
+		const char *file,
+		int line,
+		const char *id)
 {
+	//XXX cheat: using internal interface
 	gcl->flags &= ~GCLF_ISLOCKED;
-	ep_thr_mutex_unlock(&gcl->mutex);
+	_ep_thr_mutex_unlock(&gcl->mutex, file, line, id);
 }
 
 
@@ -550,7 +560,7 @@ _gdp_mutex_check_isunlocked(
 */
 
 void
-_gdp_gcl_incref(gdp_gcl_t *gcl)
+_gdp_gcl_incref_trace(gdp_gcl_t *gcl)
 {
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
 	EP_ASSERT_MUTEX_ISLOCKED(&gcl->mutex, );
@@ -573,7 +583,11 @@ _gdp_gcl_incref(gdp_gcl_t *gcl)
 */
 
 void
-_gdp_gcl_decref(gdp_gcl_t **gclp)
+_gdp_gcl_decref_trace(
+		gdp_gcl_t **gclp,
+		const char *file,
+		int line,
+		const char *id)
 {
 	gdp_gcl_t *gcl = *gclp;
 	bool gcl_was_locked = true;
@@ -597,7 +611,7 @@ _gdp_gcl_decref(gdp_gcl_t **gclp)
 	if (gcl->refcnt == 0 && !EP_UT_BITSET(GCLF_DEFER_FREE, gcl->flags))
 		_gdp_gcl_freehandle(gcl);
 	else
-		_gdp_gcl_unlock(gcl);
+		_gdp_gcl_unlock_trace(gcl, file, line, id);
 }
 
 
