@@ -54,7 +54,7 @@ bool	_EpThrUsePthreads = false;	// also used by ep_dbg_*
 	     (m)->__data.__nusers > 1))				\
 	{							\
 		fprintf(stderr,					\
-		    "%smutex_%s(%p): __lock=%x, __owner=%d, __nusers=%d%s\n", \
+		    "%smutex_%s(%p): __lock=%x, __owner=%d, __nusers=%u%s\n", \
 		    EpVid->vidfgred, e, m,			\
 		    (m)->__data.__lock, (m)->__data.__owner,	\
 		    (m)->__data.__nusers, EpVid->vidnorm);	\
@@ -91,8 +91,8 @@ diagnose_thr_err(int err,
 		strerror_r(err, nbuf, sizeof nbuf);
 		if (name == NULL)
 			name = "???";
-		ep_dbg_printf("ep_thr_%s: %s (%p): %s (call from %s:%d)\n",
-				where, name, p, nbuf, file, line);
+		ep_dbg_printf("ep_thr_%-13s: %s:%d %s (%p): %s\n",
+				where, file, line, name, p, nbuf);
 		ep_dbg_backtrace();
 	}
 	if (ep_dbg_test(Dbg, 101))
@@ -106,10 +106,9 @@ mtx_printtrace(pthread_mutex_t *m, const char *where,
 {
 	int my_tid = gettid();
 
-	ep_dbg_printf("ep_thr_%s %s:%d %p (%s) [%d] __lock=%x __owner=%d, __nusers=%d%s\n",
+	ep_dbg_printf("ep_thr_%-13s %s:%d %p (%s) [%d] __lock=%x __owner=%d%s\n",
 			where, file, line, m, name, my_tid,
 			(m)->__data.__lock, (m)->__data.__owner,
-			(m)->__data.__nusers,
 			_EpThrUsePthreads ? "" : " (ignored)");
 }
 
@@ -119,7 +118,7 @@ lock_printtrace(void *lock, const char *where,
 {
 	int my_tid = gettid();
 
-	ep_dbg_printf("ep_thr_%s %s:%d %p (%s) [%d]%s\n",
+	ep_dbg_printf("ep_thr_%-13s %s:%d %p (%s) [%d]%s\n",
 			where, file, line, lock, name, my_tid,
 			_EpThrUsePthreads ? "" : " (ignored)");
 }
@@ -136,7 +135,7 @@ lock_printtrace(void *lock, const char *where,
 {
 	pthread_t self = pthread_self();
 
-	ep_dbg_printf("ep_thr_%s %s:%d %p (%s) [%p]%s\n",
+	ep_dbg_printf("ep_thr_%-13s %s:%d %p (%s) [%p]%s\n",
 			where, file, line, lock, name, (void *) self,
 			_EpThrUsePthreads ? "" : " (ignored)");
 }
@@ -347,8 +346,8 @@ _ep_thr_mutex_check_islocked(
 
 	// oops, not locked or not locked by me
 	if (m->__data.__lock == 0)
-		ep_assert_print(file, line, "mutex %s (%p) is not locked",
-				mstr, m);
+		ep_assert_print(file, line, "mutex %s (%p) is not locked (should be %d)",
+				mstr, m, gettid());
 	else
 		ep_assert_print(file, line, "mutex %s (%p) locked by %d (should be %d)",
 				mstr, m, m->__data.__owner, gettid());
