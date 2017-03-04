@@ -560,7 +560,7 @@ _gdp_mutex_check_isunlocked(
 */
 
 void
-_gdp_gcl_incref_trace(gdp_gcl_t *gcl)
+_gdp_gcl_incref(gdp_gcl_t *gcl)
 {
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
 	EP_ASSERT_MUTEX_ISLOCKED(&gcl->mutex, );
