@@ -41,11 +41,7 @@
 
 void	(*EpAssertInfo)(void) = NULL;	// can be used to dump state
 void	(*EpAssertAbort)(void) = NULL;	// alternate abort() function
-#if _EP_CCCF_ASSERT_ALL_ABORT	//DEBUG: abort on all exceptions
-bool	EpAssertAllAbort = true;	// abort on all assertions
-#else
 bool	EpAssertAllAbort = false;	// abort on all assertions
-#endif
 
 #if !_EP_CCCF_ASSERT_NONE
 
