@@ -201,6 +201,13 @@ When creating a new log,
 use this as the signing algorithm.
 Defaults to
 .Qq ec .
+.
+.It swarm.gdp.debug.assert.allabort
+If set, assertions cause an immediate abort of the process.
+If not set, assertions may attempt a recovery action.
+Defaults to
+.Li false .
+.
 .It swarm.gdp.event.loopdelay
 If the internal event loop terminates,
 sleep this many microseconds before restarting the loop.

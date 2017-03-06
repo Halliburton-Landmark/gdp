@@ -729,6 +729,10 @@ gdp_lib_init(const char *myname)
 	if (ep_adm_getboolparam("swarm.gdp.catch.sigterm", true))
 		(void) signal(SIGTERM, exit_on_signal);
 
+	// get assertion behavior information
+	EpAssertAllAbort = ep_adm_getboolparam("swarm.gdp.debug.assert.allabort",
+									false);
+
 	// register status strings
 	_gdp_stat_init();
 
