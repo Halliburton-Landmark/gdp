@@ -108,7 +108,7 @@ mtx_printtrace(pthread_mutex_t *m, const char *where,
 
 	ep_dbg_printf("ep_thr_%-13s %s:%d %p (%s) [%d] __lock=%x __owner=%d%s\n",
 			where, file, line, m, name, my_tid,
-			(m)->__data.__lock, (m)->__data.__owner,
+			m->__data.__lock, m->__data.__owner,
 			_EpThrUsePthreads ? "" : " (ignored)");
 }
 
@@ -263,6 +263,11 @@ _ep_thr_mutex_lock(EP_THR_MUTEX *mtx,
 	if (!_EpThrUsePthreads)
 		return 0;
 	CHECKMTX(mtx, "lock >>>");
+#if EP_OPT_EXTENDED_MUTEX_CHECK
+	if (mtx->__data.__owner == gettid() /* && !recursive */)
+		ep_assert_print(file, line, "mutex %p (%s) already self-locked",
+				mtx, name);
+#endif
 	if ((err = pthread_mutex_lock(mtx)) != 0)
 		diagnose_thr_err(err, "mutex_lock", file, line, name, mtx);
 	CHECKMTX(mtx, "lock <<<");
@@ -296,6 +301,12 @@ _ep_thr_mutex_unlock(EP_THR_MUTEX *mtx,
 	if (!_EpThrUsePthreads)
 		return 0;
 	CHECKMTX(mtx, "unlock >>>");
+#if EP_OPT_EXTENDED_MUTEX_CHECK
+	if (mtx->__data.__owner != gettid())
+		ep_assert_print(file, line,
+				"_ep_thr_mutex_unlock: mtx owner = %d, I am %d",
+				mtx->__data.__owner, gettid());
+#endif
 	if ((err = pthread_mutex_unlock(mtx)) != 0)
 		diagnose_thr_err(err, "mutex_unlock", file, line, name, mtx);
 	CHECKMTX(mtx, "unlock <<<");
@@ -312,6 +323,12 @@ _ep_thr_mutex_tryunlock(EP_THR_MUTEX *mtx,
 	if (!_EpThrUsePthreads)
 		return 0;
 	CHECKMTX(mtx, "tryunlock >>>");
+#if EP_OPT_EXTENDED_MUTEX_CHECK
+	if (mtx->__data.__owner != gettid())
+		ep_assert_print(file, line,
+				"_ep_thr_mutex_unlock: mtx owner = %d, I am %d",
+				mtx->__data.__owner, gettid());
+#endif
 	// EAGAIN => mutex was not locked
 	// EPERM  => mutex held by a different thread
 	if ((err = pthread_mutex_unlock(mtx)) != 0 &&
@@ -321,6 +338,7 @@ _ep_thr_mutex_tryunlock(EP_THR_MUTEX *mtx,
 	return err;
 }
 
+
 int
 _ep_thr_mutex_check(EP_THR_MUTEX *mtx)
 {
@@ -328,8 +346,9 @@ _ep_thr_mutex_check(EP_THR_MUTEX *mtx)
 	return 0;
 }
 
+
 bool
-_ep_thr_mutex_check_islocked(
+ep_thr_mutex_assert_islocked(
 			EP_THR_MUTEX *m,
 			const char *mstr,
 			const char *file,
@@ -357,7 +376,7 @@ _ep_thr_mutex_check_islocked(
 
 
 bool
-_ep_thr_mutex_check_isunlocked(
+ep_thr_mutex_assert_isunlocked(
 			EP_THR_MUTEX *m,
 			const char *mstr,
 			const char *file,
@@ -366,11 +385,31 @@ _ep_thr_mutex_check_isunlocked(
 #if ! EP_OPT_EXTENDED_MUTEX_CHECK
 	return true;
 #else
-	if (m->__data.__lock != 0)
+	if (m->__data.__lock == 0)
 		return true;
 	ep_assert_print(file, line,
 			"mutex %s (%p) is locked by %d (should be unlocked)",
 			mstr, m, m->__data.__owner);
+	return false;
+#endif
+}
+
+
+bool
+ep_thr_mutex_assert_i_own(
+			EP_THR_MUTEX *m,
+			const char *mstr,
+			const char *file,
+			int line)
+{
+#if ! EP_OPT_EXTENDED_MUTEX_CHECK
+	return true;
+#else
+	if (m->__data.__owner == gettid())
+		return true;
+	ep_assert_print(file, line,
+			"mutex %s (%p) is locked by %d (should be %d)",
+			mstr, m, m->__data.__owner, gettid());
 	return false;
 #endif
 }
