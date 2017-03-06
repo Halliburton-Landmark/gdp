@@ -176,9 +176,11 @@ implement_me(char *s)
 #define CMD_TRACE(cmd, msg, ...)											\
 			if (ep_dbg_test(Dbg, 20))										\
 			{																\
+				flockfile(ep_dbg_getfile());								\
 				ep_dbg_printf("%s [%d]: ", _gdp_proto_cmd_name(cmd), cmd);	\
 				ep_dbg_printf(msg, __VA_ARGS__);							\
 				ep_dbg_printf("\n");										\
+				funlockfile(ep_dbg_getfile());								\
 			}
 
 
