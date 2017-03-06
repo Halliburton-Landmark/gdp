@@ -338,6 +338,8 @@ gdp_gcl_create(gdp_name_t gclname,
 
 /*
 **	GDP_GCL_OPEN --- open a GCL for reading or further appending
+**
+**		GCL is returned locked.
 */
 
 EP_STAT
@@ -420,6 +422,7 @@ gdp_gcl_open(gdp_name_t name,
 		}
 		else
 		{
+			ep_thr_mutex_unlock(&gcl->mutex);
 			ep_thr_mutex_destroy(&gcl->mutex);
 			ep_mem_free(gcl);
 		}

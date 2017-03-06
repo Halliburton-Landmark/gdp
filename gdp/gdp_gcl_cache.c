@@ -35,6 +35,7 @@
 #include <ep/ep_dbg.h>
 #include <ep/ep_hash.h>
 #include <ep/ep_log.h>
+#include <ep/ep_thr.h>
 
 #include "gdp.h"
 #include "gdp_stat.h"
@@ -124,6 +125,7 @@ _gdp_gcl_cache_add(gdp_gcl_t *gcl, gdp_iomode_t mode)
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
 	EP_ASSERT_ELSE(gdp_name_is_valid(gcl->name), return);
 
+	ep_dbg_cprintf(Dbg, 49, "_gdp_gcl_cache_add(%p): adding\n", gcl);
 	if (EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
 	{
 		ep_dbg_cprintf(Dbg, 41, "_gdp_gcl_cache_add(%p): already cached\n",
@@ -132,6 +134,8 @@ _gdp_gcl_cache_add(gdp_gcl_t *gcl, gdp_iomode_t mode)
 	}
 
 	// save it in the associative cache
+	ep_dbg_cprintf(Dbg, 49, "_gdp_gcl_cache_add(%p): insert into OpenGCLCache\n",
+			gcl);
 	(void) ep_hash_insert(OpenGCLCache, sizeof (gdp_name_t), gcl->name, gcl);
 
 	// ... and the LRU list
@@ -141,6 +145,8 @@ _gdp_gcl_cache_add(gdp_gcl_t *gcl, gdp_iomode_t mode)
 		gettimeofday(&tv, NULL);
 		gcl->utime = tv.tv_sec;
 
+		ep_dbg_cprintf(Dbg, 49, "_gdp_gcl_cache_add(%p): insert into LRU list\n",
+				gcl);
 		ep_thr_mutex_lock(&GclCacheMutex);
 		LIST_INSERT_HEAD(&GclsByUse, gcl, ulist);
 		ep_thr_mutex_unlock(&GclCacheMutex);
@@ -191,7 +197,7 @@ _gdp_gcl_cache_changename(gdp_gcl_t *gcl, gdp_name_t newname)
 **		i.e., the caller is responsible for calling
 **		_gdp_gcl_decref(&gcl) when it is finished with it.
 **
-**		gcl is returned unlocked.
+**		gcl is returned locked.
 */
 
 gdp_gcl_t *
@@ -219,10 +225,7 @@ _gdp_gcl_cache_get(gdp_name_t gcl_name, gdp_iomode_t mode)
 	{
 		// we're good to go
 		if (mode != _GDP_MODE_PEEK)
-		{
 			_gdp_gcl_incref(gcl);
-			_gdp_gcl_unlock(gcl);
-		}
 	}
 
 done:
@@ -453,7 +456,7 @@ _gdp_gcl_lock_trace(
 		int line,
 		const char *id)
 {
-	//XXX cheat: using internal interface
+	//XXX cheat: _ep_thr_mutex_lock is a libep-private interface
 	_ep_thr_mutex_lock(&gcl->mutex, file, line, id);
 	gcl->flags |= GCLF_ISLOCKED;
 }
@@ -470,7 +473,7 @@ _gdp_gcl_unlock_trace(
 		int line,
 		const char *id)
 {
-	//XXX cheat: using internal interface
+	//XXX cheat: _ep_thr_mutex_unlock is a libep-private interface
 	gcl->flags &= ~GCLF_ISLOCKED;
 	_ep_thr_mutex_unlock(&gcl->mutex, file, line, id);
 }
@@ -582,6 +585,14 @@ _gdp_gcl_incref(gdp_gcl_t *gcl)
 **		XXX	try to unlock it.
 */
 
+#undef _gdp_gcl_decref
+
+void
+_gdp_gcl_decref(gdp_gcl_t **gclp)
+{
+	_gdp_gcl_decref_trace(gclp, __FILE__, __LINE__, "gclp");
+}
+
 void
 _gdp_gcl_decref_trace(
 		gdp_gcl_t **gclp,
@@ -597,7 +608,16 @@ _gdp_gcl_decref_trace(
 
 	istat = ep_thr_mutex_trylock(&gcl->mutex);
 	if (istat == 0)
+	{
+		ep_dbg_cprintf(Dbg, 1, "_gdp_gcl_decref: %s:%d: unlocked GCL %p (%s)\n",
+				file, line, gcl, id);
 		gcl_was_locked = false;
+	}
+	else
+	{
+		// if it's locked, it should be owned by me
+		ep_thr_mutex_assert_i_own(&gcl->mutex, id, file, line);
+	}
 	ep_dbg_cprintf(Dbg, 70, "_gdp_gcl_decref(%p): locked %s istat %d\n",
 					gcl, gcl_was_locked ? "true" : "false", istat);
 	if (gcl->refcnt > 0)

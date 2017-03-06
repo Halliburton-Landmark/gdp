@@ -259,7 +259,7 @@ void			_gdp_gcl_unlock_trace(		// unlock the GCL mutex
 void			_gdp_gcl_incref(			// increase reference count
 						gdp_gcl_t *gcl);
 
-void			_gdp_gcl_decref_trace(		// decrease reference count
+void			_gdp_gcl_decref_trace(		// decrease reference count (trace)
 						gdp_gcl_t **gclp,
 						const char *file,
 						int line,

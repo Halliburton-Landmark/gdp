@@ -81,6 +81,12 @@ _gdp_invoke(gdp_req_t *req)
 	const char *cmdname;
 
 	EP_ASSERT_POINTER_VALID(req);
+	if (req->gcl != NULL)
+	{
+		EP_ASSERT_ELSE(GDP_GCL_ISGOOD(req->gcl), );
+		EP_ASSERT_MUTEX_ISUNLOCKED(&req->gcl->mutex, );
+		_gdp_gcl_lock(req->gcl);
+	}
 	cmdname = _gdp_proto_cmd_name(req->cpdu->cmd);
 	if (ep_dbg_test(Dbg, 10))
 	{
@@ -125,6 +131,10 @@ _gdp_invoke(gdp_req_t *req)
 		**  Bottom Half: read the response
 		*/
 
+		// release the GCL while we're waiting
+		if (req->gcl != NULL)
+			_gdp_gcl_unlock(req->gcl);
+
 		// wait until we receive a result
 		ep_dbg_cprintf(Dbg, 37, "_gdp_invoke: waiting on %p\n", req);
 		ep_time_deltanow(&delta_ts, &abs_to);
@@ -167,21 +177,24 @@ _gdp_invoke(gdp_req_t *req)
 				// route failure on open: don't retry
 				break;
 			}
-			else if (retries > 0)
+			else if (retries <= 0)
 			{
-				_gdp_req_unsend(req);
-				ep_time_nanosleep(retry_delay MILLISECONDS);
+				break;
 			}
 		}
-		else if (retries > 0)
+		else if (retries <= 0)
 		{
-			// if the cond_wait failed, we have to pull the req off the gcl list
-			_gdp_req_unsend(req);
-
-			// if ETIMEDOUT, maybe the router had a glitch:
-			//   wait and try again
-			ep_time_nanosleep(retry_delay MILLISECONDS);
+			break;
 		}
+
+		// do a retry, after re-locking the GCL
+		if (req->gcl != NULL)
+			_gdp_gcl_lock(req->gcl);
+		_gdp_req_unsend(req);
+
+		// if ETIMEDOUT, maybe the router had a glitch:
+		//   wait and try again
+		ep_time_nanosleep(retry_delay MILLISECONDS);
 	}
 
 	// if we had any pending asynchronous events, deliver them

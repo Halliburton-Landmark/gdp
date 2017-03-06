@@ -395,6 +395,9 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 		}
 	}
 
+	if (gcl != NULL)
+		_gdp_gcl_unlock(gcl);
+
 	if (req->cpdu == NULL)
 	{
 		ep_dbg_cprintf(DbgProcResp, 1,
@@ -466,14 +469,14 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 		req->stat = estat;
 		req->flags |= GDP_REQ_DONE;
 
+		// any further data or status is delivered via event
+		req->flags |= GDP_REQ_ASYNCIO;
+
 		if (ep_dbg_test(DbgProcResp, 40))
 		{
 			ep_dbg_printf("gdp_pdu_proc_resp: signaling ");
 			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 		}
-
-		// any further data or status is delivered via event
-		req->flags |= GDP_REQ_ASYNCIO;
 
 		// wake up invoker, which will return the status
 		ep_thr_cond_signal(&req->cond);
@@ -693,13 +696,16 @@ gdp_lib_init(const char *myname)
 	const char *progname;
 	static bool initialized = false;
 
-	ep_thr_mutex_lock(&GdpInitMutex);
-	if (initialized)
-		goto done;
-
 	ep_dbg_cprintf(Dbg, 4, "_gdp_lib_init(%s)\n\t%s\n",
 			myname == NULL ? "NULL" : myname,
 			GdpVersion);
+
+	// initialize the EP library
+	ep_lib_init(EP_LIB_USEPTHREADS);
+
+	ep_thr_mutex_lock(&GdpInitMutex);
+	if (initialized)
+		goto done;
 
 	if (ep_dbg_test(EvlibDbg, 80))
 	{
@@ -709,8 +715,6 @@ gdp_lib_init(const char *myname)
 		event_enable_debug_mode();
 	}
 
-	// initialize the EP library
-	ep_lib_init(EP_LIB_USEPTHREADS);
 	ep_adm_readparams("gdp");
 	progname = ep_app_getprogname();
 	if (progname != NULL)
@@ -828,7 +832,7 @@ done:
 
 fail0:
 	initialized = true;
-	ep_thr_mutex_unlock(&GdpInitMutex);
+	//ep_thr_mutex_unlock(&GdpInitMutex);
 	return estat;
 }
 
