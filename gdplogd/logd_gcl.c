@@ -132,6 +132,8 @@ gcl_close(gdp_gcl_t *gcl)
 **		That open instance is returned in the request passed in.
 **		The GCL will have it's reference count bumped, so the
 **		caller must call _gdp_gcl_decref when done with it.
+**
+**		GCL is returned locked.
 */
 
 EP_STAT
