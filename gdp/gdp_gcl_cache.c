@@ -124,6 +124,7 @@ _gdp_gcl_cache_add(gdp_gcl_t *gcl, gdp_iomode_t mode)
 	// sanity checks
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
 	EP_ASSERT_ELSE(gdp_name_is_valid(gcl->name), return);
+	EP_ASSERT_MUTEX_ISLOCKED(&gcl->mutex, );
 
 	ep_dbg_cprintf(Dbg, 49, "_gdp_gcl_cache_add(%p): adding\n", gcl);
 	if (EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
@@ -578,12 +579,9 @@ _gdp_gcl_incref(gdp_gcl_t *gcl)
 /*
 **  _GDP_GCL_DECREF --- decrement the reference count on a GCL
 **
-**		The GCL may be locked or unlocked.  It will be returned
-**		unlocked.  XXX This is a hack. XXX
-**
-**		XXX	We're still getting some cases where the input GCL is
-**		XXX	locked by a different thread, which gives errors when we
-**		XXX	try to unlock it.
+**		The GCL must be locked on entry.  Upon return it will
+**		be unlocked (and possibly deallocated if the refcnt has
+**		dropped to zero.
 */
 
 #undef _gdp_gcl_decref
@@ -606,6 +604,7 @@ _gdp_gcl_decref_trace(
 	int istat;
 
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
+	(void) ep_thr_mutex_assert_islocked(&gcl->mutex, id, file, line);
 
 	istat = ep_thr_mutex_trylock(&gcl->mutex);
 	if (istat == 0)

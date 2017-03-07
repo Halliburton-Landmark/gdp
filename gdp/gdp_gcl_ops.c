@@ -282,7 +282,7 @@ _gdp_gcl_create(gdp_name_t gclname,
 	_gdp_gclmd_serialize(gmd, req->cpdu->datum->dbuf);
 
 	estat = _gdp_invoke(req);
-	EP_STAT_CHECK(estat, goto fail0);
+	EP_STAT_CHECK(estat, goto fail1);
 
 	// success --- change the GCL name to the true name
 	_gdp_gcl_cache_changename(gcl, gclname);
@@ -295,6 +295,7 @@ _gdp_gcl_create(gdp_name_t gclname,
 fail0:
 	if (gcl != NULL)
 		_gdp_gcl_decref(&gcl);
+fail1:
 	if (req != NULL)
 		_gdp_req_free(&req);
 
@@ -505,7 +506,6 @@ _gdp_gcl_close(gdp_gcl_t *gcl,
 	gcl->flags &= ~GCLF_DEFER_FREE;
 	_gdp_req_free(&req);
 finis:
-	_gdp_gcl_decref(&gcl);
 fail0:
 	return estat;
 }

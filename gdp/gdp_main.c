@@ -115,7 +115,7 @@ acknak_from_estat(EP_STAT estat, int def)
 	{
 		char ebuf[100];
 
-		ep_dbg_printf("acknak_from_estat: %s ->\n\t%s\n",
+		ep_dbg_printf("acknak_from_estat: %s -> %s\n",
 				ep_stat_tostr(estat, ebuf, sizeof ebuf),
 				_gdp_proto_cmd_name(resp));
 	}
@@ -144,13 +144,14 @@ gdp_pdu_proc_cmd(void *cpdu_)
 			_gdp_proto_cmd_name(cmd), (void *) ep_thr_gettid());
 
 	gcl = _gdp_gcl_cache_get(cpdu->dst, 0);
+	if (gcl != NULL)
+		EP_ASSERT_MUTEX_ISLOCKED(&gcl->mutex, );
 
 	ep_dbg_cprintf(Dbg, 43,
 			"gdp_pdu_proc_cmd: allocating new req for GCL %p\n", gcl);
 	estat = _gdp_req_new(cmd, gcl, cpdu->chan, cpdu, GDP_REQ_CORE, &req);
 	EP_STAT_CHECK(estat, goto fail0);
-
-	// request is locked
+	EP_ASSERT_MUTEX_ISLOCKED(&req->mutex, );
 
 	ep_dbg_cprintf(Dbg, 40, "gdp_pdu_proc_cmd >>> req=%p\n", req);
 
@@ -167,7 +168,6 @@ gdp_pdu_proc_cmd(void *cpdu_)
 	}
 
 	estat = _gdp_req_dispatch(req, cmd);
-
 	if (ep_dbg_test(Dbg, 59))
 	{
 		ep_dbg_printf("gdp_pdu_proc_cmd: after dispatch, ");
@@ -221,7 +221,6 @@ gdp_pdu_proc_cmd(void *cpdu_)
 		req->postproc = NULL;
 	}
 
-
 	// free up resources
 	if (req->rpdu->datum != NULL)
 		ep_thr_mutex_unlock(&req->rpdu->datum->mutex);
@@ -232,6 +231,8 @@ gdp_pdu_proc_cmd(void *cpdu_)
 	}
 	else
 	{
+		if (req->gcl != NULL)
+			_gdp_gcl_unlock(req->gcl);
 		_gdp_req_unlock(req);
 	}
 
@@ -832,7 +833,7 @@ done:
 
 fail0:
 	initialized = true;
-	//ep_thr_mutex_unlock(&GdpInitMutex);
+	ep_thr_mutex_unlock(&GdpInitMutex);
 	return estat;
 }
 

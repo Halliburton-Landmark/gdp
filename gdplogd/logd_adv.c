@@ -109,7 +109,7 @@ logd_advertise_one(gdp_name_t gname, int cmd)
 		char ebuf[100];
 		gdp_pname_t pname;
 
-		ep_dbg_printf("logd_advertise_one(%s) =>\n\t%s\n",
+		ep_dbg_printf("logd_advertise_one(%s) => %s\n",
 				gdp_printable_name(gname, pname),
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}

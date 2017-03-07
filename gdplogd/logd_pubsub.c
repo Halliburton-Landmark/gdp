@@ -90,6 +90,8 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 	gdp_req_t *nextreq;
 	EP_TIME_SPEC sub_timeout;
 
+	EP_ASSERT_MUTEX_ISLOCKED(&pubreq->gcl->mutex, );
+
 	if (ep_dbg_test(Dbg, 32))
 	{
 		ep_dbg_printf("sub_notify_all_subscribers(%s) of pub",
@@ -105,7 +107,6 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 		ep_time_deltanow(&sub_delta, &sub_timeout);
 	}
 
-	_gdp_gcl_lock(pubreq->gcl);
 	for (req = LIST_FIRST(&pubreq->gcl->reqs); req != NULL; req = nextreq)
 	{
 		_gdp_req_lock(req);
@@ -150,7 +151,6 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 		if (req != NULL)
 			_gdp_req_unlock(req);
 	}
-	_gdp_gcl_unlock(pubreq->gcl);
 }
 
 

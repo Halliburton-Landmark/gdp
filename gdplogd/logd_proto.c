@@ -397,7 +397,7 @@ cmd_open(gdp_req_t *req)
 	if (ep_dbg_test(Dbg, 10))
 	{
 		char ebuf[100];
-		ep_dbg_printf("<<< cmd_open(%s): gcl %p nrecs %" PRIgdp_recno ":\n    %s\n",
+		ep_dbg_printf("<<< cmd_open(%s): gcl %p nrecs %" PRIgdp_recno ": %s\n",
 					gcl->pname, gcl, gcl->nrecs,
 					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
@@ -782,7 +782,7 @@ post_subscribe(gdp_req_t *req)
 
 	while (req->numrecs >= 0)
 	{
-		EP_ASSERT_INSIST(req->gcl != NULL);
+		EP_ASSERT_ELSE(req->gcl != NULL, break);
 
 		// see if data pre-exists in the GCL
 		if (req->nextrec > req->gcl->nrecs)
@@ -836,10 +836,7 @@ post_subscribe(gdp_req_t *req)
 	if (req->numrecs < 0 || !EP_UT_BITSET(GDP_REQ_SUBUPGRADE, req->flags))
 	{
 		// no more to read: do cleanup & send termination notice
-		_gdp_gcl_lock(req->gcl);
 		sub_end_subscription(req);
-		// sub_end_subscription nulls out the GCL
-		//_gdp_gcl_unlock(req->gcl);
 	}
 	else
 	{
@@ -849,11 +846,9 @@ post_subscribe(gdp_req_t *req)
 		// link this request into the GCL so the subscription can be found
 		if (!EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
 		{
-			_gdp_gcl_lock(req->gcl);
 			_gdp_gcl_incref(req->gcl);		//DEBUG: is this appropriate?
 			LIST_INSERT_HEAD(&req->gcl->reqs, req, gcllist);
 			req->flags |= GDP_REQ_ON_GCL_LIST;
-			_gdp_gcl_unlock(req->gcl);
 		}
 	}
 }
@@ -883,6 +878,9 @@ cmd_subscribe(gdp_req_t *req)
 {
 	EP_STAT estat;
 	EP_TIME_SPEC timeout;
+
+	if (req->gcl != NULL)
+		EP_ASSERT_MUTEX_ISLOCKED(&req->gcl->mutex, );
 
 	req->rpdu->cmd = GDP_ACK_SUCCESS;
 
@@ -976,10 +974,10 @@ cmd_subscribe(gdp_req_t *req)
 		// link this request into the GCL so the subscription can be found
 		if (!EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
 		{
-			_gdp_gcl_lock(req->gcl);
+			//XXX _gdp_gcl_lock(req->gcl);
 			LIST_INSERT_HEAD(&req->gcl->reqs, req, gcllist);
 			req->flags |= GDP_REQ_ON_GCL_LIST;
-			_gdp_gcl_unlock(req->gcl);
+			//XXX _gdp_gcl_unlock(req->gcl);
 		}
 	}
 

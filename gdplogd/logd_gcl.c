@@ -74,6 +74,8 @@ fail0:
 
 /*
 **  GCL_OPEN --- open an existing GCL
+**
+**		Returns the GCL locked.
 */
 
 EP_STAT
@@ -90,6 +92,7 @@ gcl_open(gdp_name_t gcl_name, gdp_iomode_t iomode, gdp_gcl_t **pgcl)
 	EP_STAT_CHECK(estat, goto fail1);
 
 	// success!
+	_gdp_gcl_lock(gcl);
 	*pgcl = gcl;
 	return estat;
 
@@ -179,7 +182,7 @@ get_open_handle(gdp_req_t *req, gdp_iomode_t iomode)
 
 		gdp_printable_name(req->cpdu->dst, pname);
 		ep_stat_tostr(estat, ebuf, sizeof ebuf);
-		ep_dbg_printf("get_open_handle: %s:\n\t@%p: %s\n",
+		ep_dbg_printf("get_open_handle: %s => %p: %s\n",
 				pname, req->gcl, ebuf);
 	}
 	return estat;
