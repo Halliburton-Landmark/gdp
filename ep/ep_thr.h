@@ -140,7 +140,6 @@ extern int	ep_thr_mutex_check(EP_THR_MUTEX *mtx);
 #define		ep_thr_mutex_tryunlock(mtx)	_ep_thr_mutex_tryunlock(mtx, \
 				__FILE__, __LINE__, #mtx)
 
-#if EP_OPT_EXTENDED_MUTEX_CHECK
 extern bool	ep_thr_mutex_assert_islocked(
 			EP_THR_MUTEX *, const char *, const char *, int);
 extern bool	ep_thr_mutex_assert_isunlocked(
@@ -148,6 +147,7 @@ extern bool	ep_thr_mutex_assert_isunlocked(
 extern bool	ep_thr_mutex_assert_i_own(
 			EP_THR_MUTEX *, const char *, const char *, int);
 
+#if EP_OPT_EXTENDED_MUTEX_CHECK
 # define	EP_ASSERT_MUTEX_ISLOCKED(m, r)				\
 			if (!ep_thr_mutex_assert_islocked(m, #m, __FILE__, __LINE__))	\
 			{	r;	}
