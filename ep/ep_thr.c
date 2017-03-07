@@ -347,6 +347,8 @@ _ep_thr_mutex_check(EP_THR_MUTEX *mtx)
 }
 
 
+#undef ep_thr_mutex_assert_islocked
+
 bool
 ep_thr_mutex_assert_islocked(
 			EP_THR_MUTEX *m,
@@ -375,6 +377,8 @@ ep_thr_mutex_assert_islocked(
 }
 
 
+#undef ep_thr_mutex_assert_isunlocked
+
 bool
 ep_thr_mutex_assert_isunlocked(
 			EP_THR_MUTEX *m,
@@ -394,6 +398,8 @@ ep_thr_mutex_assert_isunlocked(
 #endif
 }
 
+
+#undef ep_thr_mutex_assert_i_own
 
 bool
 ep_thr_mutex_assert_i_own(
