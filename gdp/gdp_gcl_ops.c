@@ -623,7 +623,9 @@ _gdp_gcl_append_async(
 	// arrange for responses to appear as events or callbacks
 	_gdp_event_setcb(req, cbfunc, cbarg);
 
+	_gdp_gcl_lock(gcl);
 	estat = _gdp_req_send(req);
+	_gdp_gcl_unlock(gcl);
 
 	// Note that this is just a guess: the write may still fail.
 	// If it does, we'll be out of sync and all hell breaks loose.
@@ -746,7 +748,9 @@ _gdp_gcl_read_async(gdp_gcl_t *gcl,
 	_gdp_event_setcb(req, cbfunc, cbarg);
 
 	req->cpdu->datum->recno = recno;
+	_gdp_gcl_lock(gcl);
 	estat = _gdp_req_send(req);
+	_gdp_gcl_unlock(gcl);
 
 	if (EP_STAT_ISOK(estat))
 	{
@@ -896,7 +900,9 @@ _gdp_gcl_fwd_append(
 
 	// XXX should we take a callback function?
 
+	_gdp_gcl_lock(gcl);
 	estat = _gdp_req_send(req);
+	_gdp_gcl_unlock(gcl);
 
 	// unlike append_async, we leave the datum intact
 

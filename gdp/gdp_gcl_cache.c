@@ -251,6 +251,9 @@ done:
 
 /*
 ** Drop a GCL from both the associative and the LRU caches
+**
+**		GclCacheMutex should already be acquired, since this is
+**		only called when freeing resources.
 */
 
 void
@@ -285,9 +288,7 @@ _gdp_gcl_cache_drop(gdp_gcl_t *gcl)
 	}
 
 	// remove it from the associative cache
-	ep_thr_mutex_lock(&GclCacheMutex);
 	(void) ep_hash_delete(OpenGCLCache, sizeof (gdp_name_t), gcl->name);
-	ep_thr_mutex_unlock(&GclCacheMutex);
 
 	// ... and the LRU list
 	LIST_REMOVE(gcl, ulist);
