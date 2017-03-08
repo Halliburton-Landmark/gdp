@@ -403,8 +403,14 @@ ack_data_content(gdp_req_t *req)
 {
 	EP_STAT estat;
 
+	EP_ASSERT_ELSE(req->gcl != NULL, return EP_STAT_ASSERT_ABORT);
+	EP_ASSERT_ELSE(req->rpdu != NULL, return EP_STAT_ASSERT_ABORT);
+	EP_ASSERT_ELSE(req->rpdu->datum != NULL, return EP_STAT_ASSERT_ABORT);
+
 	estat = ack_success(req);
 	EP_STAT_CHECK(estat, return estat);
+
+	req->gcl->nrecs = req->rpdu->datum->recno;
 
 	// keep track of how many more records we expect
 	if (req->numrecs > 0)
