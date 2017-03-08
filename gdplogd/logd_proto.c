@@ -291,6 +291,7 @@ cmd_create(gdp_req_t *req)
 	// get the memory space for the GCL itself
 	estat = gcl_alloc(gclname, GDP_MODE_AO, &gcl);
 	EP_STAT_CHECK(estat, goto fail0);
+	_gdp_gcl_lock(gcl);
 	req->gcl = gcl;			// for debugging
 
 	// assume both read and write modes
