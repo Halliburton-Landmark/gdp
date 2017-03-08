@@ -343,6 +343,11 @@ _gdp_gcl_touch(gdp_gcl_t *gcl)
 **		If we can't get the number of file descriptors down far enough
 **		we keep trying with increasingly stringent constraints, so maxage
 **		is really more advice than a requirement.
+**
+**		XXX	Currently the GCL is not reclaimed if the reference count
+**		XXX	is 2 or higher, i.e., someone is subscribed to it.
+**		XXX But the file descriptors associated with it _could_ be
+**		XXX	reclaimed, especially since they are a scarce resource.
 */
 
 void
@@ -378,25 +383,31 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 		ep_thr_mutex_lock(&GclCacheMutex);
 		for (g1 = LIST_FIRST(&GclsByUse); g1 != NULL; g1 = g2)
 		{
+			_gdp_gcl_lock(g1);
 			g2 = LIST_NEXT(g1, ulist);
 			if (g1->utime > mintime)
-				break;
-			if (!EP_UT_BITSET(GCLF_DROPPING|GCLF_ISLOCKED, g1->flags))
 			{
-				if (ep_dbg_test(Dbg, 32))
+				_gdp_gcl_unlock(g1);
+				break;
+			}
+			if (EP_UT_BITSET(GCLF_DROPPING, g1->flags) || g1->refcnt > 0)
+			{
+				if (ep_dbg_test(Dbg, 10))
 				{
-					ep_dbg_printf("_gdp_gcl_cache_reclaim: reclaiming:\n   ");
+					ep_dbg_printf("_gdp_gcl_cache_reclaim: skipping:\n   ");
 					_gdp_gcl_dump(g1, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
 				}
-				LIST_REMOVE(g1, ulist);
-				g1->flags |= GCLF_ISLOCKED;
-				_gdp_gcl_freehandle(g1);
+				_gdp_gcl_unlock(g1);
+				continue;
 			}
-			else if (ep_dbg_test(Dbg, 10))
+
+			if (ep_dbg_test(Dbg, 32))
 			{
-				ep_dbg_printf("_gdp_gcl_cache_reclaim: skipping:\n   ");
+				ep_dbg_printf("_gdp_gcl_cache_reclaim: reclaiming:\n   ");
 				_gdp_gcl_dump(g1, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
 			}
+			LIST_REMOVE(g1, ulist);
+			_gdp_gcl_freehandle(g1);
 		}
 		ep_thr_mutex_unlock(&GclCacheMutex);
 
