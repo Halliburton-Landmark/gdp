@@ -111,6 +111,7 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 	{
 		_gdp_req_lock(req);
 		nextreq = LIST_NEXT(req, gcllist);
+		EP_ASSERT_ELSE(req != nextreq, break);
 
 		// make sure we don't tell ourselves
 		if (req == pubreq)

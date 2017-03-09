@@ -770,7 +770,8 @@ post_subscribe(gdp_req_t *req)
 {
 	EP_STAT estat;
 
-	EP_ASSERT_REQUIRE(req != NULL);
+	EP_ASSERT_ELSE(req != NULL, return);
+	EP_ASSERT_ELSE(req->state != GDP_REQ_FREE, return);
 	ep_dbg_cprintf(Dbg, 38,
 			"post_subscribe: numrecs = %d, nextrec = %"PRIgdp_recno"\n",
 			req->numrecs, req->nextrec);
@@ -947,7 +948,11 @@ cmd_subscribe(gdp_req_t *req)
 			req->nextrec = r1->nextrec;
 
 			// abandon old request, we'll overwrite it with new request
+			// (but keep the GCL around)
 			ep_dbg_cprintf(Dbg, 20, "cmd_subscribe: removing old request\n");
+			LIST_REMOVE(r1, gcllist);
+			r1->flags &= ~GDP_REQ_ON_GCL_LIST;
+			r1->gcl = NULL;
 			_gdp_req_lock(r1);
 			_gdp_req_free(&r1);
 		}

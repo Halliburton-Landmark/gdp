@@ -225,6 +225,7 @@ _gdp_req_new(int cmd,
 **		it's impossible for a free request to be attached to a GCL.
 **
 **		The request must be locked on entry.
+**		A GCL in the request must be unlocked on entry.
 */
 
 void
@@ -258,13 +259,12 @@ _gdp_req_free(gdp_req_t **reqp)
 	}
 
 	// remove the request from the GCL list
-	if (EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags) && req->gcl != NULL)
+	if (EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
 	{
-		EP_ASSERT_MUTEX_ISUNLOCKED(&req->gcl->mutex, );
-		_gdp_gcl_lock(req->gcl);
+		EP_ASSERT_ELSE(req->gcl != NULL, return);
+		EP_ASSERT_MUTEX_ISLOCKED(&req->gcl->mutex, );
 		LIST_REMOVE(req, gcllist);
 		req->flags &= ~GDP_REQ_ON_GCL_LIST;
-		_gdp_gcl_unlock(req->gcl);
 	}
 
 	// remove any pending events from the request
@@ -290,6 +290,7 @@ _gdp_req_free(gdp_req_t **reqp)
 	}
 
 	req->state = GDP_REQ_FREE;
+	req->flags = 0;
 
 	// add the empty request to the free list
 	ep_thr_mutex_lock(&ReqFreeListMutex);
@@ -409,6 +410,7 @@ _gdp_req_send(gdp_req_t *req)
 		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 		funlockfile(ep_dbg_getfile());
 	}
+	EP_ASSERT_ELSE(req->state != GDP_REQ_FREE, return EP_STAT_ASSERT_ABORT);
 
 	req->flags &= ~GDP_REQ_DONE;
 	if (gcl != NULL && !EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
@@ -451,6 +453,7 @@ _gdp_req_unsend(gdp_req_t *req)
 		ep_dbg_printf("_gdp_req_unsend: ");
 		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
+	EP_ASSERT_ELSE(req->state != GDP_REQ_FREE, return EP_STAT_ASSERT_ABORT);
 
 	if (gcl == NULL)
 	{

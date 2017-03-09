@@ -157,7 +157,7 @@ subscr_poker_thread(void *chan_)
 
 					ep_time_format(&now, tbuf, sizeof tbuf, EP_TIME_FMT_HUMAN);
 					ep_dbg_printf("subscr_poker_thread: at %s checking ", tbuf);
-					_gdp_req_dump(req, ep_dbg_getfile(), 0, 0);
+					_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 				}
 
 				if (!EP_UT_BITSET(GDP_REQ_CLT_SUBSCR, req->flags))

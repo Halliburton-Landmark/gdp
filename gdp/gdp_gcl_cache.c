@@ -135,9 +135,18 @@ _gdp_gcl_cache_add(gdp_gcl_t *gcl, gdp_iomode_t mode)
 	}
 
 	// save it in the associative cache
+	gdp_gcl_t *g2;
 	ep_dbg_cprintf(Dbg, 49, "_gdp_gcl_cache_add(%p): insert into OpenGCLCache\n",
 			gcl);
-	(void) ep_hash_insert(OpenGCLCache, sizeof (gdp_name_t), gcl->name, gcl);
+	g2 = ep_hash_insert(OpenGCLCache, sizeof (gdp_name_t), gcl->name, gcl);
+	if (g2 != NULL)
+	{
+		ep_assert_print(__FILE__, __LINE__, "duplicate GCL cache entry");
+		fprintf(stderr, "New ");
+		_gdp_gcl_dump(gcl, stderr, GDP_PR_DETAILED, 0);
+		fprintf(stderr, "Existing ");
+		_gdp_gcl_dump(g2, stderr, GDP_PR_DETAILED, 0);
+	}
 
 	// ... and the LRU list
 	{
