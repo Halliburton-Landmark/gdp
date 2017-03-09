@@ -96,7 +96,7 @@ def write_batch_sync(batch):
     lc = batch.get_lc()
     cur, valid = next(dg)
     while valid:
-        print("Writing " + str(cur))
+        #print("Writing " + str(cur))
         lc.write(cur)
         lc.inc_out()
         lc.inc_resp()
@@ -118,7 +118,7 @@ def read_batch_sync(batch):
     
     print(batch.get_batchname())
     for i in range(-dg.get_max_val(), 0):
-        print("Reading " + str(i))
+        #print("Reading " + str(i))
         datum = lc.read(i)
         data = int(datum['data'])
         if data > dg.get_max_val() or data < 0:
