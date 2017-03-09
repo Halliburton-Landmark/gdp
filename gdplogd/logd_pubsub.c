@@ -107,6 +107,7 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 		ep_time_deltanow(&sub_delta, &sub_timeout);
 	}
 
+	pubreq->gcl->flags |= GCLF_KEEPLOCKED;
 	for (req = LIST_FIRST(&pubreq->gcl->reqs); req != NULL; req = nextreq)
 	{
 		_gdp_req_lock(req);
@@ -142,16 +143,21 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 			{
 				ep_dbg_printf("sub_notify_all_subscribers: subscription timeout: ");
 				_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+				_gdp_gcl_dump(req->gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 			}
 
 			// actually remove the subscription
-			LIST_REMOVE(req, gcllist);
+			//XXX isn't this done by _gdp_req_free???
+			//LIST_REMOVE(req, gcllist);
 
+			EP_ASSERT(req->gcl != NULL);
+			EP_ASSERT(EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags));
 			_gdp_req_free(&req);
 		}
 		if (req != NULL)
 			_gdp_req_unlock(req);
 	}
+	pubreq->gcl->flags &= ~GCLF_KEEPLOCKED;
 }
 
 

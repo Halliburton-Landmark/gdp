@@ -266,6 +266,15 @@ _gdp_req_free(gdp_req_t **reqp)
 		LIST_REMOVE(req, gcllist);
 		req->flags &= ~GDP_REQ_ON_GCL_LIST;
 	}
+	else if (req->gcl != NULL)
+	{
+		ep_dbg_cprintf(Dbg, 1,
+				"_gdp_req_free: req->gcl != NULL but req not on GCL list\n"
+				"    (req = %p, req->gcl = %p)\n",
+				req, req->gcl);
+		req->gcl = NULL;
+	}
+
 
 	// remove any pending events from the request
 	{
@@ -285,7 +294,6 @@ _gdp_req_free(gdp_req_t **reqp)
 	// (refcnt may be zero if called from _gdp_gcl_freehandle)
 	if (req->gcl != NULL && req->gcl->refcnt > 0)
 	{
-		_gdp_gcl_lock(req->gcl);
 		_gdp_gcl_decref(&req->gcl);
 	}
 

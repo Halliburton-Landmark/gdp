@@ -224,13 +224,19 @@ gdp_pdu_proc_cmd(void *cpdu_)
 	// free up resources
 	if (req->rpdu->datum != NULL)
 		ep_thr_mutex_unlock(&req->rpdu->datum->mutex);
-	if (req->gcl != NULL)
-		_gdp_gcl_unlock(req->gcl);
 	if (EP_UT_BITSET(GDP_REQ_CORE, req->flags) &&
 			!EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
+	{
+		if (req->gcl != NULL)
+			_gdp_gcl_unlock(req->gcl);
 		_gdp_req_free(&req);
+	}
 	else
+	{
+		if (req->gcl != NULL && EP_UT_BITSET(GCLF_ISLOCKED, req->gcl->flags))
+			_gdp_gcl_unlock(req->gcl);
 		_gdp_req_unlock(req);
+	}
 
 	ep_dbg_cprintf(Dbg, 40, "gdp_pdu_proc_cmd <<< done\n");
 

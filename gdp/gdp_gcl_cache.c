@@ -354,7 +354,7 @@ _gdp_gcl_touch(gdp_gcl_t *gcl)
 **		is really more advice than a requirement.
 **
 **		XXX	Currently the GCL is not reclaimed if the reference count
-**		XXX	is 2 or higher, i.e., someone is subscribed to it.
+**		XXX	is greater than zero, i.e., someone is subscribed to it.
 **		XXX But the file descriptors associated with it _could_ be
 **		XXX	reclaimed, especially since they are a scarce resource.
 */
@@ -620,26 +620,10 @@ _gdp_gcl_decref_trace(
 		const char *id)
 {
 	gdp_gcl_t *gcl = *gclp;
-	bool gcl_was_locked = true;
-	int istat;
 
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
 	(void) ep_thr_mutex_assert_islocked(&gcl->mutex, id, file, line);
 
-	istat = ep_thr_mutex_trylock(&gcl->mutex);
-	if (istat == 0)
-	{
-		ep_dbg_cprintf(Dbg, 1, "_gdp_gcl_decref: %s:%d: unlocked GCL %p (%s)\n",
-				file, line, gcl, id);
-		gcl_was_locked = false;
-	}
-	else
-	{
-		// if it's locked, it should be owned by me
-		ep_thr_mutex_assert_i_own(&gcl->mutex, id, file, line);
-	}
-	ep_dbg_cprintf(Dbg, 70, "_gdp_gcl_decref(%p): locked %s istat %d\n",
-					gcl, gcl_was_locked ? "true" : "false", istat);
 	if (gcl->refcnt > 0)
 		gcl->refcnt--;
 	else
@@ -650,7 +634,7 @@ _gdp_gcl_decref_trace(
 			gcl, gcl->refcnt);
 	if (gcl->refcnt == 0 && !EP_UT_BITSET(GCLF_DEFER_FREE, gcl->flags))
 		_gdp_gcl_freehandle(gcl);
-	else
+	else if (!EP_UT_BITSET(GCLF_KEEPLOCKED, gcl->flags))
 		_gdp_gcl_unlock_trace(gcl, file, line, id);
 }
 

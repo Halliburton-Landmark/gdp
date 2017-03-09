@@ -196,6 +196,7 @@ struct gdp_gcl
 #define GCLF_ISLOCKED		0x0004		// gcl is locked
 #define GCLF_INUSE			0x0008		// handle is allocated
 #define GCLF_DEFER_FREE		0x0010		// defer actual free until reclaim
+#define GCLF_KEEPLOCKED		0x0020		// don't unlock in _gdp_gcl_decref
 
 #define GDP_GCL_ISGOOD(gcl)												\
 				((gcl) != NULL &&										\

@@ -952,7 +952,7 @@ cmd_subscribe(gdp_req_t *req)
 			ep_dbg_cprintf(Dbg, 20, "cmd_subscribe: removing old request\n");
 			LIST_REMOVE(r1, gcllist);
 			r1->flags &= ~GDP_REQ_ON_GCL_LIST;
-			r1->gcl = NULL;
+			_gdp_gcl_decref(&r1->gcl);
 			_gdp_req_lock(r1);
 			_gdp_req_free(&r1);
 		}
@@ -990,7 +990,7 @@ cmd_subscribe(gdp_req_t *req)
 	// we don't drop the GCL reference until the subscription is satisified
 
 fail0:
-	return EP_STAT_OK;
+	return estat;
 }
 
 
