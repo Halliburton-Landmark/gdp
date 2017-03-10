@@ -54,6 +54,8 @@ bool	Quiet = false;			// be silent (no chatty messages)
 bool	Hexdump = false;		// echo input in hex instead of ASCII
 bool	KeepGoing = false;		// keep going on append errors
 
+static EP_DBG	Dbg = EP_DBG_INIT("gdp-writer", "gdp-writer");
+
 /*
 **  DO_LOG --- log a timestamp (for performance checking).
 */
@@ -131,6 +133,9 @@ write_record(gdp_datum_t *datum, gdp_gcl_t *gcl)
 		else
 			ep_hexdump(buf, l, stdout, EP_HEXDUMP_ASCII, 0);
 	}
+
+	if (ep_dbg_test(Dbg, 60))
+		gdp_datum_print(datum, ep_dbg_getfile(), GDP_DATUM_PRDEBUG);
 
 	// then send the buffer to the GDP
 	LOG("W");

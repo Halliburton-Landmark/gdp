@@ -588,11 +588,6 @@ const char		*_gdp_proto_cmd_name(		// return printable cmd name
 **  Initialization.
 */
 
-EP_STAT			_gdp_start_event_loop_thread(
-						EP_THR *thr,
-						struct event_base *evb,
-						const char *where);
-
 void			_gdp_newname(gdp_name_t gname,
 						gdp_gclmd_t *gmd);
 

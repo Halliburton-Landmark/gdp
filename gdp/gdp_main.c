@@ -546,6 +546,11 @@ _gdp_pdu_process(gdp_pdu_t *pdu, gdp_chan_t *chan)
 
 EP_THR			_GdpIoEventLoopThread;
 
+// to ensure event loop is running before we proceed
+bool					GdpIoEventLoopRunning		= false;
+static EP_THR_MUTEX		GdpIoEventLoopRunningMutex	EP_THR_MUTEX_INITIALIZER;
+static EP_THR_COND		GdpIoEventLoopRunningCond	EP_THR_COND_INITIALIZER;
+
 static void
 event_loop_timeout(int fd, short what, void *eli_)
 {
@@ -567,6 +572,11 @@ run_event_loop(void *eli_)
 	struct event *evtimer = event_new(evb, -1, EV_PERSIST,
 			&event_loop_timeout, eli);
 	event_add(evtimer, &tv);
+
+	ep_thr_mutex_lock(&GdpIoEventLoopRunningMutex);
+	GdpIoEventLoopRunning = true;
+	ep_thr_cond_broadcast(&GdpIoEventLoopRunningCond);
+	ep_thr_mutex_unlock(&GdpIoEventLoopRunningMutex);
 
 	for (;;)
 	{
@@ -606,7 +616,7 @@ run_event_loop(void *eli_)
 	ep_app_abort("lost channel to gdp");
 }
 
-EP_STAT
+static EP_STAT
 _gdp_start_event_loop_thread(EP_THR *thr,
 		struct event_base *evb,
 		const char *where)
@@ -692,6 +702,7 @@ run_as(const char *runasuser)
 **		Start the event loop.
 */
 
+// locks out multiple calls to gdp_lib_init
 static EP_THR_MUTEX		GdpInitMutex	EP_THR_MUTEX_INITIALIZER;
 
 EP_STAT
@@ -847,8 +858,20 @@ _gdp_evloop_init(void)
 {
 	EP_STAT estat;
 
-	// create a thread to run the event loop
-	estat = _gdp_start_event_loop_thread(&_GdpIoEventLoopThread,
-										GdpIoEventBase, "I/O");
+	// set up synchronization for event loop thread startup
+	ep_thr_mutex_lock(&GdpIoEventLoopRunningMutex);
+
+	if (!GdpIoEventLoopRunning)
+	{
+		// create a thread to run the event loop
+		estat = _gdp_start_event_loop_thread(&_GdpIoEventLoopThread,
+											GdpIoEventBase, "I/O");
+	}
+
+	while (!GdpIoEventLoopRunning)
+		ep_thr_cond_wait(&GdpIoEventLoopRunningCond,
+						&GdpIoEventLoopRunningMutex, NULL);
+	ep_thr_mutex_unlock(&GdpIoEventLoopRunningMutex);
+
 	return estat;
 }
