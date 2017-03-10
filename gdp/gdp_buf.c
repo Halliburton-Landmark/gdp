@@ -226,7 +226,7 @@ _gdp_buf_raw_copy(gdp_buf_t *obuf, gdp_buf_t *ibuf)
 
 #if LIBEVENT_VERSION_NUMBER > 0x02010100
 # ifndef LIBEVENT_USE_EVBUFFER_ADD_BUFFER_REFERENCE
-#  define LIBEVENT_USE_EVBUFFER_ADD_BUFFER_REFERENCE	1
+#  define LIBEVENT_USE_EVBUFFER_ADD_BUFFER_REFERENCE	0
 # endif
 # if LIBEVENT_USE_EVBUFFER_ADD_BUFFER_REFERENCE
 	// efficient, but has semantic quirks: "a buffer that has already been
