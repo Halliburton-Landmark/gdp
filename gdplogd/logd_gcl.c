@@ -29,6 +29,7 @@
 */
 
 #include "logd.h"
+#include "logd_pubsub.h"
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.gcl", "GDP Log Daemon GCL handling");
 
@@ -127,6 +128,7 @@ gcl_close(gdp_gcl_t *gcl)
 	gcl->x = NULL;
 }
 
+#if !LOG_CHECK
 
 /*
 **  Get an open instance of the GCL in the request.
@@ -206,4 +208,6 @@ gcl_reclaim_resources(void *null)
 	time_t reclaim_age = ep_adm_getlongparam("swarm.gdplogd.reclaim.age",
 								300L);
 	_gdp_gcl_cache_reclaim(reclaim_age);
+	sub_reclaim_resources(_GdpChannel);
 }
+# endif // LOG_CHECK

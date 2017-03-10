@@ -50,13 +50,13 @@
 */
 
 // leverage the existing code (not all used, of course)
+#define LOG_CHECK	1
 #define ep_log		log_override
 #define ep_logv		logv_override
 #define Dbg			DbgLogdGcl
 #include "../gdplogd/logd_gcl.c"
 #undef Dbg
 #define Dbg			DbgLogdDisklog
-#define LOG_CHECK	1
 #include "../gdplogd/logd_disklog.c"
 #undef Dbg
 

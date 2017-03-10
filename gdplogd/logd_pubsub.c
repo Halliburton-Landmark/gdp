@@ -101,7 +101,8 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 
 	{
 		EP_TIME_SPEC sub_delta;
-		long timeout = ep_adm_getlongparam("swarm.gdplogd.subscr.timeout", 600);
+		long timeout = ep_adm_getlongparam("swarm.gdplogd.subscr.timeout",
+							SUB_DEFAULT_TIMEOUT);
 
 		ep_time_from_nsec(-timeout SECONDS, &sub_delta);
 		ep_time_deltanow(&sub_delta, &sub_timeout);
@@ -192,4 +193,66 @@ sub_end_subscription(gdp_req_t *req)
 	}
 
 	(void) _gdp_pdu_out(req->rpdu, req->chan, NULL);
+}
+
+
+/*
+**  SUB_RECLAIM_RESOURCES --- remove any expired subscriptions
+*/
+
+void
+sub_reclaim_resources(gdp_chan_t *chan)
+{
+	gdp_req_t *req;
+	gdp_req_t *nextreq;
+	EP_TIME_SPEC sub_timeout;
+
+	{
+		EP_TIME_SPEC sub_delta;
+		long timeout = ep_adm_getlongparam("swarm.gdplogd.subscr.timeout",
+								SUB_DEFAULT_TIMEOUT);
+
+		ep_time_from_nsec(-timeout SECONDS, &sub_delta);
+		ep_time_deltanow(&sub_delta, &sub_timeout);
+	}
+
+	for (req = LIST_FIRST(&chan->reqs); req != NULL; req = nextreq)
+	{
+		_gdp_req_lock(req);
+		nextreq = LIST_NEXT(req, chanlist);
+		EP_ASSERT_ELSE(req != nextreq, break);
+
+		if (ep_dbg_test(Dbg, 59))
+		{
+			ep_dbg_printf("sub_reclaim_resources: checking ");
+			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+		}
+
+		if (!EP_UT_BITSET(GDP_REQ_SRV_SUBSCR, req->flags))
+		{
+			ep_dbg_cprintf(Dbg, 59, "   ... not a subscription (flags = 0x%x)\n",
+					req->flags);
+		}
+		else if (ep_time_before(&req->act_ts, &sub_timeout))
+		{
+			// this subscription seems to be dead
+			if (ep_dbg_test(Dbg, 18))
+			{
+				ep_dbg_printf("sub_reclaim_resources: subscription timeout: ");
+				_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+				_gdp_gcl_dump(req->gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+			}
+
+			// have to manually remove req from GCL list to avoid lock inversion
+			EP_ASSERT(req->gcl != NULL);
+			EP_ASSERT(EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags));
+			_gdp_gcl_lock(req->gcl);
+			LIST_REMOVE(req, gcllist);
+			req->flags &= ~GDP_REQ_ON_GCL_LIST;
+			_gdp_gcl_decref(&req->gcl);
+			_gdp_req_free(&req);
+		}
+		if (req != NULL)
+			_gdp_req_unlock(req);
+	}
 }
