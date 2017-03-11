@@ -401,7 +401,7 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 			}
 			if (EP_UT_BITSET(GCLF_DROPPING, g1->flags) || g1->refcnt > 0)
 			{
-				if (ep_dbg_test(Dbg, 10))
+				if (ep_dbg_test(Dbg, 19))
 				{
 					ep_dbg_printf("_gdp_gcl_cache_reclaim: skipping:\n   ");
 					_gdp_gcl_dump(g1, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
