@@ -113,6 +113,7 @@
 #   define EP_OSCF_HAS_GETPROGNAME	1	// does getprogname(3) exist?
 #  endif
 #  define EP_OSCF_NEED_OPTRESET		1	// optreset needed in getopt(3)
+#  define EP_OSCF_HAS_BACKTRACE		0	// no backtrace(3) call
 # endif // __FreeBSD__
 
 # ifdef __APPLE__
