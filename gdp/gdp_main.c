@@ -145,13 +145,13 @@ gdp_pdu_proc_cmd(void *cpdu_)
 
 	gcl = _gdp_gcl_cache_get(cpdu->dst, 0);
 	if (gcl != NULL)
-		EP_ASSERT_MUTEX_ISLOCKED(&gcl->mutex, );
+		EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
 
 	ep_dbg_cprintf(Dbg, 43,
 			"gdp_pdu_proc_cmd: allocating new req for GCL %p\n", gcl);
 	estat = _gdp_req_new(cmd, gcl, cpdu->chan, cpdu, GDP_REQ_CORE, &req);
 	EP_STAT_CHECK(estat, goto fail0);
-	EP_ASSERT_MUTEX_ISLOCKED(&req->mutex, );
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex, );
 
 	ep_dbg_cprintf(Dbg, 40, "gdp_pdu_proc_cmd >>> req=%p\n", req);
 

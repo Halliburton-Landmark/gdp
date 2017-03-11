@@ -90,7 +90,7 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 	gdp_req_t *nextreq;
 	EP_TIME_SPEC sub_timeout;
 
-	EP_ASSERT_MUTEX_ISLOCKED(&pubreq->gcl->mutex, );
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&pubreq->gcl->mutex, );
 
 	if (ep_dbg_test(Dbg, 32))
 	{
@@ -171,8 +171,8 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 void
 sub_end_subscription(gdp_req_t *req)
 {
-	EP_ASSERT_MUTEX_ISLOCKED(&req->mutex, );
-	EP_ASSERT_MUTEX_ISLOCKED(&req->gcl->mutex, );
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex, );
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->gcl->mutex, );
 
 	// make it not persistent and not a subscription
 	req->flags &= ~(GDP_REQ_PERSIST | GDP_REQ_SRV_SUBSCR);

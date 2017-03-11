@@ -84,7 +84,7 @@ _gdp_invoke(gdp_req_t *req)
 	if (req->gcl != NULL)
 	{
 		EP_ASSERT_ELSE(GDP_GCL_ISGOOD(req->gcl), );
-		EP_ASSERT_MUTEX_ISUNLOCKED(&req->gcl->mutex, );
+		EP_THR_MUTEX_ASSERT_ISUNLOCKED(&req->gcl->mutex, );
 		_gdp_gcl_lock(req->gcl);
 	}
 	cmdname = _gdp_proto_cmd_name(req->cpdu->cmd);

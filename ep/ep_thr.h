@@ -148,18 +148,18 @@ extern bool	ep_thr_mutex_assert_isunlocked(
 extern bool	ep_thr_mutex_assert_i_own(
 			EP_THR_MUTEX *, const char *, const char *, int);
 
-# define	EP_ASSERT_MUTEX_ISLOCKED(m, r)				\
+# define	EP_THR_MUTEX_ASSERT_ISLOCKED(m, r)				\
 			if (!ep_thr_mutex_assert_islocked(m, #m, __FILE__, __LINE__))	\
 			{	r;	}
-# define	EP_ASSERT_MUTEX_ISUNLOCKED(m, r)			\
+# define	EP_THR_MUTEX_ASSERT_ISUNLOCKED(m, r)			\
 			if (!ep_thr_mutex_assert_isunlocked(m, #m, __FILE__, __LINE__))	\
 			{	r;	}
 #else
 # define	ep_thr_mutex_assert_islocked(m, i, f, l)	true
 # define	ep_thr_mutex_assert_isunlocked(m, i, f, l)	true
 # define	ep_thr_mutex_assert_i_own(m, i, f, l)		true
-# define	EP_ASSERT_MUTEX_ISLOCKED(m, r)
-# define	EP_ASSERT_MUTEX_ISUNLOCKED(m, r)
+# define	EP_THR_MUTEX_ASSERT_ISLOCKED(m, r)
+# define	EP_THR_MUTEX_ASSERT_ISUNLOCKED(m, r)
 #endif
 
 typedef pthread_cond_t		EP_THR_COND;

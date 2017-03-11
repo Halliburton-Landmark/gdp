@@ -242,7 +242,7 @@ _gdp_req_free(gdp_req_t **reqp)
 	ep_dbg_cprintf(Dbg, 48, "_gdp_req_free(%p)  state=%d, gcl=%p\n",
 			req, req->state, req->gcl);
 
-	EP_ASSERT_MUTEX_ISLOCKED(&req->mutex, );
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex, );
 	if (req->state == GDP_REQ_FREE)
 	{
 		// req was freed after a reference was taken
@@ -262,7 +262,7 @@ _gdp_req_free(gdp_req_t **reqp)
 	if (EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
 	{
 		EP_ASSERT_ELSE(req->gcl != NULL, return);
-		EP_ASSERT_MUTEX_ISLOCKED(&req->gcl->mutex, );
+		EP_THR_MUTEX_ASSERT_ISLOCKED(&req->gcl->mutex, );
 		LIST_REMOVE(req, gcllist);
 		req->flags &= ~GDP_REQ_ON_GCL_LIST;
 	}
@@ -426,7 +426,7 @@ _gdp_req_send(gdp_req_t *req)
 		// link the request to the GCL
 		ep_dbg_cprintf(Dbg, 49, "_gdp_req_send(%p) gcl=%p\n", req, gcl);
 		//XXX _gdp_gcl_lock(gcl);
-		EP_ASSERT_MUTEX_ISLOCKED(&gcl->mutex, );
+		EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
 		LIST_INSERT_HEAD(&gcl->reqs, req, gcllist);
 		req->flags |= GDP_REQ_ON_GCL_LIST;
 		//XXX _gdp_gcl_unlock(gcl);
@@ -476,7 +476,7 @@ _gdp_req_unsend(gdp_req_t *req)
 	}
 	else
 	{
-		EP_ASSERT_MUTEX_ISLOCKED(&gcl->mutex, );
+		EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
 		//XXX _gdp_gcl_lock(gcl);
 		LIST_REMOVE(req, gcllist);
 		req->flags &= ~GDP_REQ_ON_GCL_LIST;
@@ -514,7 +514,7 @@ _gdp_req_find(gdp_gcl_t *gcl, gdp_rid_t rid)
 			gcl, rid);
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
 					return NULL);
-	EP_ASSERT_MUTEX_ISLOCKED(&gcl->mutex, );
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
 
 	for (;;)
 	{

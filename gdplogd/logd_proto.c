@@ -882,7 +882,7 @@ cmd_subscribe(gdp_req_t *req)
 	EP_TIME_SPEC timeout;
 
 	if (req->gcl != NULL)
-		EP_ASSERT_MUTEX_ISLOCKED(&req->gcl->mutex, );
+		EP_THR_MUTEX_ASSERT_ISLOCKED(&req->gcl->mutex, );
 
 	req->rpdu->cmd = GDP_ACK_SUCCESS;
 
