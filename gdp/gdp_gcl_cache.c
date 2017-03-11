@@ -667,10 +667,16 @@ void
 _gdp_gcl_cache_dump(int plev, FILE *fp)
 {
 	gdp_gcl_t *gcl;
+	gdp_gcl_t *prev_gcl = NULL;
 
 	fprintf(fp, "\n<<< Showing cached GCLs by usage >>>\n");
 	LIST_FOREACH(gcl, &GclsByUse, ulist)
 	{
+		// do minor sanity check on list
+		// won't help if the loop is more than one item
+		EP_ASSERT_ELSE(gcl != prev_gcl, break);
+		prev_gcl = gcl;
+
 		if (plev > GDP_PR_PRETTY)
 		{
 			_gdp_gcl_dump(gcl, fp, plev, 0);
