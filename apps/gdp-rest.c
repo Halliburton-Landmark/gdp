@@ -719,6 +719,9 @@ pfx_gcl(scgi_request *req, char *uri)
 
 		case SCGI_METHOD_GET:
 			// XXX if no GCL name, should we print all GCLs?
+			estat = error404(req, "listing GCLs not implemented (yet)");
+			break;
+
 		default:
 			// unknown URI/method
 			estat = error405(req, "only GET or POST supported for unnamed GCL");
@@ -1088,6 +1091,8 @@ main(int argc, char **argv, char **env)
 					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		}
 	}
+
+	ep_dbg_cprintf(Dbg, 9, "GDP initialized\n");
 
 	// Initialize SCGI library
 	scgi_debug = ep_dbg_level(Dbg) / 10;
