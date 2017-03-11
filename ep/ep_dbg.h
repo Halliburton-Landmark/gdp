@@ -81,6 +81,7 @@ extern void	ep_dbg_setto(const char *pat, int lev);
 // printing debug output (uses stddbg)
 extern void EP_TYPE_PRINTFLIKE(1, 2)
 		ep_dbg_printf(const char *fmt, ...);
+extern void	ep_dbg_vprintf(const char *fmt, va_list av);
 
 // print only if flag set
 #define ep_dbg_cprintf(f, l, ...)	{if (ep_dbg_test(f, l)) \

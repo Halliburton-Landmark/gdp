@@ -258,7 +258,7 @@ bdb_get(DB *db,
 
 	if (ep_dbg_test(Dbg, 47))
 	{
-		ep_dbg_printf("bdb_get: len = %ld, key =\n", key->size);
+		ep_dbg_printf("bdb_get: len = %zd, key =\n", (size_t) key->size);
 		ep_hexdump(key->data, key->size, ep_dbg_getfile(), 0, 0);
 	}
 
@@ -285,8 +285,8 @@ bdb_get_first_after_key(DB *db,
 
 	if (ep_dbg_test(Dbg, 47))
 	{
-		ep_dbg_printf("bdb_get_first_after_key: len = %ld, key =\n",
-				key->size);
+		ep_dbg_printf("bdb_get_first_after_key: len = %zd, key =\n",
+				(size_t) key->size);
 		ep_hexdump(key->data, key->size, ep_dbg_getfile(), 0, 0);
 	}
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
@@ -359,8 +359,8 @@ bdb_put(DB *db,
 
 	if (ep_dbg_test(Dbg, 47))
 	{
-		ep_dbg_printf("bdb_put: len = %ld, key =\n",
-				key->size);
+		ep_dbg_printf("bdb_put: len = %zd, key =\n",
+				(size_t) key->size);
 		ep_hexdump(key->data, key->size, ep_dbg_getfile(), 0, 0);
 	}
 
@@ -1118,7 +1118,7 @@ ridx_fseek_to_recno(
 
 	xoff = (recno - phys->ridx.min_recno) * SIZEOF_RIDX_RECORD +
 			phys->ridx.header_size;
-	ep_dbg_cprintf(Dbg, 14,
+	ep_dbg_cprintf(Dbg, 44,
 			"ridx_fseek_to_recno: recno=%" PRIgdp_recno
 			", min_recno=%" PRIgdp_recno ", ridx_hdrsize=%zd, xoff=%jd\n",
 			recno, phys->min_recno,
@@ -1190,7 +1190,7 @@ ridx_entry_read(gdp_gcl_t *gcl,
 	xent->segment = ep_net_ntoh32(xent->segment);
 	xent->reserved = ep_net_ntoh32(xent->reserved);
 
-	ep_dbg_cprintf(Dbg, 14,
+	ep_dbg_cprintf(Dbg, 44,
 			"ridx_entry_read: recno %" PRIgdp_recno ", segment %" PRIu32
 			", offset=%jd, rsvd=%" PRIu32 "\n",
 			xent->recno, xent->segment,
@@ -1840,7 +1840,7 @@ disk_read_by_recno(gdp_gcl_t *gcl,
 	if (datum->sig != NULL)
 		gdp_buf_reset(datum->sig);
 
-	ep_dbg_cprintf(Dbg, 14, "disk_read_by_recno(%s %" PRIgdp_recno "): ",
+	ep_dbg_cprintf(Dbg, 44, "disk_read_by_recno(%s %" PRIgdp_recno "): ",
 			gcl->pname, datum->recno);
 
 	ep_thr_rwlock_rdlock(&phys->lock);
@@ -1850,14 +1850,14 @@ disk_read_by_recno(gdp_gcl_t *gcl,
 	{
 		// record does not yet exist
 		estat = GDP_STAT_NAK_NOTFOUND;
-		ep_dbg_cprintf(Dbg, 14, "EOF\n");
+		ep_dbg_cprintf(Dbg, 44, "EOF\n");
 		goto fail0;
 	}
 	if (datum->recno < phys->min_recno)
 	{
 		// record is no longer available
 		estat = GDP_STAT_RECORD_EXPIRED;
-		ep_dbg_cprintf(Dbg, 14, "expired\n");
+		ep_dbg_cprintf(Dbg, 44, "expired\n");
 		goto fail0;
 	}
 
@@ -1865,11 +1865,11 @@ disk_read_by_recno(gdp_gcl_t *gcl,
 	xent = ridx_cache_get(phys, datum->recno);
 	if (xent != NULL)
 	{
-		ep_dbg_cprintf(Dbg, 14, "cached\n");
+		ep_dbg_cprintf(Dbg, 44, "cached\n");
 	}
 	else
 	{
-		ep_dbg_cprintf(Dbg, 14, "reading\n");
+		ep_dbg_cprintf(Dbg, 44, "reading\n");
 		xent = &ridx_entry;
 		estat = ridx_entry_read(gcl, datum->recno, gcl->pname, xent);
 	}
@@ -2037,7 +2037,7 @@ disk_ts_to_recno(gdp_gcl_t *gcl,
 	DBT tval_dbt;
 	gcl_physinfo_t *phys;
 
-	if (ep_dbg_test(Dbg, 14))
+	if (ep_dbg_test(Dbg, 44))
 	{
 		ep_dbg_printf("disk_ts_to_recno ");
 		_gdp_datum_dump(datum, ep_dbg_getfile());
@@ -2108,7 +2108,7 @@ disk_append(gdp_gcl_t *gcl,
 	segment_t *seg;
 	EP_STAT estat = EP_STAT_OK;
 
-	if (ep_dbg_test(Dbg, 14))
+	if (ep_dbg_test(Dbg, 44))
 	{
 		ep_dbg_printf("disk_append(%s):\n    ", gcl->pname);
 		gdp_datum_print(datum, ep_dbg_getfile(),
@@ -2263,7 +2263,7 @@ disk_getmetadata(gdp_gcl_t *gcl,
 				fread(&t32, sizeof t32, 1, seg->fp));
 		gmd->mds[i].md_len = ep_net_ntoh32(t32);
 		tlen += ep_net_ntoh32(t32);
-		ep_dbg_cprintf(Dbg, 34, "\tid = %08x, len = %zd\n",
+		ep_dbg_cprintf(Dbg, 34, "\tid = %08x, len = %" PRIu32 "\n",
 				gmd->mds[i].md_id, gmd->mds[i].md_len);
 	}
 

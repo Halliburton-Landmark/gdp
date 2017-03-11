@@ -242,7 +242,7 @@ fail0:
 	}
 	else
 	{
-		ep_dbg_cprintf(Dbg, 40, "len %zd\n", gmd->mds[indx].md_len);
+		ep_dbg_cprintf(Dbg, 40, "len %" PRIu32 "\n", gmd->mds[indx].md_len);
 		return EP_STAT_OK;
 	}
 }

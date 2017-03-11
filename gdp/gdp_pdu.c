@@ -725,7 +725,7 @@ _gdp_pdu_in(gdp_pdu_t *pdu, gdp_chan_t *chan)
 		size_t l;
 
 		ep_dbg_cprintf(DbgIn, 38,
-				"_gdp_pdu_in: reading %zd signature bytes (%zd available)\n",
+				"_gdp_pdu_in: reading %d signature bytes (%zd available)\n",
 				pdu->datum->siglen, gdp_buf_getlength(ibuf));
 		if (pdu->datum->sig == NULL)
 			pdu->datum->sig = gdp_buf_new();
@@ -740,7 +740,7 @@ _gdp_pdu_in(gdp_pdu_t *pdu, gdp_chan_t *chan)
 		{
 			// should never happen since we already have all the data in memory
 			ep_dbg_cprintf(DbgIn, 2,
-					"_gdp_pdu_in: cannot read all signature; wanted %zd, got %zd\n",
+					"_gdp_pdu_in: cannot read all signature; wanted %d, got %zd\n",
 					pdu->datum->siglen, l);
 		}
 	}

@@ -172,6 +172,16 @@ implement_me(char *s)
 ***********************************************************************/
 
 
+// print trace info about a command
+#define CMD_TRACE(cmd, msg, ...)											\
+			if (ep_dbg_test(Dbg, 20))										\
+			{																\
+				ep_dbg_printf("%s [%d]: ", _gdp_proto_cmd_name(cmd), cmd);	\
+				ep_dbg_printf(msg, __VA_ARGS__);							\
+				ep_dbg_printf("\n");										\
+			}
+
+
 /*
 **  CMD_PING --- just return an OK response to indicate that we are alive.
 **
@@ -474,6 +484,8 @@ cmd_read(gdp_req_t *req)
 
 	ep_thr_mutex_lock(&req->rpdu->datum->mutex);
 	req->rpdu->datum->recno = req->cpdu->datum->recno;
+	CMD_TRACE(req->cpdu->cmd, "%s %" PRIgdp_recno,
+			req->gcl->pname, req->cpdu->datum->recno);
 	estat = req->gcl->x->physimpl->read_by_recno(req->gcl, req->rpdu->datum);
 	ep_thr_mutex_unlock(&req->rpdu->datum->mutex);
 
@@ -590,6 +602,9 @@ cmd_append(gdp_req_t *req)
 		return gdpd_gcl_error(req->cpdu->dst, "cmd_append: GCL not open",
 							estat, GDP_STAT_NAK_BADREQ);
 	}
+
+	CMD_TRACE(req->cpdu->cmd, "%s %" PRIgdp_recno,
+			req->gcl->pname, req->cpdu->datum->recno);
 
 	// validate sequence number and signature
 	ep_thr_mutex_lock(&req->cpdu->datum->mutex);

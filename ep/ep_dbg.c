@@ -58,8 +58,9 @@ extern bool	_EpThrUsePthreads;
 static pthread_rwlock_t	FlagListRwlock	= PTHREAD_RWLOCK_INITIALIZER;
 #endif
 static FLAGPAT	*FlagList;
-FILE		*DebugFile;
+FILE		*EpDebugFileP;
 int		__EpDbgCurGen;		// current generation number
+static bool	FlushDebugFile;		// flush output on each printf?
 
 
 /*
@@ -69,9 +70,9 @@ int		__EpDbgCurGen;		// current generation number
 void
 ep_dbg_init(void)
 {
-	if (DebugFile == NULL)
+	if (EpDebugFileP == NULL)
 		ep_dbg_setfile(NULL);
-	EP_ASSERT(DebugFile != NULL);
+	EP_ASSERT(EpDebugFileP != NULL);
 }
 
 /*
@@ -203,7 +204,7 @@ ep_dbg_flaglevel(EP_DBG *flag)
 
 
 /*
-**  EP_DBG_PRINTF -- print debug information
+**  EP_DBG_[V]PRINTF -- print debug information
 **
 **	Parameters:
 **		fmt -- the message to print
@@ -213,22 +214,31 @@ ep_dbg_flaglevel(EP_DBG *flag)
 **		none.
 */
 
+
+void
+ep_dbg_vprintf(const char *fmt, va_list av)
+{
+	if (EpDebugFileP == NULL)
+		ep_dbg_init();
+
+	flockfile(EpDebugFileP);
+	fprintf(EpDebugFileP, "%s", EpVid->vidfgyellow);
+	vfprintf(EpDebugFileP, fmt, av);
+	fprintf(EpDebugFileP, "%s", EpVid->vidnorm);
+	if (FlushDebugFile)
+		fflush(EpDebugFileP);		// XXX ??? performance issues?
+	funlockfile(EpDebugFileP);
+}
+
+
 void
 ep_dbg_printf(const char *fmt, ...)
 {
 	va_list av;
 
-	if (DebugFile == NULL)
-		ep_dbg_init();
-
-	flockfile(DebugFile);
-	fprintf(DebugFile, "%s", EpVid->vidfgyellow);
 	va_start(av, fmt);
-	vfprintf(DebugFile, fmt, av);
+	ep_dbg_vprintf(fmt, av);
 	va_end(av);
-	fprintf(DebugFile, "%s", EpVid->vidnorm);
-	fflush(DebugFile);
-	funlockfile(DebugFile);
 }
 
 
@@ -247,17 +257,18 @@ void
 ep_dbg_setfile(
 	FILE *fp)
 {
-	if (fp != NULL && fp == DebugFile)
+	if (fp != NULL && fp == EpDebugFileP)
 		return;
 
 	// close the old stream
-	if (DebugFile != NULL && DebugFile != stdout && DebugFile != stderr)
-		(void) fclose(DebugFile);
+	if (EpDebugFileP != NULL &&
+	    EpDebugFileP != stdout && EpDebugFileP != stderr)
+		(void) fclose(EpDebugFileP);
 
 	// if fp is NULL, switch to the default
 	if (fp != NULL)
 	{
-		DebugFile = fp;
+		EpDebugFileP = fp;
 	}
 	else
 	{
@@ -265,20 +276,20 @@ ep_dbg_setfile(
 
 		dfile = ep_adm_getstrparam("libep.dbg.file", "stderr");
 		if (strcmp(dfile, "stderr") == 0)
-			DebugFile = stderr;
+			EpDebugFileP = stderr;
 		else if (strcmp(dfile, "stdout") == 0)
-			DebugFile = stdout;
+			EpDebugFileP = stdout;
 		else
 		{
-			DebugFile = fopen(dfile, "a");
-			if (DebugFile == NULL)
+			EpDebugFileP = fopen(dfile, "a");
+			if (EpDebugFileP == NULL)
 			{
 				ep_app_warn("Cannot open debug file %s",
 						dfile);
-				DebugFile = stderr;
+				EpDebugFileP = stderr;
 			}
 		}
-		setlinebuf(DebugFile);
+		setlinebuf(EpDebugFileP);
 	}
 }
 
@@ -286,9 +297,9 @@ ep_dbg_setfile(
 FILE *
 ep_dbg_getfile(void)
 {
-	if (DebugFile == NULL)
+	if (EpDebugFileP == NULL)
 		ep_dbg_init();
-	return DebugFile;
+	return EpDebugFileP;
 }
 
 
@@ -317,7 +328,7 @@ ep_dbg_backtrace(void)
 	int nframes;
 
 	nframes = backtrace(frames, NFRAMES);
-	backtrace_symbols_fd(frames, nframes, fileno(DebugFile));
+	backtrace_symbols_fd(frames, nframes, fileno(EpDebugFileP));
 #else
 	ep_dbg_printf("No stack backtrace available\n");
 #endif

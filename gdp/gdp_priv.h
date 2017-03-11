@@ -35,11 +35,8 @@
 #ifndef _GDP_PRIV_H_
 #define _GDP_PRIV_H_
 
-#ifndef GDP_EXTENDED_LOCKING_CHECK
-#define GDP_EXTENDED_LOCKING_CHECK		1
-#endif
-
 #include <ep/ep.h>
+#include <ep/ep_assert.h>
 #include <ep/ep_crypto.h>
 #include <ep/ep_thr.h>
 
@@ -206,44 +203,6 @@ struct gdp_gcl
 #define GDP_ASSERT_GCL_ISGOOD(gcl)										\
 				(EP_ASSERT(GDP_GCL_ISGOOD(gcl))
 
-/*
-**  Assertions on mutex locks (for debugging).
-**
-**		These macros:
-**		* Don't work on recursive mutexes.
-**		* Don't use the "do { } while(false)" idiom so r can use
-**		  break and continue.
-**		* Try to leave the lock in the same state as it started,
-**		  even if that state violates the assertion.  However,
-**		  there will (obviously) be some side effects, particularly
-**		  when unlocking a mutex that was not supposed to be locked.
-*/
-
-#if GDP_EXTENDED_LOCKING_CHECK
-
-bool		_gdp_mutex_check_islocked(
-				EP_THR_MUTEX *, const char *, const char *, int);
-bool		_gdp_mutex_check_isunlocked(
-				EP_THR_MUTEX *, const char *, const char *, int);
-
-#define GDP_ASSERT_MUTEX_ISLOCKED(m, r)									\
-				if (!_gdp_mutex_check_islocked(m, #m, __FILE__, __LINE__))	\
-				{														\
-					r;													\
-				}
-
-#define GDP_ASSERT_MUTEX_ISUNLOCKED(m, r)								\
-				if (!_gdp_mutex_check_isunlocked(m, #m, __FILE__, __LINE__)) \
-				{														\
-					r;													\
-				}
-
-#else
-
-#define GDP_ASSERT_MUTEX_ISLOCKED(m, r)
-#define GDP_ASSERT_MUTEX_ISUNLOCKED(m, r)
-
-#endif // GDP_EXTENDED_LOCKING_CHECK
 
 /*
 **  GCL cache.
@@ -281,17 +240,32 @@ void			_gdp_gcl_cache_shutdown(	// immediately shut down cache
 void			_gdp_gcl_touch(				// move to front of LRU list
 						gdp_gcl_t *gcl);
 
-void			_gdp_gcl_lock(				// lock the GCL mutex
-						gdp_gcl_t *gcl);
+void			_gdp_gcl_lock_trace(		// lock the GCL mutex
+						gdp_gcl_t *gcl,
+						const char *file,
+						int line,
+						const char *id);
 
-void			_gdp_gcl_unlock(			// unlock the GCL mutex
-						gdp_gcl_t *gcl);
+#define _gdp_gcl_lock(g)		_gdp_gcl_lock_trace(g, __FILE__, __LINE__, #g)
+
+void			_gdp_gcl_unlock_trace(		// unlock the GCL mutex
+						gdp_gcl_t *gcl,
+						const char *file,
+						int line,
+						const char *id);
+
+#define _gdp_gcl_unlock(g)		_gdp_gcl_unlock_trace(g, __FILE__, __LINE__, #g)
 
 void			_gdp_gcl_incref(			// increase reference count
 						gdp_gcl_t *gcl);
 
-void			_gdp_gcl_decref(			// decrease reference count
-						gdp_gcl_t **gclp);
+void			_gdp_gcl_decref_trace(		// decrease reference count
+						gdp_gcl_t **gclp,
+						const char *file,
+						int line,
+						const char *id);
+
+#define _gdp_gcl_decref(g)		_gdp_gcl_decref_trace(g, __FILE__, __LINE__, #g)
 
 /*
 **  Other GCL handling.  These are shared between client access
