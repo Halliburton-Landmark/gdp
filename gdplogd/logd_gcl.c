@@ -31,7 +31,9 @@
 #include "logd.h"
 #include "logd_pubsub.h"
 
+#if !LOG_CHECK
 static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.gcl", "GDP Log Daemon GCL handling");
+#endif
 
 
 /*
