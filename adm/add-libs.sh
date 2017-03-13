@@ -36,6 +36,7 @@ fi
 candidates=`ls \
 	/usr/lib/libsystemd.* \
 	/usr/lib/*/libsystemd.* \
+	/usr/local/lib*/libsystemd.* \
 	2>/dev/null`
 if [ ! -z "$candidates" ]
 then
