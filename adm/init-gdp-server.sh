@@ -35,9 +35,11 @@ GDP_SRC_ROOT=`pwd`
 
 : ${GDPLOGD_LOG:=$GDP_LOG_DIR/gdplogd.log}
 
-if [ ! -x $GDP_ROOT/sbin/gdplogd ]
+if [ ! -x $GDP_ROOT/sbin/gdplogd -o ! -x $GDP_ROOT/sbin/gdp-rest ]
 then
-	warn "It appears GDP server code is not yet installed in $GDP_ROOT"
+	warn "It appears GDP server code (gdplogd and gdp-rest) are not yet"
+	warn "installed in $GDP_ROOT/sbin.  These should be installed by"
+	warn "\"sudo make install\""
 	info "Press <return> to continue, ^C to abort"
 	read nothing
 fi
@@ -84,11 +86,8 @@ mkdir_gdp $GDP_VAR
 mkdir_gdp $GDP_KEYS_DIR 0750
 mkdir_gdp $GDPLOGD_DATADIR 0750
 
-if [ ! -f $GDPLOGD_LOG ]
-then
-	cp /dev/null $GDPLOGD_LOG
-	chown ${GDP_USER}:${GDP_GROUP} $GDPLOGD_LOG
-fi
+mkfile_gdp $GDPLOGD_LOG
+mkfile_gdp $GDP_REST_LOG
 
 ## set up default runtime administrative parameters
 hostname=`hostname`
@@ -142,6 +141,9 @@ cd $GDP_SRC_ROOT
 info "Installing gdplogd wrapper script"
 install -o ${GDP_USER} adm/gdplogd-wrapper.sh $GDP_ROOT/sbin
 
+info "Installing gdp-rest wrapper script"
+install -o ${GDP_USER} adm/gdp-rest-wrapper.sh $GDP_ROOT/sbin
+
 if [ -d /etc/rsyslog.d ]
 then
 	info "Installing rsyslog configuration"
@@ -157,9 +159,11 @@ fi
 
 if [ "$INITSYS" = "systemd" ]
 then
-	sudo adm/customize.sh adm/gdplogd.service.template /etc/systemd/system
-	sudo systemctl daemon-reload
-	sudo systemctl enable gdplogd
+	adm/customize.sh adm/gdplogd.service.template /etc/systemd/system
+	adm/customize.sh adm/gdp-rest.service.template /etc/systemd/system
+	systemctl daemon-reload
+	systemctl enable gdplogd
+	systemctl enable gdp-rest
 else
 	warn "No system initialization configured"
 fi
