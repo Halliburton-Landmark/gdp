@@ -38,9 +38,26 @@ fatal() {
 # Create a directory as the user gdp
 mkdir_gdp() {
 	test -d $1 && return
+	if [ -e $1 ]; then
+		warn "$1 exists but is not a directory"
+		return
+	fi
 	info "Creating $1 as ${GDP_USER}:${GDP_GROUP}"
 	sudo mkdir -p $1
-	sudo chmod ${2:-0755} $1
+	sudo chmod ${2:-0775} $1
+	sudo chown ${GDP_USER}:${GDP_GROUP} $1
+}
+
+# Create a file as the user gdp
+mkfile_gdp() {
+	test -f $1 && return
+	if [ -e $1 ]; then
+		warn "$1 exists but is not a file"
+		return
+	fi
+	info "Creating $1 as ${GDP_USER}:${GDP_GROUP}"
+	sudo cp /dev/null $1
+	sudo chmod ${2:-0664} $1
 	sudo chown ${GDP_USER}:${GDP_GROUP} $1
 }
 
