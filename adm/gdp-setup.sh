@@ -48,6 +48,10 @@ case "$OS" in
 	package libavahi-client-dev
 	package avahi-daemon
 	package pandoc
+	if [ -e /etc/systemd/system ]
+	then
+		package systemd-dev
+	fi
 	if ! ls /etc/apt/sources.list.d/mosquitto* > /dev/null 2>&1
 	then
 		package software-properties-common
@@ -66,8 +70,7 @@ case "$OS" in
 	package pandoc
 	if [ "$PKGMGR" = "brew" ]
 	then
-		package mosquitto
-		warn "Homebrew doesn't support Avahi."
+		package mosquitto warn "Homebrew doesn't support Avahi."
 		info "Avahi is used for Zeroconf (automatic client"
 		info "configuration.  Under Darwin, Avahi is difficult"
 		info "to build without editing files.  To build gdp without"
@@ -96,10 +99,15 @@ case "$OS" in
 	package jansson-devel
 	package avahi-devel
 	package mosquitto
+	if [ -e /etc/systemd/system ]
+	then
+		package systemd-dev
+	fi
 	warn "Yum doesn't support Pandoc: install by hand"
 	;;
 
     "centos")
+	# untested
 	package epel-release
 	package libevent-devel
 	package openssl-devel
@@ -108,6 +116,10 @@ case "$OS" in
 	package avahi-devel
 	package mosquitto
 	package pandoc
+	if [ -e /etc/systemd/system ]
+	then
+		package systemd-dev
+	fi
 	;;
 
     *)
