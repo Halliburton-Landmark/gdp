@@ -143,7 +143,18 @@ gdplogd: ${OBJS} ${LIBDEPS}
 clean:
 	-rm -f ${CLEANALL} *.o *.core
 
-install:	${ALLDIRS} ${PUBALL}
+install:	install-check install-override
+
+install-check:
+	@if [ -d /etc/systemd/system -a ! -f /usr/include/systemd/sd-daemon.h ];\
+	then\
+		echo "Warning: You seem to be using systemd, but package systemd-dev not installed.";\
+		echo "         System startup may not work.";\
+		echo "         Use \"make install-override\" to ignore this message.";\
+		exit 1;\
+	fi
+
+install-override:	${ALLDIRS} ${PUBALL}
 	test -z "${BINALL}"  || ${INSTALL} ${BINALL}  ${BINDIR}
 	test -z "${SBINALL}" || ${INSTALL} ${SBINALL} ${SBINDIR}
 	test -z "${MAN1ALL}" || ${INSTALL} ${MAN1ALL} ${MANDIR}/man1
