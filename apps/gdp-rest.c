@@ -39,6 +39,7 @@
 #include <ep/ep_hash.h>
 #include <ep/ep_dbg.h>
 #include <ep/ep_pcvt.h>
+#include <ep/ep_sd.h>
 #include <ep/ep_stat.h>
 #include <ep/ep_xlate.h>
 #include <gdp/gdp.h>
@@ -1122,6 +1123,7 @@ main(int argc, char **argv, char **env)
 	//		thread hangs since the other work happens in a different
 	//		thread.
 	poll_delay = ep_adm_getlongparam("swarm.rest.scgi.pollinterval", 100000);
+	ep_sd_notifyf("READY=1\n");
 	for (;;)
 	{
 		gdp_event_t *gev;
