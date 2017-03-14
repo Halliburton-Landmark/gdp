@@ -77,7 +77,7 @@ extern bool			_GdpLibInitialized;	// are we initialized?
 		_x_ ## item = NULL;												\
 	if (_x_ ## item == NULL)
 #else
-#define IF_LIST_CHECK_OK(list, item, chain, type, recovery)				\
+#define IF_LIST_CHECK_OK(list, item, chain, type)						\
 	if (true)
 #endif
 
