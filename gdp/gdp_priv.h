@@ -63,6 +63,9 @@ extern bool			_GdpLibInitialized;	// are we initialized?
 					(_GdpLibInitialized ? EP_STAT_OK					\
 										: gdp_init(NULL))
 
+#ifndef GDP_OPT_EXTENDED_CACHE_CHECK		//XXX DEBUG TEMPORARY
+# define GDP_OPT_EXTENDED_CACHE_CHECK	1	//XXX DEBUG TEMPORARY
+#endif										//XXX DEBUG TEMPORARY
 #if GDP_OPT_EXTENDED_CACHE_CHECK
 #define IF_LIST_CHECK_OK(list, item, chain, type)						\
 	type *_x_ ## item;													\
