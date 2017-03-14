@@ -398,6 +398,7 @@ gdp_gcl_open(gdp_name_t name,
 		ep_dbg_cprintf(Dbg, 10, "gdp_gcl_open(%s): using existing GCL @ %p\n",
 				gcl->pname, gcl);
 		gcl->iomode |= mode;
+		_gdp_gcl_unlock(gcl);
 		estat = EP_STAT_OK;
 	}
 	else
@@ -422,7 +423,6 @@ gdp_gcl_open(gdp_name_t name,
 		}
 		else
 		{
-			ep_thr_mutex_unlock(&gcl->mutex);
 			ep_thr_mutex_destroy(&gcl->mutex);
 			ep_mem_free(gcl);
 		}

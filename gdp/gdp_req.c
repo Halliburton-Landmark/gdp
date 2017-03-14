@@ -88,7 +88,8 @@ statestr(const gdp_req_t *req)
 **
 **	Parameters:
 **		cmd --- the command to be issued
-**		gcl --- the associated GCL handle, if any
+**		gcl --- the associated GCL handle, if any.  Should be unlocked
+**				on entry.
 **		chan --- the channel associated with the request
 **		pdu --- the existing PDU; if none, one will be allocated
 **		flags --- modifier flags
@@ -123,8 +124,8 @@ _gdp_req_new(int cmd,
 		flags |= GDP_REQ_PERSIST | GDP_REQ_ALLOC_RID;
 
 	// if assertion fails, may be working with an unallocated GCL
-	EP_ASSERT_ELSE(gcl == NULL || GDP_GCL_ISGOOD(gcl),
-			return EP_STAT_ASSERT_ABORT);
+	if (gcl != NULL)
+		EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return EP_STAT_ASSERT_ABORT);
 
 	// simplify the simple case
 	if (chan == NULL)
@@ -203,7 +204,10 @@ _gdp_req_new(int cmd,
 	{
 		pdu->cmd = cmd;
 		if (gcl != NULL)
+		{
+			_gdp_gcl_lock(gcl);
 			memcpy(pdu->dst, gcl->name, sizeof pdu->dst);
+		}
 		if ((gcl == NULL || !EP_UT_BITSET(GDP_REQ_PERSIST, flags)) &&
 				!EP_UT_BITSET(GDP_REQ_ALLOC_RID, flags))
 		{
@@ -215,6 +219,8 @@ _gdp_req_new(int cmd,
 			// allocate a new unique request id
 			pdu->rid = _gdp_rid_new(gcl, chan);
 		}
+		if (gcl != NULL)
+			_gdp_gcl_unlock(gcl);
 	}
 
 	// success
