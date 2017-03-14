@@ -186,8 +186,15 @@ _gdp_req_new(int cmd,
 	if (chan != NULL)
 	{
 		ep_thr_mutex_lock(&chan->mutex);
-		LIST_INSERT_HEAD(&chan->reqs, req, chanlist);
-		req->flags |= GDP_REQ_ON_CHAN_LIST;
+		IF_LIST_CHECK_OK(&chan->reqs, req, chanlist, gdp_req_t)
+		{
+			LIST_INSERT_HEAD(&chan->reqs, req, chanlist);
+			req->flags |= GDP_REQ_ON_CHAN_LIST;
+		}
+		else
+		{
+			estat = EP_STAT_ASSERT_ABORT;
+		}
 		ep_thr_mutex_unlock(&chan->mutex);
 	}
 

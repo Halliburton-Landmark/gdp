@@ -848,9 +848,12 @@ post_subscribe(gdp_req_t *req)
 		// link this request into the GCL so the subscription can be found
 		if (!EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
 		{
-			_gdp_gcl_incref(req->gcl);		//DEBUG: is this appropriate?
-			LIST_INSERT_HEAD(&req->gcl->reqs, req, gcllist);
-			req->flags |= GDP_REQ_ON_GCL_LIST;
+			IF_LIST_CHECK_OK(&req->gcl->reqs, req, gcllist, gdp_req_t)
+			{
+				_gdp_gcl_incref(req->gcl);		//DEBUG: is this appropriate?
+				LIST_INSERT_HEAD(&req->gcl->reqs, req, gcllist);
+				req->flags |= GDP_REQ_ON_GCL_LIST;
+			}
 		}
 	}
 }
@@ -980,10 +983,17 @@ cmd_subscribe(gdp_req_t *req)
 		// link this request into the GCL so the subscription can be found
 		if (!EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
 		{
-			//XXX _gdp_gcl_lock(req->gcl);
-			LIST_INSERT_HEAD(&req->gcl->reqs, req, gcllist);
-			req->flags |= GDP_REQ_ON_GCL_LIST;
-			//XXX _gdp_gcl_unlock(req->gcl);
+			IF_LIST_CHECK_OK(&req->gcl->reqs, req, gcllist, gdp_req_t)
+			{
+				//XXX _gdp_gcl_lock(req->gcl);
+				LIST_INSERT_HEAD(&req->gcl->reqs, req, gcllist);
+				req->flags |= GDP_REQ_ON_GCL_LIST;
+				//XXX _gdp_gcl_unlock(req->gcl);
+			}
+			else
+			{
+				estat = EP_STAT_ASSERT_ABORT;
+			}
 		}
 	}
 

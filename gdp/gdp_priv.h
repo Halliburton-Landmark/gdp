@@ -63,6 +63,24 @@ extern bool			_GdpLibInitialized;	// are we initialized?
 					(_GdpLibInitialized ? EP_STAT_OK					\
 										: gdp_init(NULL))
 
+#if GDP_OPT_EXTENDED_CACHE_CHECK
+#define IF_LIST_CHECK_OK(list, item, chain, type)						\
+	type *_x_ ## item;													\
+	if (ep_dbg_test(Dbg, 14))											\
+	{																	\
+		LIST_FOREACH(_x_ ## item, list, chain)							\
+		{																\
+			EP_ASSERT_ELSE(_x_ ## item != item, break);					\
+		}																\
+	}																	\
+	else																\
+		_x_ ## item = NULL;												\
+	if (_x_ ## item == NULL)
+#else
+#define IF_LIST_CHECK_OK(list, item, chain, type, recovery)				\
+	if (true)
+#endif
+
 #include "gdp_pdu.h"
 
 // declare the type of the gdp_req linked list (used multiple places)
