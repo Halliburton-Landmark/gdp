@@ -77,6 +77,9 @@
 **	went for simplicity.
 */
 
+#if !defined(EP_OPT_EXTENDED_MUTEX_CHECK) && defined(__linux__)	//XXX DEBUG TEMP
+# define EP_OPT_EXTENDED_MUTEX_LOCK	1			//XXX DEBUG TEMP
+#endif								//XXX DEBUG TEMP
 #if EP_OPT_EXTENDED_MUTEX_CHECK && !defined(__linux__)
 # warning EP_OPT_EXTENDED_MUTEX_CHECK only works on Linux
 # undef EP_OPT_EXTENDED_MUTEX_CHECK

@@ -248,6 +248,19 @@ _ep_thr_mutex_destroy(EP_THR_MUTEX *mtx,
 	if (!_EpThrUsePthreads)
 		return 0;
 	CHECKMTX(mtx, "destroy >>>");
+#if EP_OPT_EXTENDED_MUTEX_CHECK
+	if (mtx->__data.__lock != 0)
+	{
+		if (mtx->__data.__lock == gettid())
+			ep_assert_print(file, line,
+				"_ep_thr_mutex_destroy: destroying self-locked mutex %p (%s)\n",
+				mtx, name);
+		else
+			ep_assert_print(file, line,
+				"_ep_thr_mutex_destroy: destroying mutex %p (%s) locked by %d (I am %d)\n",
+				mtx, name, mtx->__data.__lock, gettid());
+	}
+#endif
 	if ((err = pthread_mutex_destroy(mtx)) != 0)
 		diagnose_thr_err(err, "mutex_destroy", file, line, name, mtx);
 	return err;
@@ -264,9 +277,14 @@ _ep_thr_mutex_lock(EP_THR_MUTEX *mtx,
 		return 0;
 	CHECKMTX(mtx, "lock >>>");
 #if EP_OPT_EXTENDED_MUTEX_CHECK
-	if (mtx->__data.__owner == gettid() /* && !recursive */)
-		ep_assert_print(file, line, "mutex %p (%s) already self-locked",
-				mtx, name);
+	if (mtx->__data.__lock != 0 &&
+	    mtx->__data.__owner == gettid() &&
+	    mtx->__data.__kind != PTHREAD_MUTEX_RECURSIVE_NP)
+	{
+		ep_assert_print(file, line,
+			"_ep_thr_mutex_lock: mutex %p (%s) already self-locked",
+			mtx, name);
+	}
 #endif
 	if ((err = pthread_mutex_lock(mtx)) != 0)
 		diagnose_thr_err(err, "mutex_lock", file, line, name, mtx);
