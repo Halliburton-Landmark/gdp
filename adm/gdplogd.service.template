@@ -4,7 +4,8 @@ Wants=gdp-router-click
 After=gdp-router-click
 
 [Service]
-Type=simple
+Type=notify
+NotifyAccess=all
 Environment=GDP_ROOT=@GDP_ROOT@
 User=@GDP_USER@
 
