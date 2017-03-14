@@ -75,6 +75,24 @@ bother you we recommend installing clang and using that
 compiler.  (Hint: it gives much better error messages and
 catches things that gcc does not.)
 
+### Compilation Flags
+
+There are a few compilation flags you can use to turn on additional
+debugging.  You can generally do this using `O=-D`flag on the
+`make` command line; this also turns off optimization so that
+debuggers can give better information.
+
+* *EP_OPT_EXTENDED_MUTEX_CHECK* &mdash; Check for cases such as locking
+  mutexes that are already locked.  Also enables some assertions
+  that check lock status.  Only works on systems using the NTPL
+  implementation (which means most versions of Linux).  This breaks
+  information hiding and hence may fail if the NPTL implementation
+  changes.
+* *GDP_OPT_EXTENDED_CACHE_CHECK* &mdash; This does some additional
+  checking on the GCL cache.  Notably, it fails if a loop in one of
+  the linked lists is detected.  This can be expensive, so use it
+  sparingly.
+
 ### Other language bindings
 
 In addition to C, there is support for Python, Java, and
