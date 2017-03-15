@@ -216,6 +216,7 @@ sub_reclaim_resources(gdp_chan_t *chan)
 		ep_time_deltanow(&sub_delta, &sub_timeout);
 	}
 
+	ep_thr_mutex_lock(&chan->mutex);
 	for (req = LIST_FIRST(&chan->reqs); req != NULL; req = nextreq)
 	{
 		_gdp_req_lock(req);
@@ -243,16 +244,19 @@ sub_reclaim_resources(gdp_chan_t *chan)
 				_gdp_gcl_dump(req->gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 			}
 
-			// have to manually remove req from GCL list to avoid lock inversion
+			// have to manually remove req from lists to avoid lock inversion
 			EP_ASSERT(req->gcl != NULL);
 			EP_ASSERT(EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags));
 			_gdp_gcl_lock(req->gcl);
 			LIST_REMOVE(req, gcllist);
-			req->flags &= ~GDP_REQ_ON_GCL_LIST;
-			_gdp_gcl_decref(&req->gcl);
+			_gdp_gcl_decref(&req->gcl);			// also unlocks GCL
+			EP_ASSERT(EP_UT_BITSET(GDP_REQ_ON_CHAN_LIST, req->flags));
+			LIST_REMOVE(req, chanlist);			// chan already locked
+			req->flags &= ~(GDP_REQ_ON_GCL_LIST | GDP_REQ_ON_CHAN_LIST);
 			_gdp_req_free(&req);
 		}
 		if (req != NULL)
 			_gdp_req_unlock(req);
 	}
+	ep_thr_mutex_unlock(&chan->mutex);
 }
