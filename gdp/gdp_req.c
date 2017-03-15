@@ -388,7 +388,11 @@ _gdp_req_lock(gdp_req_t *req)
 	if (EP_ASSERT_TEST(req->state != GDP_REQ_FREE))
 	{
 		// oops, unlock it and return failure
-		ep_dbg_cprintf(Dbg, 1, "_gdp_req_lock: req @ %p is free\n", req);
+		if (ep_dbg_test(Dbg, 1))
+		{
+			ep_dbg_printf("_gdp_req_lock: req @ %p is free\n", req);
+			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
+		}
 		ep_thr_mutex_unlock(&req->mutex);
 		return GDP_STAT_USING_FREE_REQ;
 	}
