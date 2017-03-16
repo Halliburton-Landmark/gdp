@@ -674,5 +674,11 @@ fail0:
 	if (!quiet)
 		fprintf(stderr, "exiting with status %s\n",
 				ep_stat_tostr(estat, buf, sizeof buf));
-	return !EP_STAT_ISOK(estat);
+	if (EP_STAT_ISOK(estat))
+		return EX_OK;
+	if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOROUTE))
+		return EX_NOHOST;
+	if (EP_STAT_ISABORT(estat))
+		return EX_SOFTWARE;
+	return EX_UNAVAILABLE;
 }

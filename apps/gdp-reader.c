@@ -700,8 +700,14 @@ main(int argc, char **argv)
 
 fail0:
 	// might as well let the user know what's going on....
-	if (!Quiet || EP_STAT_SEVERITY(estat) > EP_STAT_SEV_WARN)
+	if (!Quiet || EP_STAT_ISFAIL(estat))
 		fprintf(stderr, "exiting after %d records with status %s\n",
 				NRead, ep_stat_tostr(estat, buf, sizeof buf));
-	return !EP_STAT_ISOK(estat);
+	if (EP_STAT_ISOK(estat))
+		return EX_OK;
+	if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOROUTE))
+		return EX_NOINPUT;
+	if (EP_STAT_ISABORT(estat))
+		return EX_SOFTWARE;
+	return EX_UNAVAILABLE;
 }

@@ -92,12 +92,21 @@ to produce crude round-trip performance numbers.
 .It Fl q
 Run quietly, suppressing all output that isn't error text.
 .El
+.
 .Sh EXIT STATUS
 .Bl -tag
-.It 0
-Success
-.It 1
-Some failure occurred.
+.It Li EX_OK No (0)
+Success.
+.It Li EX_CANTCREAT No (73)
+Output log could not be opened.
+.It Li EX_SOFTWARE No (70)
+Severe internal error.
+.It Li EX_UNAVAILABLE No (69)
+Other unspecified error occurred.
+.It Li EX_USAGE No (64)
+Error in command line parameters.
+.El
+.
 .Sh ADMINISTRATIVE PARAMETERS
 .Bl -tag
 .It Sy swarm.gdp.crypto.key.path

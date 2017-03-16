@@ -156,22 +156,28 @@ flag or set that administrative parameter.
 .El
 .Sh EXIT STATUS
 .Bl -tag
-.It Li EX_CANTCREAT
+.It Li EX_OK No (0)
+Success
+.It Li EX_CANTCREAT No (73)
 The log already exists.
-.It Li EX_DATAERR
+.It Li EX_DATAERR No (65)
 A command-line key file could not be parsed.
-.It Li EX_IOERR
+.It Li EX_IOERR No (74)
 A secret key file could not be created.
-.It Li EX_NOINPUT
+.It Li EX_NOHOST No (68)
+The log server name was not valid.
+.It Li EX_NOINPUT No (67)
 A command-line key file could not be opened.
-.It Li EX_SOFTWARE
+.It Li EX_SOFTWARE No (70)
 A successfully created public key could not be converted to external (DER) form
-for storage in new log metadata.
-.It Li EX_USAGE
+for storage in new log metadata,
+or severe internal error.
+.It Li EX_USAGE No (64)
 Command line parameters are incorrect.
-.It Li EX_UNAVAILABLE
+.It Li EX_UNAVAILABLE No (69)
 A specified key length was insecure.
 It was impossible to create a new key.
+Other unspecified error.
 .El
 .Sh ADMINISTRATIVE PARAMETERS
 .Bl -tag

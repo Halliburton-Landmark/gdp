@@ -178,7 +178,19 @@ and
 .Fl s
 flags may be specified.
 .
-.\".Sh EXIT STATUS
+.Sh EXIT STATUS
+.Bl -tag
+.It Li EX_OK No (0) 
+.It Li EX_NOINPUT No (66)
+The log to be read did not exist or was not reachable.
+.It Li EX_SOFTWARE No (70)
+Severe internal error.
+.It Li EX_UNAVAILABLE No (69)
+Other unspecified error.
+.It Li EX_USAGE No (64)
+Error in command line parameters.
+.El
+.
 .\".Sh ADMINISTRATIVE PARAMETERS
 .\".Sh ENVIRONMENT
 .\".Sh FILES
