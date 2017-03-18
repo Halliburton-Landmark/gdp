@@ -8,8 +8,8 @@
   <body>
     <h1>RESTful Interface for the Global Data Plane</h1>
     Eric Allman<br>
-    U.C. Berkeley Swarm Lab 2015-01-16<br>
-    Draft 6<br>
+    U.C. Berkeley Swarm Lab 2017-03-18<br>
+    Draft 7<br>
     <p>This document describes the RESTful interface to the Global Data Plane
       (GDP). Note that this is not part of the GDP itself, since that layer
       treats all records as opaque. This level adds simple key-value structure
@@ -70,7 +70,8 @@
     <h3>Standard GCLs</h3>
     <hr size="2" width="100%">
     <h4>Name</h4>
-    GET /gdp/v1/gcl &mdash; list all known GCLs<br>
+    GET /gdp/v1/gcl &mdash; list all known GCLs <em>[</em><em><em>NOT
+        IMPLEMENTED</em>; see Notes]</em><br>
     <h4>Request Body</h4>
     none<br>
     <h4>Response</h4>
@@ -89,15 +90,14 @@
         "?start=&lt;#&gt;&amp;max=&lt;#&gt;", since this could be a very large
         list.&nbsp; It would probably be more useful if we could include some
         query, e.g., only return GCLs where the metadata matches some pattern,
-        but that would require a change in the GDP protocol itself.]]</i><br>
-    </p>
-    <p>Not implemented at this time (requires GDP protocol extension).&nbsp;
+        but that would require a change in the GDP protocol itself.]]</i></p><h4>Notes</h4>
+    <p>Not implemented at this time, and is unlikely to be implemented in this form in the future.&nbsp; This requires display of the global state of the GDP, which is likely to be immense.&nbsp; A possible alternative implementation would take a query that would be passed to a directory service.&nbsp;
       Returns 405 Method Not Allowed.<br>
     </p>
     <hr size="2" width="100%">
     <h4>Name</h4>
     GET /gdp/v1/gcl/&lt;gcl_name&gt; &mdash; list information known about
-    specified GCL<br>
+    specified GCL <em>[NOT IMPLEMENTED at this time]</em><br>
     <h4>Request Data</h4>
     none<br>
     <h4>Response Data</h4>
@@ -137,7 +137,7 @@
     <h4>Description</h4>
     <p>Creates a new GCL under an internally-assigned name and returns the
       information about that GCL in the same format as that delivered by the
-      status query.<br>
+      status query.</p><h4>Notes</h4><p>The plan is that GCLs will be created using a log creation service that will deal with resource allocation.&nbsp; This command is likely to be an interface to that service.<br>
     </p>
     <hr size="2" width="100%">
     <h4>Name</h4>
@@ -164,7 +164,7 @@
     </p>
     <hr size="2" width="100%">
     <h4>Name</h4>
-    DELETE /gdp/v1/gcl/&lt;gcl_name&gt; &mdash; delete a GCL<br>
+    DELETE /gdp/v1/gcl/&lt;gcl_name&gt; &mdash; delete a GCL <em>[NOT IMPLEMENTED; see Notes]</em><br>
     <h4>Request Data</h4>
     <p>none<br>
     </p>
@@ -173,8 +173,7 @@
     <p>401 Unauthorized</p>
     <p>404 Not Found<br>
     </p>
-    <h4>Description<br>
-    </h4>
+    <h4>Description</h4><h4>Notes</h4><p>Currently the GDP does not support log deletion.&nbsp; Until it does this will not be implemented.</p>
     <p><br>
     </p>
     <hr size="2" width="100%">
@@ -270,7 +269,7 @@
       number does not exist, this call waits for up to the indicated timeout for
       that record to appear; if it does, the record is returned in the usual
       way, otherwise it returns with a 408 Request Timeout response. If the
-      starting record number is not specified, it starts from the beginning.</p>
+      starting record number is not specified, it starts from the beginning.</p><h4>Notes</h4>
     <p>The <var>nrecs</var> and <var>timeout</var> parameters are not
       implemented at this time.</p>
     <p><i>[[Perhaps this should not take recno and nrecs, and just return the
@@ -327,7 +326,7 @@
     </p>
     <h2> 4 Summary</h2>
     <p>This is just a quick recap of the material presented above.&nbsp; All
-      URLs begin with "/gdp/v1/".<br>
+      URLs begin with "<code>/gdp/v1/</code>".<br>
     </p>
     <table border="1" cellpadding="2" cellspacing="2" width="100%">
       <tbody>
@@ -344,7 +343,7 @@
           </td>
           <td valign="top">gcl<br>
           </td>
-          <td valign="top">Lists existing GCLs<br>
+          <td valign="top"><span style="text-decoration: line-through;">Lists existing GCLs</span>&nbsp; [405 Method Not Allowed]<br>
           </td>
         </tr>
         <tr>
@@ -352,7 +351,7 @@
           </td>
           <td valign="top">gcl<br>
           </td>
-          <td valign="top">Create new GCL with random name<br>
+          <td valign="top"><span style="text-decoration: line-through;">Create new GCL with random name</span>&nbsp; [405 Method Not Allowed]<br>
           </td>
         </tr>
         <tr>
@@ -368,7 +367,7 @@
           </td>
           <td valign="top">gcl/&lt;id&gt;<br>
           </td>
-          <td valign="top">Get metadata about GCL &lt;id&gt;<br>
+          <td valign="top"><span style="text-decoration: line-through;">Get metadata about GCL</span> &lt;id&gt;&nbsp; [405 Method Not Allowed]<br>
           </td>
         </tr>
         <tr>
@@ -383,7 +382,7 @@
           </td>
           <td valign="top">gcl/&lt;id&gt;<br>
           </td>
-          <td valign="top">Create new GCL named &lt;id&gt; (sha256)<br>
+          <td valign="top"><span style="text-decoration: line-through;">Create new GCL named &lt;id&gt; (sha256)</span>&nbsp; [405 Method Not Allowed]<br>
           </td>
         </tr>
         <tr>
@@ -391,7 +390,7 @@
           </td>
           <td valign="top">gcl/&lt;id&gt;<br>
           </td>
-          <td valign="top">Delete GCL &lt;id&gt;<br>
+          <td valign="top"><span style="text-decoration: line-through;">Delete GCL &lt;id&gt;</span>&nbsp; [405 Method Not Allowed]<br>
           </td>
         </tr>
         <tr>
@@ -457,8 +456,5 @@
     <p>How does "GET as POST" work?<br>
     </p>
     <p>Do subscriptions wait until all data is ready to return, or does it
-      return immediately as soon as any data appears?<br>
-    </p>
-    <h2> </h2>
-  </body>
-</html>
+      return immediately as soon as any data appears?</p><p>How are signatures on POST methods handled?</p><p>How is authentication handled for sensitive operations, e.g., <br></p><h2> </h2>
+</body></html>
