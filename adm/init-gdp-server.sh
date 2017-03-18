@@ -159,11 +159,17 @@ fi
 
 if [ "$INITSYS" = "systemd" ]
 then
+	info "Installing and enabling systemd service files"
+	info "gdplogd.service ..."
 	adm/customize.sh adm/gdplogd.service.template /etc/systemd/system
+	info "gdp-rest.service ..."
 	adm/customize.sh adm/gdp-rest.service.template /etc/systemd/system
 	systemctl daemon-reload
 	systemctl enable gdplogd
 	systemctl enable gdp-rest
+	info "Startup scripts for gdp-rest are installed, but you will"
+	info "need to configure a web server to use the SCGI interface."
+	info "See README-CAAPI.md for advice."
 else
 	warn "No system initialization configured"
 fi

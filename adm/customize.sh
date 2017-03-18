@@ -8,6 +8,12 @@
 #	Usage: adm/customize.sh source-file target-dir
 #
 
+if [ $# != 2 ]
+then
+	echo 1>&2 "Usage: $0 source-file target-dir"
+	exit 1
+fi
+
 source_file=$1
 target_dir=$2
 
@@ -36,6 +42,8 @@ fi
 : ${GDPLOGD_DATADIR:=}
 : ${GDPLOGD_PIDFILE:=$GDP_VAR_RUN/gdplogd.pid}
 : ${GDP_ROUTER_CONF:=$GDP_VAR_RUN/gdp-router-click.conf}
+: ${SCGI_DEBUG:=1}
+: ${SCGI_PORT:=8001}
 
 (
 	echo "# Generated" `date +"%F %T %z"` from $source_file
@@ -53,6 +61,8 @@ fi
 		-e "s;@GDPLOGD_DATADIR@;$GDPLOGD_DATADIR;g" \
 		-e "s;@GDPLOGD_PIDFILE@;$GDPLOGD_PIDFILE;g" \
 		-e "s;@GDP_ROUTER_CONF@;$GDP_ROUTER_CONF;g" \
+		-e "s;@SCGI_DEBUG@;$SCGI_DEBUG;g" \
+		-e "s;@SCGI_PORT@;$SCGI_PORT;g" \
 
 	echo "# End of generated text" $1
 ) < $source_file > $target_dir/$source_root
