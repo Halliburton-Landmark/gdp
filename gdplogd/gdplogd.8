@@ -201,8 +201,13 @@ and still be considered active.
 Any subscriptions that are not renewed in this interval
 are considered dead and are removed from the subscription list.
 Should be greater than two times
-.Va swarm.gdp.subscr.pokeintvl .
-Defaults to 600 (ten minutes).
+.Va swarm.gdp.subscr.refresh .
+Defaults to the value of
+.Va swarm.gdp.subscr.timeout
+(which should probably be preferred over this name).
+See
+.Xr gdp 7
+for more information.
 .
 .It swarm.gdplogd.assert.maxasserts
 If more than this number of assertions occur,

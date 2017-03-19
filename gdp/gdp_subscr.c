@@ -115,8 +115,10 @@ static void *
 subscr_poker_thread(void *chan_)
 {
 	gdp_chan_t *chan = chan_;
-	long delta_poke = ep_adm_getlongparam("swarm.gdp.subscr.pokeintvl", 60L);
-	long delta_dead = ep_adm_getlongparam("swarm.gdp.subscr.deadintvl", 180L);
+	long delta_poke = ep_adm_getlongparam("swarm.gdp.subscr.pokeintvl",
+							GDP_SUBSCR_REFRESH_DEF);
+	long delta_dead = ep_adm_getlongparam("swarm.gdp.subscr.deadintvl",
+							GDP_SUBSCR_TIMEOUT_DEF);
 
 	ep_dbg_cprintf(Dbg, 10, "Starting subscription poker thread\n");
 	chan->flags |= GDP_CHAN_HAS_SUB_THR;

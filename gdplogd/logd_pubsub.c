@@ -101,9 +101,11 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 
 	{
 		EP_TIME_SPEC sub_delta;
-		long timeout = ep_adm_getlongparam("swarm.gdplogd.subscr.timeout",
-							SUB_DEFAULT_TIMEOUT);
+		long timeout = ep_adm_getlongparam("swarm.gdplogd.subscr.timeout", 0);
 
+		if (timeout == 0)
+			timeout = ep_adm_getlongparam("swarm.gdp.subscr.timeout",
+									GDP_SUBSCR_TIMEOUT_DEF);
 		ep_time_from_nsec(-timeout SECONDS, &sub_delta);
 		ep_time_deltanow(&sub_delta, &sub_timeout);
 	}

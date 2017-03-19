@@ -629,6 +629,9 @@ EP_STAT			_gdp_advertise_me(			// advertise me only
 **  Subscriptions.
 */
 
+#define GDP_SUBSCR_REFRESH_DEF	60L			// default refresh interval (sec)
+#define GDP_SUBSCR_TIMEOUT_DEF	180L		// default timeout (sec)
+
 void			_gdp_subscr_lost(			// subscription disappeared
 						gdp_req_t *req);
 
