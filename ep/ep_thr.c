@@ -302,6 +302,16 @@ _ep_thr_mutex_trylock(EP_THR_MUTEX *mtx,
 	if (!_EpThrUsePthreads)
 		return 0;
 	CHECKMTX(mtx, "trylock >>>");
+#if EP_OPT_EXTENDED_MUTEX_CHECK
+	if (mtx->__data.__lock != 0 &&
+	    mtx->__data.__owner == gettid() &&
+	    mtx->__data.__kind != PTHREAD_MUTEX_RECURSIVE_NP)
+	{
+		ep_assert_print(file, line,
+			"_ep_thr_mutex_lock: mutex %p (%s) already self-locked",
+			mtx, name);
+	}
+#endif
 	// EBUSY => mutex was already locked
 	if ((err = pthread_mutex_trylock(mtx)) != 0 && err != EBUSY)
 		diagnose_thr_err(err, "mutex_trylock", file, line, name, mtx);
