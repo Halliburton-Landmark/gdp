@@ -127,6 +127,12 @@ typedef struct ep_mutex		EP_THR_MUTEX;
 				PTHREAD_MUTEX_INITIALIZER,		\
 				0,					\
 			}
+#  define	EP_THR_MUTEX_INITIALIZER2(o)	=			\
+			{						\
+				_EP_THR_MUTEX_MAGIC,			\
+				PTHREAD_MUTEX_INITIALIZER,		\
+				o,					\
+			}
 
 #  define ep_thr_mutex_setorder(mtx, order)				\
 		_ep_thr_mutex_setorder(mtx, order,			\
@@ -138,6 +144,7 @@ extern void	_ep_thr_mutex_setorder(EP_THR_MUTEX *mtx, int order,
 #else
 typedef pthread_mutex_t		EP_THR_MUTEX;
 #  define	EP_THR_MUTEX_INITIALIZER	= PTHREAD_MUTEX_INITIALIZER
+#  define	EP_THR_MUTEX_INITIALIZER2(o)	= PTHREAD_MUTEX_INITIALIZER
 #  define	ep_thr_mutex_setorder(mtx, order)
 #endif // EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
 
