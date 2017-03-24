@@ -45,7 +45,8 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.req", "GDP request processing");
 
 // unused request structures
 static struct req_head	ReqFreeList = LIST_HEAD_INITIALIZER(ReqFreeList);
-static EP_THR_MUTEX		ReqFreeListMutex	EP_THR_MUTEX_INITIALIZER;
+static EP_THR_MUTEX		ReqFreeListMutex
+							EP_THR_MUTEX_INITIALIZER2(GDP_MUTEX_LORDER_LEAF);
 
 static const char *ReqStates[] =
 {

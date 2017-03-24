@@ -62,7 +62,7 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.api", "C API for GDP");
 **  Mutex around open operations
 */
 
-static EP_THR_MUTEX		OpenMutex		EP_THR_MUTEX_INITIALIZER;
+static EP_THR_MUTEX		OpenMutex		EP_THR_MUTEX_INITIALIZER2(GDP_MUTEX_LORDER_LEAF);
 
 
 // simplify debugging

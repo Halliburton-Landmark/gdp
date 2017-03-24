@@ -767,7 +767,8 @@ _gdp_pdu_in(gdp_pdu_t *pdu, gdp_chan_t *chan)
 **  _GDP_PDU_FREE --- return a PDU to the free list
 */
 
-static EP_THR_MUTEX		PduFreeListMutex	EP_THR_MUTEX_INITIALIZER;
+static EP_THR_MUTEX		PduFreeListMutex
+							EP_THR_MUTEX_INITIALIZER2(GDP_MUTEX_LORDER_LEAF);
 static TAILQ_HEAD(pkt_head, gdp_pdu)
 						PduFreeList = TAILQ_HEAD_INITIALIZER (PduFreeList);
 

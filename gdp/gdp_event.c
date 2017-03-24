@@ -44,16 +44,16 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.event", "GDP event handling");
 
 
 // free (unused) events
-static EP_THR_MUTEX		FreeListMutex	EP_THR_MUTEX_INITIALIZER;
+static EP_THR_MUTEX		FreeListMutex	EP_THR_MUTEX_INITIALIZER2(GDP_MUTEX_LORDER_LEAF);
 static struct gev_list	FreeList		= STAILQ_HEAD_INITIALIZER(FreeList);
 
 // active events (synchronous, ready for gdp_event_next)
-static EP_THR_MUTEX		ActiveListMutex	EP_THR_MUTEX_INITIALIZER;
+static EP_THR_MUTEX		ActiveListMutex	EP_THR_MUTEX_INITIALIZER2(GDP_MUTEX_LORDER_LEAF);
 static EP_THR_COND		ActiveListSig	EP_THR_COND_INITIALIZER;
 static struct gev_list	ActiveList		= STAILQ_HEAD_INITIALIZER(ActiveList);
 
 // callback events (asynchronous, ready for delivery in callback thread)
-static EP_THR_MUTEX		CallbackListMutex	EP_THR_MUTEX_INITIALIZER;
+static EP_THR_MUTEX		CallbackListMutex	EP_THR_MUTEX_INITIALIZER2(GDP_MUTEX_LORDER_LEAF);
 static EP_THR_COND		CallbackListSig		EP_THR_COND_INITIALIZER;
 static struct gev_list	CallbackList		= STAILQ_HEAD_INITIALIZER(CallbackList);
 static EP_THR			CallbackThread;

@@ -91,6 +91,7 @@ _gdp_gcl_cache_init(void)
 			err = "could not initialize GclCacheMutex";
 			goto fail0;
 		}
+		ep_thr_mutex_setorder(&GclCacheMutex, GDP_MUTEX_LORDER_LEAF);
 
 		OpenGCLCache = ep_hash_new("OpenGCLCache", NULL, 0);
 		if (OpenGCLCache == NULL)

@@ -47,7 +47,7 @@
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.datum", "GDP datum processing");
 
 static gdp_datum_t		*DatumFreeList;
-static EP_THR_MUTEX		DatumFreeListMutex EP_THR_MUTEX_INITIALIZER;
+static EP_THR_MUTEX		DatumFreeListMutex EP_THR_MUTEX_INITIALIZER2(GDP_MUTEX_LORDER_LEAF);
 
 
 /*

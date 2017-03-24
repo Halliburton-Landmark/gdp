@@ -672,7 +672,7 @@ EP_STAT			_gdp_evloop_init(void);		// start event loop
 #define GDP_MUTEX_LORDER_CHAN		4
 #define GDP_MUTEX_LORDER_DATUM		6
 #define GDP_MUTEX_LORDER_GCL		8
-#define GDP_MUTEX_LORDER_SHORT		24	// freelists, etc.
+#define GDP_MUTEX_LORDER_LEAF		31	// freelists, etc.
 
 
 /*
