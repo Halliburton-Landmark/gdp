@@ -154,6 +154,7 @@ _gdp_req_new(int cmd,
 		// nothing on free list; allocate another
 		req = ep_mem_zalloc(sizeof *req);
 		ep_thr_mutex_init(&req->mutex, EP_THR_MUTEX_DEFAULT);
+		ep_thr_mutex_setorder(&req->mutex, GDP_MUTEX_LORDER_REQ);
 		ep_thr_cond_init(&req->cond);
 		STAILQ_INIT(&req->events);
 	}

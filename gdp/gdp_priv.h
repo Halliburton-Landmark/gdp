@@ -664,6 +664,18 @@ EP_STAT			_gdp_evloop_init(void);		// start event loop
 
 
 /*
+**  Orders for lock acquisition
+**		Lower numbered locks should be acquired before higher numbered locks.
+*/
+
+#define GDP_MUTEX_LORDER_REQ		2
+#define GDP_MUTEX_LORDER_CHAN		4
+#define GDP_MUTEX_LORDER_DATUM		6
+#define GDP_MUTEX_LORDER_GCL		8
+#define GDP_MUTEX_LORDER_SHORT		24	// freelists, etc.
+
+
+/*
 **  Convenience macros
 */
 

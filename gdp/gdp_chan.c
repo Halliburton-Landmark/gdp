@@ -192,6 +192,7 @@ _gdp_chan_open(const char *gdp_addr,
 		chan = ep_mem_zalloc(sizeof *chan);
 		LIST_INIT(&chan->reqs);
 		ep_thr_mutex_init(&chan->mutex, EP_THR_MUTEX_DEFAULT);
+		ep_thr_mutex_setorder(&chan->mutex, GDP_MUTEX_LORDER_CHAN);
 		ep_thr_cond_init(&chan->cond);
 		chan->state = GDP_CHAN_CONNECTING;
 		chan->process = process;

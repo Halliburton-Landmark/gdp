@@ -88,6 +88,7 @@ _gdp_gcl_newhandle(gdp_name_t gcl_name, gdp_gcl_t **pgcl)
 		goto fail1;
 
 	ep_thr_mutex_init(&gcl->mutex, EP_THR_MUTEX_DEFAULT);
+	ep_thr_mutex_setorder(&gcl->mutex, GDP_MUTEX_LORDER_GCL);
 	LIST_INIT(&gcl->reqs);
 	gcl->refcnt = 1;
 

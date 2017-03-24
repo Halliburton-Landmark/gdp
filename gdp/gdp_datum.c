@@ -73,6 +73,7 @@ gdp_datum_new(void)
 		// nothing on the free list; allocate anew
 		datum = ep_mem_zalloc(sizeof *datum);
 		ep_thr_mutex_init(&datum->mutex, EP_THR_MUTEX_DEFAULT);
+		ep_thr_mutex_setorder(&datum->mutex, GDP_MUTEX_LORDER_DATUM);
 	}
 	datum->next = NULL;
 
