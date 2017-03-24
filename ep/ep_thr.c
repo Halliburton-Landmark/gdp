@@ -58,7 +58,7 @@ struct lorder
 
 #  define GETMTX(m)							\
 	pthread_mutex_t *pmtx;						\
-	int mtxorder;							\
+	int mtxorder EP_ATTR_UNUSED;					\
 	if (m->magic != _EP_THR_MUTEX_MAGIC)				\
 	{								\
 	    ep_assert_print(file, line,					\
