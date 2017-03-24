@@ -33,6 +33,7 @@
 #include <ep_thr.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/errno.h>
 
 #if EP_OSCF_USE_PTHREADS
@@ -375,8 +376,8 @@ _ep_thr_mutex_lock(EP_THR_MUTEX *mtx,
 	{
 		uint64_t mask;
 
-		pthread_once(&lorder_once, lorder_init);
 		mask = ~((1 << (mtxorder - 1)) - 1) << 1;
+		pthread_once(&lorder_once, lorder_init);
 		lorder = pthread_getspecific(lorder_key);
 		if (lorder != NULL)
 		{
@@ -394,7 +395,7 @@ _ep_thr_mutex_lock(EP_THR_MUTEX *mtx,
 	if ((err = pthread_mutex_lock(pmtx)) != 0)
 		diagnose_thr_err(err, "mutex_lock", file, line, name, mtx);
 #if EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
-	if (mtxorder > 0 && lorder != NULL)
+	if (err == 0 && mtxorder > 0 && lorder != NULL)
 		lorder->lorder_used |= 1 << (mtxorder - 1);
 #endif
 	CHECKMTX(mtx, "lock <<<");
@@ -425,6 +426,13 @@ _ep_thr_mutex_trylock(EP_THR_MUTEX *mtx,
 	// EBUSY => mutex was already locked
 	if ((err = pthread_mutex_trylock(pmtx)) != 0 && err != EBUSY)
 		diagnose_thr_err(err, "mutex_trylock", file, line, name, mtx);
+#if EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
+	struct lorder *lorder;
+	pthread_once(&lorder_once, lorder_init);
+	lorder = pthread_getspecific(lorder_key);
+	if (err == 0 && mtxorder > 0 && lorder != NULL)
+		lorder->lorder_used |= 1 << (mtxorder - 1);
+#endif
 	CHECKMTX(mtx, "trylock <<<");
 	return err;
 }
@@ -449,7 +457,7 @@ _ep_thr_mutex_unlock(EP_THR_MUTEX *mtx,
 	if ((err = pthread_mutex_unlock(pmtx)) != 0)
 		diagnose_thr_err(err, "mutex_unlock", file, line, name, mtx);
 #if EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
-	if (mtxorder > 0)
+	if (err == 0 && mtxorder > 0)
 	{
 		pthread_once(&lorder_once, lorder_init);
 		struct lorder *lorder = pthread_getspecific(lorder_key);
