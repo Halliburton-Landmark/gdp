@@ -189,27 +189,33 @@
 /*
 ** C Compiler configuration variables
 **
-**	EP_CCCF_USE_ATTRIBUTES
-**		Use __attribute__ (at all; if 0, overrides specific attrs)
+**	EP_CCCF_USE_ATTR_NORETURN
+**		Use __attribute__((noreturn))
 **	EP_CCCF_USE_ATTR_PACKED
 **		Use __attribute__((packed))
+**	EP_CCCF_USE_ATTR_UNUSED
+**		Use __attribute__((unused))
 */
 
-#ifndef EP_CCCF_USE_ATTRIBUTES
-# define EP_CCCF_USE_ATTRIBUTES		1	// use __attribute__ decls
-#endif
+# define EP_CCCF_USE_ATTR_NORETURN	1	// use __attribute__((noreturn))
+# define EP_CCCF_USE_ATTR_PACKED	1	// use __attribute__((packed))
+# define EP_CCCF_USE_ATTR_UNUSED	1	// use __attribute__((unused))
 
 // wrap GCC attributes in macros to make code easier to port to non-gcc
-#if EP_CCCF_USE_ATTRIBUTES
-# define EP_ATTR(_attr)		__attribute__((_attr))
+#if EP_CCCF_USE_ATTR_NORETURN
+# define EP_ATTR_NORETURN	__attribute__((noreturn))
 #else
-# define EP_ATTR(_attr)
+# define EP_ATTR_NORETURN
 #endif
-#define EP_ATTR_NORETURN	EP_ATTR(noreturn)
 #if EP_CCCF_USE_ATTR_PACKED
-# define EP_ATTR_PACKED		EP_ATTR(packed)
+# define EP_ATTR_PACKED		__attribute__((packed))
 #else
 # define EP_ATTR_PACKED
+#endif
+#if EP_CCCF_USE_ATTR_UNUSED
+#  define EP_ATTR_UNUSED	__attribute__((unused))
+#else
+#  define EP_ATTR_UNUSED
 #endif
 
 #endif // _EP_CONF_H_
