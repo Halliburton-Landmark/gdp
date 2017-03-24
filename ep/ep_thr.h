@@ -75,12 +75,28 @@
 **	stdio libraries deal with the problem.  Problem is, that
 **	wouldn't fix the problem (because of local variables), so I
 **	went for simplicity.
+**
+**  EP_OPT_EXTENDED_MUTEX_CHECK adds special mutex debugging.  It can
+**	slow things down, so it doesn't default on.  It is a bitmap:
+**
+**	0x01	Do rationality checks on locks, notably checking for
+**		self-locking non-recursive mutexes, unlocking a mutex
+**		we don't own, etc.  It also adds assertions that
+**		mutexes must be locked (by me) or unlocked.
+**		This peeks into the pthread mutex implementation, and
+**		hence only runs on Linux systems using NPTL.
+**	0x02	Add primitive lock ordering checks.  This changes the
+**		ABI!!!  As a result, it should not be used in production.
 */
 
-#if !defined(EP_OPT_EXTENDED_MUTEX_CHECK) && defined(__linux__)	//XXX DEBUG TEMP
-# define EP_OPT_EXTENDED_MUTEX_LOCK	1			//XXX DEBUG TEMP
+#ifndef EP_OPT_EXTENDED_MUTEX_CHECK				//XXX DEBUG TEMP
+# ifdef __linux							//XXX DEBUG TEMP
+#  define EP_OPT_EXTENDED_MUTEX_LOCK	0x03			//XXX DEBUG TEMP
+# else								//XXX DEBUG TEMP
+#  define EP_OPT_EXTERNDED_MUTEX_LOCK	0x02			//XXX DEBUG TEMP
+# endif								//XXX DEBUG TEMP
 #endif								//XXX DEBUG TEMP
-#if EP_OPT_EXTENDED_MUTEX_CHECK && !defined(__linux__)
+#if (EP_OPT_EXTENDED_MUTEX_CHECK & 0x11) && !defined(__linux__)
 # warning EP_OPT_EXTENDED_MUTEX_CHECK only works on Linux
 # undef EP_OPT_EXTENDED_MUTEX_CHECK
 #endif
@@ -95,30 +111,43 @@ extern void	_ep_thr_yield(const char *file, int line);
 				__FILE__, __LINE__)
 #define		ep_thr_yield()			_ep_thr_yield(__FILE__, __LINE__)
 
-#if EP_OPT_EXTENDED_MUTEX_CHECK_NEW
-struct pthread_mutex
+#if EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
+#  define _EP_THR_MUTEX_MAGIC	0x454d5458	// EMTX
+
+struct ep_mutex
 {
-	pthread_mutex_t		mutex;		// the actual mutex
-	pthread_mutex_t		guard;		// guard for this mutex
-	EP_THR			tid;		// owning thread
+	uint32_t		magic;		// _EP_THR_MUTEX_MAGIC
+	pthread_mutex_t		pthr_mtx;	// the actual mutex
+	uint8_t			order;		// lock order indicator
 };
-typedef struct pthread_mutex	EP_THR_MUTEX;
-#  define	EP_THR_MUTX_INITIALIZER		=			\
+typedef struct ep_mutex		EP_THR_MUTEX;
+#  define	EP_THR_MUTEX_INITIALIZER	=			\
 			{						\
+				_EP_THR_MUTEX_MAGIC,			\
 				PTHREAD_MUTEX_INITIALIZER,		\
-				PTHREAD_MUTEX_INITIALIZER,		\
-				0					\
+				0,					\
 			}
+
+#  define ep_thr_mutex_setorder(mtx, order)				\
+		_ep_thr_mutex_setorder(mtx, order,			\
+				__FILE__, __LINE__, #mtx)
+
+extern void	_ep_thr_mutex_setorder(EP_THR_MUTEX *mtx, int order,
+				const char *file, int line, const char *name);
+
 #else
 typedef pthread_mutex_t		EP_THR_MUTEX;
 #  define	EP_THR_MUTEX_INITIALIZER	= PTHREAD_MUTEX_INITIALIZER
-#endif
-extern int	_ep_thr_mutex_init(EP_THR_MUTEX *mtx, int type,
-				const char *file, int line, const char *name);
+#  define	ep_thr_mutex_setorder(mtx, order)
+#endif // EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
+
 #define		EP_THR_MUTEX_NORMAL		PTHREAD_MUTEX_NORMAL
 #define		EP_THR_MUTEX_ERRORCHECK		PTHREAD_MUTEX_ERRORCHECK
 #define		EP_THR_MUTEX_RECURSIVE		PTHREAD_MUTEX_RECURSIVE
 #define		EP_THR_MUTEX_DEFAULT		PTHREAD_MUTEX_DEFAULT
+
+extern int	_ep_thr_mutex_init(EP_THR_MUTEX *mtx, int type,
+				const char *file, int line, const char *name);
 extern int	_ep_thr_mutex_destroy(EP_THR_MUTEX *mtx,
 				const char *file, int line, const char *name);
 extern int	_ep_thr_mutex_lock(EP_THR_MUTEX *mtx,
