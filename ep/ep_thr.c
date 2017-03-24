@@ -384,10 +384,12 @@ _ep_thr_mutex_lock(EP_THR_MUTEX *mtx,
 			int llu = ffsl(lorder->lorder_used & mask);
 			if (llu > mtxorder)
 			{
-				ep_assert_print(file, line,
+				ep_dbg_cprintf(Dbg, 1,
 					"_ep_thr_mutex_lock: mutex %p (%s) has"
-					" order %d,  but %d is already locked",
-					mtx, name, mtxorder, llu);
+					" order %d,  but %d is already locked"
+					" (%s:%d)\n",
+					mtx, name, mtxorder, llu,
+					file, line);
 			}
 		}
 	}
