@@ -130,9 +130,6 @@
 # endif // __APPLE__
 
 #ifdef __linux__
-# ifndef _GNU_SOURCE
-#  define _GNU_SOURCE			1	// necessary for some decls
-# endif
 # define EP_TYPE_PRINTFLIKE(a, b)	__attribute__((format(printf, a, b)))
 # define EP_OSCF_HAS_STRLCPY		0	// no strlcpy on linux
 # ifndef EP_OSCF_USE_GETDATE

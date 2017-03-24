@@ -71,6 +71,12 @@ struct lorder
 	    pmtx = (pthread_mutex_t *) &m->pthr_mtx;			\
 	    mtxorder = m->order;					\
 	}
+
+// This extern is needed because GNU insists that _GNU_SOURCE be defined
+// to get the declaration.  But that pulls in a non-Posix strerror_r.
+// Damned if you do, damned if you don't.
+extern int	ffsl(long);
+
 #else
 #  define GETMTX(m)							\
 	pthread_mutex_t *pmtx = m;
