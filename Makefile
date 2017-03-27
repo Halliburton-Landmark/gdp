@@ -127,6 +127,10 @@ tags: .FORCE
 
 .FORCE:
 
+# Install Python interface in system paths. Optional
+install-python: install-client
+	(cd lang/python; $(MAKE) install) 
+
 
 # Build the Java interface to the GDP. Optional for the GDP per se.
 all_Java:
