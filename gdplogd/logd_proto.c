@@ -985,10 +985,8 @@ cmd_subscribe(gdp_req_t *req)
 		{
 			IF_LIST_CHECK_OK(&req->gcl->reqs, req, gcllist, gdp_req_t)
 			{
-				//XXX _gdp_gcl_lock(req->gcl);
 				LIST_INSERT_HEAD(&req->gcl->reqs, req, gcllist);
 				req->flags |= GDP_REQ_ON_GCL_LIST;
-				//XXX _gdp_gcl_unlock(req->gcl);
 			}
 			else
 			{
@@ -1100,7 +1098,6 @@ cmd_getmetadata(gdp_req_t *req)
 	req->rpdu->cmd = GDP_ACK_CONTENT;
 
 	// should have no input data; ignore anything there
-	ep_thr_mutex_lock(&req->rpdu->datum->mutex);
 	flush_input_data(req, "cmd_getmetadata");
 
 	estat = get_open_handle(req, GDP_MODE_RO);
@@ -1116,13 +1113,13 @@ cmd_getmetadata(gdp_req_t *req)
 	EP_STAT_CHECK(estat, goto fail1);
 
 	// serialize it to the client
+	ep_thr_mutex_lock(&req->rpdu->datum->mutex);
 	_gdp_gclmd_serialize(gmd, req->rpdu->datum->dbuf);
 	ep_thr_mutex_unlock(&req->rpdu->datum->mutex);
 
 fail1:
 	_gdp_gcl_decref(&req->gcl);
 fail0:
-	ep_thr_mutex_unlock(&req->rpdu->datum->mutex);
 	return estat;
 }
 
