@@ -226,15 +226,15 @@ sub_reclaim_resources(gdp_chan_t *chan)
 		// if this req is already locked it must be current
 		istat = ep_thr_mutex_trylock(&req->mutex);
 		nextreq = LIST_NEXT(req, chanlist);			//XXX race if istat != 0?
-		if (ep_dbg_test(Dbg, 21))
-		{
-			ep_dbg_printf("sub_reclaim_resources: req already locked:\n    ");
-			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
-		}
 		EP_ASSERT_ELSE(req != nextreq, break);
 		if (istat != 0)
 		{
 			// already locked
+			if (ep_dbg_test(Dbg, 21))
+			{
+				ep_dbg_printf("sub_reclaim_resources: req already locked:\n    ");
+				_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+			}
 			continue;
 		}
 
