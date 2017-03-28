@@ -444,11 +444,9 @@ _gdp_req_send(gdp_req_t *req)
 	{
 		// link the request to the GCL
 		ep_dbg_cprintf(Dbg, 49, "_gdp_req_send(%p) gcl=%p\n", req, gcl);
-		//XXX _gdp_gcl_lock(gcl);
 		EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
 		LIST_INSERT_HEAD(&gcl->reqs, req, gcllist);
 		req->flags |= GDP_REQ_ON_GCL_LIST;
-		//XXX _gdp_gcl_unlock(gcl);
 
 		// register this handle so we can process the results
 		//		(it's likely that it's already in the cache)
@@ -496,10 +494,8 @@ _gdp_req_unsend(gdp_req_t *req)
 	else
 	{
 		EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
-		//XXX _gdp_gcl_lock(gcl);
 		LIST_REMOVE(req, gcllist);
 		req->flags &= ~GDP_REQ_ON_GCL_LIST;
-		//XXX _gdp_gcl_unlock(gcl);
 	}
 
 	return EP_STAT_OK;
