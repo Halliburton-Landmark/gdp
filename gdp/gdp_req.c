@@ -282,14 +282,7 @@ _gdp_req_free(gdp_req_t **reqp)
 		LIST_REMOVE(req, gcllist);
 		req->flags &= ~GDP_REQ_ON_GCL_LIST;
 	}
-	else if (req->gcl != NULL)
-	{
-		ep_dbg_cprintf(Dbg, 1,
-				"_gdp_req_free: req->gcl != NULL but req not on GCL list\n"
-				"    (req = %p, req->gcl = %p)\n",
-				req, req->gcl);
-		req->gcl = NULL;
-	}
+	req->gcl = NULL;
 
 
 	// remove any pending events from the request
@@ -353,6 +346,7 @@ _gdp_req_freeall(struct req_head *reqlist, void (*shutdownfunc)(gdp_req_t *))
 			// couldn't lock the request, so skip it
 			ep_log(estat, "_gdp_req_freeall: couldn't acquire req lock");
 			LIST_REMOVE(req, gcllist);
+			req->flags &= ~GDP_REQ_ON_GCL_LIST;
 			rstat = estat;
 		}
 		else
@@ -488,17 +482,14 @@ _gdp_req_unsend(gdp_req_t *req)
 				req);
 		return GDP_STAT_NULL_GCL;
 	}
-	else if (!EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
+	if (!EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
 	{
 		ep_dbg_cprintf(Dbg, 4, "_gdp_req_unsend: req %p not on GCL list\n",
 				req);
 	}
-	else
-	{
-		EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
-		LIST_REMOVE(req, gcllist);
-		req->flags &= ~GDP_REQ_ON_GCL_LIST;
-	}
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
+	LIST_REMOVE(req, gcllist);
+	req->flags &= ~GDP_REQ_ON_GCL_LIST;
 
 	return EP_STAT_OK;
 }
