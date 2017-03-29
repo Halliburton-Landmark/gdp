@@ -49,7 +49,8 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.buf", "GDP buffer processing");
 				{													\
 					char ebuf[40];									\
 					strerror_r(errno, ebuf, sizeof ebuf);			\
-					ep_dbg_printf("gdp_buf_%s: %s\n", cmd, ebuf);	\
+					ep_dbg_printf("gdp_buf_%s: stat %d: %s\n",		\
+							cmd, istat, ebuf);						\
 				}													\
 			} while (false)
 
@@ -142,7 +143,7 @@ size_t
 gdp_buf_peek(gdp_buf_t *buf, void *out, size_t sz)
 {
 	ssize_t s = evbuffer_copyout(buf, out, sz);
-	DIAGNOSE("peek", s);
+	DIAGNOSE("peek", (int) s);
 	if (s < 0)
 		return 0;
 	return s;
@@ -241,6 +242,8 @@ _gdp_buf_raw_copy(gdp_buf_t *obuf, gdp_buf_t *ibuf)
 	struct evbuffer_ptr bufpos;
 
 	evbuffer_ptr_set(ibuf, &bufpos, 0, EVBUFFER_PTR_SET);
+	if (nleft == 0)
+		istat = 0;
 	while (nleft > 0)
 	{
 		char xbuf[4096];
