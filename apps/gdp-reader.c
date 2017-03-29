@@ -389,8 +389,8 @@ do_async_read(gdp_gcl_t *gcl,
 		numrecs = gdp_gcl_getnrecs(gcl);
 	if (firstrec < 0)
 	{
-		firstrec += numrecs;
-		numrecs -= firstrec;
+		firstrec += numrecs + 1;
+		numrecs -= firstrec - 1;
 	}
 
 	// issue the multiread commands without reading results
@@ -398,7 +398,6 @@ do_async_read(gdp_gcl_t *gcl,
 	int n = 0;
 	while (EP_STAT_ISOK(estat) && n++ < numrecs)
 	{
-		// issue multiread of size 1 for this record
 		estat = gdp_gcl_read_async(gcl, recno, cbfunc, NULL);
 		if (!EP_STAT_ISOK(estat))
 		{
