@@ -146,6 +146,8 @@ dump_state(int plev)
 	ep_app_dumpfds(stderr);
 	fprintf(stderr, "\n<<< Stack backtrace >>>\n");
 	ep_dbg_backtrace();
+	fprintf(stderr, "\n<<< Statistics >>>\n");
+	_gdp_req_pr_stats(stderr);
 	funlockfile(stderr);
 }
 

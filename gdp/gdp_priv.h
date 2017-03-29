@@ -579,6 +579,9 @@ void			_gdp_req_dump(				// print (debug) request
 						int detail,
 						int indent);
 
+void			_gdp_req_pr_stats(			// print (debug) statistics
+						FILE *fp);
+
 void			_gdp_chan_drain_input(		// drain all input from channel
 						gdp_chan_t *chan);
 

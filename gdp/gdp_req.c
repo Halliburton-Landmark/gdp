@@ -43,10 +43,10 @@
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.req", "GDP request processing");
 
-// unused request structures
 static struct req_head	ReqFreeList = LIST_HEAD_INITIALIZER(ReqFreeList);
 static EP_THR_MUTEX		ReqFreeListMutex
 							EP_THR_MUTEX_INITIALIZER2(GDP_MUTEX_LORDER_LEAF);
+static int				NReqsAllocated = 0;
 
 static const char *ReqStates[] =
 {
@@ -132,8 +132,9 @@ _gdp_req_new(int cmd,
 	if (chan == NULL)
 		chan = _GdpChannel;
 
-	// get memory, off free list if possible
+	// get memory, off free list if possible (and do stats now)
 	ep_thr_mutex_lock(&ReqFreeListMutex);
+	NReqsAllocated++;
 	req = LIST_FIRST(&ReqFreeList);
 	if (req != NULL)
 		LIST_REMOVE(req, gcllist);
@@ -318,6 +319,7 @@ _gdp_req_free(gdp_req_t **reqp)
 	// add the empty request to the free list
 	ep_thr_mutex_lock(&ReqFreeListMutex);
 	LIST_INSERT_HEAD(&ReqFreeList, req, gcllist);
+	NReqsAllocated--;
 	ep_thr_mutex_unlock(&ReqFreeListMutex);
 
 	_gdp_req_unlock(req);
@@ -641,6 +643,17 @@ _gdp_req_dump(const gdp_req_t *req, FILE *fp, int detail, int indent)
 		_gdp_pdu_dump(req->rpdu, fp);
 	}
 	funlockfile(fp);
+}
+
+
+/*
+**  Print statistics (for debugging)
+*/
+
+void
+_gdp_req_pr_stats(FILE *fp)
+{
+	fprintf(fp, "Reqs Allocated: %d\n", NReqsAllocated);
 }
 
 
