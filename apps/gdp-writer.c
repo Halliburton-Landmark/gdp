@@ -367,6 +367,13 @@ fail1:
 		gdp_gcl_open_info_free(info);
 
 fail0:
+	if (ep_dbg_test(Dbg, 10))
+	{
+		// cheat here and use internal interface
+		extern void _gdp_req_pr_stats(FILE *);
+		_gdp_req_pr_stats(ep_dbg_getfile());
+	}
+
 	// OK status can have values; hide that from the user
 	if (EP_STAT_ISOK(estat))
 		estat = EP_STAT_OK;
