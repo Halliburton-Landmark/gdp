@@ -423,6 +423,7 @@ gdp_gcl_open(gdp_name_t name,
 		}
 		else
 		{
+			ep_thr_mutex_unlock(&gcl->mutex);
 			ep_thr_mutex_destroy(&gcl->mutex);
 			ep_mem_free(gcl);
 		}

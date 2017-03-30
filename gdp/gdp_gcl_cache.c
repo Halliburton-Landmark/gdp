@@ -273,8 +273,6 @@ done:
 void
 _gdp_gcl_cache_drop(gdp_gcl_t *gcl)
 {
-	bool gcl_was_locked = false;
-
 	EP_ASSERT_ELSE(gcl != NULL, return);
 	if (EP_ASSERT_TEST(GDP_GCL_ISGOOD(gcl)))
 	{
@@ -282,14 +280,12 @@ _gdp_gcl_cache_drop(gdp_gcl_t *gcl)
 		EP_ASSERT_ELSE(gdp_name_is_valid(gcl->name), return);
 	}
 
-	// make sure it is locked
-	if (ep_thr_mutex_trylock(&gcl->mutex) != 0)
-		gcl_was_locked = true;
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
 
 	if (!EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
 	{
 		ep_dbg_cprintf(Dbg, 8, "_gdp_gcl_cache_drop(%p): uncached\n", gcl);
-		goto fail0;
+		return;
 	}
 
 	// error if we're dropping something that's referenced from the cache
@@ -310,9 +306,6 @@ _gdp_gcl_cache_drop(gdp_gcl_t *gcl)
 
 	ep_dbg_cprintf(Dbg, 40, "_gdp_gcl_cache_drop: %s => %p\n",
 			gcl->pname, gcl);
-fail0:
-	if (!gcl_was_locked)
-		ep_thr_mutex_unlock(&gcl->mutex);
 }
 
 
@@ -461,11 +454,11 @@ _gdp_gcl_cache_shutdown(void (*shutdownfunc)(gdp_req_t *))
 
 	ep_dbg_cprintf(Dbg, 30, "\n_gdp_gcl_shutdown\n");
 
-	// don't bother with mutexes --- we need to shut down now!
-
 	// free all GCLs and all reqs linked to them
+	// can give locking errors in some circumstances
 	for (g1 = LIST_FIRST(&GclsByUse); g1 != NULL; g1 = g2)
 	{
+		ep_thr_mutex_trylock(&g1->mutex);
 		g2 = LIST_NEXT(g1, ulist);
 		LIST_REMOVE(g1, ulist);
 		_gdp_req_freeall(&g1->reqs, shutdownfunc);

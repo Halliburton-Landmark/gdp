@@ -131,12 +131,7 @@ _gdp_gcl_freehandle(gdp_gcl_t *gcl)
 	// this is a forced free, so ignore existing refcnts, etc.
 	gcl->refcnt = 0;
 
-	// make sure gcl is locked
-	{
-		int i = ep_thr_mutex_trylock(&gcl->mutex);
-		if (i != 0 && ep_dbg_test(Dbg, 28))
-			ep_dbg_printf("    ep_tyr_mutex_trylock => %d\n", i);
-	}
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
 	gcl->flags |= GCLF_DROPPING | GCLF_ISLOCKED;
 
 	// drop it from the name -> handle cache
