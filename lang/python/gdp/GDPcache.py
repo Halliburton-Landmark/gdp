@@ -26,8 +26,6 @@
 #   OR MODIFICATIONS.                                                           
 # ----- END LICENSE BLOCK -----      
 
-import sys
-sys.path.append("../")
 import gdp
 import time
 

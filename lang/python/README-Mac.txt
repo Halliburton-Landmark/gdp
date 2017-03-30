@@ -1,4 +1,4 @@
-To use the Python/GDP interface under Mac OS X:
+To use the testing suite based on Python/GDP interface under Mac OS X:
 
 1. Install Mac Ports: https://www.macports.org/
 2. Run ../../adm/gdp-setup.sh to install the necesary packages
