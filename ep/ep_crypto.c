@@ -37,7 +37,7 @@
 #include <openssl/err.h>
 
 
-//static EP_DBG	Dbg = EP_DBG_INIT("libep.crypto", "crypto support");
+static EP_DBG	Dbg = EP_DBG_INIT("libep.crypto", "crypto support");
 
 /*
 **  LIBEP CRYPTOGRAPHIC SUPPORT
@@ -73,9 +73,10 @@ ep_crypto_init(uint32_t flags)
 void *
 _ep_crypto_error(const char *msg, ...)
 {
-	va_list ap;
-	FILE *fp = ep_dbg_getfile();
 	static bool initialized = false;
+
+	if (!ep_dbg_test(Dbg, 9))
+		return NULL;
 
 	// load openssl error strings if not already done
 	if (!initialized)
@@ -84,12 +85,15 @@ _ep_crypto_error(const char *msg, ...)
 		initialized = true;
 	}
 
-	//XXX should be on some flag (don't print unconditionally)
+	FILE *fp = ep_dbg_getfile();
+	va_list ap;
 	va_start(ap, msg);
 	ep_dbg_printf("EP Crypto Error: ");
 	vfprintf(fp, msg, ap);
 	ep_dbg_printf("\n");
 	ERR_print_errors_fp(fp);
+	if (ep_dbg_test(Dbg, 31))
+		ep_dbg_backtrace();
 
 	return NULL;
 }
