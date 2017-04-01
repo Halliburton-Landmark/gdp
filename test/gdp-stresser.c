@@ -369,7 +369,7 @@ read_batch_synchronous(batch_t *bi)
 EP_STAT
 read_batch_asynchronous(batch_t *bi)
 {
-	EP_STAT estat;
+	EP_STAT estat = EP_STAT_OK;
 	logctl_t *lc = bi->lc;
 	int n_read = 0;
 
@@ -1054,7 +1054,7 @@ main(int argc, char **argv)
 	**		Do readers first so subscribers will be ready.
 	*/
 
-	EP_THR *r_threads;
+	EP_THR *r_threads = NULL;
 	if (n_readers > 0)
 	{
 		phase = "reader batch run";
@@ -1065,7 +1065,7 @@ main(int argc, char **argv)
 		EP_STAT_CHECK(estat, goto fail0);
 	}
 
-	EP_THR *w_threads;
+	EP_THR *w_threads = NULL;
 	if (n_writers > 0)
 	{
 		phase = "writer batch run";
@@ -1082,10 +1082,9 @@ main(int argc, char **argv)
 	int i;
 	for (i = 0; i < n_writers; i++)
 	{
-		void *vstat;
 		EP_STAT tstat = EP_STAT_OK;
 		int istat;
-		istat = pthread_join(w_threads[i], &vstat);
+		istat = pthread_join(w_threads[i], (void **) &tstat);
 		if (istat != 0)
 		{
 			tstat = ep_stat_from_errno(istat);
@@ -1093,7 +1092,6 @@ main(int argc, char **argv)
 		}
 		else
 		{
-			tstat = EP_STAT_FROM_INT((uint32_t) vstat);
 //			if (verbose)
 //				ep_app_message(tstat, "batch %s-%d", w_bi->btype, i);
 		}
@@ -1102,10 +1100,9 @@ main(int argc, char **argv)
 	}
 	for (i = 0; i < n_readers; i++)
 	{
-		void *vstat;
 		EP_STAT tstat = EP_STAT_OK;
 		int istat;
-		istat = pthread_join(r_threads[i], &vstat);
+		istat = pthread_join(r_threads[i], (void **) &tstat);
 		if (istat != 0)
 		{
 			tstat = ep_stat_from_errno(istat);
@@ -1115,7 +1112,6 @@ main(int argc, char **argv)
 		}
 		else
 		{
-			tstat = EP_STAT_FROM_INT((uint32_t) vstat);
 //			if (verbose)
 //				ep_app_message(tstat, "batch %s-%d", r_bi->btype, i);
 		}
