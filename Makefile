@@ -179,7 +179,7 @@ READMES_HTML= \
 	README-developers.html \
 
 PANDOC=		pandoc
-PANFLAGS=	-sS
+PANFLAGS=	-sS -c doc/gdpdoc.css
 
 .SUFFIXES: .md .html
 
