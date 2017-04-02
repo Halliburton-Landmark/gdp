@@ -191,6 +191,7 @@ admin_post_stats(
 
 	va_start(av, msgid);
 	admin_post_statsv(mask, msgid, av);
+	writeToMonitorGCL(mask, msgid, av); //web-visualization output
 	va_end(av);
 }
 
@@ -348,3 +349,122 @@ admin_probe(int fd, short what, void *ctx)
 {
 	ep_thr_pool_run(admin_probe_thread, ctx);
 }
+
+/*
+** GDP Visualization and Monitoring Application 
+** 	Write visualization statistics to a GCL (a GDP log file, not a log file of the system)
+** 	Should be called whenever data is written to system log file (admin_post_stats)
+*/
+
+void writeToMonitorGCL(uint32_t mask, const char *msgid, va_list av)
+{
+        string temp1 = "{\"GDP_IDENTIFIER\": \"" + GDP_IDENTIFIER + "\", \"ACTION\": \"" + ACTION + "\", \"GDP_ROUTER_IDENTIFIER\": \"" + GDP_ROUTER_IDENTIFIER + "\"}";
+        char * temp = const_cast<char *>(temp1.c_str());
+        printf("%s\n", temp);
+        gdp_name_t gcliname;
+        gdp_gcl_t* gcl;
+        gdp_gcl_open_info_t *info = gdp_gcl_open_info_new();
+
+        const char * name = "edu.berkeley.eecs.swarmlab.neil.2.25.D";
+        gdp_parse_name(name, gcliname);
+        EP_STAT ep = gdp_gcl_open(gcliname, GDP_MODE_RA, info, &gcl);
+        gdp_datum_t *datum = gdp_datum_new();
+        if (!EP_STAT_ISOK(ep)) {
+                printf("oh no - could not create datum");
+                free(datum);
+                return;
+        }
+        gdp_buf_write(gdp_datum_getbuf(datum), temp, strlen(temp));
+        ep = gdp_gcl_append(gcl, datum);
+        if (!EP_STAT_ISOK(ep)) {
+                printf("oh no - could not write to datum");
+        }
+        free(datum);
+
+
+int argno = 0;
+        bool firstparam = true;
+        int xlatemode = EP_XLATE_PLUS | EP_XLATE_NPRINT;
+        static const char *forbidchars = NULL;
+        FILE *fp;
+
+        if (!AdminInitialized)
+                admin_init();
+        if ((mask & AdminRunMask) == 0)
+                return;
+        if (forbidchars == NULL)
+                forbidchars = ep_adm_getstrparam("gdplogd.admin.forbidchars", "=;");
+
+        // check to see if we need to re-open the output
+        if (AdminStatsFileName != NULL)
+        {
+                struct stat st;
+
+                if (stat(AdminStatsFileName, &st) != 0 || st.st_ino != AdminStatsIno)
+                {
+                        reopen(AdminStatsFileName, &AdminStatsFp, &AdminStatsIno);
+                }
+        }
+        fp = AdminStatsFp;
+
+        // make sure this message is atomic
+        flockfile(fp);
+
+        // output an initial indicator to make this easy to find
+        fprintf(fp, "%s", AdminPrefix);
+
+        // add a timestamp and the message id
+        {
+                EP_TIME_SPEC now;
+                char tbuf[60];
+
+                ep_time_now(&now);
+                ep_time_format(&now, tbuf, sizeof tbuf, EP_TIME_FMT_NOFUZZ);
+                fprintf(fp, "%s ", tbuf);
+        }
+
+        (void) ep_xlate_out(msgid,
+                        strlen(msgid),
+                        fp,
+                        forbidchars,
+                        xlatemode);
+
+        // scan the arguments
+        for (;;)
+        {
+                const char *apn;
+                const char *apv;
+
+                argno++;
+                apn = va_arg(av, const char *);
+                if ((apv = va_arg(av, const char *)) == NULL)
+                        break;
+
+                if (!firstparam)
+                        putc(';', fp);
+                putc(' ', fp);
+                firstparam = false;
+
+                if (apn != NULL)
+                {
+                        (void) ep_xlate_out(apn,
+                                        strlen(apn),
+                                        fp,
+                                        forbidchars,
+                                        xlatemode);
+
+                        putc('=', fp);
+                }
+
+                (void) ep_xlate_out(apv,
+                                strlen(apv),
+                                fp,
+                                forbidchars,
+                                xlatemode);
+        }
+        putc('\n', fp);
+        fflush(fp);
+        funlockfile(fp);
+}
+
+
