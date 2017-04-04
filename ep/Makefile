@@ -89,6 +89,9 @@ OBJS_MOST=	\
 	ep_thr_pool.o \
 	ep_time.o \
 	ep_xlate.o \
+	ep_file.o \
+	ep_symkey_gen.o \
+	ep_util.o \
 
 OBJS=	\
 	${OBJS_MOST} \
@@ -154,6 +157,9 @@ HFILES=	\
 	ep_time.h \
 	ep_xlate.h \
 	ep_version.h \
+	ep_util.h \
+	ep_file.h \
+	ep_symkey_gen.h \
 
 HFILES_NOTYET=	\
 	ep_cdefs.h \

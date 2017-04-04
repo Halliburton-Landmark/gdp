@@ -118,6 +118,35 @@ ep_crypto_cipher_new(
 }
 
 
+
+// temporary testing.. hsmoon 
+bool
+ep_crypto_cipher_reinit(
+		EP_CRYPTO_CIPHER_CTX *ctx, 
+		uint32_t cipher,
+		uint8_t *key,
+		uint8_t *iv,
+		bool enc)
+{
+	const EVP_CIPHER *ciphertype;
+	ENGINE *engine = NULL;
+
+	ciphertype = evp_cipher_type(cipher);
+	if (ciphertype == NULL)
+		return false;
+
+	//EVP_CIPHER_CTX_init(&ctx->ctx);
+	if (EVP_CipherInit_ex(&ctx->ctx, ciphertype, engine, key, iv, enc) <= 0)
+	{
+		ep_crypto_cipher_free(ctx);
+		return false;
+	}
+
+	return true;
+}
+
+
+
 /*
 **  Free a cipher context
 **

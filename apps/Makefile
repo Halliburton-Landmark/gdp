@@ -33,6 +33,7 @@ BINALL=		gcl-create \
 		log-mirror \
 		gdp-reader \
 		gdp-writer \
+		create_symkey \
 		$(BINALL_ZC) \
 
 SBINALL_ZC= 	gdp-zcpublish

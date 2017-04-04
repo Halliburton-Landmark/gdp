@@ -329,6 +329,14 @@ EP_STAT			ep_crypto_cipher_final(
 				void *out,		// output buffer
 				size_t outlen);		// output buf size
 
+// temporary testing hsmoon 
+bool ep_crypto_cipher_reinit( 
+				EP_CRYPTO_CIPHER_CTX *cipher,
+				uint32_t ciphertype,	// mode + keytype & len
+				uint8_t *key,		// the key
+				uint8_t *iv,		// initialization vector
+				bool enc);		// true => encrypt
+
 
 /*
 **  Error Handling (private)

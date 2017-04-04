@@ -91,6 +91,8 @@ OBJS_MOST=	\
 	gdp_stat.o \
 	gdp_subscr.o \
 	gdp_util.o \
+	gdp_devicekey.o \
+	gdp_logdatakey.o \
 	$(OBJS_ZC)
 
 OBJS=	\
@@ -104,12 +106,14 @@ PUBHFILES=	\
 	gdp_version.h \
 	gdp_zc_client.h \
 	gdp_zc_server.h \
+	gdp_logdatakey.h \
 
 PRIVHFILES=	\
 	gdp_event.h \
 	gdp_gclmd.h \
 	gdp_pdu.h \
 	gdp_priv.h \
+	gdp_devicekey.h \
 
 HFILES=		${PUBHFILES} ${PRIVHFILES}
 
