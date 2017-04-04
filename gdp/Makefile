@@ -94,6 +94,7 @@ OBJS_MOST=	\
 	gdp_devicekey.o \
 	gdp_logdatakey.o \
 	$(OBJS_ZC)
+# hsmoon changed (add 2 line over OBJS_ZC line) 
 
 OBJS=	\
 	${OBJS_MOST} \
@@ -107,6 +108,7 @@ PUBHFILES=	\
 	gdp_zc_client.h \
 	gdp_zc_server.h \
 	gdp_logdatakey.h \
+# hsmoon changed (add last 1 line) 
 
 PRIVHFILES=	\
 	gdp_event.h \
@@ -114,6 +116,7 @@ PRIVHFILES=	\
 	gdp_pdu.h \
 	gdp_priv.h \
 	gdp_devicekey.h \
+# hsmoon changed (add last 1 line) 
 
 HFILES=		${PUBHFILES} ${PRIVHFILES}
 
