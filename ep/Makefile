@@ -92,6 +92,7 @@ OBJS_MOST=	\
 	ep_file.o \
 	ep_symkey_gen.o \
 	ep_util.o \
+# hsmoon changed  (add 3 last objects)
 
 OBJS=	\
 	${OBJS_MOST} \
@@ -160,6 +161,7 @@ HFILES=	\
 	ep_util.h \
 	ep_file.h \
 	ep_symkey_gen.h \
+# hsmoon changed  (add 3 last header files)
 
 HFILES_NOTYET=	\
 	ep_cdefs.h \
