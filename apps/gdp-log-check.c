@@ -64,7 +64,7 @@
 #include <sysexits.h>
 
 
-static EP_DBG	Dbg = EP_DBG_INIT("gdp-log-rebuild", "GDP Log Rebuilder");
+static EP_DBG	Dbg = EP_DBG_INIT("gdp-log-check", "GDP Log Rebuilder");
 
 #define LOGCHECK_MISSING_INDEX	EP_STAT_NEW(WARN, EP_REGISTRY_USER, 1, 1)
 
@@ -88,7 +88,7 @@ struct ctx
 	const char		*logpath;		// path to the log directory
 	const char		*logxname;		// external name of log
 	gcl_physinfo_t	*phys;			// physical manifestation
-	
+
 	// info about the record number index
 
 	// info about the timestamp index
@@ -184,6 +184,28 @@ fail0:
 */
 
 
+/*
+**  Since recnos are integers, we need to sort properly in the btree.
+*/
+
+int
+#if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
+recno_cmpf(DB *dbp, const DBT *a, const DBT *b)
+#else
+recno_cmpf(const DBT *a, const DBT *b)
+#endif
+{
+	gdp_recno_t ar[3], br[3];
+
+	memcpy(&ar, a->data, sizeof ar);
+	memcpy(&br, b->data, sizeof br);
+	if (ar[0] != br[0])
+		return ar[0] - br[0];
+	else if (ar[1] != br[1])
+		return ar[1] - br[1];
+	else
+		return ar[2] - br[2];
+}
 
 /*
 **  Initialization
@@ -198,9 +220,12 @@ recseq_init(struct ctx *ctx)
 	ctx->begin = ctx->recno = 0;
 
 	// create temporary database
-	estat = bdb_open(NULL, DB_CREATE, 0666, DB_BTREE, &ctx->recseqdb);
+	estat = bdb_open(NULL, DB_CREATE, 0600,
+					DB_BTREE, &recno_cmpf, &ctx->recseqdb);
 	if (!EP_STAT_ISOK(estat))
+	{
 		ep_app_message(estat, "Cannot open recno sequence temp db");
+	}
 	else
 	{
 		estat = bdb_cursor_open(ctx->recseqdb, &ctx->recseqdbc);
@@ -211,20 +236,38 @@ recseq_init(struct ctx *ctx)
 }
 
 
+/*
+**  Write a record to the temporary database
+**
+**		We use a btree so that we'll read a sorted list.  We could use
+**		insertion sort, although there's a risk that a very large log
+**		might not fit in memory.
+**
+**		The database key consists of the starting record number, the
+**		ending record number, and a sequence number.  The sequence number
+**		is only to make sure that duplicates are not deleted.
+*/
+
 EP_STAT
 recseq_db_write(DB *db, gdp_recno_t start, gdp_recno_t end)
 {
 	DBT key_thang, val_thang;
-	gdp_recno_t key[2];
+	gdp_recno_t key[3];
 	EP_STAT estat;
+	static gdp_recno_t seq = 0;		// not really a recno
 
+	ep_dbg_cprintf(Dbg, 91,
+				"recseq_db_write %" PRIgdp_recno " .. %" PRIgdp_recno "\n",
+				start, end);
+
+	memset(&key_thang, 0, sizeof key_thang);
 	key[0] = start;
 	key[1] = end;
+	key[2] = seq++;
 	key_thang.data = key;
-	key_thang.size = 2 * sizeof *key;
+	key_thang.size = 3 * sizeof *key;
 
-	val_thang.data = NULL;
-	val_thang.size = 0;
+	memset(&val_thang, 0, sizeof val_thang);
 
 	estat = bdb_put(db, &key_thang, &val_thang);
 	return estat;
@@ -243,7 +286,7 @@ recseq_db_getnext(DBC *dbc, gdp_recno_t *startp, gdp_recno_t *endp)
 	estat = bdb_cursor_next(dbc, &key_thang, &val_thang);
 	EP_STAT_CHECK(estat, return estat);
 
-	EP_ASSERT(key_thang.size == 2 * sizeof *key);
+	EP_ASSERT(key_thang.size == 3 * sizeof *key);
 	key = key_thang.data;
 	*startp = key[0];
 	*endp = key[1];
@@ -274,7 +317,6 @@ recseq_add_recno(gdp_recno_t recno, struct ctx *ctx)
 		}
 
 		// end of a sequential block: write to database
-//		printf("XXX db_write %lld .. %lld\n", ctx->begin, ctx->recno);
 		recseq_db_write(ctx->recseqdb, ctx->begin, ctx->recno);
 	}
 
@@ -286,7 +328,6 @@ recseq_add_recno(gdp_recno_t recno, struct ctx *ctx)
 void
 recseq_last_recno(struct ctx *ctx)
 {
-//	printf("XXX db_write %lld .. %lld\n", ctx->begin, ctx->recno);
 	recseq_db_write(ctx->recseqdb, ctx->begin, ctx->recno);
 }
 
@@ -325,6 +366,9 @@ recseq_last_recno(struct ctx *ctx)
 void
 recseq_output(gdp_recno_t start, gdp_recno_t end, int n)
 {
+	ep_dbg_cprintf(Dbg, 91,
+				"recseq_output: %" PRIgdp_recno " .. %" PRIgdp_recno ", %d\n",
+				start, end, n);
 	if (n == 0)
 		printf("Missing records   %" PRIgdp_recno " .. %" PRIgdp_recno "\n",
 			start, end);
@@ -342,37 +386,24 @@ struct recno_vect
 };
 
 
+static int
+recseq_sortfunc(const void *a, const void *b)
+{
+	gdp_recno_t arec = *(gdp_recno_t *) a;
+	gdp_recno_t brec = *(gdp_recno_t *) b;
+
+	if (arec < brec)
+		return -1;
+	else if (arec == brec)
+		return 0;
+	else
+		return 1;
+}
+
 void
 recseq_sort(struct recno_vect *rv)
 {
-	int i;
-
-//	printf("XXX pre-sort:");
-//	for (i = 0; i < rv->nused; i++)
-//		printf(" %lld", rv->ends[i]);
-//	printf("\n");
-
-	for (i = 0; i < rv->nused - 1; i++)
-	{
-		int j;
-
-		for (j = i + 1; j < rv->nused; j++)
-		{
-			gdp_recno_t t;
-
-			if (rv->ends[i] <= rv->ends[j])
-				continue;
-			t = rv->ends[i];
-			memmove(&rv->ends[i], &rv->ends[i + 1],
-					(j - i) * sizeof rv->ends[0]);
-			rv->ends[j] = t;
-		}
-	}
-
-//	printf("XXX post-sort:");
-//	for (i = 0; i < rv->nused; i++)
-//		printf(" %lld", rv->ends[i]);
-//	printf("\n");
+	qsort(rv->ends, rv->nused, sizeof rv->ends[0], recseq_sortfunc);
 }
 
 
@@ -388,18 +419,22 @@ recseq_flush(struct ctx *ctx,
 			int pos,
 			gdp_recno_t before)
 {
-	int j;
-
-//	printf("XXX recseq_flush stack:");
-//	for (j = 0; j < rv->nused; j++)
-//		printf(" %lld", rv->ends[j]);
-//	printf("\n");
+	int epos = pos + 1;
 
 	// see if there are other entries that overlap
-	for (j = pos + 1; j < rv->nused && rv->ends[pos] == rv->ends[j]; j++)
-		continue;
+	while (epos < rv->nused && rv->ends[pos] == rv->ends[epos])
+		epos++;
 
-//	printf("XXX recseq_flush: pos %d, j %d, nused %d\n", pos, j, rv->nused);
+	if (ep_dbg_test(Dbg, 91))
+	{
+		int i;
+		ep_dbg_printf("recseq_flush: pos %d, epos %d, nused %d, ends:",
+					pos, epos, rv->nused);
+		for (i = 0; i < rv->nused; i++)
+			ep_dbg_printf(" %" PRIgdp_recno "", rv->ends[i]);
+		ep_dbg_printf("\n");
+	}
+
 
 	// output starting recno, ending recno, and the number of dups
 	int n = rv->nused - pos;
@@ -410,7 +445,7 @@ recseq_flush(struct ctx *ctx,
 	}
 	recseq_output(rv->start, before, n);
 	rv->start = before + 1;
-	return j;
+	return epos;
 }
 
 
@@ -421,33 +456,55 @@ recseq_process(struct ctx *ctx)
 	gdp_recno_t start, end;
 	int i;
 
+	ep_dbg_cprintf(Dbg, 30, "recseq_process:\n");
+
 	while (EP_STAT_ISOK(recseq_db_getnext(ctx->recseqdbc, &start, &end)))
 	{
 		gdp_recno_t last_end = start;
 
+		// the list needs to be sorted
+		recseq_sort(rv);
+
+		if (ep_dbg_test(Dbg, 91))
+		{
+			ep_dbg_printf("recseq_process: input %" PRIgdp_recno
+					" .. %" PRIgdp_recno ", start %" PRIgdp_recno " ends",
+					start, end, rv->start);
+			int x = 0;
+			while (x < rv->nused)
+				ep_dbg_printf(" %" PRIgdp_recno, rv->ends[x++]);
+			ep_dbg_printf("\n");
+		}
+//		if (rv->nused > 0 && end < rv->ends[rv->nused - 1])
 //		{
-//			printf("XXX read start %lld, end %lld, rvstart %lld, nused %d\n",
-//					start, end, rv->start, rv->nused);
-//			if (rv->nused > 0)
-//				printf("    last end %lld\n", rv->ends[rv->nused - 1]);
-//			printf("    stack: ");
-//			int x = 0;
-//			while ( x < rv->nused)
-//				printf(" %lld", rv->ends[x++]);
-//			printf("\n");
+//			EP_ASSERT_FAILURE("recseq_process: rv->nused = %d"
+//						", rv->ends[%d] = %" PRIgdp_recno
+//						", end = %" PRIgdp_recno,
+//						rv->nused, rv->nused - 1, rv->ends[rv->nused - 1], end);
 //		}
-//		EP_ASSERT_INSIST(rv->nused <= 0 || end >= rv->ends[rv->nused - 1]);
+		if (rv->nused > 0 && end < rv->ends[0])
+		{
+			EP_ASSERT_FAILURE("recseq_process: rv->nused = %d"
+						", rv->ends[0] = %" PRIgdp_recno
+						", end = %" PRIgdp_recno,
+						rv->nused, rv->ends[0], end);
+		}
 
 		// see if this just extends an existing entry
 		for (i = 0; i < rv->nused; i++)
 		{
 			if (rv->ends[i] + 1 == start)
 			{
-//				printf("XXX extending entry %d\n", i);
+				ep_dbg_cprintf(Dbg, 91,
+							"recseq_process: extending entry %d, now %" PRIgdp_recno
+							" .. %" PRIgdp_recno "\n",
+							i, rv->start, end);
 				rv->ends[i] = end;
-				goto done;
+				break;
 			}
 		}
+		if (i < rv->nused)
+			continue;
 
 		// flush old entries
 		if (start > rv->start)
@@ -466,17 +523,26 @@ recseq_process(struct ctx *ctx)
 			// can now compress the records that are flushed, if any
 			if (i > 0)
 			{
-//				int j;
-//				printf("XXX pre-compress stack (i %d, nused %d):", i, rv->nused);
-//				for (j = 0; j < rv->nused; j++)
-//					printf(" %lld", rv->ends[j]);
-//				printf("\n");
+				if (ep_dbg_test(Dbg, 91))
+				{
+					int j;
+					ep_dbg_printf("recseq_process: pre-compress stack (i %d, nused %d):",
+								i, rv->nused);
+					for (j = 0; j < rv->nused; j++)
+						ep_dbg_printf(" %" PRIgdp_recno "", rv->ends[j]);
+					ep_dbg_printf("\n");
+				}
 				memmove(&rv->ends[0], &rv->ends[i], i * sizeof rv->ends[0]);
 				rv->nused -= i;
-//				printf("XXX post-compress stack (i %d, nused %d):", i, rv->nused);
-//				for (j = 0; j < rv->nused; j++)
-//					printf(" %lld", rv->ends[j]);
-//				printf("\n");
+				if (ep_dbg_test(Dbg, 91))
+				{
+					int j;
+					ep_dbg_printf("recseq_process: post-compress stack (i %d, nused %d):",
+								i, rv->nused);
+					for (j = 0; j < rv->nused; j++)
+						ep_dbg_printf(" %" PRIgdp_recno "", rv->ends[j]);
+					ep_dbg_printf("\n");
+				}
 			}
 
 			// there may be some entries that are still active
@@ -498,20 +564,23 @@ recseq_process(struct ctx *ctx)
 		{
 			// allocate more space
 			int new_nalloc = (rv->nalloc + 1) * 3 / 2;
-//			printf("XXX allocating to %d entries\n", new_nalloc);
-			rv->ends = ep_mem_realloc(rv->ends, new_nalloc);
+			ep_dbg_cprintf(Dbg, 94,
+						"recseq_process: expanding to %d entries\n",
+						new_nalloc);
+			rv->ends = ep_mem_realloc(rv->ends, new_nalloc * sizeof rv->ends[0]);
 			rv->nalloc = new_nalloc;
 		}
-//		printf("XXX adding entry %lld .. %lld\n", rv->start, end);
+		ep_dbg_cprintf(Dbg, 91,
+					"recseq_process: adding entry %" PRIgdp_recno
+					" .. %" PRIgdp_recno "\n",
+					rv->start, end);
 		rv->ends[rv->nused++] = end;
-
-	done:
-		// make sure the list remains sorted
-		recseq_sort(rv);
 	}
 
 	// output anything left in the sequence vector
-//	printf("XXX flushing final values, nused %d\n", rv->nused);
+	ep_dbg_cprintf(Dbg, 91,
+				"recseq_process: flushing final values, nused %d\n",
+				rv->nused);
 	for (i = 0; i < rv->nused; )
 		i = recseq_flush(ctx, rv, i, rv->ends[i] + 1);
 }
@@ -713,9 +782,6 @@ scan_recs(gdp_gcl_t *gcl,
 		{
 			segment_record_t log_record;
 
-			ep_dbg_cprintf(Dbg, 22, "Reading recno %" PRIgdp_recno " @ %jd\n",
-					recno + 1, (intmax_t) record_offset);
-
 			if (record_offset != ftello(seg->fp))
 				ep_dbg_cprintf(Dbg, 1, "WARNING: Recno %" PRIgdp_recno
 							" offset should be %jd, is %jd\n",
@@ -740,8 +806,9 @@ scan_recs(gdp_gcl_t *gcl,
 			log_record.flags = ep_net_ntoh16(log_record.flags);
 			log_record.data_length = ep_net_ntoh32(log_record.data_length);
 
-			ep_dbg_cprintf(Dbg, 23, "   recno %" PRIgdp_recno
+			ep_dbg_cprintf(Dbg, 23, "   offset %jd: recno %" PRIgdp_recno
 					", sigmeta %x, flags %x, data_length %d\n",
+					(intmax_t) record_offset,
 					log_record.recno, log_record.sigmeta, log_record.flags,
 					log_record.data_length);
 
@@ -786,8 +853,6 @@ scan_recs(gdp_gcl_t *gcl,
 
 			// skip over header and data (that part is opaque)
 			record_offset += sizeof log_record + log_record.data_length;
-			ep_dbg_cprintf(Dbg, 32, "Seeking to %jd\n",
-					(intmax_t) record_offset);
 			if (fseek(seg->fp, record_offset, SEEK_SET) < 0)
 			{
 				estat = posix_error(errno, "record %" PRIgdp_recno
@@ -796,15 +861,19 @@ scan_recs(gdp_gcl_t *gcl,
 			}
 
 			// skip over signature (should we be checking this?)
-			record_offset += log_record.sigmeta & 0x0fff;
-			ep_dbg_cprintf(Dbg, 33, "Seeking %d further (to %jd)\n",
-					log_record.sigmeta & 0x0fff,
-					(intmax_t) record_offset);
-			if (fseek(seg->fp, log_record.sigmeta & 0x0fff, SEEK_CUR) < 0)
+			if ((log_record.sigmeta & 0x0fff) != 0)
 			{
-				estat = posix_error(errno, "record %" PRIgdp_recno
-									": signature seek error", log_record.recno);
-				break;
+				record_offset += log_record.sigmeta & 0x0fff;
+				ep_dbg_cprintf(Dbg, 33, "Seeking %d further (to %jd)\n",
+						log_record.sigmeta & 0x0fff,
+						(intmax_t) record_offset);
+				if (fseek(seg->fp, log_record.sigmeta & 0x0fff, SEEK_CUR) < 0)
+				{
+					estat = posix_error(errno, "record %" PRIgdp_recno
+										": signature seek error",
+										log_record.recno);
+					break;
+				}
 			}
 		}
 fail1:
@@ -945,7 +1014,7 @@ check_record(
 		}
 	}
 
-	// keep track of record numbers
+	// keep track of record numbers to detect dups and holes
 	recseq_add_recno(rec->recno, ctx);
 
 fail0:
@@ -978,6 +1047,7 @@ do_check(gdp_gcl_t *gcl, struct ctx *ctx)
 	estat = scan_recs(gcl, check_segment, check_record, ctx);
 
 	// output result of record number scanning
+	recseq_last_recno(ctx);
 	recseq_process(ctx);
 
 fail0:
@@ -1272,7 +1342,7 @@ initialize(void)
 	_gdp_stat_init();
 	ep_stat_reg_strings(Stats);
 	signal(SIGINT, sigint);
-	
+
 	disk_init();
 }
 

@@ -176,6 +176,11 @@ bdb_open(const char *filename,
 		int dbflags,
 		int filemode,
 		int dbtype,
+#if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
+		int (*cmpf)(DB *, const DBT *, const DBT *),
+#else
+		int (*cmpf)(const DBT *, const DBT *),
+#endif
 		DB **pdb)
 {
 	DB *db = NULL;
@@ -194,6 +199,9 @@ bdb_open(const char *filename,
 	int dbstat = db_create(&db, NULL, 0);
 	if (dbstat != 0)
 		goto fail0;
+	phase = "initfunc";
+	if (cmpf != NULL && dbtype == DB_BTREE)
+		db->set_bt_compare(db, cmpf);
 	phase = "db->open";
 	dbstat = db->open(db, NULL, filename, NULL, dbtype, dbflags, filemode);
 	if (dbstat != 0)
@@ -209,14 +217,20 @@ fail0:
 					db_strerror(dbstat));
 		}
 	}
-	db->set_errcall(db, bdb_error);
+	else
+	{
+		db->set_errcall(db, bdb_error);
+	}
 #else
 	int fileflags = O_RDWR;
+	BTREEINFO btinfo;
 
 	if (EP_UT_BITSET(DB_CREATE, dbflags))
 		fileflags |= O_CREAT;
 	if (EP_UT_BITSET(DB_EXCL, dbflags))
 		fileflags |= O_EXCL;
+	memset(&btinfo, 0, sizeof btinfo);
+	btinfo.compare = cmpf;
 	db = dbopen(filename, fileflags, filemode, dbtype, NULL);
 	if (db == NULL)
 	{
@@ -1040,7 +1054,6 @@ physinfo_free(gcl_physinfo_t *phys)
 		(void) posix_error(errno, "physinfo_free: cannot destroy rwlock");
 
 	ep_mem_free(phys);
-	return;
 }
 
 
@@ -1453,7 +1466,7 @@ tidx_create(gdp_gcl_t *gcl, const char *suffix, uint32_t flags)
 	if (!EP_UT_BITSET(FLAG_TMPFILE, flags))
 		dbflags |= DB_EXCL;
 	estat = bdb_open(tidx_pbuf, dbflags, GCLfilemode,
-						DB_BTREE, &phys->tidx.db);
+						DB_BTREE, NULL, &phys->tidx.db);
 	if (!EP_STAT_ISOK(estat))
 	{
 		ep_log(estat, "tidx_create: create(%s)", tidx_pbuf);
@@ -1488,7 +1501,8 @@ tidx_open(gdp_gcl_t *gcl, const char *suffix, int openmode)
 		dbflags |= DB_RDONLY;
 	else if (EP_UT_BITSET(O_CREAT, openmode))
 		dbflags |= DB_CREATE;
-	estat = bdb_open(tidx_pbuf, dbflags, GCLfilemode, DB_BTREE, &phys->tidx.db);
+	estat = bdb_open(tidx_pbuf, dbflags, GCLfilemode,
+						DB_BTREE, NULL, &phys->tidx.db);
 	if (EP_STAT_IS_SAME(estat, ep_stat_from_errno(ENOENT)))
 	{
 		ep_dbg_cprintf(Dbg, 33, "tidx_open(%s): no tidx\n", gcl->pname);
@@ -1605,11 +1619,7 @@ disk_create(gdp_gcl_t *gcl, gdp_gclmd_t *gmd)
 	if (!gdp_name_is_valid(gcl->name))
 	{
 		estat = _gdp_gcl_newname(gcl);
-		if (!EP_STAT_ISOK(estat))
-		{
-			physinfo_free(phys);
-			return estat;
-		}
+		EP_STAT_CHECK(estat, goto fail0);
 	}
 
 	// create an initial segment for the GCL
