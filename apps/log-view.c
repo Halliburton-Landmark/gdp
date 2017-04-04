@@ -243,24 +243,27 @@ show_record(segment_record_t *rec, FILE *dfp, size_t *foffp, int plev)
 	*foffp += sizeof *rec;
 	CHECK_FILE_OFFSET(dfp, *foffp);
 
-	char *data_buffer = malloc(rec->data_length);
-	if (fread(data_buffer, rec->data_length, 1, dfp) != 1)
+	if (rec->data_length > 0)
 	{
-		fprintf(stderr, "fread() failed while reading data (%d)\n",
-				ferror(dfp));
-		free(data_buffer);
-		return EX_DATAERR;
-	}
+		char *data_buffer = malloc(rec->data_length);
+		if (fread(data_buffer, rec->data_length, 1, dfp) != 1)
+		{
+			fprintf(stderr, "fread() failed while reading data @ %jd, len %zd (%d)\n",
+					(intmax_t) *foffp, rec->data_length, ferror(dfp));
+			free(data_buffer);
+			return EX_DATAERR;
+		}
 
-	if (plev >= 4)
-	{
-		ep_hexdump(data_buffer, rec->data_length,
-				stdout, EP_HEXDUMP_ASCII,
-				plev < 3 ? 0 : *foffp);
+		if (plev >= 4)
+		{
+			ep_hexdump(data_buffer, rec->data_length,
+					stdout, EP_HEXDUMP_ASCII,
+					plev < 3 ? 0 : *foffp);
+		}
+		*foffp += rec->data_length;
+		CHECK_FILE_OFFSET(dfp, *foffp);
+		free(data_buffer);
 	}
-	*foffp += rec->data_length;
-	CHECK_FILE_OFFSET(dfp, *foffp);
-	free(data_buffer);
 
 	// print the signature
 	if ((rec->sigmeta & 0x0fff) > 0)
