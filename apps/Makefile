@@ -33,8 +33,12 @@ BINALL=		gcl-create \
 		log-mirror \
 		gdp-reader \
 		gdp-writer \
+		gdp-reader-dec \
+		gdp-writer-enc \
+		encdec_symkey \
 		create_symkey \
 		$(BINALL_ZC) \
+# hsmoon changed (add 4 lines over BINALL_ZC) 
 
 SBINALL_ZC= 	gdp-zcpublish
 SBINALL=	gdp-rest \
