@@ -119,7 +119,7 @@ show_metadata(int nmds, FILE *dfp, size_t *foffp, int plev)
 		mdhdrs[i].md_id = ep_net_ntoh32(mdhdrs[i].md_id);
 		mdhdrs[i].md_len = ep_net_ntoh32(mdhdrs[i].md_len);
 
-		mdata = malloc(mdhdrs[i].md_len + 1);
+		mdata = ep_mem_malloc(mdhdrs[i].md_len + 1);
 											// +1 for null-terminator
 		if (fread(mdata, mdhdrs[i].md_len, 1, dfp) != 1)
 		{
@@ -204,7 +204,7 @@ show_metadata(int nmds, FILE *dfp, size_t *foffp, int plev)
 			ep_hexdump(mdata, mdhdrs[i].md_len,
 					stdout, EP_HEXDUMP_ASCII, *foffp);
 		}
-		free(mdata);
+		ep_mem_free(mdata);
 	}
 	return EX_OK;
 }
@@ -245,13 +245,13 @@ show_record(segment_record_t *rec, FILE *dfp, size_t *foffp, int plev)
 
 	if (rec->data_length > 0)
 	{
-		char *data_buffer = malloc(rec->data_length);
+		char *data_buffer = ep_mem_malloc(rec->data_length);
 		if (fread(data_buffer, rec->data_length, 1, dfp) != 1)
 		{
 			fprintf(stderr, "fread() failed while reading data @ %jd, "
 							"len %" PRId32 " (%d)\n",
 					(intmax_t) *foffp, rec->data_length, ferror(dfp));
-			free(data_buffer);
+			ep_mem_free(data_buffer);
 			return EX_DATAERR;
 		}
 
@@ -263,7 +263,7 @@ show_record(segment_record_t *rec, FILE *dfp, size_t *foffp, int plev)
 		}
 		*foffp += rec->data_length;
 		CHECK_FILE_OFFSET(dfp, *foffp);
-		free(data_buffer);
+		ep_mem_free(data_buffer);
 	}
 
 	// print the signature
