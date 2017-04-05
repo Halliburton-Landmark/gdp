@@ -858,6 +858,7 @@ usage(const char *msg)
 			"    -d  delay after writing records (msec)\n"
 			"    -D  turn on debugging flags\n"
 			"    -G  IP host to contact for gdp_router\n"
+			"    -i  interval (delay) between writes\n"
 			"    -m  use multiread for read batches\n"
 			"    -n  set number of records in run\n"
 			"    -p  set payload size\n"
