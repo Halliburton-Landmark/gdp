@@ -248,7 +248,8 @@ show_record(segment_record_t *rec, FILE *dfp, size_t *foffp, int plev)
 		char *data_buffer = malloc(rec->data_length);
 		if (fread(data_buffer, rec->data_length, 1, dfp) != 1)
 		{
-			fprintf(stderr, "fread() failed while reading data @ %jd, len %zd (%d)\n",
+			fprintf(stderr, "fread() failed while reading data @ %jd, "
+							"len %" PRId32 " (%d)\n",
 					(intmax_t) *foffp, rec->data_length, ferror(dfp));
 			free(data_buffer);
 			return EX_DATAERR;
