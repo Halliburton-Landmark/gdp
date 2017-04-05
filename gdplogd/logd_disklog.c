@@ -231,7 +231,7 @@ fail0:
 		fileflags |= O_EXCL;
 	memset(&btinfo, 0, sizeof btinfo);
 	btinfo.compare = cmpf;
-	db = dbopen(filename, fileflags, filemode, dbtype, NULL);
+	db = dbopen(filename, fileflags, filemode, dbtype, &btinfo);
 	if (db == NULL)
 	{
 		int _errno = errno;
