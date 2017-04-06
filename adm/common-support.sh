@@ -217,26 +217,43 @@ set_os() {
     fi
 }
 
-
-# check to make sure we understand this OS and OSVER; choose PKGMGR & INITsys
-PKGMGR=$OS
-INITguess=""
-
-set_pkgmgr() {
-    case $OS in
-      "debian")
+check_os() {
+    case "$OS" in
+	"debian")
 	    if expr $OSVER \< 80000 > /dev/null
 	    then
 		    fatal_osver "Debian 8 (Jessie)"
 	    fi
 	    ;;
 
-      "ubuntu")
-	    PKGMGR=debian
+	"ubuntu")
 	    if expr $OSVER \< 140400 > /dev/null
 	    then
 		    fatal_osver "Ubuntu 14.04"
 	    fi
+	    ;;
+
+	"raspbian")
+	    warn_unsupported "assume it is debian-based"
+	    ;;
+
+	"centos" | "freebsd" | "darwin" | "redhat" | "gentoo")
+	    warn_unsupported
+	    ;;
+
+	*)
+	    fatal "Oops, we don't support $OS"
+    esac
+}
+
+
+# check to make sure we understand this OS and OSVER; choose PKGMGR & INITsys
+set_pkgmgr() {
+    PKGMGR=$OS
+    INITguess=""
+    case $OS in
+      "debian"|"ubuntu")
+	    PKGMGR=debian
 	    if expr $OSVER \>= 160400 > /dev/null
 	    then
 		    INITguess=systemd
@@ -246,12 +263,10 @@ set_pkgmgr() {
 	    ;;
 
       "raspbian")
-	    warn_unsupported "assume it is debian-based"
 	    PKGMGR=debian
 	    ;;
 
       "redhat")
-	    warn_unsupported
 	    PKGMGR=yum
 	    if expr $OSVER \< 070000 > /dev/null
 	    then
@@ -262,7 +277,6 @@ set_pkgmgr() {
 	    ;;
 
       "darwin")
-	    warn_unsupported
 	    if type brew > /dev/null 2>&1 && [ ! -z "`brew config`" ]; then
 		PKGMGR=brew
 		brew=`which brew`
@@ -283,7 +297,7 @@ set_pkgmgr() {
 		    warn "They conflict with each other, and you may break all your"
 		    warn "packages if you try to use them at the same time."
 		    warn "Please choose one or the other."
-		    fatal "You will have to deactivate one (or modify this script)"
+		    fatal "Set envar PKGMGR to 'brew' or 'macports' to choose."
 		else
 		    PKGMGR=macports
 		fi
@@ -295,16 +309,7 @@ set_pkgmgr() {
 	    ;;
 
       "centos")
-	    warn_unsupported
 	    PKGMGR=yum
-	    ;;
-
-      "freebsd" | "gentoo")
-	    warn_unsupported
-	    ;;
-
-      *)
-	    fatal "Oops, we don't support $OS"
 	    ;;
     esac
 
@@ -322,7 +327,6 @@ set_pkgmgr() {
 		    ;;
 	    esac
     fi
-    test -z "$INITguess" && INITguess="unknown"
 }
 
 
@@ -350,10 +354,14 @@ done
 
 configure_defaults
 set_os
-set_pkgmgr
+check_os
+if [ -z "$PKGMGR" ]
+then
+    set_pkgmgr
+fi
 
 # see if we should use our guess
-test -z "$INITSYS" && INITSYS=$INITguess
+test -z "$INITSYS" && INITSYS=${INITguess:-unknown}
 
 if ! $quiet
 then
