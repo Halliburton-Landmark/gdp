@@ -115,8 +115,19 @@ usage(void)
 			"    -k  (mandatory) the secret key file of key distributor\n"
 			"    -p  (mandatory) the cert name of device where enc key is sent \n"
 			"    -s  the secret key file of the device that receive encrypted key \n"
-			"    outfilename is the name of file encrypted for another device (without extension)\n"
-			"        the cert of the device is indicated with -p option. \n"
+			"    outfilename is the name of file encrypted for another device (without extension)\n\n"
+			" There are two execution style according to the -i input file.\n"
+			" Firstly, with the file name with txt extension,"
+			" this program creates the encrypted key file for target device from the plain key info."
+			" The simple usage for this style is as follows: \n"
+			"		encdec_symkey [-d] -i <plainkey.txt>"
+			" -k <key distributor's key file> -p <deviceT's cert> outFile\n"
+			" Secondly, with the file name with enc extension,"
+			" this program creates the encrypted key file for target device (deviceT)"
+			" from the encrypted key info for input device (deviceI)."
+			" The simple usage for this style is as follows: \n"
+			"		encdec_symkey [-d] -i <symkey.enc for deviceI> -c <key distributor's cert>"
+			" -k <key distributor's key file> -p <deviceT's cert> -s <deviceI's key file> outFile\n"
 			, ep_app_getprogname());
 	exit(64);
 }
@@ -165,7 +176,10 @@ main(int argc, char **argv)
 
 
 	// initialize ecryption routine. 
-	gdp_lib_init(NULL);
+	// gdp_lib_init(NULL);
+	ep_lib_init(EP_LIB_USEPTHREADS);
+	ep_crypto_init(0);
+
 
 	// collect command-line arguments
 	while ((opt = getopt(argc, argv, "c:di:k:p:s:")) > 0)
@@ -178,6 +192,7 @@ main(int argc, char **argv)
 			if( dec_kcert == NULL ) {
 				ep_app_error("Cannot read certificate in file %s", optarg ); 
 				show_usage = true;
+				break;
 			}
 
 			// extract the public key in the cert file 
@@ -210,6 +225,7 @@ main(int argc, char **argv)
 			if( t_fp == NULL ) {
 				ep_app_error("Cannot open the secret key in %s", optarg );  
 				show_usage = true;
+				break;
 			}
 
 			if( PEM_read_PrivateKey( t_fp, &enc_kskey, NULL, NULL ) == NULL ) {
@@ -229,6 +245,7 @@ main(int argc, char **argv)
 			if( enc_dcert == NULL ) {
 				ep_app_error("Cannot read certificate in file %s", optarg ); 
 				show_usage = true;
+				break;
 			}
 
 			// extract the public key in the cert file 
@@ -249,6 +266,7 @@ main(int argc, char **argv)
 			if( t_fp == NULL ) {
 				ep_app_error("Cannot open the secret key in %s", optarg );  
 				show_usage = true;
+				break;
 			}
 
 			if( PEM_read_PrivateKey( t_fp, &dec_dskey, NULL, NULL ) == NULL ) {
@@ -281,15 +299,15 @@ main(int argc, char **argv)
 
 
 	if( encrypted == false ) {
-		if( dec_kpkey!=NULL )  	ep_app_error("Non necessary the cert info of key distributor"); 
-		if( dec_dskey!=NULL )  	ep_app_error("Non necessary the secret key info of device"); 
+		if( dec_kpkey!=NULL )  	ep_app_error("Unecessary the cert info of key distributor"); 
+		if( dec_dskey!=NULL )  	ep_app_error("Unnecessary the secret key info of device"); 
 
 		//usage();
 	}  
 
 
 	if( enc_dpkey==NULL || enc_kskey==NULL ) {
-		ep_app_error("Unsufficient key info for final encryption"); 
+		ep_app_error("Insufficient key info for final encryption"); 
 		if( dec_kpkey	!= NULL ) EVP_PKEY_free( dec_kpkey );	
 		if( enc_dpkey	!= NULL ) EVP_PKEY_free( enc_dpkey );	
 		if( enc_kskey	!= NULL ) EVP_PKEY_free( enc_kskey );	
@@ -335,6 +353,11 @@ main(int argc, char **argv)
 		char				*encBuf		= NULL;
 
 		t_enclen = ep_get_fileContents( symkeyfile, &encBuf );
+		//input error check. 
+		if( t_enclen == -1 ) {
+			ep_app_error("Invalid input file name with -i option");
+			goto fail0;
+		}
 
 		// Calculate the shared key from my secret key & other's public key  
 		// decrypt the input file 
@@ -412,6 +435,11 @@ main(int argc, char **argv)
 	} else {
 		// read file contents into skBuf[] 
 		ori_dlen = ep_get_fileContents( symkeyfile, &skBuf );
+		//input error check. 
+		if( ori_dlen == -1 ) {
+			ep_app_error("Invalid input file name with -i option");
+			goto fail0;
+		}
 	}
 
 	if( show_dbg ) {
@@ -425,7 +453,8 @@ main(int argc, char **argv)
 	// B. Encrypt the plain key info & store it in file //
 	//////////////////////////////////////////////////////
 
-	if( EVP_PKEY_type( dec_kpkey->type ) == EVP_PKEY_EC ) {
+	if( EVP_PKEY_type( enc_dpkey->type ) == EVP_PKEY_EC ) {
+
 
 		//////////////////////////////////////////////////////
 		// B1. Calculate the new shared key for encryption  //

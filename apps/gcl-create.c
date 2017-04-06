@@ -289,6 +289,7 @@ main(int argc, char **argv)
 	if (show_usage || argc > 0)
 		usage();
 
+
 	// initialize the GDP library
 	estat = gdp_init(gdpd_addr);
 	if (!EP_STAT_ISOK(estat))

@@ -70,7 +70,7 @@ static EP_THR_MUTEX		OpenMutex		EP_THR_MUTEX_INITIALIZER2(GDP_MUTEX_LORDER_LEAF)
 			if (ep_dbg_test(Dbg, EP_STAT_ISOK(estat) ? 39 : 1))				\
 			{																\
 				char ebuf[100];												\
-				ep_dbg_printf("<<< %s: %s\\n",								\
+				ep_dbg_printf("<<< %s: %s\n",								\
 						where, ep_stat_tostr(estat, ebuf, sizeof ebuf));	\
 			}
 
@@ -416,17 +416,8 @@ gdp_gcl_open(gdp_name_t name,
 	}
 	else
 	{
-		if (gcl->refcnt > 0)
-		{
-			gcl->refcnt = 0;			// avoid errors in _gdp_gcl_cache_drop
-			_gdp_gcl_freehandle(gcl);
-		}
-		else
-		{
-			ep_thr_mutex_unlock(&gcl->mutex);
-			ep_thr_mutex_destroy(&gcl->mutex);
-			ep_mem_free(gcl);
-		}
+		ep_thr_mutex_destroy(&gcl->mutex);
+		ep_mem_free(gcl);
 	}
 
 fail0:
