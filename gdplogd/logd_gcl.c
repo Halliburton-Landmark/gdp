@@ -91,11 +91,11 @@ gcl_open(gdp_name_t gcl_name, gdp_iomode_t iomode, gdp_gcl_t **pgcl)
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// so far, so good...  do the physical open
+	_gdp_gcl_lock(gcl);
 	estat = gcl->x->physimpl->open(gcl);
 	EP_STAT_CHECK(estat, goto fail1);
 
 	// success!
-	_gdp_gcl_lock(gcl);
 	*pgcl = gcl;
 	return estat;
 
