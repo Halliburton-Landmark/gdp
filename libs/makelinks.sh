@@ -25,7 +25,6 @@ fi
 info "Creating lib$lib links in $dir"
 cd $dir
 
-info "Creating library links"
 ver=$major.$minor
 case "$OS" in
   "ubuntu" | "debian" | "freebsd" | "centos")
