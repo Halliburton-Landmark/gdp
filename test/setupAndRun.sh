@@ -1,4 +1,5 @@
-#!/bin/sh
+#!/bin/bash
+# Use bash so that we get $RANDOM
 # Check for gdplogd and gdp_router first, then create directories,
 # then run the script optionally named as an argument, then kill the daemons.
 
