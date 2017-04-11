@@ -269,6 +269,7 @@ _gdp_gcl_create(gdp_name_t gclname,
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// create the request
+	_gdp_gcl_lock(gcl);
 	estat = _gdp_req_new(GDP_CMD_CREATE, gcl, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
@@ -330,6 +331,7 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 	// send the request across to the log daemon
 	errno = 0;				// avoid spurious messages
 	reqflags |= GDP_REQ_ROUTEFAIL;			// don't retry on router errors
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
 	estat = _gdp_req_new(cmd, gcl, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 	estat = _gdp_invoke(req);
@@ -468,6 +470,7 @@ _gdp_gcl_close(gdp_gcl_t *gcl,
 	errno = 0;				// avoid spurious messages
 	if (!GDP_GCL_ISGOOD(gcl))
 		return GDP_STAT_GCL_NOT_OPEN;
+	_gdp_gcl_lock(gcl);
 
 	if (ep_dbg_test(Dbg, 38))
 	{
@@ -504,6 +507,7 @@ _gdp_gcl_close(gdp_gcl_t *gcl,
 	_gdp_req_free(&req);
 finis:
 fail0:
+	_gdp_gcl_unlock(gcl);
 	return estat;
 }
 
@@ -620,9 +624,7 @@ _gdp_gcl_append_async(
 	// arrange for responses to appear as events or callbacks
 	_gdp_event_setcb(req, cbfunc, cbarg);
 
-	_gdp_gcl_lock(gcl);
 	estat = _gdp_req_send(req);
-	_gdp_gcl_unlock(gcl);
 
 	// Note that this is just a guess: the write may still fail.
 	// If it does, we'll be out of sync and all hell breaks loose.
@@ -745,9 +747,7 @@ _gdp_gcl_read_async(gdp_gcl_t *gcl,
 	_gdp_event_setcb(req, cbfunc, cbarg);
 
 	req->cpdu->datum->recno = recno;
-	_gdp_gcl_lock(gcl);
 	estat = _gdp_req_send(req);
-	_gdp_gcl_unlock(gcl);
 
 	if (EP_STAT_ISOK(estat))
 	{
@@ -812,11 +812,12 @@ _gdp_gcl_newsegment(gdp_gcl_t *gcl,
 	if (!GDP_GCL_ISGOOD(gcl))
 		return GDP_STAT_GCL_NOT_OPEN;
 	estat = _gdp_req_new(GDP_CMD_NEWSEGMENT, gcl, chan, NULL, reqflags, &req);
-	EP_STAT_CHECK(estat, return estat);
+	EP_STAT_CHECK(estat, goto fail0);
 
 	estat = _gdp_invoke(req);
 
 	_gdp_req_free(&req);
+fail0:
 	return estat;
 }
 
@@ -866,6 +867,7 @@ _gdp_gcl_fwd_append(
 	// deliver results asynchronously
 	reqflags |= GDP_REQ_ASYNCIO;
 
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
 	estat = _gdp_req_new(GDP_CMD_FWD_APPEND, gcl, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 

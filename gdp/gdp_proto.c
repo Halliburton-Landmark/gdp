@@ -84,8 +84,7 @@ _gdp_invoke(gdp_req_t *req)
 	if (req->gcl != NULL)
 	{
 		EP_ASSERT_ELSE(GDP_GCL_ISGOOD(req->gcl), );
-		EP_THR_MUTEX_ASSERT_ISUNLOCKED(&req->gcl->mutex, );
-		_gdp_gcl_lock(req->gcl);
+		EP_THR_MUTEX_ASSERT_ISLOCKED(&req->gcl->mutex, );
 	}
 	cmdname = _gdp_proto_cmd_name(req->cpdu->cmd);
 	if (ep_dbg_test(Dbg, 10))
@@ -131,10 +130,6 @@ _gdp_invoke(gdp_req_t *req)
 		**  Bottom Half: read the response
 		*/
 
-		// release the GCL while we're waiting
-		if (req->gcl != NULL)
-			_gdp_gcl_unlock(req->gcl);
-
 		// wait until we receive a result
 		ep_dbg_cprintf(Dbg, 37, "_gdp_invoke: waiting on %p\n", req);
 		ep_time_deltanow(&delta_ts, &abs_to);
@@ -143,8 +138,21 @@ _gdp_invoke(gdp_req_t *req)
 		req->flags &= ~GDP_REQ_ASYNCIO;
 		while (!EP_UT_BITSET(GDP_REQ_DONE, req->flags))
 		{
+			// release the GCL while we're waiting
+			if (req->gcl != NULL)
+				_gdp_gcl_unlock(req->gcl);
+
 			// cond_wait will unlock the mutex
 			int e = ep_thr_cond_wait(&req->cond, &req->mutex, &abs_to);
+
+			if (req->gcl != NULL)
+			{
+				// have to unlock the req so lock ordering is right
+				//XXX possible race condition?
+				_gdp_req_unlock(req);
+				_gdp_gcl_lock(req->gcl);
+				_gdp_req_lock(req);
+			}
 
 			char ebuf[100];
 			ep_dbg_cprintf(Dbg, 52,
@@ -188,8 +196,6 @@ _gdp_invoke(gdp_req_t *req)
 		}
 
 		// do a retry, after re-locking the GCL
-		if (req->gcl != NULL)
-			_gdp_gcl_lock(req->gcl);
 		_gdp_req_unsend(req);
 
 		// if ETIMEDOUT, maybe the router had a glitch:

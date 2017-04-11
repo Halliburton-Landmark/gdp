@@ -62,12 +62,12 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.api", "C API for GDP");
 **  Mutex around open operations
 */
 
-static EP_THR_MUTEX		OpenMutex		EP_THR_MUTEX_INITIALIZER2(GDP_MUTEX_LORDER_LEAF);
+static EP_THR_MUTEX		OpenMutex		EP_THR_MUTEX_INITIALIZER;
 
 
 // simplify debugging
 #define PRSTAT(estat, where)												\
-			if (ep_dbg_test(Dbg, EP_STAT_ISOK(estat) ? 39 : 1))				\
+			if (ep_dbg_test(Dbg, EP_STAT_ISOK(estat) ? 39 : 11))			\
 			{																\
 				char ebuf[100];												\
 				ep_dbg_printf("<<< %s: %s\n",								\
@@ -398,7 +398,6 @@ gdp_gcl_open(gdp_name_t name,
 		ep_dbg_cprintf(Dbg, 10, "gdp_gcl_open(%s): using existing GCL @ %p\n",
 				gcl->pname, gcl);
 		gcl->iomode |= mode;
-		_gdp_gcl_unlock(gcl);
 		estat = EP_STAT_OK;
 	}
 	else
@@ -406,28 +405,29 @@ gdp_gcl_open(gdp_name_t name,
 		// it's not there yet, so create a new one
 		estat = _gdp_gcl_newhandle(name, &gcl);
 		EP_STAT_CHECK(estat, goto fail0);
-		gcl->iomode = mode;
 
+		_gdp_gcl_lock(gcl);
+		gcl->iomode = mode;
 		estat = _gdp_gcl_open(gcl, cmd, skey, _GdpChannel, GDP_REQ_ALLOC_RID);
+		EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
 	}
 	if (EP_STAT_ISOK(estat))
 	{
 		*pgcl = gcl;
+		_gdp_gcl_unlock(gcl);
+		ep_dbg_cprintf(Dbg, 8, "<<< gdp_gcl_open(%s): OK\n", gcl->pname);
 	}
 	else
 	{
-		ep_thr_mutex_destroy(&gcl->mutex);
-		ep_mem_free(gcl);
+		char ebuf[100];
+		ep_dbg_cprintf(Dbg, 8, "<<< gdp_gcl_open(%s): %s\n", gcl->pname,
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		_gdp_gcl_freehandle(gcl);
+		gcl = NULL;
 	}
 
 fail0:
 	ep_thr_mutex_unlock(&OpenMutex);
-	if (ep_dbg_test(Dbg, 8))
-	{
-		char ebuf[100];
-		ep_dbg_printf("<<< gdp_gcl_open(%s): %s\n", gcl->pname,
-				ep_stat_tostr(estat, ebuf, sizeof ebuf));
-	}
 	return estat;
 }
 
@@ -457,8 +457,14 @@ gdp_gcl_close(gdp_gcl_t *gcl)
 EP_STAT
 gdp_gcl_append(gdp_gcl_t *gcl, gdp_datum_t *datum)
 {
+	EP_STAT estat;
+
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_append\n");
-	return _gdp_gcl_append(gcl, datum, _GdpChannel, 0);
+	_gdp_gcl_lock(gcl);
+	estat = _gdp_gcl_append(gcl, datum, _GdpChannel, 0);
+	_gdp_gcl_unlock(gcl);
+	PRSTAT(estat, "gdp_gcl_append");
+	return estat;
 }
 
 
@@ -475,7 +481,9 @@ gdp_gcl_append_async(gdp_gcl_t *gcl,
 	EP_STAT estat;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_append_async\n");
+	_gdp_gcl_lock(gcl);
 	estat = _gdp_gcl_append_async(gcl, datum, cbfunc, udata, _GdpChannel, 0);
+	_gdp_gcl_unlock(gcl);
 	PRSTAT(estat, "gdp_gcl_append_async");
 	return estat;
 }
@@ -506,7 +514,9 @@ gdp_gcl_read(gdp_gcl_t *gcl,
 	gdp_datum_reset(datum);
 	datum->recno = recno;
 
+	_gdp_gcl_lock(gcl);
 	estat = _gdp_gcl_read(gcl, datum, _GdpChannel, 0);
+	_gdp_gcl_unlock(gcl);
 	PRSTAT(estat, "gdp_gcl_read");
 	return estat;
 }
@@ -537,7 +547,9 @@ gdp_gcl_read_ts(gdp_gcl_t *gcl,
 	memcpy(&datum->ts, ts, sizeof datum->ts);
 	datum->recno = GDP_PDU_NO_RECNO;
 
+	_gdp_gcl_lock(gcl);
 	estat = _gdp_gcl_read(gcl, datum, _GdpChannel, 0);
+	_gdp_gcl_unlock(gcl);
 	PRSTAT(estat, "gdp_gcl_read_ts");
 	return estat;
 }
@@ -559,7 +571,9 @@ gdp_gcl_read_async(gdp_gcl_t *gcl,
 	EP_STAT estat;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_read_async\n");
+	_gdp_gcl_lock(gcl);
 	estat = _gdp_gcl_read_async(gcl, recno, cbfunc, cbarg, _GdpChannel);
+	_gdp_gcl_unlock(gcl);
 	PRSTAT(estat, "gdp_gcl_read_async");
 	return estat;
 }
@@ -582,7 +596,9 @@ gdp_gcl_subscribe(gdp_gcl_t *gcl,
 	gdp_req_t *req;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_subscribe\n");
+
 	// create the subscribe request
+	_gdp_gcl_lock(gcl);
 	estat = _gdp_req_new(GDP_CMD_SUBSCRIBE, gcl, _GdpChannel, NULL,
 			GDP_REQ_PERSIST | GDP_REQ_CLT_SUBSCR | GDP_REQ_ALLOC_RID,
 			&req);
@@ -595,6 +611,7 @@ gdp_gcl_subscribe(gdp_gcl_t *gcl,
 	// now do the hard work
 	estat = _gdp_gcl_subscribe(req, numrecs, timeout, cbfunc, cbarg);
 fail0:
+	_gdp_gcl_unlock(gcl);
 	PRSTAT(estat, "gdp_gcl_subscribe");
 	return estat;
 }
@@ -616,7 +633,9 @@ gdp_gcl_subscribe_ts(gdp_gcl_t *gcl,
 	gdp_req_t *req;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_subscribe_ts\n");
+
 	// create the subscribe request
+	_gdp_gcl_lock(gcl);
 	estat = _gdp_req_new(GDP_CMD_SUBSCRIBE, gcl, _GdpChannel, NULL,
 			GDP_REQ_PERSIST | GDP_REQ_CLT_SUBSCR | GDP_REQ_ALLOC_RID,
 			&req);
@@ -629,6 +648,7 @@ gdp_gcl_subscribe_ts(gdp_gcl_t *gcl,
 	// now do the hard work
 	estat = _gdp_gcl_subscribe(req, numrecs, timeout, cbfunc, cbarg);
 fail0:
+	_gdp_gcl_unlock(gcl);
 	PRSTAT(estat, "gdp_gcl_subscribe_ts");
 	return estat;
 }
@@ -652,7 +672,9 @@ gdp_gcl_multiread(gdp_gcl_t *gcl,
 	gdp_req_t *req;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_multiread\n");
+
 	// create the multiread request
+	_gdp_gcl_lock(gcl);
 	estat = _gdp_req_new(GDP_CMD_MULTIREAD, gcl, _GdpChannel, NULL,
 			GDP_REQ_PERSIST | GDP_REQ_CLT_SUBSCR | GDP_REQ_ALLOC_RID,
 			&req);
@@ -665,6 +687,7 @@ gdp_gcl_multiread(gdp_gcl_t *gcl,
 	// now do the hard work
 	estat = _gdp_gcl_subscribe(req, numrecs, NULL, cbfunc, cbarg);
 fail0:
+	_gdp_gcl_unlock(gcl);
 	PRSTAT(estat, "gdp_gcl_multiread");
 	return estat;
 }
@@ -688,7 +711,9 @@ gdp_gcl_multiread_ts(gdp_gcl_t *gcl,
 	gdp_req_t *req;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_multiread_ts\n");
+
 	// create the multiread request
+	_gdp_gcl_lock(gcl);
 	estat = _gdp_req_new(GDP_CMD_MULTIREAD, gcl, _GdpChannel, NULL,
 			GDP_REQ_PERSIST | GDP_REQ_CLT_SUBSCR | GDP_REQ_ALLOC_RID,
 			&req);
@@ -701,6 +726,7 @@ gdp_gcl_multiread_ts(gdp_gcl_t *gcl,
 	// now do the hard work
 	estat = _gdp_gcl_subscribe(req, numrecs, NULL, cbfunc, cbarg);
 fail0:
+	_gdp_gcl_unlock(gcl);
 	PRSTAT(estat, "gdp_gcl_multiread_ts");
 	return estat;
 }
@@ -717,7 +743,9 @@ gdp_gcl_getmetadata(gdp_gcl_t *gcl,
 	EP_STAT estat;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_getmetadata\n");
+	_gdp_gcl_lock(gcl);
 	estat = _gdp_gcl_getmetadata(gcl, gmdp, _GdpChannel, 0);
+	_gdp_gcl_unlock(gcl);
 	PRSTAT(estat, "gdp_gcl_getmetadata");
 	return estat;
 }
@@ -736,7 +764,9 @@ gdp_gcl_newsegment(gdp_gcl_t *gcl)
 	EP_STAT estat;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_newsegment\n");
+	_gdp_gcl_lock(gcl);
 	estat = _gdp_gcl_newsegment(gcl, _GdpChannel, 0);
+	_gdp_gcl_unlock(gcl);
 	PRSTAT(estat, "gdp_gcl_newsegment");
 	return estat;
 }
@@ -753,8 +783,10 @@ gdp_gcl_set_append_filter(gdp_gcl_t *gcl,
 {
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_set_append_filter\n");
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
+	_gdp_gcl_lock(gcl);
 	gcl->apndfilter = appendfilter;
 	gcl->apndfpriv = filterdata;
+	_gdp_gcl_unlock(gcl);
 }
 
 
@@ -769,8 +801,10 @@ gdp_gcl_set_read_filter(gdp_gcl_t *gcl,
 {
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_set_read_filter\n");
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
+	_gdp_gcl_lock(gcl);
 	gcl->readfilter = readfilter;
 	gcl->readfpriv = filterdata;
+	_gdp_gcl_unlock(gcl);
 }
 
 

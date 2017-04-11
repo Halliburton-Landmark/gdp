@@ -671,9 +671,9 @@ EP_STAT			_gdp_evloop_init(void);		// start event loop
 **		Lower numbered locks should be acquired before higher numbered locks.
 */
 
-#define GDP_MUTEX_LORDER_REQ		4
-#define GDP_MUTEX_LORDER_CHAN		8
-#define GDP_MUTEX_LORDER_GCL		12
+#define GDP_MUTEX_LORDER_GCL		4
+#define GDP_MUTEX_LORDER_REQ		8
+#define GDP_MUTEX_LORDER_CHAN		12
 #define GDP_MUTEX_LORDER_GCLCACHE	15
 #define GDP_MUTEX_LORDER_DATUM		18
 #define GDP_MUTEX_LORDER_LEAF		31	// freelists, etc.

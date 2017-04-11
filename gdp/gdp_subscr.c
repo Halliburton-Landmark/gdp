@@ -162,6 +162,18 @@ subscr_poker_thread(void *chan_)
 					_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 				}
 
+				// if no GCL, it can't be a subscription
+				gdp_gcl_t *gcl = req->gcl;
+				_gdp_req_unlock(req);	// GCLs need to be locked before reqs
+				if (gcl == NULL)
+					continue;
+
+				// lock GCL, then req, then validate req
+				if (ep_thr_mutex_trylock(&gcl->mutex) != 0)
+					continue;
+				gcl->flags |= GCLF_ISLOCKED;
+				_gdp_req_lock(req);
+
 				if (!EP_UT_BITSET(GDP_REQ_CLT_SUBSCR, req->flags))
 				{
 					// not a subscription: skip this entry
@@ -184,6 +196,7 @@ subscr_poker_thread(void *chan_)
 
 				// if _gdp_invoke failed, try again at the next poke interval
 				_gdp_req_unlock(req);
+				_gdp_gcl_unlock(gcl);
 			}
 		}
 		while (!EP_STAT_ISOK(estat));

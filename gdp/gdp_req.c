@@ -126,7 +126,10 @@ _gdp_req_new(int cmd,
 
 	// if assertion fails, may be working with an unallocated GCL
 	if (gcl != NULL)
+	{
 		EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return EP_STAT_ASSERT_ABORT);
+		EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, return EP_STAT_ASSERT_ABORT);
+	}
 
 	// simplify the simple case
 	if (chan == NULL)
@@ -208,7 +211,7 @@ _gdp_req_new(int cmd,
 		pdu->cmd = cmd;
 		if (gcl != NULL)
 		{
-			_gdp_gcl_lock(gcl);
+			EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
 			memcpy(pdu->dst, gcl->name, sizeof pdu->dst);
 		}
 		if ((gcl == NULL || !EP_UT_BITSET(GDP_REQ_PERSIST, flags)) &&
@@ -222,8 +225,6 @@ _gdp_req_new(int cmd,
 			// allocate a new unique request id
 			pdu->rid = _gdp_rid_new(gcl, chan);
 		}
-		if (gcl != NULL)
-			_gdp_gcl_unlock(gcl);
 	}
 
 	// success
@@ -283,7 +284,6 @@ _gdp_req_free(gdp_req_t **reqp)
 		req->flags &= ~GDP_REQ_ON_GCL_LIST;
 	}
 	req->gcl = NULL;
-
 
 	// remove any pending events from the request
 	{

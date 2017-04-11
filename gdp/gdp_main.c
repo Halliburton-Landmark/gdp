@@ -365,6 +365,12 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 				"gdp_pdu_proc_resp: searching gcl %p for rid %" PRIgdp_rid "\n",
 				gcl, rpdu->rid);
 		req = _gdp_req_find(gcl, rpdu->rid);
+		if (ep_dbg_test(DbgProcResp, 51))
+		{
+			ep_dbg_printf("... found ");
+			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+		}
+
 		// req is already locked by _gdp_req_find
 		if (req == NULL)
 		{
@@ -420,10 +426,11 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 	// save the response PDU for further processing
 	if (req->rpdu != NULL)
 	{
-		if (ep_dbg_test(DbgProcResp, 1))
+		// this can happen in multiread/subscription and async I/O
+		if (ep_dbg_test(DbgProcResp, 41))
 		{
-			ep_dbg_printf("gdp_pdu_proc_resp: req->rpdu already set\n");
-			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+			ep_dbg_printf("gdp_pdu_proc_resp: req->rpdu already set\n    ");
+			_gdp_pdu_dump(req->rpdu, ep_dbg_getfile());
 		}
 		_gdp_pdu_free(req->rpdu);
 	}
@@ -441,7 +448,6 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 	ep_time_now(&req->act_ts);
 
 	// do ack/nak specific processing
-	//req->pdu = req->rpdu;
 	estat = _gdp_req_dispatch(req, cmd);
 
 	// figure out potential response code
@@ -467,6 +473,10 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 	{
 		// send the status as an event
 		estat = _gdp_event_add_from_req(req);
+
+		// since this is asynchronous we can release the PDU
+		_gdp_pdu_free(req->rpdu);
+		req->rpdu = NULL;
 	}
 	else if (req->state == GDP_REQ_WAITING)
 	{

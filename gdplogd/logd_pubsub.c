@@ -261,12 +261,16 @@ sub_reclaim_resources(gdp_chan_t *chan)
 
 			// have to manually remove req from lists to avoid lock inversion
 			EP_ASSERT(req->gcl != NULL);
-			EP_ASSERT(EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags));
-			_gdp_gcl_lock(req->gcl);
-			LIST_REMOVE(req, gcllist);
-			_gdp_gcl_decref(&req->gcl);			// also unlocks GCL
-			EP_ASSERT(EP_UT_BITSET(GDP_REQ_ON_CHAN_LIST, req->flags));
-			LIST_REMOVE(req, chanlist);			// chan already locked
+			if (EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
+			{
+				_gdp_gcl_lock(req->gcl);
+				LIST_REMOVE(req, gcllist);
+				_gdp_gcl_decref(&req->gcl);			// also unlocks GCL
+			}
+			if (EP_UT_BITSET(GDP_REQ_ON_CHAN_LIST, req->flags))
+			{
+				LIST_REMOVE(req, chanlist);			// chan already locked
+			}
 			req->flags &= ~(GDP_REQ_ON_GCL_LIST | GDP_REQ_ON_CHAN_LIST);
 			_gdp_req_free(&req);
 		}
