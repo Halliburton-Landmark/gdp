@@ -867,7 +867,7 @@ _gdp_gcl_fwd_append(
 	// deliver results asynchronously
 	reqflags |= GDP_REQ_ASYNCIO;
 
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
+	_gdp_gcl_lock(gcl);
 	estat = _gdp_req_new(GDP_CMD_FWD_APPEND, gcl, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
@@ -899,9 +899,7 @@ _gdp_gcl_fwd_append(
 
 	// XXX should we take a callback function?
 
-	_gdp_gcl_lock(gcl);
 	estat = _gdp_req_send(req);
-	_gdp_gcl_unlock(gcl);
 
 	// unlike append_async, we leave the datum intact
 
@@ -919,6 +917,7 @@ _gdp_gcl_fwd_append(
 	}
 
 fail0:
+	_gdp_gcl_unlock(gcl);
 	if (ep_dbg_test(Dbg, 11))
 	{
 		char ebuf[100];
