@@ -121,6 +121,8 @@ posix_error(int _errno, const char *fmt, ...)
 #define DB_VERSION_THRESHOLD	4	// XXX not clear the number is right
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
 
+DB_ENV		*DbEnv;
+
 static void
 bdb_error(const DB_ENV *dbenv, const char *errpfx, const char *msg)
 {
@@ -133,6 +135,7 @@ bdb_error(const DB_ENV *dbenv, const char *errpfx, const char *msg)
 # define DB_CREATE		0x00000001
 # define DB_EXCL		0x00000004
 # define DB_RDONLY		0x00000400
+# define DB_THREAD		0
 
 // fake up a cursor
 typedef DB			DBC;
@@ -195,13 +198,28 @@ bdb_open(const char *filename,
 	}
 
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
-	const char *phase = "db_create";
-	int dbstat = db_create(&db, NULL, 0);
-	if (dbstat != 0)
+	int dbstat;
+	const char *phase;
+
+	if (DbEnv == NULL)
+	{
+		phase = "db_env_create";
+		if ((dbstat = db_env_create(&DbEnv, 0)) != 0)
+			goto fail0;
+		phase = "dbenv->open";
+		uint32_t dbenv_flags = DB_CREATE | DB_INIT_MPOOL;
+		if ((dbstat = DbEnv->open(DbEnv, NULL, dbenv_flags, 0)) != 0)
+			goto fail0;
+	}
+
+	phase = "db_create";
+	if ((dbstat = db_create(&db, NULL, 0)) != 0)
 		goto fail0;
+
 	phase = "initfunc";
 	if (cmpf != NULL && dbtype == DB_BTREE)
 		db->set_bt_compare(db, cmpf);
+
 	phase = "db->open";
 	dbstat = db->open(db, NULL, filename, NULL, dbtype, dbflags, filemode);
 	if (dbstat != 0)
@@ -209,7 +227,8 @@ bdb_open(const char *filename,
 fail0:
 		db = NULL;
 		estat = ep_stat_from_dbstat(dbstat);
-		ep_dbg_cprintf(Dbg, 1, "db_open: error during %s: %s\n",
+		ep_dbg_cprintf(Dbg, 1, "bdb_open(%s): error during %s: %s\n",
+					filename == NULL ? "<memory>" : filename,
 					phase, db_strerror(dbstat));
 		if (db != NULL && (dbstat = db->close(db, 0)) != 0)
 		{
@@ -231,8 +250,7 @@ fail0:
 		fileflags |= O_EXCL;
 	memset(&btinfo, 0, sizeof btinfo);
 	btinfo.compare = cmpf;
-	db = dbopen(filename, fileflags, filemode, dbtype, &btinfo);
-	if (db == NULL)
+	if ((db = dbopen(filename, fileflags, filemode, dbtype, &btinfo)) == NULL)
 	{
 		int _errno = errno;
 
@@ -278,12 +296,18 @@ bdb_get(DB *db,
 
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
 	dbstat = db->get(db, NULL, key, val, 0);
+	if (dbstat != 0 && ep_dbg_test(Dbg, 1))
+		DbEnv->err(DbEnv, dbstat, "db->get");
 #else
 	dbstat = db->get(db, key, val, 0);
 #endif
 	estat = ep_stat_from_dbstat(dbstat);
-	if (!EP_STAT_ISOK(estat))
-		ep_log(estat, "bdb_get: dbstat %d", dbstat);
+	if (!EP_STAT_ISOK(estat) && ep_dbg_test(Dbg, 49))
+	{
+		char ebuf[80];
+		ep_dbg_printf("bdb_get: dbstat %d (%s)", dbstat,
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
 	return estat;
 }
 #endif // LOG_CHECK
@@ -1462,7 +1486,7 @@ tidx_create(gdp_gcl_t *gcl, const char *suffix, uint32_t flags)
 	EP_STAT_CHECK(estat, goto fail0);
 
 	ep_dbg_cprintf(Dbg, 20, "tidx_create: creating %s\n", tidx_pbuf);
-	int dbflags = DB_CREATE;
+	int dbflags = DB_CREATE | DB_THREAD;
 	if (!EP_UT_BITSET(FLAG_TMPFILE, flags))
 		dbflags |= DB_EXCL;
 	estat = bdb_open(tidx_pbuf, dbflags, GCLfilemode,
@@ -1488,7 +1512,7 @@ tidx_open(gdp_gcl_t *gcl, const char *suffix, int openmode)
 	EP_STAT estat;
 	const char *phase;
 	struct physinfo *phys = GETPHYS(gcl);
-	int dbflags = 0;
+	int dbflags = DB_THREAD;
 	char tidx_pbuf[GCL_PATH_MAX];
 
 	phase = "get_gcl_path";
@@ -2071,8 +2095,13 @@ disk_ts_to_recno(gdp_gcl_t *gcl,
 	tkey.sec = ep_net_hton64(datum->ts.tv_sec);
 	tkey.nsec = ep_net_hton32(datum->ts.tv_nsec);
 	tkey_dbt.data = &tkey;
-	tkey_dbt.size = sizeof tkey;
 	memset(&tval_dbt, 0, sizeof tval_dbt);
+#if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
+	tidx_value_t tval;
+	tval_dbt.data = &tval;
+	tval_dbt.flags = DB_DBT_USERMEM;
+	tval_dbt.size = tval_dbt.ulen = sizeof tval;
+#endif
 
 	estat = bdb_get_first_after_key(phys->tidx.db, &tkey_dbt, &tval_dbt);
 
@@ -2084,8 +2113,8 @@ disk_ts_to_recno(gdp_gcl_t *gcl,
 			estat = GDP_STAT_CORRUPT_INDEX;
 			goto fail0;
 		}
-		tidx_value_t *tval = tval_dbt.data;
-		datum->recno = tval->recno;
+		tidx_value_t *tvalp = tval_dbt.data;
+		datum->recno = tvalp->recno;
 	}
 
 fail0:

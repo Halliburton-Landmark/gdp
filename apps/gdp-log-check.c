@@ -224,13 +224,13 @@ recseq_init(struct ctx *ctx)
 					DB_BTREE, &recno_cmpf, &ctx->recseqdb);
 	if (!EP_STAT_ISOK(estat))
 	{
-		ep_app_message(estat, "Cannot open recno sequence temp db");
+		ep_app_message(estat, "Cannot open record sequence temp db");
 	}
 	else
 	{
 		estat = bdb_cursor_open(ctx->recseqdb, &ctx->recseqdbc);
 		if (!EP_STAT_ISOK(estat))
-			ep_app_message(estat, "Cannot open recno sequence cursor");
+			ep_app_message(estat, "Cannot open sequence sequence db cursor");
 	}
 	return estat;
 }
@@ -985,6 +985,13 @@ check_record(
 		tkey_dbt.data = &tkey;
 		tkey_dbt.size = sizeof tkey;
 		memset(&tval_dbt, 0, sizeof tval_dbt);
+#if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
+		tidx_value_t tval;
+		memset(&tval, 0, sizeof tval);
+		tval_dbt.data = &tval;
+		tval_dbt.flags = DB_DBT_USERMEM;
+		tval_dbt.size = tval_dbt.ulen = sizeof tval;
+#endif
 
 		estat = bdb_get(phys->tidx.db, &tkey_dbt, &tval_dbt);
 		if (!EP_STAT_ISOK(estat))
@@ -1025,6 +1032,51 @@ fail0:
 
 
 EP_STAT
+check_tidx_db(gdp_gcl_t *gcl, struct ctx *ctx, const char **phasep)
+{
+	EP_STAT estat = EP_STAT_OK;
+
+#if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
+	const char *phase;
+	DB_ENV *dbenv = NULL;
+	DB *dbp = NULL;
+	int istat;
+	char tidx_pbuf[GCL_PATH_MAX];
+
+	phase = "tidx_get_gcl_path";
+	estat = get_gcl_path(gcl, -1, GCL_TIDX_SUFFIX,
+					tidx_pbuf, sizeof tidx_pbuf);
+
+	// first do a low-level verify on the database
+	phase = "tidx_db_env_create";
+	if ((istat = db_env_create(&dbenv, 0)) != 0)
+		goto fail1;
+	if (!Flags.silent)
+	{
+		dbenv->set_errfile(dbenv, stderr);
+		dbenv->set_errpfx(dbenv, ep_app_getprogname());
+	}
+	phase = "tidx_db_create";
+	if ((istat = db_create(&dbp, dbenv, 0)) != 0)
+		goto fail1;
+	phase = "tidx_db_verify";
+	istat = dbp->verify(dbp, tidx_pbuf, ctx->logxname, NULL, 0);
+fail1:
+	if (istat != 0)
+	{
+		dbenv->err(dbenv, istat, "%s", phase);
+		estat = GDP_STAT_CORRUPT_TIDX;
+	}
+	// dbp->verify has released the dbp
+	if (dbenv != NULL)
+		(void) dbenv->close(dbenv, 0);
+	*phasep = phase;
+#endif
+	return estat;
+}
+
+
+EP_STAT
 do_check(gdp_gcl_t *gcl, struct ctx *ctx)
 {
 	EP_STAT estat;
@@ -1036,6 +1088,10 @@ do_check(gdp_gcl_t *gcl, struct ctx *ctx)
 	// open recno index for read
 	phase = "ridx_open";
 	estat = ridx_open(gcl, GCL_RIDX_SUFFIX, O_RDONLY);
+	EP_STAT_CHECK(estat, goto fail0);
+
+	// check timestamp database
+	estat = check_tidx_db(gcl, ctx, &phase);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// open timestamp index for read
@@ -1149,6 +1205,11 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 	EP_STAT estat;
 	const char *phase;
 	gcl_physinfo_t *phys = GETPHYS(gcl);
+	bool install_new_files = false;
+
+	// check the tidx database
+	estat = check_tidx_db(gcl, ctx, &phase);
+	EP_STAT_CHECK(estat, install_new_files = true);
 
 	// create temporary recno index
 	phase = "create ridx temp";
@@ -1170,7 +1231,6 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 	bdb_close(phys->tidx.db);
 	phys->tidx.db = NULL;
 
-	bool install_new_files = false;
 	if (EP_STAT_ISOK(estat))
 	{
 		struct stat st;
@@ -1182,27 +1242,24 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 			estat = LOGCHECK_MISSING_INDEX;
 	}
 
-	if (EP_STAT_ISWARN(estat))
+	if (install_new_files || EP_STAT_ISWARN(estat))
 	{
 		ep_app_message(estat, "changes made to log %s", ctx->logxname);
-		if (Flags.force ||
+		if (Flags.force || install_new_files ||
 			askuser("Do you want to install the new indices [Yn]?", true))
 		{
 			install_new_files = true;
 		}
 	}
+	else if (!EP_STAT_ISOK(estat))
+	{
+		ep_app_message(estat, "could not rebuild log %s", ctx->logxname);
+	}
 	else
 	{
-		if (!EP_STAT_ISOK(estat))
-		{
-			ep_app_message(estat, "could not rebuild log %s", ctx->logxname);
-		}
-		else
-		{
-			ep_app_info("no changes to %s%s\n\t", ctx->logxname,
-					Flags.force ? "(forcing new index installation anyway)"
-								: "(use -f to force new index installation)");
-		}
+		ep_app_info("no changes to %s%s\n\t", ctx->logxname,
+				Flags.force ? "(forcing new index installation anyway)"
+							: "(use -f to force new index installation)");
 	}
 
 	if (Flags.force || install_new_files)
