@@ -712,6 +712,7 @@ cmd_append(gdp_req_t *req)
 		else
 		{
 			ep_dbg_cprintf(Dbg, 51, "cmd_append: good signature\n");
+			
 		}
 	}
 
@@ -728,6 +729,11 @@ cmd_append(gdp_req_t *req)
 
 		// update the server's view of the number of records
 		req->gcl->nrecs++;
+		char ebuf[60];
+
+		admin_post_stats(ADMIN_LOG_EXIST, "log-written",
+					"status", ep_stat_tostr(estat, ebuf, sizeof ebuf),
+					NULL, NULL);
 	}
 
 	if (false)

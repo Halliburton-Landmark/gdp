@@ -171,6 +171,51 @@ admin_init(void)
 
 
 /*
+** GDP Visualization and Monitoring Application 
+** 	Write visualization statistics to a GCL (a GDP log file, not a log file of the system)
+** 	Should be called whenever data is written to system log file (admin_post_stats)
+*/
+
+void writeToMonitorGCL(const char * timestamp, const char * messageId, const char * name)
+{
+        // string temp1 = "{\"GDP_IDENTIFIER\": \"" + name + "\", \"MESSAGE-ID\": \"" + messageId + "\", \"TIMESTAMP\": \"" + timestamp + "\"}";
+        // char * temp = const_cast<char *>(temp1.c_str());
+    
+    	// char * temp = "test";
+        // fprintf(stderr, "wooo testing %s %s\n", timestamp, messageId);
+    
+        // gdp_name_t gcliname;
+        // gdp_gcl_t* gcl;
+    
+        // gdp_gcl_open_info_t *info = gdp_gcl_open_info_new();
+        // const char * name = "edu.berkeley.eecs.swarmlab.neil.4.07"; //specify GCL
+        // gdp_parse_name(name, gcliname); //get GDP identifier of specified GCL
+    
+    
+        // EP_STAT ep = gdp_gcl_open(gcliname, GDP_MODE_RA, info, &gcl); //open GCL
+        // gdp_datum_t *datum = gdp_datum_new(); //init new datum
+    
+        // if (!EP_STAT_ISOK(ep)) { //check if able to open GCL
+        //         printf("oh no - could not create datum");
+        //         free(datum);
+        //         return;
+        // }
+    
+        // gdp_buf_write(gdp_datum_getbuf(datum), temp, strlen(temp)); //format datum
+        // ep = gdp_gcl_append(gcl, datum); //apend datum
+    
+    
+        // if (!EP_STAT_ISOK(ep)) {
+        //         printf("oh no - could not write to datum");
+        // }
+        // free(datum);
+}
+
+
+
+
+
+/*
 **  _ADMIN_POST_STATS, _ADMIN_POST_STATSV --- post statistics
 **
 **		Parameters:
@@ -188,10 +233,10 @@ admin_post_stats(
 		...)
 {
 	va_list av;
-
+	fprintf(stderr, "%s\n", msgid);
 	va_start(av, msgid);
 	admin_post_statsv(mask, msgid, av);
-	writeToMonitorGCL(mask, msgid, av); //web-visualization output
+	// writeToMonitorGCL(mask, msgid, av); //web-visualization output
 	va_end(av);
 }
 
@@ -201,6 +246,7 @@ admin_post_statsv(
 		const char *msgid,
 		va_list av)
 {
+
 	int argno = 0;
 	bool firstparam = true;
 	int xlatemode = EP_XLATE_PLUS | EP_XLATE_NPRINT;
@@ -246,6 +292,7 @@ admin_post_statsv(
         timestamp = tbuf; //visualization variable
 	}
 
+
 	(void) ep_xlate_out(msgid,
 			strlen(msgid),
 			fp,
@@ -260,6 +307,7 @@ admin_post_statsv(
 
 		argno++;
 		apn = va_arg(av, const char *);
+		fprintf(stderr, "YO TESTING %s\n", apn);
 		if ((apv = va_arg(av, const char *)) == NULL)
 			break;
 
@@ -291,7 +339,7 @@ admin_post_statsv(
 				forbidchars,
 				xlatemode);
 	}
-    writeToMonitorGCL(timestamp, msgid, name);
+    // writeToMonitorGCL(timestamp, msgid, name);
 	putc('\n', fp);
 	fflush(fp);
 	funlockfile(fp);
@@ -361,44 +409,6 @@ admin_probe(int fd, short what, void *ctx)
 	ep_thr_pool_run(admin_probe_thread, ctx);
 }
 
-/*
-** GDP Visualization and Monitoring Application 
-** 	Write visualization statistics to a GCL (a GDP log file, not a log file of the system)
-** 	Should be called whenever data is written to system log file (admin_post_stats)
-*/
 
-void writeToMonitorGCL(char * timestamp, char * message-id, char * name)
-{
-        string temp1 = "{\"GDP_IDENTIFIER\": \"" + name + "\", \"MESSAGE-ID\": \"" + message-id + "\", \"TIMESTAMP\": \"" + timestamp + "\"}";
-        char * temp = const_cast<char *>(temp1.c_str());
-    
-        printf("%s\n", temp);
-    
-        gdp_name_t gcliname;
-        gdp_gcl_t* gcl;
-    
-        gdp_gcl_open_info_t *info = gdp_gcl_open_info_new();
-        const char * name = "edu.berkeley.eecs.swarmlab.neil.4.07"; //specify GCL
-        gdp_parse_name(name, gcliname); //get GDP identifier of specified GCL
-    
-    
-        EP_STAT ep = gdp_gcl_open(gcliname, GDP_MODE_RA, info, &gcl); //open GCL
-        gdp_datum_t *datum = gdp_datum_new(); //init new datum
-    
-        if (!EP_STAT_ISOK(ep)) { //check if able to open GCL
-                printf("oh no - could not create datum");
-                free(datum);
-                return;
-        }
-    
-        gdp_buf_write(gdp_datum_getbuf(datum), temp, strlen(temp)); //format datum
-        ep = gdp_gcl_append(gcl, datum); //apend datum
-    
-    
-        if (!EP_STAT_ISOK(ep)) {
-                printf("oh no - could not write to datum");
-        }
-        free(datum);
-}
 
 
