@@ -815,7 +815,8 @@ post_subscribe(gdp_req_t *req)
 			}
 			req->nextrec++;
 		}
-		else if (!EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOTFOUND))
+		else if (!EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOTFOUND) &&
+				 !EP_STAT_IS_SAME(estat, GDP_STAT_RECORD_MISSING))
 		{
 			// this is some error that should be logged
 			ep_log(estat, "post_subscribe: bad read");
