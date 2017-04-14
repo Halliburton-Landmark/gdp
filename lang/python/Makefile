@@ -5,4 +5,3 @@ install:
 	sed 's@"..", "..", "..", "libs"@"/", "usr", "lib"@g' \
 		/usr/local/lib/python2.7/dist-packages/gdp/MISC.py > MISC.py.tmp
 	mv MISC.py.tmp /usr/local/lib/python2.7/dist-packages/gdp/MISC.py
-	-diff gdp/MISC.py /usr/local/lib/python2.7/dist-packages/gdp/MISC.py
