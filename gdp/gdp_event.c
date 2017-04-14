@@ -343,6 +343,10 @@ _gdp_event_add_from_req(gdp_req_t *req)
 		req->flags &= ~GDP_REQ_PERSIST;
 		break;
 
+	  case GDP_NAK_C_REC_MISSING:
+		evtype = GDP_EVENT_MISSING;
+		break;
+
 	  default:
 		if (req->rpdu->cmd >= GDP_ACK_MIN && req->rpdu->cmd <= GDP_ACK_MAX)
 		{
@@ -401,12 +405,16 @@ _gdp_event_add_from_req(gdp_req_t *req)
 void
 gdp_event_print(const gdp_event_t *gev, FILE *fp, int detail)
 {
+	gdp_recno_t recno = -1;
 	char ebuf[100];
 
 	if (detail > GDP_PR_BASIC + 1)
 		fprintf(fp, "Event type %d, udata %p, stat %s\n",
 				gev->type, gev->udata,
 				ep_stat_tostr(gev->stat, ebuf, sizeof ebuf));
+
+	if (gev->datum != NULL)
+		recno = gev->datum->recno;
 
 	switch (gev->type)
 	{
@@ -443,9 +451,15 @@ gdp_event_print(const gdp_event_t *gev, FILE *fp, int detail)
 					ep_stat_tostr(gev->stat, ebuf, sizeof ebuf));
 		break;
 
+	  case GDP_EVENT_MISSING:
+		fprintf(fp, "    Record %" PRIgdp_recno " missing\n",
+				recno);
+		break;
+
 	  default:
 		if (detail > 0)
-			fprintf(fp, "    Unknown event type %d\n", gev->type);
+			fprintf(fp, "    Unknown event type %d: %s\n",
+					gev->type, ep_stat_tostr(gev->stat, ebuf, sizeof ebuf));
 		break;
 	}
 }

@@ -130,6 +130,7 @@ extern void		_gdp_stat_init(void);
 											// (HTTP 415 Request URI Too Long)
 											// (HTTP 416 Requested Range Not Satisficable)
 											// (HTTP 417 Expectation Failed)
+#define _GDP_CCODE_MISSING_RECORD	430		// GDP missing record (gap)
 #define _GDP_CCODE_DUP_RECORD		431		// GDP Duplicate Record
 
 #define _GDP_CCODE_INTERNAL			500		// HTTP/CoAP Internal Server Error
@@ -165,6 +166,7 @@ extern void		_gdp_stat_init(void);
 #define GDP_STAT_NAK_PRECONFAILED	GDP_STAT_NEW(ERROR, _GDP_CCODE_PRECONFAILED)
 #define GDP_STAT_NAK_TOOLARGE		GDP_STAT_NEW(ERROR, _GDP_CCODE_TOOLARGE)
 #define GDP_STAT_NAK_UNSUPMEDIA		GDP_STAT_NEW(ERROR, _GDP_CCODE_UNSUPMEDIA)
+#define GDP_STAT_NAK_MISSING_RECORD	GDP_STAT_NEW(WARN, _GDP_CCODE_MISSING_RECORD)
 #define GDP_STAT_NAK_DUP_RECORD		GDP_STAT_NEW(WARN, _GDP_CCODE_DUP_RECORD)
 
 #define GDP_STAT_NAK_INTERNAL		GDP_STAT_NEW(SEVERE, _GDP_CCODE_INTERNAL)

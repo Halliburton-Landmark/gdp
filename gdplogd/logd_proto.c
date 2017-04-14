@@ -799,34 +799,37 @@ post_subscribe(gdp_req_t *req)
 		if (EP_STAT_ISOK(estat))
 		{
 			// OK, the next record exists: send it
-			req->stat = estat = _gdp_pdu_out(req->rpdu, req->chan, NULL);
-
-			// have to clear the old data and signature
-			gdp_buf_reset(req->rpdu->datum->dbuf);
-			if (req->rpdu->datum->sig != NULL)
-				gdp_buf_reset(req->rpdu->datum->sig);
-			req->rpdu->datum->siglen = 0;
-
-			// advance to the next record
-			if (req->numrecs > 0 && --req->numrecs == 0)
-			{
-				// numrecs was positive, now zero, but zero means infinity
-				req->numrecs--;
-			}
-			req->nextrec++;
+			req->rpdu->cmd = GDP_ACK_CONTENT;
 		}
-		else if (!EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOTFOUND) &&
-				 !EP_STAT_IS_SAME(estat, GDP_STAT_RECORD_MISSING))
+		else if (EP_STAT_IS_SAME(estat, GDP_STAT_RECORD_MISSING))
+		{
+			req->rpdu->cmd = GDP_NAK_C_REC_MISSING;
+			estat = EP_STAT_OK;
+		}
+		else
 		{
 			// this is some error that should be logged
 			ep_log(estat, "post_subscribe: bad read");
 			req->numrecs = -1;		// terminate subscription
+			break;
 		}
-		else
+
+		// send the PDU out
+		req->stat = estat = _gdp_pdu_out(req->rpdu, req->chan, NULL);
+
+		// have to clear the old data and signature
+		gdp_buf_reset(req->rpdu->datum->dbuf);
+		if (req->rpdu->datum->sig != NULL)
+			gdp_buf_reset(req->rpdu->datum->sig);
+		req->rpdu->datum->siglen = 0;
+
+		// advance to the next record
+		if (req->numrecs > 0 && --req->numrecs == 0)
 		{
-			// shouldn't happen
-			ep_log(estat, "post_subscribe: read EOF");
+			// numrecs was positive, now zero, but zero means infinity
+			req->numrecs--;
 		}
+		req->nextrec++;
 
 		// if we didn't successfully send a record, terminate
 		EP_STAT_CHECK(estat, break);

@@ -136,12 +136,13 @@ typedef struct gdp_event	gdp_event_t;
 
 // event types
 #define _GDP_EVENT_FREE		0	// internal use: event is free
-#define GDP_EVENT_DATA		1	// returned data
-#define GDP_EVENT_EOS		2	// normal end of subscription
-#define GDP_EVENT_SHUTDOWN	3	// subscription terminating because of shutdown
-#define GDP_EVENT_CREATED	4	// successful append, create, or other similar
-#define GDP_EVENT_SUCCESS	5	// generic asynchronous success status
-#define GDP_EVENT_FAILURE	6	// generic asynchronous failure status
+#define GDP_EVENT_DATA		1	// 205 returned data
+#define GDP_EVENT_EOS		2	// 205 normal end of subscription
+#define GDP_EVENT_SHUTDOWN	3	// 515 subscription terminating because of shutdown
+#define GDP_EVENT_CREATED	4	// 201 successful append, create, or similar
+#define GDP_EVENT_SUCCESS	5	// 200 generic asynchronous success status
+#define GDP_EVENT_FAILURE	6	//     generic asynchronous failure status
+#define GDP_EVENT_MISSING	7	// 430 record is missing
 
 extern gdp_event_t		*gdp_event_next(		// get event (caller must free!)
 							gdp_gcl_t *gcl,			// if set wait for this GCL only

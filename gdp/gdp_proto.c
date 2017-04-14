@@ -689,6 +689,7 @@ static dispatch_ent_t	DispatchTable[256] =
 	NOENT,				// 189
 	NOENT,				// 190
 	NOENT,				// 191
+
 	{ nak_client,		"NAK_C_BADREQ"			},			// 192
 	{ nak_client,		"NAK_C_UNAUTH"			},			// 193
 	{ nak_client,		"NAK_C_BADOPT"			},			// 194
@@ -719,8 +720,9 @@ static dispatch_ent_t	DispatchTable[256] =
 	NOENT,				// 219
 	NOENT,				// 220
 	NOENT,				// 221
-	NOENT,				// 222
+	{ nak_client,		"NAK_C_MISSING_RECORD"	},			// 222
 	{ nak_client,		"NAK_C_REC_DUP"			},			// 223
+
 	{ nak_server,		"NAK_S_INTERNAL"		},			// 224
 	{ nak_server,		"NAK_S_NOTIMPL"			},			// 225
 	{ nak_server,		"NAK_S_BADGATEWAY"		},			// 226
@@ -737,6 +739,7 @@ static dispatch_ent_t	DispatchTable[256] =
 	NOENT,				// 237
 	{ nak_server,		"NAK_S_REC_MISSING"		},			// 238
 	{ nak_server,		"NAK_S_LOSTSUB"			},			// 239
+
 	{ nak_router,		"NAK_R_NOROUTE"			},			// 240
 	NOENT,				// 241
 	NOENT,				// 242

@@ -235,20 +235,9 @@ print_event(gdp_event_t *gev, bool subscribe)
 		fprintf(stderr, "Successful append, create, or similar\n");
 		break;
 
-	  case GDP_EVENT_SUCCESS:
-		fprintf(stderr, "Generic success\n");
-		break;
-
-	  case GDP_EVENT_FAILURE:
-		fprintf(stderr, "Generic failure\n");
-		break;
-
 	  default:
-		// should be ignored, but we print it since this is a test program
-		fprintf(stderr, "Unknown event type %d\n", gdp_event_gettype(gev));
-
-		// just in case we get into some crazy loop.....
-		sleep(1);
+		// let the library handle this
+		gdp_event_print(gev, stderr, 1);
 		break;
 	}
 
