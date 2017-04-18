@@ -305,12 +305,19 @@ simple as possible._]]
 Protocol Overview (Option 3)
 ----------------------------
 
-This section is a placeholder.  It presumes that this protocol is
-a Layer 3 (packet-based) protocol, and as such has to include
+This section is a placeholder.  It presumes that the GDP protocol
+is a Layer 3 (packet-based) protocol, and as such has to include
 fields to do packet fragmentation/reassembly, retransmission,
-packet ordering, windowing, etc.  It would probably run directly
-on top of IP (which would mean tunneling one L3 protocol through
-another), but it could conceivably run as a peer to IP.
+packet ordering, windowing, congestion/flow control, etc.
+It would probably run directly on top of IP (which would mean
+tunneling one L3 protocol through another), but it could
+conceivably run as a peer to IP.
+
+As a practical matter, this would be multiple protocols, one at
+Layer 3 to route packets using GDP addresses, one at Layer 4 to
+provide TCP-like functions noted above, and at least one at a
+higher layer to interpret the payload (which would probably look
+a lot like the previous options).
 
 [[_Not specified at this time._]]
 
