@@ -4,18 +4,21 @@
 #
 
 # files that should be made public (installed in /usr/local/share/doc)
-#   should include gdplogd-vizstats.html once pandoc is installed
+# 	It would be nice to make .html versions of the .md files, but
+# 	pandoc is not installed on the Jenkins machine.
 PUBALL= \
 		gdp-gcl-metadata.html \
 		gdp-programmatic-api.html \
-		gdp-proto-v4-proposal.html \
+		gdp-proto-v4-proposal.md \
 		gdp-protocol.html \
 		gdp-rest-interface.html \
+		gdplogd-vizstats.md \
 		Libep.dbk \
 		Libep.pdf \
 
 # files that are auto-generated (should be cleaned)
 CLEANALL= \
+	  	gdp-proto-v4-proposal.html \
 		gdplogd-vizstats.html \
 
 ALL=		${CLEANALL} ${PUBALL}
@@ -24,6 +27,9 @@ DESTDIR=
 LOCALROOT=	/usr
 INSTALLROOT=	${DESTDIR}${LOCALROOT}
 DOCDIR=		${INSTALLROOT}/share/doc/gdp
+
+# remove this if pandoc gets installed on the Jenkins machine
+jenkins-all: ${PUBALL}
 
 all: ${ALL}
 
