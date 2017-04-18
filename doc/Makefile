@@ -8,6 +8,7 @@
 PUBALL= \
 		gdp-gcl-metadata.html \
 		gdp-programmatic-api.html \
+		gdp-proto-v4-proposal.html \
 		gdp-protocol.html \
 		gdp-rest-interface.html \
 		Libep.dbk \
