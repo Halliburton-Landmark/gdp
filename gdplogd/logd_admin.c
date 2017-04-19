@@ -61,6 +61,7 @@ static FILE			*AdminStatsFp;
 static uint32_t		AdminRunMask = 0xffffffff;
 static char			*AdminPrefix = "";
 static bool			AdminInitialized = false;
+static bool			MonitorWriteEnable = true;
 
 // a prefix to indicate that this is an admin message (stdout & stderr only)
 #define INDICATOR		">#<"
@@ -176,39 +177,33 @@ admin_init(void)
 ** 	Should be called whenever data is written to system log file (admin_post_stats)
 */
 
-void writeToMonitorGCL(const char * timestamp, const char * messageId, const char * name)
-{
-        // string temp1 = "{\"GDP_IDENTIFIER\": \"" + name + "\", \"MESSAGE-ID\": \"" + messageId + "\", \"TIMESTAMP\": \"" + timestamp + "\"}";
-        // char * temp = const_cast<char *>(temp1.c_str());
+void writeToMonitorGCL(char * data)
+{   
+        gdp_name_t gcliname;
+        gdp_gcl_t* gcl;
     
-    	// char * temp = "test";
-        // fprintf(stderr, "wooo testing %s %s\n", timestamp, messageId);
-    
-        // gdp_name_t gcliname;
-        // gdp_gcl_t* gcl;
-    
-        // gdp_gcl_open_info_t *info = gdp_gcl_open_info_new();
-        // const char * name = "edu.berkeley.eecs.swarmlab.neil.4.07"; //specify GCL
-        // gdp_parse_name(name, gcliname); //get GDP identifier of specified GCL
+        gdp_gcl_open_info_t *info = gdp_gcl_open_info_new();
+        const char * name = "edu.berkeley.eecs.swarmlab.neil.04.18CC"; //specify GCL
+        gdp_parse_name(name, gcliname); //get GDP identifier of specified GCL
     
     
-        // EP_STAT ep = gdp_gcl_open(gcliname, GDP_MODE_RA, info, &gcl); //open GCL
-        // gdp_datum_t *datum = gdp_datum_new(); //init new datum
+        EP_STAT ep = gdp_gcl_open(gcliname, GDP_MODE_RA, info, &gcl); //open GCL
+        gdp_datum_t *datum = gdp_datum_new(); //init new datum
     
-        // if (!EP_STAT_ISOK(ep)) { //check if able to open GCL
-        //         printf("oh no - could not create datum");
-        //         free(datum);
-        //         return;
-        // }
+        if (!EP_STAT_ISOK(ep)) { //check if able to open GCL
+                fprintf(stderr, "oh no - could not create datum");
+                free(datum);
+                return;
+        }
     
-        // gdp_buf_write(gdp_datum_getbuf(datum), temp, strlen(temp)); //format datum
-        // ep = gdp_gcl_append(gcl, datum); //apend datum
+        gdp_buf_write(gdp_datum_getbuf(datum), data, strlen(data)); //format datum
+        ep = gdp_gcl_append(gcl, datum); //apend datum
     
     
-        // if (!EP_STAT_ISOK(ep)) {
-        //         printf("oh no - could not write to datum");
-        // }
-        // free(datum);
+        if (!EP_STAT_ISOK(ep)) {
+            fprintf(stderr, "oh no - could not write to datum");
+        } 
+        free(datum);
 }
 
 
@@ -233,10 +228,8 @@ admin_post_stats(
 		...)
 {
 	va_list av;
-	fprintf(stderr, "%s\n", msgid);
 	va_start(av, msgid);
 	admin_post_statsv(mask, msgid, av);
-	// writeToMonitorGCL(mask, msgid, av); //web-visualization output
 	va_end(av);
 }
 
@@ -246,25 +239,24 @@ admin_post_statsv(
 		const char *msgid,
 		va_list av)
 {
-
 	int argno = 0;
 	bool firstparam = true;
 	int xlatemode = EP_XLATE_PLUS | EP_XLATE_NPRINT;
 	static const char *forbidchars = NULL;
 	FILE *fp;
     
-    char * timestamp;
-    char * name;
+    char data [200];
 
-	if (!AdminInitialized)
+	if (!AdminInitialized && !MonitorWriteEnable)
 		admin_init();
-	if ((mask & AdminRunMask) == 0)
+	if ((mask & AdminRunMask) == 0 && !MonitorWriteEnable)
 		return;
+
 	if (forbidchars == NULL)
 		forbidchars = ep_adm_getstrparam("gdplogd.admin.forbidchars", "=;");
 
 	// check to see if we need to re-open the output
-	if (AdminStatsFileName != NULL)
+	if (AdminStatsFileName != NULL && !MonitorWriteEnable)
 	{
 		struct stat st;
 
@@ -273,31 +265,45 @@ admin_post_statsv(
 			reopen(AdminStatsFileName, &AdminStatsFp, &AdminStatsIno);
 		}
 	}
-	fp = AdminStatsFp;
 
-	// make sure this message is atomic
-	flockfile(fp);
+	if (!MonitorWriteEnable) {
+		fp = AdminStatsFp;
 
-	// output an initial indicator to make this easy to find
-	fprintf(fp, "%s", AdminPrefix);
+		// make sure this message is atomic
+		flockfile(fp);
+
+		// output an initial indicator to make this easy to find
+		fprintf(fp, "%s", AdminPrefix);
+	}
 
 	// add a timestamp and the message id
 	{
 		EP_TIME_SPEC now;
 		char tbuf[60];
+		//string temp1 = "{\"GDP_IDENTIFIER\": \"" + GDP_IDENTIFIER + "\", \"ACTION\": \"" + ACTION + "\", \"GDP_ROUTER_IDENTIFIER\": \"" + GDP_ROUTER_IDENTIFIER + "\"}";
 
 		ep_time_now(&now);
 		ep_time_format(&now, tbuf, sizeof tbuf, EP_TIME_FMT_NOFUZZ);
-		fprintf(fp, "%s ", tbuf);
-        timestamp = tbuf; //visualization variable
+		if (!MonitorWriteEnable) {
+			fprintf(fp, "%s ", tbuf);
+		} else {
+			strcat(data, "{\"TIME\": \"");
+			strcat(data, tbuf);
+			strcat(data, "\", \"log-id");
+		}
 	}
+	if (MonitorWriteEnable) {
+		strcat(data, "\": \"");
+		strcat(data, msgid);
+		strcat(data, "\"");
 
-
-	(void) ep_xlate_out(msgid,
+	} else {
+		(void) ep_xlate_out(msgid,
 			strlen(msgid),
 			fp,
 			forbidchars,
 			xlatemode);
+	}
 
 	// scan the arguments
 	for (;;)
@@ -307,42 +313,65 @@ admin_post_statsv(
 
 		argno++;
 		apn = va_arg(av, const char *);
-		fprintf(stderr, "YO TESTING %s\n", apn);
+		
 		if ((apv = va_arg(av, const char *)) == NULL)
 			break;
 
 		if (!firstparam)
         {
-			putc(';', fp);
+        	if (!MonitorWriteEnable) {
+				putc(';', fp);
+        	}
         }
-        else
-        {
-            name = apn; //visualization variable
-        }
-            putc(' ', fp);
+       
+       if (!MonitorWriteEnable) {
+			putc(' ', fp);
+       }
+
 		firstparam = false;
 
 		if (apn != NULL)
 		{
-			(void) ep_xlate_out(apn,
-					strlen(apn),
+			if (MonitorWriteEnable) {
+				strcat(data, ", \"");
+				strcat(data, apn);
+				strcat(data, "\": ");
+			} else {
+
+				(void) ep_xlate_out(apn,
+						strlen(apn),
+						fp,
+						forbidchars,
+						xlatemode);
+
+				putc('=', fp);
+			}
+
+		}
+		if (MonitorWriteEnable) {
+			strcat(data, "\"");
+			strcat(data, apv);
+			strcat(data, "\"");
+
+		} else {
+
+			(void) ep_xlate_out(apv,
+					strlen(apv),
 					fp,
 					forbidchars,
 					xlatemode);
-
-			putc('=', fp);
 		}
-
-		(void) ep_xlate_out(apv,
-				strlen(apv),
-				fp,
-				forbidchars,
-				xlatemode);
 	}
-    // writeToMonitorGCL(timestamp, msgid, name);
-	putc('\n', fp);
-	fflush(fp);
-	funlockfile(fp);
+	
+	if (!MonitorWriteEnable) {
+		putc('\n', fp);
+		fflush(fp);
+		funlockfile(fp);
+	} else {
+		strcat(data, "}");
+		writeToMonitorGCL(data);
+	}
+	
 }
 
 
@@ -412,3 +441,4 @@ admin_probe(int fd, short what, void *ctx)
 
 
 
+ 
