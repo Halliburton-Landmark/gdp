@@ -397,7 +397,7 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 			if (g1->utime > mintime)
 			{
 				_gdp_gcl_unlock(g1);
-				break;
+				continue;
 			}
 			if (EP_UT_BITSET(GCLF_DROPPING, g1->flags) || g1->refcnt > 0)
 			{
