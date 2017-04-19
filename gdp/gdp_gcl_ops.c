@@ -551,6 +551,12 @@ append_common(gdp_gcl_t *gcl,
 	req->md = gcl->digest;
 	datum->recno = gcl->nrecs + 1;
 
+	// Note that this is just a guess: the append may still fail,
+	// but we need to do this if there are multiple threads appending
+	// at the same time.
+	// If the append fails, we'll be out of sync and all hell breaks loose.
+	gcl->nrecs++;
+
 	// if doing append filtering (e.g., encryption), call it now.
 	if (gcl->apndfilter != NULL)
 		estat = gcl->apndfilter(datum, gcl->apndfpriv);
@@ -625,11 +631,6 @@ _gdp_gcl_append_async(
 	_gdp_event_setcb(req, cbfunc, cbarg);
 
 	estat = _gdp_req_send(req);
-
-	// Note that this is just a guess: the write may still fail.
-	// If it does, we'll be out of sync and all hell breaks loose.
-	if (EP_STAT_ISOK(estat))
-		gcl->nrecs++;
 
 	// synchronous calls clear the data in the datum, so be consistent
 	i = gdp_buf_drain(req->cpdu->datum->dbuf, SIZE_MAX);
