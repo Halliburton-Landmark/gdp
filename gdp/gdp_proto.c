@@ -190,17 +190,17 @@ _gdp_invoke(gdp_req_t *req)
 				break;
 			}
 		}
-		else if (retries <= 0)
+		else
 		{
-			break;
+			// do a retry, after re-locking the GCL
+			estat = _gdp_req_unsend(req);
+			if (!EP_STAT_ISOK(estat) || retries <= 0)
+				break;
+
+			// if ETIMEDOUT, maybe the router had a glitch:
+			//   wait and try again
+			ep_time_nanosleep(retry_delay MILLISECONDS);
 		}
-
-		// do a retry, after re-locking the GCL
-		_gdp_req_unsend(req);
-
-		// if ETIMEDOUT, maybe the router had a glitch:
-		//   wait and try again
-		ep_time_nanosleep(retry_delay MILLISECONDS);
 	}
 
 	// if we had any pending asynchronous events, deliver them
