@@ -154,7 +154,9 @@ do_simpleread(gdp_gcl_t *gcl,
 		estat = ep_time_parse(dtstr, &ts, EP_TIME_USE_LOCALTIME);
 		if (!EP_STAT_ISOK(estat))
 		{
-			fprintf(stderr, "Cannot convert date/time string \"%s\"\n", dtstr);
+			ep_app_message(estat,
+						"Cannot convert date/time string \"%s\"",
+						dtstr);
 			goto done;
 		}
 
@@ -175,8 +177,7 @@ do_simpleread(gdp_gcl_t *gcl,
 			char nbuf[40];
 
 			strerror_r(errno, nbuf, sizeof nbuf);
-			fprintf(stderr, "*** WARNING: buffer reset failed: %s\n",
-					nbuf);
+			ep_app_warn("buffer reset failed: %s", nbuf);
 		}
 
 		// move to next record
@@ -221,7 +222,7 @@ print_event(gdp_event_t *gev, bool subscribe)
 		// "end of subscription": no more data will be returned
 		if (!Quiet)
 		{
-			fprintf(stderr, "End of %s\n",
+			ep_app_info("End of %s\n",
 					subscribe ? "Subscription" : "Multiread");
 		}
 		estat = EP_STAT_END_OF_FILE;
@@ -235,7 +236,7 @@ print_event(gdp_event_t *gev, bool subscribe)
 		break;
 
 	  case GDP_EVENT_CREATED:
-		fprintf(stderr, "Successful append, create, or similar\n");
+		ep_app_info("Successful append, create, or similar");
 		break;
 
 	  default:
@@ -598,7 +599,7 @@ main(int argc, char **argv)
 
 	if (firstrec > 0 && dtstr != NULL)
 	{
-		fprintf(stderr, "Cannot specify -f and -d\n");
+		ep_app_error("Cannot specify -f and -d");
 		exit(EX_USAGE);
 	}
 
@@ -611,7 +612,7 @@ main(int argc, char **argv)
 		ntypes++;
 	if (ntypes > 1)
 	{
-		fprintf(stderr, "Can only specify one of -a, -m, and -s\n");
+		ep_app_error("Can only specify one of -a, -m, and -s");
 		exit(EX_USAGE);
 	}
 
@@ -624,7 +625,7 @@ main(int argc, char **argv)
 		// open a log file (for timing measurements)
 		LogFile = fopen(log_file_name, "a");
 		if (LogFile == NULL)
-			fprintf(stderr, "Cannot open log file %s: %s\n",
+			ep_app_warn("Cannot open log file %s: %s",
 					log_file_name, strerror(errno));
 		else
 			setlinebuf(LogFile);
@@ -645,7 +646,7 @@ main(int argc, char **argv)
 	estat = gdp_parse_name(argv[0], gclname);
 	if (!EP_STAT_ISOK(estat))
 	{
-		ep_app_fatal("illegal GCL name syntax:\n\t%s", argv[0]);
+		ep_app_message(estat, "illegal GCL name syntax:\n\t%s", argv[0]);
 		exit(EX_USAGE);
 	}
 
@@ -655,18 +656,15 @@ main(int argc, char **argv)
 		gdp_pname_t gclpname;
 
 		gdp_printable_name(gclname, gclpname);
-		fprintf(stderr, "Reading GCL %s\n", gclpname);
+		ep_app_info("Reading GCL %s", gclpname);
 	}
 
 	// open the GCL; arguably this shouldn't be necessary
 	estat = gdp_gcl_open(gclname, open_mode, NULL, &gcl);
 	if (!EP_STAT_ISOK(estat))
 	{
-		char sbuf[100];
-
-		ep_app_error("Cannot open GCL:\n    %s",
-				ep_stat_tostr(estat, sbuf, sizeof sbuf));
-		goto fail0;
+		ep_app_message(estat, "Cannot open GCL %s", argv[0]);
+		exit(EX_NOINPUT);
 	}
 
 	// if we are converting a date/time string, set the local timezone
