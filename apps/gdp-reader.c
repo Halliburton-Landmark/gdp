@@ -219,8 +219,11 @@ print_event(gdp_event_t *gev, bool subscribe)
 
 	  case GDP_EVENT_EOS:
 		// "end of subscription": no more data will be returned
-		fprintf(stderr, "End of %s\n",
-				subscribe ? "Subscription" : "Multiread");
+		if (!Quiet)
+		{
+			fprintf(stderr, "End of %s\n",
+					subscribe ? "Subscription" : "Multiread");
+		}
 		estat = EP_STAT_END_OF_FILE;
 		break;
 
@@ -241,7 +244,7 @@ print_event(gdp_event_t *gev, bool subscribe)
 		break;
 	}
 
-	if (!EP_STAT_ISOK(estat))
+	if (EP_STAT_ISFAIL(estat))			// ERROR or higher severity
 	{
 		char ebuf[100];
 		fprintf(stderr, "    STATUS: %s\n",
@@ -489,9 +492,8 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	gdp_gcl_t *gcl;
+	gdp_gcl_t *gcl = NULL;
 	EP_STAT estat;
-	char buf[200];
 	gdp_name_t gclname;
 	int opt;
 	char *gdpd_addr = NULL;
@@ -683,10 +685,27 @@ main(int argc, char **argv)
 	else
 		estat = do_simpleread(gcl, firstrec, dtstr, numrecs);
 
-	// might as well let the GDP know we're going away
-	gdp_gcl_close(gcl);
-
 fail0:
+	;				// silly compiler grammar
+	int exitstat;
+
+	if (!EP_STAT_ISFAIL(estat))			// WARN or OK
+		exitstat = EX_OK;
+	else if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOROUTE))
+		exitstat = EX_NOINPUT;
+	else if (EP_STAT_ISABORT(estat))
+		exitstat = EX_SOFTWARE;
+	else
+		exitstat = EX_UNAVAILABLE;
+
+	// might as well let the GDP know we're going away
+	if (gcl != NULL)
+	{
+		EP_STAT close_stat = gdp_gcl_close(gcl);
+		if (!EP_STAT_ISOK(close_stat))
+			ep_app_message(close_stat, "cannot close GCL");
+	}
+
 	if (ep_dbg_test(Dbg, 10))
 	{
 		// cheat here and use internal interface
@@ -696,13 +715,6 @@ fail0:
 
 	// might as well let the user know what's going on....
 	if (!Quiet || EP_STAT_ISFAIL(estat))
-		fprintf(stderr, "exiting after %d records with status %s\n",
-				NRead, ep_stat_tostr(estat, buf, sizeof buf));
-	if (EP_STAT_ISOK(estat))
-		return EX_OK;
-	if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOROUTE))
-		return EX_NOINPUT;
-	if (EP_STAT_ISABORT(estat))
-		return EX_SOFTWARE;
-	return EX_UNAVAILABLE;
+		ep_app_message(estat, "exiting after %d records", NRead);
+	return exitstat;
 }
