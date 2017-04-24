@@ -1388,18 +1388,33 @@ scan_log(const char *logxname, bool rebuild)
 */
 
 
+/*
+**  We don't call gdp_init (or even _gdp_lib_init) because we aren't
+**  actually a gdp program.  The downside of this is that we have to
+**  replicate some of the initialization here.
+*/
+
 void
 initialize(void)
 {
+	extern void _gdp_run_as(const char *);
+
 	ep_lib_init(0);
-	const char *progname = ep_app_getprogname();	// should be in ep_lib_init
-	if (progname != NULL)							// should be in ep_lib_init
-		ep_adm_readparams(progname);				// should be in ep_lib_init
+
+	// pretend we are gdplogd (at least a little bit)
+	ep_adm_readparams("gdplogd");					// include gdplogd defs
+
+	// possible local overrides
+	const char *progname = ep_app_getprogname();
+	if (progname != NULL)
+		ep_adm_readparams(progname);
+
 	ep_dbg_setfile(NULL);
 	_gdp_stat_init();
 	ep_stat_reg_strings(Stats);
+	if (getuid() == 0)
+		_gdp_run_as(ep_adm_getstrparam("swarm.gdplogd.runasuser", NULL));
 	signal(SIGINT, sigint);
-
 	disk_init();
 }
 

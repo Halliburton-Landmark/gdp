@@ -678,8 +678,8 @@ exit_on_signal(int sig)
 **  Change user id to something innocuous.
 */
 
-static void
-run_as(const char *runasuser)
+void
+_gdp_run_as(const char *runasuser)
 {
 	if (runasuser != NULL && *runasuser != '\0')
 	{
@@ -797,7 +797,7 @@ gdp_lib_init(const char *myname)
 		if (getuid() == 0)
 		{
 			snprintf(argname, sizeof argname, "swarm.%s.runasuser", progname);
-			run_as(ep_adm_getstrparam(argname, NULL));
+			_gdp_run_as(ep_adm_getstrparam(argname, NULL));
 		}
 
 		// allow log facilities on a per-app basis
@@ -809,7 +809,7 @@ gdp_lib_init(const char *myname)
 	}
 
 	if (getuid() == 0)
-		run_as(ep_adm_getstrparam("swarm.gdp.runasuser", NULL));
+		_gdp_run_as(ep_adm_getstrparam("swarm.gdp.runasuser", NULL));
 
 	if (ep_dbg_test(Dbg, 1))
 	{
