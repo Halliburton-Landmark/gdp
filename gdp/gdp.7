@@ -122,6 +122,7 @@ The units are seconds.
 When the GDP library is initialized several parameters come into play.
 These apply to all programs using the GDP library.
 .Bl -tag
+.
 .It swarm.gdp.cache.fd.headroom
 When aging out the log cache,
 this is the number of file descriptors that must be available
@@ -137,6 +138,15 @@ headroom
 available file descriptors available,
 the cache is swept again with a 3.75 minute (225 seconds) maximum age.
 The default is half the per-process maximum number of open files.
+.
+.It swarm.gdp.cache.reclaim.maxgcls
+Limit the number of GCLs to be examined during a reclaim operation.
+This is intended for debugging (to detect loops in the usage time list).
+If the number of GCLs in the cache exceed this number
+an assertion failure will be thrown.
+Defaults to
+.Li 100000 .
+.
 .It swarm.gdp.catch.sigint
 Arranges to catch the
 .Li SIGINT
@@ -145,6 +155,7 @@ signal and exit cleanly.
 Defaults to
 .Li true .
 You might want to set this to false in some debugging contexts.
+.
 .It swarm.gdp.catch.sigterm
 Arranges to catch the
 .Li SIGTERM
@@ -153,6 +164,7 @@ signal and exit cleanly.
 Defaults to
 .Li true .
 You might want to set this to false in some debugging contexts.
+.
 .It swarm.gdp.crypto.dsa.keylen
 When creating a new key of type DSA,
 the default number of bits to use.

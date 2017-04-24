@@ -363,6 +363,7 @@ void
 _gdp_gcl_cache_reclaim(time_t maxage)
 {
 	static int headroom = 0;
+	static long maxgcls;				// maximum number of GCLs in one pass
 
 	ep_dbg_cprintf(Dbg, 68, "_gdp_gcl_cache_reclaim(maxage = %ld)\n", maxage);
 
@@ -370,7 +371,7 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 	if (headroom == 0)
 	{
 		headroom = ep_adm_getintparam("swarm.gdp.cache.fd.headroom", 0);
-		if (headroom == 0)
+		if (headroom <= 0)
 		{
 			int maxfds;
 			(void) ep_app_numfds(&maxfds);
@@ -380,11 +381,17 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 		}
 	}
 
+	if (maxgcls <= 0)
+	{
+		maxgcls = ep_adm_getlongparam("swarm.gdp.cache.reclaim.maxgcls", 100000);
+	}
+
 	for (;;)
 	{
 		struct timeval tv;
 		gdp_gcl_t *g1, *g2;
 		time_t mintime;
+		long loopcount = 0;
 
 		gettimeofday(&tv, NULL);
 		mintime = tv.tv_sec - maxage;
@@ -392,6 +399,13 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 		ep_thr_mutex_lock(&GclCacheMutex);
 		for (g1 = LIST_FIRST(&GclsByUse); g1 != NULL; g1 = g2)
 		{
+			if (loopcount++ > maxgcls)
+			{
+				EP_ASSERT_PRINT("_gdp_gcl_cache_reclaim: processed %ld "
+								"GCLS (giving up)",
+							maxgcls);
+				break;
+			}
 			_gdp_gcl_lock(g1);
 			g2 = LIST_NEXT(g1, ulist);
 			if (g1->utime > mintime)
