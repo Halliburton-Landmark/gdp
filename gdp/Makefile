@@ -187,13 +187,17 @@ ${LIBNAME}.so.${GDPLIBVER}: ${OBJS}
 ${OBJS}: ${HFILES}
 
 
-gdp_version.o: gdp_version.c ${OBJS_MOST} Makefile gdp_version.h
+gdp_version.o: gdp_version.c ${OBJS_MOST} Makefile gdp_version.h \
+		../git-version.txt
 	${CC} ${CFLAGS} \
 		-D_VERSION_INFO_="\"`sh ../adm/get-version-info.sh`\"" \
 		-c gdp_version.c
 
 gdp_version.h: gdp_version.template gdp_version.sh Makefile
 	sh gdp_version.sh ${GDP_VERSION_MAJOR} ${GDP_VERSION_MINOR} ${GDP_VERSION_PATCH}
+
+../git-version.txt:
+	../adm/get-version-info.sh > /dev/null
 
 #
 #  Administrative stuff

@@ -21,6 +21,7 @@ then
 else
 	# no git information at all
 	revmods=""
+	cp /dev/null gdp-version.txt
 fi
 
 # add a leading space
