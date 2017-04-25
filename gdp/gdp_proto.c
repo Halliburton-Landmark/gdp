@@ -416,7 +416,9 @@ ack_data_content(gdp_req_t *req)
 	estat = ack_success(req);
 	EP_STAT_CHECK(estat, return estat);
 
-	req->gcl->nrecs = req->rpdu->datum->recno;
+	// hack to try to "self heal" in case we get out of sync
+	if (req->gcl->nrecs < req->rpdu->datum->recno)
+		req->gcl->nrecs = req->rpdu->datum->recno;
 
 	// keep track of how many more records we expect
 	if (req->numrecs > 0)
