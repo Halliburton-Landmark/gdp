@@ -669,7 +669,7 @@ evlib_log_cb(int severity, const char *msg)
 static void
 exit_on_signal(int sig)
 {
-	fprintf(stderr, "\nExiting on signal %d\n", sig);
+	ep_app_warn("Exiting on signal %d", sig);
 	exit(sig);
 }
 

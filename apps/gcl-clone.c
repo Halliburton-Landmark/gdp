@@ -199,7 +199,6 @@ fail0:
 	else
 		xstat = EX_CANTCREAT;
 	if (!quiet)
-		fprintf(stderr, "exiting with status %s\n",
-				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		ep_app_message(estat, exiting with status");
 	exit(xstat);
 }

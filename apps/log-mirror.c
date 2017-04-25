@@ -59,7 +59,6 @@ main(int argc, char **argv)
 	EP_STAT estat;
 	gdp_gcl_t *igcl, *ogcl;
 	char *gdpd_addr = NULL;
-	char buf[200];
 	const char *lname, *lmode;
 	gdp_recno_t nextrecno;
 	gdp_name_t gcliname;
@@ -155,7 +154,6 @@ fail1:
 	}
 
 fail0:
-	fprintf(stderr, "exiting with status %s\n",
-			ep_stat_tostr(estat, buf, sizeof buf));
+	ep_app_message(estat, "exiting with status");
 	return EP_STAT_ISOK(estat) ? EX_OK : EX_UNAVAILABLE;
 }

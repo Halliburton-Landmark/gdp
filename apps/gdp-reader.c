@@ -222,7 +222,7 @@ print_event(gdp_event_t *gev, bool subscribe)
 		// "end of subscription": no more data will be returned
 		if (!Quiet)
 		{
-			ep_app_info("End of %s\n",
+			ep_app_info("End of %s",
 					subscribe ? "Subscription" : "Multiread");
 		}
 		estat = EP_STAT_END_OF_FILE;
@@ -230,9 +230,9 @@ print_event(gdp_event_t *gev, bool subscribe)
 
 	  case GDP_EVENT_SHUTDOWN:
 		// log daemon has shut down, meaning we lose our subscription
-		fprintf(stderr, "%s terminating because of log daemon shutdown\n",
-				subscribe ? "Subscription" : "Multiread");
 		estat = GDP_STAT_DEAD_DAEMON;
+		ep_app_message(estat, "%s terminating because of log daemon shutdown",
+				subscribe ? "Subscription" : "Multiread");
 		break;
 
 	  case GDP_EVENT_CREATED:
@@ -292,7 +292,8 @@ do_multiread(gdp_gcl_t *gcl,
 		estat = ep_time_parse(dtstr, &ts, EP_TIME_USE_LOCALTIME);
 		if (!EP_STAT_ISOK(estat))
 		{
-			fprintf(stderr, "Cannot convert date/time string \"%s\"\n", dtstr);
+			ep_app_message(estat, "Cannot convert date/time string \"%s\"",
+						dtstr);
 			return estat;
 		}
 	}
@@ -453,12 +454,7 @@ print_metadata(gdp_gcl_t *gcl)
 	return;
 
 fail0:
-	{
-		char ebuf[100];
-
-		fprintf(stderr, "Could not read metadata!\n    %s\n",
-				ep_stat_tostr(estat, ebuf, sizeof ebuf));
-	}
+	ep_app_message(estat, "Could not read metadata!");
 }
 
 void

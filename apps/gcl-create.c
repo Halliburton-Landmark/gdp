@@ -138,7 +138,6 @@ main(int argc, char **argv)
 	int opt;
 	EP_STAT estat;
 	char *gdpd_addr = NULL;
-	char buf[200];
 	bool show_usage = false;
 	bool make_new_key = true;
 	bool quiet = false;
@@ -672,8 +671,7 @@ fail0:
 	if (EP_STAT_ISOK(estat))
 		estat = EP_STAT_OK;
 	if (!quiet)
-		fprintf(stderr, "exiting with status %s\n",
-				ep_stat_tostr(estat, buf, sizeof buf));
+		ep_app_message(estat, "exiting with status");
 	if (EP_STAT_ISOK(estat))
 		return EX_OK;
 	if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOROUTE))

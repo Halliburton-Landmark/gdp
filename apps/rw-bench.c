@@ -287,8 +287,6 @@ fail1:
 
 fail0:
 done:
-	fprintf(stderr, "exiting with status %s\n",
-	ep_stat_tostr(estat, buf, sizeof buf));
-
+	ep_app_message(estat, "exiting with status");
 	return !EP_STAT_ISOK(estat);
 }

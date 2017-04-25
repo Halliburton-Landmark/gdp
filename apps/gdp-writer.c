@@ -254,7 +254,7 @@ main(int argc, char **argv)
 		// open a log file (for timing measurements)
 		LogFile = fopen(log_file_name, "a");
 		if (LogFile == NULL)
-			fprintf(stderr, "Cannot open log file %s: %s\n",
+			ep_app_error("Cannot open log file %s: %s",
 					log_file_name, strerror(errno));
 		else
 			setlinebuf(LogFile);
@@ -379,11 +379,7 @@ fail0:
 		estat = EP_STAT_OK;
 	if (!Quiet || !EP_STAT_ISOK(estat))
 	{
-		char buf[200];
-
-		fprintf(stderr, "%s: exiting with status %s\n",
-				ep_app_getprogname(),
-				ep_stat_tostr(estat, buf, sizeof buf));
+		ep_app_message(estat, "exiting with status");
 	}
 	if (EP_STAT_ISOK(estat))
 		return EX_OK;
