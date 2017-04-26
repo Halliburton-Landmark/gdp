@@ -87,7 +87,8 @@ _gdp_gcl_newhandle(gdp_name_t gcl_name, gdp_gcl_t **pgcl)
 	if (gcl == NULL)
 		goto fail1;
 
-	ep_thr_mutex_init(&gcl->mutex, EP_THR_MUTEX_DEFAULT);
+	if (ep_thr_mutex_init(&gcl->mutex, EP_THR_MUTEX_DEFAULT) != 0)
+		goto fail1;
 	ep_thr_mutex_setorder(&gcl->mutex, GDP_MUTEX_LORDER_GCL);
 	LIST_INIT(&gcl->reqs);
 	gcl->refcnt = 1;
@@ -108,12 +109,11 @@ _gdp_gcl_newhandle(gdp_name_t gcl_name, gdp_gcl_t **pgcl)
 
 fail1:
 	estat = ep_stat_from_errno(errno);
-	{
-		char ebuf[100];
+	ep_mem_free(gcl);
 
-		ep_dbg_cprintf(Dbg, 4, "_gdp_gcl_newhandle failed: %s\n",
+	char ebuf[100];
+	ep_dbg_cprintf(Dbg, 4, "_gdp_gcl_newhandle failed: %s\n",
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
-	}
 	return estat;
 }
 
@@ -470,13 +470,14 @@ _gdp_gcl_close(gdp_gcl_t *gcl,
 	errno = 0;				// avoid spurious messages
 	if (!GDP_GCL_ISGOOD(gcl))
 		return GDP_STAT_GCL_NOT_OPEN;
-	_gdp_gcl_lock(gcl);
 
 	if (ep_dbg_test(Dbg, 38))
 	{
 		ep_dbg_printf("_gdp_gcl_close: ");
 		_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
 	}
+
+	_gdp_gcl_lock(gcl);
 
 	// need to count the number of references /excluding/ subscriptions
 	nrefs = gcl->refcnt;
