@@ -136,6 +136,7 @@ bdb_error(const DB_ENV *dbenv, const char *errpfx, const char *msg)
 # define DB_EXCL		0x00000004
 # define DB_RDONLY		0x00000400
 # define DB_THREAD		0
+# define DB_PRIVATE		0
 
 // fake up a cursor
 typedef DB			DBC;
@@ -1486,7 +1487,7 @@ tidx_create(gdp_gcl_t *gcl, const char *suffix, uint32_t flags)
 	EP_STAT_CHECK(estat, goto fail0);
 
 	ep_dbg_cprintf(Dbg, 20, "tidx_create: creating %s\n", tidx_pbuf);
-	int dbflags = DB_CREATE | DB_THREAD;
+	int dbflags = DB_CREATE | DB_THREAD | DB_PRIVATE;
 	if (!EP_UT_BITSET(FLAG_TMPFILE, flags))
 		dbflags |= DB_EXCL;
 	estat = bdb_open(tidx_pbuf, dbflags, GCLfilemode,
@@ -1512,7 +1513,7 @@ tidx_open(gdp_gcl_t *gcl, const char *suffix, int openmode)
 	EP_STAT estat;
 	const char *phase;
 	struct physinfo *phys = GETPHYS(gcl);
-	int dbflags = DB_THREAD;
+	int dbflags = DB_THREAD | DB_PRIVATE;
 	char tidx_pbuf[GCL_PATH_MAX];
 
 	phase = "get_gcl_path";
