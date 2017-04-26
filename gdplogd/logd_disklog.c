@@ -207,7 +207,7 @@ bdb_open(const char *filename,
 		if ((dbstat = db_env_create(&DbEnv, 0)) != 0)
 			goto fail0;
 		phase = "dbenv->open";
-		uint32_t dbenv_flags = DB_CREATE | DB_INIT_MPOOL;
+		uint32_t dbenv_flags = DB_CREATE | DB_INIT_MPOOL | DB_PRIVATE;
 		if ((dbstat = DbEnv->open(DbEnv, NULL, dbenv_flags, 0)) != 0)
 			goto fail0;
 	}

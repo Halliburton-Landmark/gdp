@@ -1064,7 +1064,7 @@ check_tidx_db(gdp_gcl_t *gcl, struct ctx *ctx, const char **phasep)
 fail1:
 	if (istat != 0)
 	{
-		dbenv->err(dbenv, istat, "%s", phase);
+		dbenv->err(dbenv, istat, "during %s", phase);
 		estat = GDP_STAT_CORRUPT_TIDX;
 	}
 	// dbp->verify has released the dbp
@@ -1486,6 +1486,9 @@ main(int argc, char **argv)
 			ep_adm_getboolparam("swarm.gdplogd.sequencing.allowgaps", true);
 	GdplogdForgive.allow_log_dups =
 			ep_adm_getboolparam("swarm.gdplogd.sequencing.allowdups", true);
+
+	ep_dbg_cprintf(Dbg, 1, "Running as %d:%d (%d:%d)\n",
+						getuid(), getgid(), geteuid(), getegid());
 
 	while (argc-- > 0)
 	{
