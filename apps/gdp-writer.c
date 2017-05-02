@@ -367,6 +367,18 @@ fail1:
 		gdp_gcl_open_info_free(info);
 
 fail0:
+	;			// avoid compiler error
+	int exitstat;
+
+	if (EP_STAT_ISOK(estat))
+		exitstat = EX_OK;
+	if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOROUTE))
+		exitstat = EX_CANTCREAT;
+	if (EP_STAT_ISABORT(estat))
+		exitstat = EX_SOFTWARE;
+	else
+		exitstat = EX_UNAVAILABLE;
+
 	if (ep_dbg_test(Dbg, 10))
 	{
 		// cheat here and use internal interface
@@ -377,15 +389,9 @@ fail0:
 	// OK status can have values; hide that from the user
 	if (EP_STAT_ISOK(estat))
 		estat = EP_STAT_OK;
-	if (!Quiet || !EP_STAT_ISOK(estat))
-	{
+	if (!EP_STAT_ISOK(estat))
 		ep_app_message(estat, "exiting with status");
-	}
-	if (EP_STAT_ISOK(estat))
-		return EX_OK;
-	if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOROUTE))
-		return EX_CANTCREAT;
-	if (EP_STAT_ISABORT(estat))
-		return EX_SOFTWARE;
-	return EX_UNAVAILABLE;
+	else if (!Quiet)
+		fprintf(stderr, "Exiting with status OK\n");
+	return exitstat;
 }

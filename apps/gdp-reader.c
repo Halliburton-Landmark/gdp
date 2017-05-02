@@ -652,7 +652,7 @@ main(int argc, char **argv)
 		gdp_pname_t gclpname;
 
 		gdp_printable_name(gclname, gclpname);
-		ep_app_info("Reading GCL %s", gclpname);
+		fprintf(stderr, "Reading GCL %s\n", gclpname);
 	}
 
 	// open the GCL; arguably this shouldn't be necessary
@@ -708,7 +708,9 @@ fail0:
 	}
 
 	// might as well let the user know what's going on....
-	if (!Quiet || EP_STAT_ISFAIL(estat))
+	if (EP_STAT_ISFAIL(estat))
 		ep_app_message(estat, "exiting after %d records", NRead);
+	else if (!Quiet)
+		fprintf(stderr, "Exiting after %d records\n", NRead);
 	return exitstat;
 }

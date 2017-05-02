@@ -667,16 +667,24 @@ fail1:
 		gdp_gclmd_free(gmd);
 
 fail0:
+	;				// avoid compiler error
+	int exitstat;
+
+	if (EP_STAT_ISOK(estat))
+		exitstat = EX_OK;
+	if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOROUTE))
+		exitstat = EX_NOHOST;
+	if (EP_STAT_ISABORT(estat))
+		exitstat = EX_SOFTWARE;
+	else
+		exitstat = EX_UNAVAILABLE;
+
 	// OK status can have values; hide that from the user
 	if (EP_STAT_ISOK(estat))
 		estat = EP_STAT_OK;
-	if (!quiet)
+
+	if (!EP_STAT_ISOK(estat))
 		ep_app_message(estat, "exiting with status");
-	if (EP_STAT_ISOK(estat))
-		return EX_OK;
-	if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOROUTE))
-		return EX_NOHOST;
-	if (EP_STAT_ISABORT(estat))
-		return EX_SOFTWARE;
-	return EX_UNAVAILABLE;
+	else if (!quiet)
+		fprintf(stderr, "Exiting with status OK\n");
 }
