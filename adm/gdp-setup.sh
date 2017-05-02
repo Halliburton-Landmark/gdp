@@ -50,7 +50,7 @@ case "$OS" in
 	package pandoc
 	if [ -e /etc/systemd/system ]
 	then
-		package systemd-dev
+		package libsystemd-dev
 	fi
 	if ! ls /etc/apt/sources.list.d/mosquitto* > /dev/null 2>&1
 	then
