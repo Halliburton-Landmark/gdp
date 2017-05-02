@@ -672,9 +672,9 @@ fail0:
 
 	if (EP_STAT_ISOK(estat))
 		exitstat = EX_OK;
-	if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOROUTE))
+	else if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOROUTE))
 		exitstat = EX_NOHOST;
-	if (EP_STAT_ISABORT(estat))
+	else if (EP_STAT_ISABORT(estat))
 		exitstat = EX_SOFTWARE;
 	else
 		exitstat = EX_UNAVAILABLE;
