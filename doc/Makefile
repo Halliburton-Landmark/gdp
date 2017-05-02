@@ -34,7 +34,7 @@ jenkins-all: ${PUBALL}
 all: ${ALL}
 
 clean:
-	-rm ${CLEANALL}
+	rm -f ${CLEANALL}
 
 ${DOCDIR}:
 	mkdir -p $@

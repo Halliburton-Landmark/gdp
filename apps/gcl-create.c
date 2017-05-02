@@ -687,4 +687,6 @@ fail0:
 		ep_app_message(estat, "exiting with status");
 	else if (!quiet)
 		fprintf(stderr, "Exiting with status OK\n");
+
+	return exitstat;
 }
