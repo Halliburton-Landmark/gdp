@@ -596,8 +596,15 @@ _gdp_gcl_append(gdp_gcl_t *gcl,
 	gdp_buf_reset(datum->dbuf);
 	if (datum->sig != NULL)
 		gdp_buf_reset(datum->sig);
+	gdp_datum_copy(datum, req->rpdu->datum);
+
 	_gdp_req_free(&req);
 fail0:
+	if (ep_dbg_test(Dbg, 42))
+	{
+		ep_dbg_printf("_gdp_gcl_append: returning ");
+		gdp_datum_print(datum, ep_dbg_getfile(), GDP_DATUM_PRDEBUG);
+	}
 	return estat;
 }
 

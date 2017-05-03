@@ -728,6 +728,9 @@ cmd_append(gdp_req_t *req)
 
 		// update the server's view of the number of records
 		req->gcl->nrecs++;
+
+		// the caller might like the timestamp
+		req->rpdu->datum->ts = req->cpdu->datum->ts;
 	}
 
 	if (false)
