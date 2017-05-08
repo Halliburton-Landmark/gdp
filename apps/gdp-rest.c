@@ -475,27 +475,12 @@ a_append(scgi_request *req, gdp_name_t gcliname, gdp_datum_t *datum)
 
 	ep_dbg_cprintf(Dbg, 5, "=== Append value to GCL\n");
 
-	//XXX violates the principle that gdp-rest is "just an app"
-	if ((gcl = _gdp_gcl_cache_get(gcliname, GDP_MODE_AO)) == NULL)
-	{
-		estat = gdp_gcl_open(gcliname, GDP_MODE_AO, NULL, &gcl);
-	}
-	if (EP_STAT_ISOK(estat))
-	{
-		estat = gdp_gcl_append(gcl, datum);
-	}
-	if (!EP_STAT_ISOK(estat))
-	{
-		char ebuf[200];
-		gdp_pname_t gclpname;
+	estat = gdp_gcl_open(gcliname, GDP_MODE_AO, NULL, &gcl);
+	EP_STAT_CHECK(estat, goto fail_open);
 
-		gdp_printable_name(gcliname, gclpname);
-		gdp_failure(req, "420", "Cannot append to GCL", "ss",
-				"GCL", gclpname,
-				"error", ep_stat_tostr(estat, ebuf, sizeof ebuf));
-		return estat;
-	}
-	else
+	estat = gdp_gcl_append(gcl, datum);
+	EP_STAT_CHECK(estat, goto fail_append);
+	
 	{
 		// success: send a response
 		char rbuf[SCGI_MAX_OUTBUF_SIZE];
@@ -503,7 +488,8 @@ a_append(scgi_request *req, gdp_name_t gcliname, gdp_datum_t *datum)
 		char *jbuf;
 		EP_TIME_SPEC ts;
 
-		json_object_set_nocheck(j, "recno", json_integer(gdp_datum_getrecno(datum)));
+		json_object_set_nocheck(j, "recno",
+								json_integer(gdp_datum_getrecno(datum)));
 		gdp_datum_getts(datum, &ts);
 		if (EP_TIME_IS_VALID(&ts))
 		{
@@ -526,6 +512,25 @@ a_append(scgi_request *req, gdp_name_t gcliname, gdp_datum_t *datum)
 		free(jbuf);
 		json_decref(j);
 	}
+
+	// finished
+	gdp_gcl_close(gcl);
+	// caller frees datum
+	return estat;
+	
+ fail_append:
+	gdp_gcl_close(gcl);
+ fail_open:
+	// caller frees datum
+	{
+		char ebuf[200];
+		gdp_pname_t gclpname;
+
+		gdp_printable_name(gcliname, gclpname);
+		gdp_failure(req, "420", "Cannot append to GCL", "ss",
+				"GCL", gclpname,
+				"error", ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
 	return estat;
 }
 
@@ -546,11 +551,11 @@ a_read_datum(scgi_request *req, gdp_name_t gcliname, gdp_recno_t recno)
 	gdp_datum_t *datum = gdp_datum_new();
 
 	estat = gdp_gcl_open(gcliname, GDP_MODE_RO, NULL, &gcl);
-	EP_STAT_CHECK(estat, goto fail0);
+	EP_STAT_CHECK(estat, goto fail_open);
 
 	estat = gdp_gcl_read(gcl, recno, datum);
 	if (!EP_STAT_ISOK(estat))
-		goto fail0;
+		goto fail_read;
 
 	// package up the results and send them back
 	{
@@ -577,7 +582,7 @@ a_read_datum(scgi_request *req, gdp_name_t gcliname, gdp_recno_t recno)
 						"GDP-GCL-Name: %s\r\n"
 						"GDP-Record-Number: %" PRIgdp_recno "\r\n",
 						gclpname,
-						recno);
+						datum->recno);
 			gdp_datum_getts(datum, &ts);
 			if (EP_TIME_IS_VALID(&ts))
 			{
@@ -622,7 +627,10 @@ a_read_datum(scgi_request *req, gdp_name_t gcliname, gdp_recno_t recno)
 	gdp_gcl_close(gcl);
 	return estat;
 
-fail0:
+ fail_read:
+	gdp_gcl_close(gcl);
+ fail_open:
+	gdp_datum_free(datum);
 	{
 		char ebuf[200];
 		gdp_pname_t gclpname;
@@ -632,8 +640,6 @@ fail0:
 				"GCL", gclpname,
 				"reason", ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
-	if (gcl != NULL)
-		gdp_gcl_close(gcl);
 	return estat;
 }
 
