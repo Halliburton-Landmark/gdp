@@ -508,7 +508,7 @@ _gdp_gcl_close(gdp_gcl_t *gcl,
 	_gdp_req_free(&req);
 finis:
 fail0:
-	_gdp_gcl_unlock(gcl);
+	_gdp_gcl_decref(&gcl);
 	return estat;
 }
 
