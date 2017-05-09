@@ -407,7 +407,7 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 	}
 
 	if (gcl != NULL)
-		_gdp_gcl_unlock(gcl);
+		_gdp_gcl_decref(&gcl);
 
 	if (req->cpdu == NULL)
 	{
