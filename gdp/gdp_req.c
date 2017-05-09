@@ -308,6 +308,8 @@ _gdp_req_free(gdp_req_t **reqp)
 
 	req->state = GDP_REQ_FREE;
 	req->flags = 0;
+	req->md = NULL;
+	req->udata = NULL;
 
 	// add the empty request to the free list
 	ep_thr_mutex_lock(&ReqFreeListMutex);
