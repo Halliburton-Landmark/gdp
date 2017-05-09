@@ -583,11 +583,6 @@ run_event_loop(void *eli_)
 			&event_loop_timeout, eli);
 	event_add(evtimer, &tv);
 
-	ep_thr_mutex_lock(&GdpIoEventLoopRunningMutex);
-	GdpIoEventLoopRunning = true;
-	ep_thr_cond_broadcast(&GdpIoEventLoopRunningCond);
-	ep_thr_mutex_unlock(&GdpIoEventLoopRunningMutex);
-
 	for (;;)
 	{
 		if (ep_dbg_test(Dbg, 20))
@@ -597,11 +592,18 @@ run_event_loop(void *eli_)
 			event_base_dump_events(evb, ep_dbg_getfile());
 		}
 
+		ep_thr_mutex_lock(&GdpIoEventLoopRunningMutex);
+		GdpIoEventLoopRunning = true;
+		ep_thr_cond_broadcast(&GdpIoEventLoopRunningCond);
+		ep_thr_mutex_unlock(&GdpIoEventLoopRunningMutex);
+
 #ifdef EVLOOP_NO_EXIT_ON_EMPTY
 		event_base_loop(evb, EVLOOP_NO_EXIT_ON_EMPTY);
 #else
 		event_base_loop(evb, 0);
 #endif
+
+		GdpIoEventLoopRunning = false;
 
 		if (ep_dbg_test(Dbg, 1))
 		{
