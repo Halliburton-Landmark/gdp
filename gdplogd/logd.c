@@ -70,19 +70,27 @@ logd_sock_close_cb(gdp_chan_t *chan)
 
 
 /*
-**  GDPD_RECLAIM_RESOURCES --- called periodically to prune old resources
-**
-**		This should really do reclaimation in a thread.
+**  LOGD_RECLAIM_RESOURCES --- called periodically to prune old resources
 */
 
 static void
-gdpd_reclaim_resources(int fd, short what, void *ctx)
+logd_reclaim_resources(void *null)
 {
-	ep_dbg_cprintf(Dbg, 69, "gdpd_reclaim_resources\n");
+	_gdp_reclaim_resources(NULL);
+	sub_reclaim_resources(_GdpChannel);
+}
+
+
+// stub for libevent
+
+static void
+logd_reclaim_resources_callback(int fd, short what, void *ctx)
+{
+	ep_dbg_cprintf(Dbg, 69, "logd_reclaim_resources_callback\n");
 	if (ep_adm_getboolparam("swarm.gdplogd.reclaim.inthread", false))
-		ep_thr_pool_run(gcl_reclaim_resources, NULL);
+		ep_thr_pool_run(logd_reclaim_resources, NULL);
 	else
-		gcl_reclaim_resources(NULL);
+		logd_reclaim_resources(NULL);
 }
 
 
@@ -126,43 +134,6 @@ logd_shutdown(void)
 
 
 /*
-**  SIGINFO --- called to print out internal state (for debugging)
-**
-**		On BSD and MacOS this is implemented as a SIGINFO (^T from
-**		the command line), but since Linux doesn't have that we use
-**		SIGUSR1 instead.
-*/
-
-extern const char GdplogdVersion[];
-
-static void
-dump_state(int plev)
-{
-	flockfile(stderr);
-	fprintf(stderr, "\n<<< GDPLOGD STATE >>>\nVersion: %s\n",
-			GdplogdVersion);
-	_gdp_gcl_cache_dump(plev, stderr);
-	fprintf(stderr, "\n<<< Open file descriptors >>>\n");
-	ep_app_dumpfds(stderr);
-	fprintf(stderr, "\n<<< Stack backtrace >>>\n");
-	ep_dbg_backtrace();
-	fprintf(stderr, "\n<<< Statistics >>>\n");
-	_gdp_req_pr_stats(stderr);
-	funlockfile(stderr);
-}
-
-
-static void
-siginfo(int sig, short what, void *arg)
-{
-	if (ep_dbg_test(Dbg, 1))
-		dump_state(GDP_PR_DETAILED);
-	else
-		dump_state(GDP_PR_PRETTY);
-}
-
-
-/*
 **  SIGTERM --- called on interrupt or kill to do clean shutdown
 */
 
@@ -173,7 +144,7 @@ sigterm(int sig)
 	ep_sd_notifyf("STOPPING=1\nSTATUS=Terminating on signal %d\n", sig);
 	ep_log(EP_STAT_OK, "Terminating on signal %d", sig);
 	if (ep_dbg_test(Dbg, 1))
-		dump_state(GDP_PR_DETAILED);
+		_gdp_dump_state(GDP_PR_DETAILED);
 	exit(EX_UNAVAILABLE);		// this will do cleanup
 }
 
@@ -188,7 +159,7 @@ sigabort(int sig)
 	signal(sig, SIG_DFL);
 	ep_sd_notifyf("STOPPING=1\nSTATUS=Aborting on signal %d\n", sig);
 	ep_log(EP_STAT_ABORT, "Aborting on signal %d", sig);
-	dump_state(GDP_PR_DETAILED);
+	_gdp_dump_state(GDP_PR_DETAILED);
 	kill(getpid(), sig);		// this will not do cleanup
 }
 
@@ -203,7 +174,7 @@ assertion_dump(void)
 	static EP_TIME_SPEC base_time = {EP_TIME_NOTIME, 0, 0};
 	static int n_assertions = 0;
 
-	dump_state(GDP_PR_DETAILED);
+	_gdp_dump_state(GDP_PR_DETAILED);
 
 	// check to see if we are in a tight loop
 	int max_asserts = ep_adm_getintparam("swarm.gdplogd.assert.maxasserts", 0);
@@ -423,12 +394,6 @@ main(int argc, char **argv)
 	// initialize the thread pool
 	ep_thr_pool_init(nworkers, nworkers, 0);
 
-	// add a debugging signal to print out some internal data structures
-#ifdef SIGINFO
-	event_add(evsignal_new(GdpIoEventBase, SIGINFO, siginfo, NULL), NULL);
-#endif
-	event_add(evsignal_new(GdpIoEventBase, SIGUSR1, siginfo, NULL), NULL);
-
 	// do cleanup on termination
 	signal(SIGINT, sigterm);
 	signal(SIGTERM, sigterm);
@@ -439,14 +404,7 @@ main(int argc, char **argv)
 	EpAssertInfo = assertion_dump;
 
 	// arrange to clean up resources periodically
-	{
-		long gc_intvl = ep_adm_getlongparam("swarm.gdplogd.reclaim.interval",
-								15L);
-		struct timeval tv = { gc_intvl, 0 };
-		struct event *evtimer = event_new(GdpIoEventBase, -1,
-									EV_PERSIST, &gdpd_reclaim_resources, NULL);
-		event_add(evtimer, &tv);
-	}
+	_gdp_reclaim_resources_init(&logd_reclaim_resources_callback);
 
 	// initialize connection
 	void _gdp_pdu_process(gdp_pdu_t *, gdp_chan_t *);

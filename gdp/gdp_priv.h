@@ -396,7 +396,8 @@ EP_STAT			_gdp_gcl_fwd_append(		// forward APPEND (replication)
 
 struct gdp_gcl_open_info
 {
-	EP_CRYPTO_KEY		*signkey;		// signing key
+	EP_CRYPTO_KEY		*signkey;			// signing key
+	bool				keep_in_cache:1;	// defer GCL free
 };
 
 
@@ -609,11 +610,21 @@ const char		*_gdp_proto_cmd_name(		// return printable cmd name
 						uint8_t cmd);
 
 /*
-**  Initialization.
+**  Initialization and Maintenance.
 */
 
 void			_gdp_newname(gdp_name_t gname,
 						gdp_gclmd_t *gmd);
+
+void			_gdp_reclaim_resources(		// reclaim system resources
+						void *);				// unused
+
+void			_gdp_reclaim_resources_init(
+						void (*f)(int, short, void *));
+
+void			_gdp_dump_state(int plev);
+
+#define GDP_RECLAIM_AGE_DEF		300L		// default reclaim age (sec)
 
 
 /*

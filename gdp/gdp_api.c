@@ -415,6 +415,11 @@ gdp_gcl_open(gdp_name_t name,
 	}
 	if (EP_STAT_ISOK(estat))
 	{
+		if (info != NULL && info->keep_in_cache)
+		{
+			gcl->flags |= GCLF_DEFER_FREE;
+			_gdp_reclaim_resources_init(NULL);
+		}
 		*pgcl = gcl;
 		_gdp_gcl_unlock(gcl);
 		ep_dbg_cprintf(Dbg, 8, "<<< gdp_gcl_open(%s): OK\n", gcl->pname);
@@ -836,5 +841,14 @@ gdp_gcl_open_info_set_signing_key(gdp_gcl_open_info_t *info,
 		EP_CRYPTO_KEY *skey)
 {
 	info->signkey = skey;
+	return EP_STAT_OK;
+}
+
+EP_STAT
+gdp_gcl_open_info_set_caching(
+		gdp_gcl_open_info_t *info,
+		bool keep_in_cache)
+{
+	info->keep_in_cache = keep_in_cache;
 	return EP_STAT_OK;
 }

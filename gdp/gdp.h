@@ -357,6 +357,11 @@ EP_STAT				gdp_gcl_open_info_set_signing_key(
 						gdp_gcl_open_info_t *info,
 						EP_CRYPTO_KEY *skey);
 
+// set the caching behavior
+EP_STAT				gdp_gcl_open_info_set_caching(
+						gdp_gcl_open_info_t *info,
+						bool keep_in_cache);
+
 /*
 **  Metadata handling
 */

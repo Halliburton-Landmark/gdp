@@ -548,6 +548,71 @@ _gdp_pdu_process(gdp_pdu_t *pdu, gdp_chan_t *chan)
 
 
 /*
+**  _GDP_RECLAIM_RESOURCES --- find unused GDP resources and reclaim them
+**
+**		This should really also have a maximum number of GCLs to leave
+**		open so we don't run out of file descriptors under high load.
+**
+**		This implementation locks the GclsByUse list during the
+**		entire operation.  That's probably not the best idea.
+*/
+
+void
+_gdp_reclaim_resources(void *null)
+{
+	char pbuf[200];
+	time_t reclaim_age;		// how long to leave GCLs open before reclaiming
+
+	ep_dbg_cprintf(Dbg, 69, "_gdp_reclaim_resources\n");
+	snprintf(pbuf, sizeof pbuf, "swarm.%s.reclaim.age", ep_app_getprogname());
+	reclaim_age = ep_adm_getlongparam(pbuf, -1);
+	if (reclaim_age == -1)
+		reclaim_age = ep_adm_getlongparam("swarm.gdp.reclaim.age",
+									GDP_RECLAIM_AGE_DEF);
+	_gdp_gcl_cache_reclaim(reclaim_age);
+}
+
+// stub for libevent
+
+static void
+gdp_reclaim_resources_callback(int fd, short what, void *ctx)
+{
+	ep_dbg_cprintf(Dbg, 69, "gdp_reclaim_resources_callback\n");
+	if (ep_adm_getboolparam("swarm.gdp.reclaim.inthread", false))
+		ep_thr_pool_run(_gdp_reclaim_resources, NULL);
+	else
+		_gdp_reclaim_resources(NULL);
+}
+
+
+void
+_gdp_reclaim_resources_init(void (*f)(int, short, void *))
+{
+	static bool running = false;
+
+	if (running)
+		return;
+	running = true;
+	if (f == NULL)
+		f = &gdp_reclaim_resources_callback;
+
+	long gc_intvl;
+	char pbuf[200];
+
+	snprintf(pbuf, sizeof pbuf, "swarm.%s.reclaim.interval",
+			ep_app_getprogname());
+	gc_intvl = ep_adm_getlongparam(pbuf, -1);
+	if (gc_intvl == -1)
+		gc_intvl = ep_adm_getlongparam("swarm.gdp.reclaim.interval", 15L);
+
+	struct timeval tv = { gc_intvl, 0 };
+	struct event *evtimer = event_new(GdpIoEventBase, -1, EV_PERSIST,
+								f, NULL);
+	event_add(evtimer, &tv);
+}
+
+
+/*
 **	Base loop to be called for event-driven systems.
 **	Their events should have already been added to the event base.
 **
@@ -707,6 +772,42 @@ _gdp_run_as(const char *runasuser)
 
 
 /*
+**  SIGINFO --- called to print out internal state (for debugging)
+**
+**		On BSD and MacOS this is implemented as a SIGINFO (^T from
+**		the command line), but since Linux doesn't have that we use
+**		SIGUSR1 instead.
+*/
+
+extern const char GdpVersion[];
+
+void
+_gdp_dump_state(int plev)
+{
+	flockfile(stderr);
+	fprintf(stderr, "\n<<< GDP STATE >>>\nVersion: %s\n", GdpVersion);
+	_gdp_gcl_cache_dump(plev, stderr);
+	fprintf(stderr, "\n<<< Open file descriptors >>>\n");
+	ep_app_dumpfds(stderr);
+	fprintf(stderr, "\n<<< Stack backtrace >>>\n");
+	ep_dbg_backtrace();
+	fprintf(stderr, "\n<<< Statistics >>>\n");
+	_gdp_req_pr_stats(stderr);
+	funlockfile(stderr);
+}
+
+
+static void
+siginfo(int sig, short what, void *arg)
+{
+	if (ep_dbg_test(Dbg, 1))
+		_gdp_dump_state(GDP_PR_DETAILED);
+	else
+		_gdp_dump_state(GDP_PR_PRETTY);
+}
+
+
+/*
 **  Initialization, Part 1:
 **		Initialize the various external libraries.
 **		Set up the I/O event loop base.
@@ -848,6 +949,12 @@ gdp_lib_init(const char *myname)
 			estat = init_error("could not create event base", "gdp_lib_init");
 		event_config_free(ev_cfg);
 		EP_STAT_CHECK(estat, goto fail0);
+
+		// add a debugging signal to print out some internal data structures
+#ifdef SIGINFO
+		event_add(evsignal_new(GdpIoEventBase, SIGINFO, siginfo, NULL), NULL);
+#endif
+		event_add(evsignal_new(GdpIoEventBase, SIGUSR1, siginfo, NULL), NULL);
 	}
 
 done:

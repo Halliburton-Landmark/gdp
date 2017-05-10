@@ -36,7 +36,7 @@
   <body>
     <h1>Global Data Plane Programmatic API </h1>
     <h4>Editor: Eric Allman, U.C. Berkeley Swarm Lab, eric@cs.berkeley.edu<br>
-      Version 0.7.2, 2016-09-28</h4>
+      Version 0.7.3, 2017-05-10</h4>
     <p>This document describes the procedural programmatic interface to the
       Global Data Plane.&nbsp; The native code is written in C for maximum
       flexibility and performance, but it is expected that most applications
@@ -199,16 +199,14 @@
       <li> Opens the GCL with the indicated name for the mode indicated by <code>rw</code>,
         which may be <code>GDP_MODE_RO</code> (read only), <code>GDP_MODE_AO</code>
         (append only), or <code>GDP_MODE_RA</code> (read and append).</li>
-      <li>Open information is for future use.&nbsp; For now pass in NULL.&nbsp;
+      <li>Open information is to pass in detailed information needed for the open as described below.&nbsp; In most cases it can be passed as NULL.&nbsp;
         Eventually it will be used to convey signing keys, quality of service
         requests, payment information, authorization tokens, etc.</li>
       <li>The handle itself is returned indirectly through <code>*gclp</code>.</li>
       <li>If a signing key associated with the GCL is found, all writes to this
         GCL will automatically be signed.&nbsp; See the section on Signing and
-        Encryption below for details.</li>
-    </ul>
-    <hr size="2" width="100%">
-    <h4> Name</h4>
+        Encryption below for details.</li></ul><hr><h4>Name</h4>gdp_gcl_open_info_new &mdash; Create a new open information data structure<br><h4>Synopsis</h4><pre>gdp_gcl_open_info_t *gdp_gcl_open_info_new(void)</pre><h4>Notes</h4><ul><li>Creates a new data structure to be used in the following routines.</li></ul><hr><br><h4>Name</h4>gdp_gcl_open_info_free &mdash; Free the open information structure<br><h4>Synopsis</h4><pre>void gdp_gcl_open_info_free(gdp_gcl_open_info_t *info)</pre><h4>Notes</h4><ul><li>Frees the data structure pointed to by <code>info</code>.</li><li>This can be freed as soon as it has been used in <code>gdp_gcl_open</code>.</li></ul><hr><h4>Name</h4>gdp_gcl_open_info_set_signing_key &mdash; Set signing key for an open GCL<br><h4>Synopsis</h4><pre>EP_STAT gdp_gcl_open_info_set_signing_key(<br>&nbsp;&nbsp;&nbsp;             gdp_gcl_open_info_t *info,<br>&nbsp;&nbsp;&nbsp;             EP_CRYPTO_KEY *skey)</pre><h4>Notes</h4><ul><li>Sets the signing key to be used when appending data to a log.</li></ul><hr><h4>Name</h4>gdp_gcl_open_info_set_caching &mdash; set caching behavior<br><h4>Synopsis</h4><pre>EP_STAT gdp_gcl_open_info_set_caching(<br>&nbsp;&nbsp;            &nbsp; gdp_gcl_open_info_t *info,<br>&nbsp;&nbsp;            &nbsp; bool keep_in_cache)</pre><h4>Notes</h4><ul><li>Sets whether this GCL should be kept in the cache after <code>gdp_gcl_close</code> is called.</li><li>If set, cached information will be reclaimed based on the last usage time of the GCL.</li><li>Use of this call with <code>keep_in_cache</code> set to <code>TRUE</code> may cause a cleanup thread to be spawned.</li></ul><hr
+size="2" width="100%"><h4> Name</h4>
     gdp_gcl_close &mdash; Close a GCL and release resources
     <h4> Synopsis</h4>
     <pre>EP_STAT gdp_gcl_close(gdp_gcl_t *gcl)

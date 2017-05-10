@@ -504,7 +504,6 @@ _gdp_gcl_close(gdp_gcl_t *gcl,
 	//XXX should probably check status (and do what with it?)
 
 	// release resources held by this handle
-	gcl->flags &= ~GCLF_DEFER_FREE;
 	_gdp_req_free(&req);
 finis:
 fail0:
