@@ -357,6 +357,15 @@ EP_STAT				gdp_gcl_open_info_set_signing_key(
 						gdp_gcl_open_info_t *info,
 						EP_CRYPTO_KEY *skey);
 
+// set the signing callback function
+EP_STAT				gdp_gcl_open_info_set_signkey_cb(
+						gdp_gcl_open_info_t *info,
+						EP_STAT (*signkey_cb)(
+							gdp_name_t gname,
+							void *signkey_udata,
+							EP_CRYPTO_KEY **skey),
+						void *signkey_udata);
+
 // set the caching behavior
 EP_STAT				gdp_gcl_open_info_set_caching(
 						gdp_gcl_open_info_t *info,

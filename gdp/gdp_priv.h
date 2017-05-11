@@ -323,7 +323,7 @@ EP_STAT			_gdp_gcl_create(			// create a new GCL
 EP_STAT			_gdp_gcl_open(				// open a GCL
 						gdp_gcl_t *gcl,
 						int cmd,
-						EP_CRYPTO_KEY *skey,
+						gdp_gcl_open_info_t *info,
 						gdp_chan_t *chan,
 						uint32_t reqflags);
 
@@ -397,6 +397,11 @@ EP_STAT			_gdp_gcl_fwd_append(		// forward APPEND (replication)
 struct gdp_gcl_open_info
 {
 	EP_CRYPTO_KEY		*signkey;			// signing key
+	EP_STAT				(*signkey_cb)(		// callback to get signing key
+							gdp_name_t	name,
+							void *signkey_udata,
+							EP_CRYPTO_KEY **);
+	void				*signkey_udata;
 	bool				keep_in_cache:1;	// defer GCL free
 };
 

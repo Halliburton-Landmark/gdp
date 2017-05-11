@@ -353,7 +353,6 @@ gdp_gcl_open(gdp_name_t name,
 	EP_STAT estat;
 	gdp_gcl_t *gcl = NULL;
 	int cmd;
-	EP_CRYPTO_KEY *skey = NULL;
 
 	if (ep_dbg_test(Dbg, 19))
 	{
@@ -375,11 +374,6 @@ gdp_gcl_open(gdp_name_t name,
 		// illegal I/O mode
 		ep_app_error("gdp_gcl_open: illegal mode %d", mode);
 		return GDP_STAT_BAD_IOMODE;
-	}
-
-	if (info != NULL)
-	{
-		skey = info->signkey;
 	}
 
 	if (!gdp_name_is_valid(name))
@@ -410,7 +404,7 @@ gdp_gcl_open(gdp_name_t name,
 
 		_gdp_gcl_lock(gcl);
 		gcl->iomode = mode;
-		estat = _gdp_gcl_open(gcl, cmd, skey, _GdpChannel, GDP_REQ_ALLOC_RID);
+		estat = _gdp_gcl_open(gcl, cmd, info, _GdpChannel, GDP_REQ_ALLOC_RID);
 		EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
 	}
 	if (EP_STAT_ISOK(estat))
@@ -841,6 +835,20 @@ gdp_gcl_open_info_set_signing_key(gdp_gcl_open_info_t *info,
 		EP_CRYPTO_KEY *skey)
 {
 	info->signkey = skey;
+	return EP_STAT_OK;
+}
+
+EP_STAT
+gdp_gcl_open_info_set_signkey_cb(
+				gdp_gcl_open_info_t *info,
+				EP_STAT (*signkey_cb)(
+					gdp_name_t gname,
+					void *signkey_udata,
+					EP_CRYPTO_KEY **skey),
+				void *signkey_udata)
+{
+	info->signkey_cb = signkey_cb;
+	info->signkey_udata = signkey_udata;
 	return EP_STAT_OK;
 }
 

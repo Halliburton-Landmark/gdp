@@ -314,7 +314,7 @@ fail1:
 EP_STAT
 _gdp_gcl_open(gdp_gcl_t *gcl,
 			int cmd,
-			EP_CRYPTO_KEY *secretkey,
+			gdp_gcl_open_info_t *info,
 			gdp_chan_t *chan,
 			uint32_t reqflags)
 {
@@ -324,6 +324,8 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 	const uint8_t *pkbuf;
 	int md_alg;
 //	int pktype;
+	EP_CRYPTO_KEY *secretkey = NULL;
+	bool my_secretkey = false;
 
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
 					return EP_STAT_ASSERT_ABORT);
@@ -360,6 +362,20 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 	md_alg = pkbuf[0];
 //	pktype = pkbuf[1];
 
+	// get the secret key if needed
+	if (info != NULL)
+	{
+		secretkey = info->signkey;
+		if (secretkey == NULL && info->signkey_cb != NULL)
+		{
+			estat = (*info->signkey_cb)(gcl->name,
+							info->signkey_udata, &secretkey);
+			EP_STAT_CHECK(estat, return estat);
+			my_secretkey = true;				// we must deallocate
+		}
+	}
+
+	// nothing from user; let's try a standard search
 	if (secretkey == NULL)
 	{
 		secretkey = _gdp_crypto_skey_read(gcl->pname, "pem");
@@ -371,6 +387,8 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 			ep_dbg_cprintf(Dbg, 30, "_gdp_gcl_open: no secret key\n");
 			goto fail0;
 		}
+
+		my_secretkey = true;			// we must deallocate
 	}
 
 	// validate the compatibility of the public and secret keys
@@ -393,6 +411,11 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 
 	// set up the message digest context
 	gcl->digest = ep_crypto_sign_new(secretkey, md_alg);
+
+	// we can release the key now
+	if (my_secretkey)
+		ep_crypto_key_free(secretkey);
+
 	if (gcl->digest == NULL)
 		goto fail1;
 

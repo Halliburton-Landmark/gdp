@@ -167,6 +167,38 @@ write_record(gdp_datum_t *datum, gdp_gcl_t *gcl)
 }
 
 
+EP_STAT
+signkey_cb(
+		gdp_name_t gname,
+		void *udata,
+		EP_CRYPTO_KEY **skeyp)
+{
+	FILE *fp;
+	EP_CRYPTO_KEY *skey;
+	const char *signing_key_file = udata;
+
+	ep_dbg_cprintf(Dbg, 1, "signkey_cb(%s)\n", signing_key_file);
+
+	fp = fopen(signing_key_file, "r");
+	if (fp == NULL)
+	{
+		ep_app_error("cannot open signing key file %s", signing_key_file);
+		return ep_stat_from_errno(errno);
+	}
+
+	skey = ep_crypto_key_read_fp(fp, signing_key_file,
+			EP_CRYPTO_KEYFORM_PEM, EP_CRYPTO_F_SECRET);
+	if (skey == NULL)
+	{
+		ep_app_error("cannot read signing key file %s", signing_key_file);
+		return ep_stat_from_errno(errno);
+	}
+
+	*skeyp = skey;
+	return EP_STAT_OK;
+}
+
+
 void
 usage(void)
 {
@@ -276,6 +308,9 @@ main(int argc, char **argv)
 
 	if (signing_key_file != NULL)
 	{
+		gdp_gcl_open_info_set_signkey_cb(info, signkey_cb, signing_key_file);
+
+#if 0	// old code: keep as an example of gdp_gcl_open_info_set_signing_key
 		FILE *fp;
 		EP_CRYPTO_KEY *skey;
 
@@ -296,6 +331,7 @@ main(int argc, char **argv)
 
 		estat = gdp_gcl_open_info_set_signing_key(info, skey);
 		EP_STAT_CHECK(estat, goto fail1);
+#endif
 	}
 
 	// open a GCL with the provided name
