@@ -249,6 +249,10 @@ table td {
   vertical-align: top;
 }
 
+.title {
+  text-align: center;
+}
+
 .author {
   font-size: 1.2em;
   text-align: center;
