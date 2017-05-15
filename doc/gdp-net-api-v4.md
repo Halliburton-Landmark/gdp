@@ -1,10 +1,16 @@
 % What I Want to See in a Network API
   for the GDP
 % Eric Allman
-% 2017-05-11
+% 2017-05-12
+
+***This is a proposal, not a specification***
 
 
 SEE ALSO: Nitesh's documents.
+
+[[NOTE: "PDU", "blob", and "payload" are used somewhat interchangeably,
+with a bit of "message" thrown in for good measure.]]
+
 
 ## Key Points
 
@@ -17,27 +23,41 @@ of the legacy of the "overlay network" model.
 
 For the purposes of this document, "I", "me", and "my" refer
 to the user of this API.  "You" and "your" refer to the
-implementer of the API.
+implementer of the API.  "Payload" is an opaque blob for you;
+the term is approximately equal to "PDU".
+
+> Using OSI language, a "payload" would be called a "Service
+Data Unit" or SDU.  You add a header to that, and then it
+becomes the PDU for the next layer down.  This document does
+not discuss the internal structure of the payload.
 
 GDP clients and servers ("my side" of the API) see:
 
-* Fragmentation, flow control, etc. already handled at some lower
-  layer.
-* Individual PDUs delivered reliably and in order.
+* A message-based interface (i.e., PDUs are delimited by the
+  network).
+* Reliable data transmission:
+    + Fragmentation, flow control, retransmission, etc. already
+      handled.
+    + Individual PDUs delivered reliably and in order, that is,
+      fragments of PDUs will not be delivered out of order,
+      fragments will not be duplicated, and an error will be
+      delivered if a fragment is lost.
 * Different PDUs may be delivered out of order.
 * PDU sizes are not inherently limited by underlying MTUs.
 
-The network ("your side" of the API) sees:
+The network ("your side" of the API) sees (that is, I will give
+you)::
 
 * Source and destination GDPnames (256-bit).
-* A dynamically sized buffer in which to read or store a blob.
+* A dynamically sized buffer in which to read or store an
+  opaque payload, which must be treated as an opaque blob.
 * Advertisements of known GDPnames, authenticated using a
   certificate-based scheme, still not fully defined.
 * Probably some hints vis-a-vis client expectations such as
   Quality of Service.  These remain _for further study_.
 * _Other information to be determined._
 
-... and is responsible for:
+Your side is responsible for:
 
 * Routing.
 * Reliability (retransmissions, etc.).
@@ -54,7 +74,8 @@ switch/forwarder/router layer or in a separate service.  I assume
 that this layer will not rely on threads in client processes to
 make it possible to run in low-end (non-MMU) processors.
 _Note: this is a change from the V3 design, which assumes a
-dedicated thread for I/O._
+dedicated thread for I/O.  This is intended to support Kubi's
+dream of the GDP on an Arduino._
 
 Issues that we should consider:
 
@@ -117,12 +138,10 @@ processors.
 Background:
 
 * `gdp_chan_t` is opaque to "my side" of the API.
-* `gdp_pdu_t` is opaque to "my side" of the API; it maintains
-  the state of a single logical message from a known source to
-  a known destination during receipt.  It exists to provide the
-  potential of streaming interface, and is only used when
-  receiving a PDU.  Internally ("your side") it is fair game
-  for other use, in particular, for sending a PDU.
+* `gdp_cursor_t` is opaque to "my side" of the API; it provides a
+  streaming interface to a payload while the client is receiving.
+  Internally ("your side") it is fair game for other use, in
+  particular, it may be useful on the sending side.
 * `gdp_buf_t` implements dynamically allocated, variable sized
   buffers (already exists; based on `libevent`).  Details of that
   interface are not included here.
@@ -196,22 +215,21 @@ use `chan` after it is freed.
 	EP_STAT gdp_chan_set_callbacks(
 		gdp_chan_t *chan,
 		EP_STAT *gdp_recv_cb(
-			gdp_message_t *message,
+			gdp_cursor_t *cursor,
 			gdp_name_t *src,
 			gdp_name_t *dst,
 			size_t payload_len),
 		EP_STAT *gdp_send_cb(
-			gdp_message_t *message));
+			gdp_buf_t *payload));
 ~~~
 
 When a new PDU is ready to read on `chan`, call `gdp_recv_cb`,
 including the total size of the payload (not necessarily what is
-available for read right now).  Data is actually read using
-`gdp_chan_recv` (see below).  The `message` is a handle created by
-the network layer that I must pass into subsequent functions
-during the lifetime of this callback, and that I promise to
-never use outside this callback.  A single message is equivalent
-to a single PDU.
+available for read right now).  The `cursor` is a handle created
+by the network layer that I must pass into subsequent functions
+during the lifetime of this callback in order to actually read the
+data, and that I promise to never use outside this callback.  Data
+is actually read using `gdp_cursor_recv` (see below).
 
 The `gdp_send_cb` is not used at this time; for now, if it is non-NULL
 `gdp_chan_set_callbacks` should return `GDP_STAT_NOT_IMPLEMENTED`.
@@ -310,10 +328,10 @@ from a given server.
 		gdp_XXX_t target,
 		gdp_name_t src,
 		gdp_name_t dst,
-		gdp_buf_t *blob);
+		gdp_buf_t *payload);
 ~~~
 
-Sends the entire contents of `blob` to the indicated `dst` over
+Sends the entire contents of `payload` to the indicated `dst` over
 `chan`.  The source address is specified by `src`.
 
 The `target` give clues as to exactly where to deliver the
@@ -327,7 +345,7 @@ an address you aren't authorized to speak for, but the ultimate
 responsibility for avoiding problems falls to the receiver.]]_
 
 _[[Implementation Note: in the short run this may return
-`GDP_STAT_PDU_TOO_LONG` if the size of `blob` exceeds an
+`GDP_STAT_PDU_TOO_LONG` if the size of `payload` exceeds an
 implementation-defined limit.  This should be as large as possible
 since it limits the size of any single record stored in the GDP.]]_
 
@@ -339,10 +357,10 @@ since it limits the size of any single record stored in the GDP.]]_
 		gdp_chan_t *chan,
 		gdp_name_t src,
 		gdp_XXX_t multicast_addr,
-		gdp_buf_t *blob);
+		gdp_buf_t *payload);
 ~~~
 
-Sends `blob` to multiple destinations as indicated by
+Sends `payload` to multiple destinations as indicated by
 `multicast_addr`.  It isn't clear what that is.
 
 This is primarily intended for delivering subscription data.
@@ -351,29 +369,35 @@ This will certainly need support to set up a multicast channel,
 probably with "new", "join", "leave", and "free" style interface.
 
 
-#### gdp_pdu_recv (pdu::recv)
+#### gdp_cursor_recv (cursor::recv)
 
 This can only be called within a receive callback.  It acts on a
-single PDU rather than on the channel itself.
+cursor rather than on the channel itself.  It is not necessary for
+the entire payload to be read for this call to return data, nor is
+it necessary to read the entire payload at once.
 
 ~~~
-	EP_STAT gdp_pdu_recv(
-		gdp_pdu_t *pdu,
-		gdp_buf_t *blob,
-		size_t *len);
+	EP_STAT gdp_cursor_recv(
+		gdp_cursor_t *cursor,
+		gdp_buf_t *payload,
+		size_t *payload_len);
 ~~~
 
-Read up to `*len` octets from `pdu` into `blob`.  If `*len` = 0,
-block until all octets comprising the current PDU have been read.
-Returns the number of octets actually read into `*len`.
-If `blob` already has data, the new data is appended.
+Read up to `*payload_len` octets from `cursor` into `payload`.  If
+`*payload_len` = 0, block until all octets comprising the current
+payload have been read.  Returns the number of octets actually read
+into `*payload_len`.  If `payload` already has data, the new data is
+appended.
 
-Data read on a given message is guaranteed to be presented in the
+Data read from a cursor is guaranteed to be presented in the
 same order it was written with no duplicates or dropouts.
-There is no such "in order" guarantee between messages.
+There is no such "in order" guarantee between different payloads.
 
 * If all data has been read, returns `EP_STAT_OK`.
-* If data remains to be read, returns `GDP_STAT_KEEP_READING`.
+* If data remains to be read, returns `GDP_STAT_KEEP_READING`
+  (this is an information status, not an error).
+* If a fragment of payload cannot be read, returns
+  `GDP_STAT_PDU_READ_FAIL` and any remainder of the payload is discarded.
 
 _[[Include a timeout, or is it sufficient to say that if
 `*len` ≠ 0 it will return immediately? And the semantics imply
@@ -388,16 +412,16 @@ available.]]_
 
 ### Utilities
 
-#### gdp_pdu_get_endpoints (pdu::get_endpoints)
+#### gdp_cursor_get_endpoints (cursor::get_endpoints)
 
 ~~~
-	EP_STAT gdp_pdu_get_endpoints(
-		gdp_pdu_t *pdu,
+	EP_STAT gdp_cursor_get_endpoints(
+		gdp_cursor_t *cursor,
 		gdp_name_t *src,
 		gdp_name_t *dst);
 ~~~
 
-Returns the endpoints of the given `pdu` into `src` and `dst`.
+Returns the endpoints of the given `cursor` into `src` and `dst`.
 These will be the same as passed to `gdp_recv_cb`.
 
 
