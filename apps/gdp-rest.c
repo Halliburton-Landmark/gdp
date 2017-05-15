@@ -64,6 +64,7 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.rest", "RESTful interface to GDP");
 const char		*GclUriPrefix;			// prefix on all REST calls
 EP_HASH			*OpenGclCache;			// cache of open GCLs
 
+gdp_gcl_open_info_t *shared_gcl_open_info;
 
 /*
 **  LOG_ERROR --- generic error logging routine
@@ -475,7 +476,7 @@ a_append(scgi_request *req, gdp_name_t gcliname, gdp_datum_t *datum)
 
 	ep_dbg_cprintf(Dbg, 5, "=== Append value to GCL\n");
 
-	estat = gdp_gcl_open(gcliname, GDP_MODE_AO, NULL, &gcl);
+	estat = gdp_gcl_open(gcliname, GDP_MODE_AO, shared_gcl_open_info, &gcl);
 	EP_STAT_CHECK(estat, goto fail_open);
 
 	estat = gdp_gcl_append(gcl, datum);
@@ -550,7 +551,7 @@ a_read_datum(scgi_request *req, gdp_name_t gcliname, gdp_recno_t recno)
 	gdp_gcl_t *gcl = NULL;
 	gdp_datum_t *datum = gdp_datum_new();
 
-	estat = gdp_gcl_open(gcliname, GDP_MODE_RO, NULL, &gcl);
+	estat = gdp_gcl_open(gcliname, GDP_MODE_RO, shared_gcl_open_info, &gcl);
 	EP_STAT_CHECK(estat, goto fail_open);
 
 	estat = gdp_gcl_read(gcl, recno, datum);
@@ -1088,6 +1089,7 @@ main(int argc, char **argv, char **env)
 
 	// Initialize the GDP library
 	//		Also initializes the EVENT library and starts the I/O thread
+	// Initialize shared gcl open info with caching enabled
 	{
 		EP_STAT estat = gdp_init(gdpd_addr);
 		char ebuf[100];
@@ -1097,8 +1099,17 @@ main(int argc, char **argv, char **env)
 			ep_app_abort("Cannot initialize gdp library: %s",
 					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		}
-	}
 
+		shared_gcl_open_info = gdp_gcl_open_info_new();
+		estat = gdp_gcl_open_info_set_caching(shared_gcl_open_info, true);
+
+		if (!EP_STAT_ISOK(estat))
+		{
+			ep_app_abort("Cannot initialize gdp gcl cache preference: %s",
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		}
+	}
+		
 	ep_dbg_cprintf(Dbg, 9, "GDP initialized\n");
 
 	// Initialize SCGI library
