@@ -170,27 +170,39 @@ printmessage(struct msginfo *mi,
 //
 
 void
+ep_app_messagev(
+	EP_STAT estat,
+	const char *fmt,
+	va_list av)
+{
+	struct msginfo *mi = &MsgInfo[EP_STAT_SEVERITY(estat)];
+	char ebuf[100];
+	va_list av2;
+
+	ep_stat_tostr(estat, ebuf, sizeof ebuf);
+	errno = 0;
+	if (EP_UT_BITSET(mi->flag, OperationFlags))
+		va_copy(av2, av);
+	printmessage(mi, ebuf, fmt, av);
+	if (EP_UT_BITSET(mi->flag, OperationFlags))
+	{
+		ep_logv(estat, fmt, av2);
+		va_end(av2);
+	}
+}
+
+void
 ep_app_message(
 	EP_STAT estat,
 	const char *fmt,
 	...)
 {
 	va_list av;
-	struct msginfo *mi = &MsgInfo[EP_STAT_SEVERITY(estat)];
-	char ebuf[100];
 
-	ep_stat_tostr(estat, ebuf, sizeof ebuf);
 	errno = 0;
 	va_start(av, fmt);
-	printmessage(mi, ebuf, fmt, av);
+	ep_app_messagev(estat, fmt, av);
 	va_end(av);
-
-	if (EP_UT_BITSET(mi->flag, OperationFlags))
-	{
-		va_start(av, fmt);
-		ep_logv(estat, fmt, av);
-		va_end(av);
-	}
 }
 
 
