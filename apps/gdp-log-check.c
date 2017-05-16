@@ -475,20 +475,6 @@ recseq_process(struct ctx *ctx)
 				ep_dbg_printf(" %" PRIgdp_recno, rv->ends[x++]);
 			ep_dbg_printf("\n");
 		}
-//		if (rv->nused > 0 && end < rv->ends[rv->nused - 1])
-//		{
-//			EP_ASSERT_FAILURE("recseq_process: rv->nused = %d"
-//						", rv->ends[%d] = %" PRIgdp_recno
-//						", end = %" PRIgdp_recno,
-//						rv->nused, rv->nused - 1, rv->ends[rv->nused - 1], end);
-//		}
-		if (rv->nused > 0 && end < rv->ends[0])
-		{
-			EP_ASSERT_FAILURE("recseq_process: rv->nused = %d"
-						", rv->ends[0] = %" PRIgdp_recno
-						", end = %" PRIgdp_recno,
-						rv->nused, rv->ends[0], end);
-		}
 
 		// see if this just extends an existing entry
 		for (i = 0; i < rv->nused; i++)
