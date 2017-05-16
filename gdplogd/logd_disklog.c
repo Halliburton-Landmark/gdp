@@ -1219,8 +1219,11 @@ ridx_entry_read(gdp_gcl_t *gcl,
 	EP_STAT_CHECK(estat, goto fail3);
 	if (fread(xent, SIZEOF_RIDX_RECORD, 1, phys->ridx.fp) < 1)
 	{
-		estat = posix_error(errno, "ridx_entry_read(%s): fread failed",
-					gclpname);
+		if (errno == 0)
+			estat = EP_STAT_END_OF_FILE;
+		else
+			estat = posix_error(errno, "ridx_entry_read(%s): fread failed",
+						gclpname);
 		goto fail3;
 	}
 	xent->recno = ep_net_ntoh64(xent->recno);
