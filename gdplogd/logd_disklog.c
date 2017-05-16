@@ -108,7 +108,10 @@ posix_error(int _errno, const char *fmt, ...)
 	EP_STAT estat = ep_stat_from_errno(_errno);
 
 	va_start(ap, fmt);
-	ep_logv(estat, fmt, ap);
+	if (EP_UT_BITSET(LOG_POSIX_ERRORS, DefaultLogFlags))
+		ep_logv(estat, fmt, ap);
+	else if (ep_dbg_test(Dbg, 1))
+		ep_app_messagev(estat, fmt, ap);
 	va_end(ap);
 
 	return estat;
@@ -439,6 +442,9 @@ disk_init()
 	// not be a good idea.
 	if (ep_adm_getboolparam("swarm.gdplogd.gcl.abandon_corrupt_tidx", true))
 		DefaultLogFlags |= LOG_TIDX_HIDEFAILURE;
+
+	if (ep_adm_getboolparam("swarm.gdplogd.disklog.log-posix-errors", false))
+		DefaultLogFlags |= LOG_POSIX_ERRORS;
 
 	ep_dbg_cprintf(Dbg, 8, "disk_init: log dir = %s, mode = 0%o\n",
 			GCLDir, GCLfilemode);
