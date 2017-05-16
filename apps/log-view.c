@@ -68,6 +68,8 @@ static EP_DBG	Dbg = EP_DBG_INIT("log-view", "Dump GDP logs for debugging");
 
 #define CHECK_FILE_OFFSET	check_file_offset
 
+#define LIST_NO_METADATA		0x00000001	// only list logs with no metadata
+
 void
 check_file_offset(FILE *fp, long offset)
 {
@@ -476,6 +478,29 @@ show_index_contents(const char *gcl_dir_name, gdp_name_t gcl_name, int plev)
 
 
 int
+read_segment_header(FILE *logfp, segment_header_t *loghdr)
+{
+	if (fread(loghdr, sizeof *loghdr, 1, logfp) != 1)
+	{
+		fprintf(stderr, "fread() failed while reading log_header, ferror = %d\n",
+				ferror(logfp));
+		return EX_DATAERR;
+	}
+	loghdr->magic = ep_net_ntoh32(loghdr->magic);
+	loghdr->version = ep_net_ntoh32(loghdr->version);
+	loghdr->header_size = ep_net_ntoh32(loghdr->header_size);
+	loghdr->reserved1 = ep_net_ntoh32(loghdr->reserved1);
+	loghdr->n_md_entries = ep_net_ntoh16(loghdr->n_md_entries);
+	loghdr->log_type = ep_net_ntoh16(loghdr->log_type);
+	loghdr->segment = ep_net_ntoh32(loghdr->segment);
+	loghdr->reserved2 = ep_net_ntoh64(loghdr->reserved2);
+	loghdr->recno_offset = ep_net_ntoh64(loghdr->recno_offset);
+
+	return 0;
+}
+
+
+int
 show_segment(const char *gcl_dir_name,
 		gdp_name_t gcl_name,
 		int extno,
@@ -520,22 +545,9 @@ show_segment(const char *gcl_dir_name,
 	size_t file_offset = 0;
 	segment_header_t log_header;
 	segment_record_t record;
-	if (fread(&log_header, sizeof log_header, 1, data_fp) != 1)
-	{
-		fprintf(stderr, "fread() failed while reading log_header, ferror = %d\n",
-				ferror(data_fp));
-		istat = EX_DATAERR;
+	istat = read_segment_header(data_fp, &log_header);
+	if (istat != 0)
 		goto fail0;
-	}
-	log_header.magic = ep_net_ntoh32(log_header.magic);
-	log_header.version = ep_net_ntoh32(log_header.version);
-	log_header.header_size = ep_net_ntoh32(log_header.header_size);
-	log_header.reserved1 = ep_net_ntoh32(log_header.reserved1);
-	log_header.n_md_entries = ep_net_ntoh16(log_header.n_md_entries);
-	log_header.log_type = ep_net_ntoh16(log_header.log_type);
-	log_header.segment = ep_net_ntoh32(log_header.segment);
-	log_header.reserved2 = ep_net_ntoh64(log_header.reserved2);
-	log_header.recno_offset = ep_net_ntoh64(log_header.recno_offset);
 
 	if (plev >= 1)
 	{
@@ -647,8 +659,28 @@ show_gcl(const char *gcl_dir_name, gdp_name_t gcl_name, int plev)
 }
 
 
+bool
+test_metadata(const char *filename, int list_flags)
+{
+	FILE *dfp;
+
+	if (!EP_UT_BITSET(LIST_NO_METADATA, list_flags))
+		return true;
+
+	dfp = fopen(filename, "r");
+	if (dfp == NULL)
+		return true;
+
+	segment_header_t seghdr;
+	if (read_segment_header(dfp, &seghdr) != 0)
+		return true;
+
+	return seghdr.n_md_entries == 0;
+}
+
+
 int
-list_gcls(const char *gcl_dir_name, int plev)
+list_gcls(const char *gcl_dir_name, int plev, int list_flags)
 {
 	DIR *dir;
 	int subdir;
@@ -694,6 +726,10 @@ list_gcls(const char *gcl_dir_name, int plev)
 			if (p == NULL || strcmp(p, GCL_LDF_SUFFIX) != 0)
 				continue;
 
+			// save the full pathname in case we need it
+			snprintf(dbuf, sizeof dbuf, "%s/_%02x/%s",
+					gcl_dir_name, subdir, dent->d_name);
+
 			// strip off the ".data"
 			*p = '\0';
 
@@ -707,9 +743,13 @@ list_gcls(const char *gcl_dir_name, int plev)
 					!= NULL)
 				continue;
 
-			// print the name
-			gdp_parse_name(dent->d_name, gcl_iname);
-			show_gcl(gcl_dir_name, gcl_iname, plev);
+			// we may want to select by metadata
+			if (test_metadata(dbuf, list_flags))
+			{
+				// print the name
+				gdp_parse_name(dent->d_name, gcl_iname);
+				show_gcl(gcl_dir_name, gcl_iname, plev);
+			}
 		}
 		closedir(dir);
 		ep_hash_free(seenhash);
@@ -729,6 +769,7 @@ usage(const char *msg)
 			"\t-d dir -- set log database root directory\n"
 			"\t-D spec -- set debug flags\n"
 			"\t-l -- list all local GCLs\n"
+			"\t-n -- only list GCLs with no metadata\n"
 			"\t-v -- print verbose information (-vv for more detail)\n",
 				msg);
 
@@ -743,10 +784,11 @@ main(int argc, char *argv[])
 	bool list_gcl = false;
 	char *gcl_xname = NULL;
 	const char *gcl_dir_name = NULL;
+	uint32_t list_flags = 0;
 
 	ep_lib_init(0);
 
-	while ((opt = getopt(argc, argv, "d:D:lv")) > 0)
+	while ((opt = getopt(argc, argv, "d:D:lnv")) > 0)
 	{
 		switch (opt)
 		{
@@ -760,6 +802,10 @@ main(int argc, char *argv[])
 
 		case 'l':
 			list_gcl = true;
+			break;
+
+		case 'n':
+			list_flags |= LIST_NO_METADATA;
 			break;
 
 		case 'v':
@@ -785,7 +831,7 @@ main(int argc, char *argv[])
 	{
 		if (argc > 0)
 			usage("cannot use a GCL name with -l");
-		return list_gcls(gcl_dir_name, verbosity);
+		return list_gcls(gcl_dir_name, verbosity, list_flags);
 	}
 
 	if (argc > 0)
