@@ -404,9 +404,10 @@ show_ridx_header(const char *ridx_filename,
 				ridx_header.magic, ridx_header.version,
 				ridx_header.header_size, ridx_header.min_recno);
 
-		printf("\tfirst segment %d, last recno %" PRIgdp_recno
-				" offset %jd segment %d reserved %x\n",
+		printf("\tmin_segment=%d, max_segment=%d max_recno=%" PRIgdp_recno
+				"\n\toffset=%jd segment=%d reserved=%x\n",
 				*min_segment,
+				*max_segment,
 				ep_net_ntoh64(xent.recno),
 				(intmax_t) ep_net_ntoh64(xent.offset),
 				ep_net_ntoh32(xent.segment),
@@ -618,7 +619,7 @@ show_gcl(const char *gcl_dir_name, gdp_name_t gcl_name, int plev)
 	snprintf(filename, filename_size,
 			"%s/_%02x/%s%s",
 			gcl_dir_name, gcl_name[0], gcl_pname, GCL_RIDX_SUFFIX);
-	max_recno = show_ridx_header(filename, 0,
+	max_recno = show_ridx_header(filename, plev,
 						&min_segment, &max_segment);
 	printf("\t%" PRIgdp_recno " recs\n", max_recno - 1);
 
@@ -636,7 +637,6 @@ show_gcl(const char *gcl_dir_name, gdp_name_t gcl_name, int plev)
 
 	for (segment = min_segment; segment <= max_segment; segment++)
 		istat = show_segment(gcl_dir_name, gcl_name, segment, false, plev);
-	(void) show_segment(gcl_dir_name, gcl_name, segment, true, plev);
 
 	if (plev >= 5)
 	{

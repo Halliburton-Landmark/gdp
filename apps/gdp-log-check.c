@@ -64,13 +64,18 @@
 #include <sysexits.h>
 
 
-static EP_DBG	Dbg = EP_DBG_INIT("gdp-log-check", "GDP Log Rebuilder");
+static EP_DBG	Dbg = EP_DBG_INIT("gdp-log-check", "GDP Log Checker/Rebuilder");
 
-#define LOGCHECK_MISSING_INDEX	EP_STAT_NEW(WARN, EP_REGISTRY_USER, 1, 1)
+#define LOGCHECK_STAT(sev, det)	EP_STAT_NEW(sev, EP_REGISTRY_USER, 1, det)
 
 static struct ep_stat_to_string	Stats[] =
 {
+#define LOGCHECK_MISSING_INDEX			LOGCHECK_STAT(WARN, 1)
 	{ LOGCHECK_MISSING_INDEX,		"missing index",						},
+#define LOGCHECK_DUPLICATE_TIMESTAMP	LOGCHECK_STAT(ERROR, 2)
+	{ LOGCHECK_DUPLICATE_TIMESTAMP,	"duplicate timestamp",					},
+#define LOGCHECK_MISSING_TIMESTAMP		LOGCHECK_STAT(ERROR, 3)
+	{ LOGCHECK_MISSING_TIMESTAMP,	"missing timestamp in index",			},
 	{ EP_STAT_OK,					NULL,									}
 };
 
@@ -369,6 +374,8 @@ recseq_output(gdp_recno_t start, gdp_recno_t end, int n)
 	ep_dbg_cprintf(Dbg, 91,
 				"recseq_output: %" PRIgdp_recno " .. %" PRIgdp_recno ", %d\n",
 				start, end, n);
+	if (Flags.silent || Flags.summaryonly)
+		return;
 	if (n == 0)
 		printf("Missing records   %" PRIgdp_recno " .. %" PRIgdp_recno "\n",
 			start, end);
@@ -929,6 +936,12 @@ check_record(
 		ridx_entry_t *xent = &xentbuf;
 
 		estat = ridx_entry_read(gcl, rec->recno, gcl->pname, xent);
+		if (!EP_STAT_ISOK(estat))
+		{
+			char ebuf[80];
+			testfail("ridx entry read fail: %" PRIgdp_recno ": %s\n",
+					rec->recno, ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		}
 		EP_STAT_CHECK(estat, goto fail0);
 
 		// do consistency checks
@@ -943,7 +956,8 @@ check_record(
 		{
 			estat = GDP_STAT_RECORD_DUPLICATED;		// most likely
 			if (!GdplogdForgive.allow_log_dups || Flags.verbose)
-				testfail("ridx offset inconsistency: %jd != %jd\n",
+				testfail("ridx offset inconsistency: recno %" PRIgdp_recno
+						": %jd != %jd\n",
 								xent->offset, offset);
 		}
 		else if (xent->segment != seg->segno)
@@ -984,6 +998,8 @@ check_record(
 		{
 			char ebuf[100];
 
+			if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOTFOUND))
+				estat = LOGCHECK_MISSING_TIMESTAMP;
 			testfail("tidx read failure: %s\n",
 					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 			goto fail0;
@@ -992,14 +1008,15 @@ check_record(
 		if (tval_dbt.size != sizeof *tvalp)
 		{
 			estat = GDP_STAT_CORRUPT_INDEX;
-			testfail("tidx inconsistency");
+			testfail("tidx size inconsistency: %zd != %zd",
+					tval_dbt.size, sizeof *tvalp);
 			goto fail0;
 		}
 
 		tvalp = tval_dbt.data;
 		if (tvalp->recno != rec->recno)
 		{
-			estat = GDP_STAT_CORRUPT_INDEX;
+			estat = LOGCHECK_DUPLICATE_TIMESTAMP;
 			testfail("tidx recno inconsistency: %" PRIgdp_recno
 							" != %" PRIgdp_recno "\n",
 							tvalp->recno, rec->recno);
@@ -1103,7 +1120,7 @@ fail0:
 		else if (EP_STAT_ISWARN(estat))
 			fgcolor = EpVid->vidfgyellow;
 		else if (EP_STAT_ISERROR(estat))
-			fgcolor = EpVid->vidfgcyan;
+			fgcolor = EpVid->vidfgmagenta;
 		else
 			fgcolor = EpVid->vidfgred;
 		printf("%s%s%s", fgcolor, EpVid->vidbgblack, ctx->logxname);
@@ -1219,13 +1236,36 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 
 	if (EP_STAT_ISOK(estat))
 	{
-		struct stat st;
+		struct stat tidx_stat;
 		char pbuf[GCL_PATH_MAX];
 
 		// if no tidx file exists, always ask if you want to install
 		estat = get_gcl_path(gcl, -1, GCL_TIDX_SUFFIX, pbuf, sizeof pbuf);
-		if (EP_STAT_ISOK(estat) && stat(pbuf, &st) < 0)
+		if (!EP_STAT_ISOK(estat))
+		{
+			install_new_files = true;
+		}
+		else if (stat(pbuf, &tidx_stat) < 0)
+		{
 			estat = LOGCHECK_MISSING_INDEX;
+			install_new_files = true;
+		}
+		else
+		{
+			char tmptidx[GCL_PATH_MAX];
+			struct stat tmptidx_stat;
+
+			// heuristic: check to see if size has changed
+			// XXX: should really check to see if content has changed
+			estat = get_gcl_path(gcl, -1, ".tmptidx", tmptidx, sizeof tmptidx);
+			if (EP_STAT_ISOK(estat) &&
+					stat(tmptidx, &tmptidx_stat) >= 0 &&
+					tmptidx_stat.st_size != tidx_stat.st_size)
+			{
+				install_new_files = true;
+			}
+		}
+
 	}
 
 	if (install_new_files || EP_STAT_ISWARN(estat))
@@ -1243,7 +1283,7 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 	}
 	else
 	{
-		ep_app_info("no changes to %s%s\n\t", ctx->logxname,
+		ep_app_info("no changes to %s %s", ctx->logxname,
 				Flags.force ? "(forcing new index installation anyway)"
 							: "(use -f to force new index installation)");
 	}
@@ -1252,19 +1292,20 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 	{
 		// move the new indexes into place
 		char real_path[GCL_PATH_MAX];
-		get_gcl_path(gcl, -1, GCL_RIDX_SUFFIX, real_path, sizeof real_path);
 		char save_path[GCL_PATH_MAX];
-		get_gcl_path(gcl, -1, ".oldridx", save_path, sizeof save_path);
 		char temp_path[GCL_PATH_MAX];
-		get_gcl_path(gcl, -1, ".tmpridx", temp_path, sizeof temp_path);
 
+		ep_app_info("installing new files for %s", ctx->logxname);
+
+		get_gcl_path(gcl, -1, GCL_RIDX_SUFFIX, real_path, sizeof real_path);
+		get_gcl_path(gcl, -1, ".oldridx", save_path, sizeof save_path);
+		get_gcl_path(gcl, -1, ".tmpridx", temp_path, sizeof temp_path);
 		rename(real_path, save_path);
 		rename(temp_path, real_path);
 
 		get_gcl_path(gcl, -1, GCL_TIDX_SUFFIX, real_path, sizeof real_path);
 		get_gcl_path(gcl, -1, ".oldtidx", save_path, sizeof save_path);
 		get_gcl_path(gcl, -1, ".tmptidx", temp_path, sizeof temp_path);
-
 		rename(real_path, save_path);
 		rename(temp_path, real_path);
 	}
