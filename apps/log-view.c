@@ -663,6 +663,7 @@ bool
 test_metadata(const char *filename, int list_flags)
 {
 	FILE *dfp;
+	int istat;
 
 	if (!EP_UT_BITSET(LIST_NO_METADATA, list_flags))
 		return true;
@@ -672,7 +673,9 @@ test_metadata(const char *filename, int list_flags)
 		return true;
 
 	segment_header_t seghdr;
-	if (read_segment_header(dfp, &seghdr) != 0)
+	istat = read_segment_header(dfp, &seghdr);
+	fclose(dfp);
+	if (istat != 0)
 		return true;
 
 	return seghdr.n_md_entries == 0;
