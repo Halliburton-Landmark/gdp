@@ -1210,7 +1210,7 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 	gcl_physinfo_t *phys = GETPHYS(gcl);
 	bool install_new_files = false;
 
-	// check the tidx database
+	// check the tidx database (this is just to see if we need to reinstall)
 	estat = check_tidx_db(gcl, ctx, &phase);
 	EP_STAT_CHECK(estat, install_new_files = true);
 
