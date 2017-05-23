@@ -1,7 +1,7 @@
 % What I Want to See in a Network API
   for the GDP
 % Eric Allman
-% 2017-06-21
+% 2017-07-14
 
 ***This is a proposal, not a specification***
 
@@ -49,11 +49,13 @@ GDP clients and servers ("my side" of the API) see:
 
 * A message-based interface (i.e., PDUs are delimited by the
   network layer).
-* Fragmentation, flow control, etc. already handled.
-* Individual PDUs delivered reliably, that is, fragments of
-  PDUs will be delivered in order, fragments will not be
-  duplicated, and an error will be delivered if a fragment
-  is lost.
+* Reliable data transmission:
+    + Fragmentation, flow control, retransmission, etc. already
+      handled.
+    + Individual PDUs delivered reliably and in order, that is,
+      fragments of PDUs will not be delivered out of order,
+      fragments will not be duplicated, and an error will be
+      delivered if a fragment is lost.
 * Different PDUs may be delivered out of order.
 * PDU sizes are not inherently limited by underlying MTUs.
 
@@ -71,6 +73,7 @@ you):
   events.  I may register my own events in the same event
   base.
 * _Other information to be determined._
+* Functions to declare I/O event handlers.
 
 Your side is responsible for:
 
@@ -276,9 +279,10 @@ which side of the interface this belongs on.]]
 Deallocate `chan`.  All resources are freed.  I promise I will not
 attempt to use `chan` after it is freed.
 
-
-
 #### \_gdp\_chan\_get\_cdata (chan::get_cdata)
+
+_[[Need callbacks for received data, failure on a connection.
+Anything else?]]_
 
 ~~~
 	gdp_chan_x_t *_gdp_chan_get_cdata(
@@ -403,6 +407,8 @@ since it limits the size of any single record stored in the GDP.]]
 #### \_gdp\_chan\_multicast (chan::multicast)
 
 > [[Note: this is a placeholder.]]
+
+_[[Note: this is a placeholder.]]_
 
 ~~~
 	EP_STAT _gdp_chan_multicast(
