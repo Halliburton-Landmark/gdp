@@ -1,14 +1,27 @@
 % What I Want to See in a Network API
   for the GDP
 % Eric Allman
-% 2017-05-20
+% 2017-05-24
 
 ***This is a proposal, not a specification***
 
+This defines an API, not "bits on the wire" or, to the extent
+possible, specifics of implementation.  The goal is that subject
+to a few constraints, everything "above the line" can be insulated
+from the actual network implementation, which must define the
+packet format in whatever way it sees fit.  Conversely, everything
+"below the line" will not be in any way affected by changes in the
+higher level protocol.  Obviously both of those specifications will
+be required, but this document isn't the place.
 
 SEE ALSO: Nitesh's documents.
 
-[[NOTE: "PDU", "blob", and "payload" are used somewhat interchangeably,
+> [[Note: I'm doing a "proof of concept" implementation, essentially
+just adapting the current version, in order to test the API for
+completeness and simplicity.  In that process I'm still finding
+new problems, so this **WILL** change.]]
+
+> [[NOTE: "PDU", "blob", and "payload" are used somewhat interchangeably,
 with a bit of "message" thrown in for good measure.  This is a bug,
 not a feature.]]
 
@@ -36,13 +49,11 @@ GDP clients and servers ("my side" of the API) see:
 
 * A message-based interface (i.e., PDUs are delimited by the
   network layer).
-* Reliable data transmission:
-    + Fragmentation, flow control, retransmission, etc. already
-      handled.
-    + Individual PDUs delivered reliably and in order, that is,
-      fragments of PDUs will not be delivered out of order,
-      fragments will not be duplicated, and an error will be
-      delivered if a fragment is lost.
+* Fragmentation, flow control, etc. already handled.
+* Individual PDUs delivered reliably, that is, fragments of
+  PDUs will be delivered in order, fragments will not be
+  duplicated, and an error will be delivered if a fragment
+  is lost.
 * Different PDUs may be delivered out of order.
 * PDU sizes are not inherently limited by underlying MTUs.
 
@@ -51,18 +62,22 @@ you):
 
 * Source and destination GDPnames (256-bit).
 * A dynamically sized buffer in which to read or store a
-  payload, which must be treated as an opaque blob.
+  payload, which you must treat as an opaque blob.
 * Advertisements of known GDPnames, authenticated using a
   certificate-based scheme, still not fully defined.
 * Probably some hints vis-a-vis client expectations such as
   Quality of Service.  These remain _for further study_.
+* A `libevent` event base to be used for registering I/O
+  events.  I may register my own events in the same event
+  base.
 * _Other information to be determined._
-* Functions to declare I/O event handlers.
 
 Your side is responsible for:
 
 * Routing.
-* Reliability (retransmissions, etc.).
+* Retransmissions, etc.
+* Reestablishing dropped connections (e.g., in presence of
+  router failure).
 * Fragmentation/Reassembly.
 * In order delivery (i.e., all pieces of the PDU delivered in order).
 * Compression (notably header compression).
@@ -93,10 +108,9 @@ Issues that we should consider:
 
 * This interface allows streaming receipt of data (within a single
   record) but not streaming transmission.  How serious is this?
-  _[[Note to self: use bufferevents?  This might dramatically
-  change the interface, but ties us even more closely to libevent.]]_
   Note: it's impossible to write a header that includes the payload
-  length until the entire payload has been read.
+  length until the size has been determined, which often means that
+  the entire payload must be assembled in advance.
 
 * This should be easy to implement (from the network perspective)
   for the existing TCP-based, no fragmentation model, but is it
@@ -106,13 +120,10 @@ Issues that we should consider:
 
 Design/Implementation Notes:
 
-* This interface uses `libevent` (<http://libevent.org>).
+* This interface uses `libevent` (see <http://libevent.org>).
   There is really no way around my picking the library without
-  inverting the control flow, which leaves us with threads.
-  However, the network internals are presented with a new
-  interface ("gdp_ioevent") that masks the details and gives
-  us an opportunity to swap out the implementation in the
-  future.
+  inverting the control flow, which would leave us forced to
+  use threads.
 
 Documentation Notes:
 
@@ -142,8 +153,6 @@ a model of how this would map into an OO environment.
 * `gdp_buf_t` implements dynamically allocated, variable sized
   buffers (already exists; based on `libevent`).  Details of that
   interface are not included here.
-* `gdp_ioevent_t` encodes callbacks for particular I/O events.
-  It is opaque to "your side" of the API.
 * `gdp_name_t` is the 256-bit version of a GDP name.
 * `gdp_adcert_t` is whatever information is needed to advertise
   a GDPname.  This is _for further study_.
@@ -152,70 +161,20 @@ a model of how this would map into an OO environment.
 ### Initialization
 
 
-#### gdp_chan_init (class method)
+#### \_gdp\_chan\_init (class method)
 
 I promise to call this routine on startup:
 
 ~~~
-	EP_STAT gdp_chan_init(
-		void *unused);
+	EP_STAT _gdp_chan_init(
+			struct event_base *evbase,
+			void *options);
 ~~~
 
-The `unused` parameter is there for future use.  Until then, I'll
+The `evbase` parameter is a `libevent` event base that I will
+create and pass to you.
+The `options` parameter is for future use.  Until then, I'll
 always pass it as `NULL`.
-
-
-#### gdp_ioevent_add (constructor)
-
-~~~
-	typedef void gdp_ioevent_cb_t(
-		int socket_fd,
-		uint32_t what,
-		void *cb_arg);
-
-	EP_STAT gdp_ioevent_add(
-		int socket_fd,
-		uint32_t when,
-		EP_TIME *timeout,
-		gdp_ioevent_cb_t *cb_func,
-		void *cb_arg,
-		gdp_ioevent_t **ioevent);
-~~~
-
-`gdp_ioevent_add` adds a new event to the event loop (a.k.a.
-"reactor" in Twisted-speak) and returns it indirectly through
-`ioevent`.  You only need to save it if you want to be able to
-delete the ioevent in the future.  When something indicated by `when`
-happens on `socket_fd`, the indicated `cbfunc` will be called.
-The `cb_arg` value is passed through to the callback unchanged.
-If a `timeout` is specified, `cbfunc` will also be invoked if
-there is no activity in the given time interval.  The `when`
-parameter says what activity should trigger the callback, and
-the `what` callback parameter tells what event(s) actually
-occurred.  Both paramters are based on the set:
-
-| Value			| Meaning	|
-|-----------------------|---------------|
-| `GDP_IOEVENT_READ`	| Input is available for reading	|
-| `GDP_IOEVENT_WRITE`	| The indicated socket can be written	|
-| `GDP_IOEVENT_TIMEOUT`	| There was a timeout on this event	|
-| `GDP_IOEVENT_CLOSE`	| The socket was closed by the other end	|
-| `GDP_IOEVENT_ERROR`	| There was an I/O error on the socket	|
-
-These are bitmaps, and it is possible for multiple events to
-trigger a single callback.
-
-
-#### gdp_ioevent_del (ioevent::del)
-
-~~~
-	EP_STAT	gdp_ioevent_del(
-		gdp_ioevent_t *ioevent)
-~~~
-
-Delete the indicated `ioevent`.  If the indicated event was set
-with a `cb_arg`, it is the responsibility of the caller to free
-any memory associated with that argument.
 
 
 
@@ -225,84 +184,85 @@ A Channel is a somewhat arbitrary class used to store whatever the
 network ("your") side needs.  I promise to create at least one
 channel when I start up.
 
-#### gdp_chan_open (constructor)
+#### \_gdp\_chan\_open (constructor)
 
 ~~~
-	EP_STAT gdp_chan_open(
-		const char *addrspec,
-		void *unused,
-		void *udata,
-		gdp_chan_t **chan);
+	EP_STAT _gdp_chan_open(
+			const char *addrspec,
+			void *qos,
+			void *udata,
+			gdp_chan_t **chan);
 ~~~
 
 Creates a channel to a GDP switch located at `addrspec` and stores
-the result in `*chan`.  If `addrspec` is NULL, the `swarm.gdp.routers`
-runtime parameter is used.  The `unused` parameter is intended to
+the result in `*chan`.  The format is a semicolon-delimited list of
+`hostname:port` entries.  The entries in the list should be tried
+in order.  If `addrspec` is NULL, the `swarm.gdp.routers`
+runtime parameter is used.  The `qos` parameter is intended to
 hold specifications (e.g., QoS requirements), but for now I promise to
 pass it as `NULL`.  The `udata` parameter is saved and is available
 to any callbacks on this channel.
 
-_[[Note: it isn't clear we need `gdp_chan_init`; it could just be
-done on the first call to `gdp_chan_open` --- unless we need to use
-the `unused` parameter during `gdp_chan_init`.]]_
-
-#### gdp_chan_close (destructor)
+#### \_gdp\_chan\_close (destructor)
 
 ~~~
-	EP_STAT gdp_chan_close(
-		gdp_chan_t *chan);
+	EP_STAT _gdp_chan_close(
+			gdp_chan_t *chan);
 ~~~
 
 Deallocate `chan`.  All resources are freed.  I promise I will not
 attempt to use `chan` after it is freed.
 
-#### gdp_chan_set_callbacks (chan::set_callbacks)
+#### \_gdp\_chan\_set\_callbacks (chan::set_callbacks)
 
-_[[Need callbacks for received data, failure on a connection.
-Anything else?]]_
+> [[Need callbacks for received data, failure on a connection.
+Anything else?]]
 
 ~~~
-	EP_STAT gdp_chan_set_callbacks(
-		gdp_chan_t *chan,
-		EP_STAT *gdp_recv_cb(
+	typedef EP_STAT chan_recv_cb_t(
 			gdp_chan_t *chan,
 			gdp_cursor_t *cursor,
 			gdp_name_t *src,
 			gdp_name_t *dst,
-			size_t payload_len),
-		EP_STAT *gdp_send_cb(
+			size_t payload_len);
+	typedef EP_STAT gdp_send_cb(
 			gdp_chan_t *chan,
 			gdp_buf_t *payload),
-		EP_STAT (*gdp_close_cb)(
+	typedef EP_STAT (*gdp_close_cb)(
 			gdp_chan_t *chan,
-			int what));
+			int what);
+
+	EP_STAT _gdp_chan_set_callbacks(
+			gdp_chan_t *chan,
+			chan_recv_cb_t *gdp_recv_cb,
+			chan_send_cb_t *gdp_send_cb,
+			chan_close_cb_t *gdp_close_cb);
 ~~~
 
 When a new PDU is ready to read on `chan`, call `gdp_recv_cb`,
 including the total size of the payload (not necessarily what is
 available for read right now).  The `cursor` is a handle created
-by the network layer that I must pass into subsequent functions
+by the network layer that I must pass into `_gdp_cursor_recv` (see below)
 during the lifetime of this callback in order to actually read the
-data, and that I promise to never use outside this callback.  Data
-is actually read using `gdp_cursor_recv` (see below).
+data, and that I promise to never use outside this callback.
 
 The `gdp_send_cb` is not used at this time; for now, if it is non-NULL
-`gdp_chan_set_callbacks` should return `GDP_STAT_NOT_IMPLEMENTED`.
+`_gdp_chan_set_callbacks` should return `GDP_STAT_NOT_IMPLEMENTED`.
 The parameters to this function are subject to change.
 
 When a channel is closed by the other end of the connection, or on
 I/O error, `gdp_close_cb` is called.  the `what` parameter is from
 the same set of values, i.e., `GDP_IOEVENT_CLOSE` or `GDP_IOEVENT_ERROR`.
 
-_[[Nitesh brings up the question of `dst` filtering.  It isn't clear
-which side of the interface this belongs on.]]_
+> [[Nitesh brings up the question of `dst` filtering.  It isn't clear
+which side of the interface this belongs on.]]
 
 
-#### gdp_chan_get_udata(
+#### \_gdp\_chan\_get\_udata (chan::get_udata)
 
 ~~~
-	void *gdp_chan_get_udata(
-		gdp_chan_t *chan);
+	void *_gdp_chan_get_udata(
+			gdp_chan_t *chan);
 ~~~
 
 Returns the `udata` associated with `chan`.
@@ -310,28 +270,28 @@ Returns the `udata` associated with `chan`.
 
 ### Advertising and Certificates
 
-_[[Who is responsible for certificate management and advertisements?
-I guess that's likely to be me.  Drat.]]_
+> [[Who is responsible for certificate management and advertisements?
+I guess that's likely to be me.  Drat.]]
 
-#### gdp_chan_advertise (chan::advertise)
+#### \_gdp\_chan\_advertise (chan::advertise)
 
 _This interface is still under development._
 
 ~~~
 	// challenge/response callback function type
-	typedef EP_STAT (*gdp_cr_func_t)(
-		gdp_chan_t *chan,
-		int action,
-		void *ndata,
-		void *udata);
+	typedef EP_STAT (*advert_cr_cb_t)(
+			gdp_chan_t *chan,
+			int action,
+			void *cdata,
+			void *adata);
 
 	// advertisement method
-	EP_STAT gdp_chan_advertise(
-		gdp_chan_t *chan,
-		gdp_name_t gname,
-		gdp_adcert_t *adcert,
-		gdp_cr_func_t *challenge_cb,
-		void *udata);
+	EP_STAT _gdp_chan_advertise(
+			gdp_chan_t *chan,
+			gdp_name_t gname,
+			gdp_adcert_t *adcert,
+			gdp_cr_func_t *challenge_cb,
+			void *adata);
 ~~~
 
 Advertises the name `gname` on the given `chan`.  If a certificate
@@ -340,68 +300,69 @@ underlying layer needs further interaction (e.g., for challenge/response)
 it should call `challenge_cb`.
 
 The callback function is passed the `chan`, an `action` **to be
-determined**, and any network data needed in order to continue as
-`ndata`.  The `udata` field is passed directly from `gdp_chan_advertise`.
+determined**, and any challenge data needed in order to continue as
+`cdata`.  The `adata` field is passed directly from `_gdp_chan_advertise`.
 
-_[[What is `adcert` exactly?  Where does it come from?]]_
+> [[What is `adcert` exactly?  Where does it come from?]]
 
-#### gdp_chan_withdraw (chan::withdraw)
+#### \_gdp\_chan\_withdraw (chan::withdraw)
 
 ~~~
-	EP_STAT gdp_chan_withdraw(
-		gdp_chan_t *chan,
-		gdp_name_t gname);
+	EP_STAT _gdp_chan_withdraw(
+			gdp_chan_t *chan,
+			gdp_name_t gname);
 ~~~
 
 Withdraw a previous advertisement, for example, if a log is removed
 from a given server.
 
-_[[Question: should `gdp_chan_advertisement` return a data structure
-that can be passed to `gdp_chan_withdraw`?]]_
+> [[Question: should `_gdp_chan_advertise` return a data structure
+that can be passed to `_gdp_chan_withdraw` or is the gname enough?]]
 
 
 ### Sending and Receiving Messages
 
-#### gdp_chan_send (chan::send)
+#### \_gdp\_chan\_send (chan::send)
 
 ~~~
-	EP_STAT gdp_chan_send(
-		gdp_chan_t *chan,
-		gdp_XXX_t target,
-		gdp_name_t src,
-		gdp_name_t dst,
-		gdp_buf_t *payload);
+	EP_STAT _gdp_chan_send(
+			gdp_chan_t *chan,
+			gdp_XXX_t *target,
+			gdp_name_t src,
+			gdp_name_t dst,
+			gdp_buf_t *payload);
 ~~~
 
 Sends the entire contents of `payload` to the indicated `dst` over
 `chan`.  The source address is specified by `src`.
+> [[Does this clear `payload` or leave it unchanged?]]
 
 The `target` give clues as to exactly where to deliver the
 message.  For example, it might be any replica of a given log,
 all replicas of a given log (e.g., for quorum read), or a specific
 replica.  How it is specified is _for further study_.
 
-_[[Issue: There are issues regarding allowing an arbitrary `src` that
+> [[Issue: There are issues regarding allowing an arbitrary `src` that
 need to be explored.  You should never be permitted to send from
 an address you aren't authorized to speak for, but the ultimate
-responsibility for avoiding problems falls to the receiver.]]_
+responsibility for avoiding problems falls to the receiver.]]
 
-_[[Implementation Note: in the short run this may return
+> [[Implementation Note: in the short run this may return
 `GDP_STAT_PDU_TOO_LONG` if the size of `payload` exceeds an
 implementation-defined limit.  This should be as large as possible
-since it limits the size of any single record stored in the GDP.]]_
+since it limits the size of any single record stored in the GDP.]]
 
 
-### gdp_chan_multicast (chan::multicast)
+#### \_gdp\_chan\_multicast (chan::multicast)
 
-_[[Note: this is a placeholder.]]_
+> [[Note: this is a placeholder.]]
 
 ~~~
-	EP_STAT gdp_chan_multicast(
-		gdp_chan_t *chan,
-		gdp_name_t src,
-		gdp_XXX_t multicast_addr,
-		gdp_buf_t *payload);
+	EP_STAT _gdp_chan_multicast(
+			gdp_chan_t *chan,
+			gdp_name_t src,
+			gdp_XXX_t multicast_addr,
+			gdp_buf_t *payload);
 ~~~
 
 Sends `payload` to multiple destinations as indicated by
@@ -413,26 +374,24 @@ This will certainly need support to set up a multicast channel,
 probably with "new", "join", "leave", and "free" style interface.
 
 
-#### gdp_cursor_recv (cursor::recv)
+#### \_gdp\_cursor\_recv (cursor::recv)
 
 This can only be called within a receive callback.  It acts on a
 cursor rather than on the channel itself.  It is not necessary for
-the entire payload to be read for this call to return data, nor is
-it necessary to read the entire payload at once.
+the entire payload to be in memory for this call to return data,
+nor is it necessary to read the entire payload at once.
 
 ~~~
-	EP_STAT gdp_cursor_recv(
-		gdp_cursor_t *cursor,
-		gdp_buf_t *payload,
-		size_t *payload_len,
-		uint32_t flags);
+	EP_STAT _gdp_cursor_recv(
+			gdp_cursor_t *cursor,
+			gdp_buf_t *payload,
+			size_t *payload_len,
+			uint32_t flags);
 ~~~
 
-Read up to `*payload_len` octets from `cursor` into `payload`.  If
-`*payload_len` = 0, block until all octets comprising the current
-payload have been read.  Returns the number of octets actually read
-into `*payload_len`.  If `payload` already has data, the new data is
-appended.
+Read up to `*payload_len` octets from `cursor` into `payload`.
+Returns the number of octets actually read into `*payload_len`.
+If `payload` already has data, the new data is appended.
 
 Data read from a cursor is guaranteed to be presented in the
 same order it was written with no duplicates or dropouts.
@@ -447,21 +406,21 @@ There is no such "in order" guarantee between different payloads.
 * If a fragment of payload cannot be read, returns
   `GDP_STAT_PDU_READ_FAIL` and any remainder of the payload is discarded.
 
-_[[Include a timeout, or is it sufficient to say that if
+> [[Include a timeout, or is it sufficient to say that if
 `*len` ≠ 0 it will return immediately? And the semantics imply
 that it wcan return at any time once it has at least one
-octet.]]_
+octet.]]
 
-_[[Should it wait until at least one octet is read?
+> [[Should it wait until at least one octet is read?
 This should never happen, since it can only be called during a
 receive callback, which asserts that at least some data is
-available.]]_
+available.]]
 
-_[[If I try to read a portion of the PDU that is not yet available
+> [[If I try to read a portion of the PDU that is not yet available
 should it block or return a different status code (which would
 mean that the callback would be invoked again when more data
 became available)?  If it fails there should be some way to say
-"no, I really want to block."]]_
+"no, I really want to block."]]
 
 Flags:
 
@@ -472,65 +431,19 @@ Flags:
 
 ### Utilities
 
-#### gdp_cursor_get_endpoints (cursor::get_endpoints)
+#### \_gdp\_cursor\_get\_endpoints (cursor::get_endpoints)
 
 ~~~
-	EP_STAT gdp_cursor_get_endpoints(
-		gdp_cursor_t *cursor,
-		gdp_name_t *src,
-		gdp_name_t *dst);
+	EP_STAT _gdp_cursor_get_endpoints(
+			gdp_cursor_t *cursor,
+			gdp_name_t *src,
+			gdp_name_t *dst);
 ~~~
 
 Returns the endpoints of the given `cursor` into `src` and `dst`.
 These will be the same as passed to `gdp_recv_cb`.
 
 It isn't clear this function is needed.
-
-
-### Buffers
-
-These routines already exist.  This list is not exhaustive.
-
-#### gdp_buf_read
-
-~~~
-	size_t buf_read(
-		gdp_buf_t *buf,
-		void *out,
-		size_t size);
-~~~
-
-#### gdp_buf_peek
-
-~~~
-	size_t buf_peek(
-		gdp_buf_t *buf,
-		void *out,
-		size_t size);
-~~~
-
-#### gdp_buf_write
-
-~~~
-	EP_STAT buf_peek(
-		gdp_buf_t *buf,
-		void *out,
-		size_t size);
-~~~
-
-#### gdp_buf_reset
-
-~~~
-	EP_STAT gdp_buf_reset(
-		gdp_buf_t *buf);
-~~~
-
-#### gdp_buf_getlength
-
-~~~
-	size_t gdp_buf_getlength(
-		const gdp_buf_t *buf);
-~~~
 
 
 ## Status Codes
