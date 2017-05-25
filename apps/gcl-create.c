@@ -660,6 +660,7 @@ main(int argc, char **argv)
 	{
 		gdp_pname_t pname;
 
+		// this output gets parsed by gdp-rest --- don't change it!
 		printf("Created new GCL %s\n\ton log server %s\n",
 				gdp_printable_name(*gdp_gcl_getname(gcl), pname), logdxname);
 	}
