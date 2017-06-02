@@ -7,9 +7,8 @@
   </head>
   <body>
     <h1>RESTful Interface for the Global Data Plane</h1>
-    Eric Allman<br>
-    U.C. Berkeley Swarm Lab 2017-03-18<br>
-    Draft 7<br>
+    Eric Allman, U.C. Berkeley Swarm Lab<br><br>Revision Notes:<br>
+    Draft 8 2017-06-02, rpratt@berkeley.edu: GDP & GCL scope separation, API revisions.<br>
     <p>This document describes the RESTful interface to the Global Data Plane
       (GDP). Note that this is not part of the GDP itself, since that layer
       treats all records as opaque. This level adds simple key-value structure
@@ -17,9 +16,10 @@
       data is valid JSON text.</p>
     <h2>1 Introduction</h2>
     <p>This interface is a true RESTful interface, that is, it uses
-      GET/POST/PUT/DELETE instead of overloading everything into GET. This
-      implies that it won't work using only an off the shelf web browser because
-      browsers will only use POST methods in response to an HTML form.</p>
+      GET/POST/PUT/DELETE instead of overloading everything into
+      GET. This implies that requests cannot be submitted using only
+      an off the shelf web browser because browsers will only use POST
+      methods in response to an HTML form.</p>
     <p>The data representation chosen is JSON, which is easier to build and
       parse than XML.&nbsp; <i>[[This should be expanded to include XML as
         specified by the Accept header.]]</i><br>
@@ -44,9 +44,14 @@
         data as base64-encoded strings.&nbsp; However, this puts more work on
         the client.</i><br>
     </p>
-    <p>Although the data portion of the transaction may be encrypted, the
-      request/response exchange is not, so it is highly recommended that clients
-      communicate using https.</p>
+    <p>Although the data portion of the GDP transaction may be
+      encrypted, an HTTP request/response exchange is not, so it is
+      highly recommended that clients authenticate and communicate
+      with a RESTful server using HTTPS only. Depending on
+      writer-platform capabilities, basic or htdigest client
+      authentication within an encrypted session may be useful to gate
+      resource consumption and log access within an organization's
+      larger security perimeter.</p>
     <h2>3 Individual Operations</h2>
     <p>In general all GET calls must include "Accept: application/json".&nbsp; <i>Is
         this true?</i><br>
@@ -120,53 +125,129 @@
     <p> </p>
     <hr size="2" width="100%">
     <h4>Name</h4>
-    POST /gdp/v1/gcl &mdash; Create a new GCL&nbsp; <i>[NOT IMPLEMENTED; create
-      using the gcl_create application]</i><br>
+    POST /gdp/v1/gcl &mdash; Create a new GCL with a random name&nbsp;<br>
     <h4>Request Data</h4>
-    <p> <i>[[Should include metadata, once that is supported.]]</i></p>
-    <p> </p>
+    <p>
+      <pre>    Content-Type: application/json;
+<br>    {
+      "external-name": &lt;null&gt;
+       <i><u>, optional gcl-create parameters</u></i>
+    }</pre>
+	<p>The <i><u>optional gcl-create parameters</u></i> are supplied
+	  as zero or more comma delimited JSON lines. For example:
+	  </p>
+      <pre>    Content-Type: application/json;
+<br>    {
+      "external-name": null,
+      "-C": "creator_name@berkeley.edu"
+    }</pre>
+	  <p>RESTful server supported parameter keys are "-C", "-h", "-k",
+	  "-b", "c", and "-s", and should be paired with a parameter value
+	  which is valid for the selected parameter key. Consult the
+	  gcl-create documentation or man page for detailed parameter
+	  help. Metadata may be optionally specified, using the
+	  RESTful-unique "META" key, paired with a value which is a JSON
+	  array of one or more comma separated
+	  "&lt;metadataname&gt;=&lt;metadata&gt;" strings as array elements.
+	  </p>
+	</p>
     <h4>Response Data</h4>
     <p> 201 Created<br>
     </p>
-    <pre>    Content-Type: application/json; type=gdp/gcldesc
+    <pre>    Content-Type: application/json;
 <br>    {
-    	"gcl_id": &lt;gcl_id&gt;,<br>	"nrecs": &lt;integer&gt;,<br>	...
+    	"gcl_name": &lt;gcl_id&gt;,<br>	"gdplogd_name": &lt;gdplogd_name&gt;
     }</pre>
-    <p>401 Unauthorized<br>
+    <p>400 Bad Request<br>
     </p>
-    <h4>Description</h4>
+      <pre>    Content-Type: application/json;
+<br>    {
+      "detail": &lt;detail&gt;
+    }</pre>
+    <p>409 Conflict<br>
+    </p>
+      <pre>    Content-Type: application/json;
+<br>    {
+      "detail": "generated-name conflict on gdplogd server"
+    }</pre>
+    <p>500 Internal Server Error<br>
+    </p>
+      <pre>    Content-Type: application/json;
+<br>    {
+      "detail": &lt;detail&gt;<br>      [, optional diagnostic key/value pairs]
+    }</pre>
+      <h4>Description</h4>
     <p>Creates a new GCL under an internally-assigned name and returns the
       information about that GCL in the same format as that delivered by the
       status query.</p><h4>Notes</h4><p>The plan is that GCLs will be created using a log creation service that will deal with resource allocation.&nbsp; This command is likely to be an interface to that service.<br>
     </p>
     <hr size="2" width="100%">
     <h4>Name</h4>
-    PUT /gdp/v1/gcl/&lt;symbolic_name&gt; &mdash; Create a new named GCL&nbsp; <i>[NOT
-      IMPLEMENTED; create using the gcl_create application]</i>
+    PUT /gdp/v1/gcl &mdash; Create a new GCL with a specified name&nbsp;<br>
     <h4>Request Data</h4>
-    <p> <i>[[Should include metadata, once that is supported.]]</i></p>
+    <p>
+      <pre>    Content-Type: application/json;
+<br>    {
+      "external-name": &lt;user_selected_name&gt;
+       <i><u>, optional gcl-create parameters</u></i>
+    }</pre>
+	<p>The <i><u>optional gcl-create parameters</u></i> are supplied
+	  as zero or more comma delimited JSON lines. For example:
+	  </p>
+      <pre>    Content-Type: application/json;
+<br>    {
+      "external-name": "edu.berkeley.eecs.swarmlab.test.log00",
+      "-C": "creator_name@berkeley.edu"
+    }</pre>
+	  <p>RESTful server supported parameter keys are "-C", "-h", "-k",
+	  "-b", "c", and "-s", and should be paired with a parameter value
+	  which is valid for the selected parameter key. Consult the
+	  gcl-create documentation or man page for detailed parameter
+	  help. Metadata may be optionally specified, using the
+	  RESTful-unique "META" key, paired with a value which is a JSON
+	  array of one or more comma separated
+	  "&lt;metadataname&gt;=&lt;metadata&gt;" strings as array elements.
+	  </p>
+	</p>
     <h4>Response Data</h4>
     <p> 201 Created<br>
     </p>
-    <pre>    Content-Type: application/json; type=gdp/gcldesc
+    </p>
+    <pre>    Content-Type: application/json;
 <br>    {
-    	"gcl_id": &lt;gcl_id&gt;,<br>	"nrecs": &lt;integer&gt;,<br>	...
+    	"gcl_name": &lt;gcl_id&gt;,<br>	"gdplogd_name": &lt;gdplogd_name&gt;
     }</pre>
-    <p>401 Unauthorized<br>
+    <p>400 Bad Request<br>
     </p>
-    <p>405 Not Allowed<br>
+      <pre>    Content-Type: application/json;
+<br>    {
+      "detail": &lt;detail&gt;
+    }</pre>
+    <p>409 Conflict<br>
     </p>
-    <h4>Description</h4>
-    <p>Creates a new GCL under a user-assigned name and returns the information
-      about that GCL in the same format as that delivered by the status query.</p>
-    <p><i>Question: should this give an error if the GCL already exists?&nbsp;
-        If so use 405?</i><br>
+      <pre>    Content-Type: application/json;
+<br>    {
+      "detail": "external-name already exists on gdplogd server"
+    }</pre>
+    <p>500 Internal Server Error<br>
     </p>
+      <pre>    Content-Type: application/json;
+<br>    {
+      "detail": &lt;detail&gt;<br>      [, optional diagnostic key/value pairs]
+    }</pre>
+      <h4>Description</h4>
+    <p>Creates a new GCL under a user-assigned name and returns the
+      information about the creation of that GCL, or reports a
+      conflict if the name already exists.</p>
     <hr size="2" width="100%">
     <h4>Name</h4>
-    DELETE /gdp/v1/gcl/&lt;gcl_name&gt; &mdash; delete a GCL <em>[NOT IMPLEMENTED; see Notes]</em><br>
+    DELETE /gdp/v1/gcl &mdash; delete a GCL <em>[NOT IMPLEMENTED; see Notes]</em><br>
     <h4>Request Data</h4>
-    <p>none<br>
+    <p>
+      <pre>    Content-Type: application/json;
+<br>    {
+      "external-name": &lt;user_selected_name&gt;
+    }</pre>
     </p>
     <h4>Response</h4>
     <p>204 No Content</p>
@@ -331,104 +412,139 @@
     <table border="1" cellpadding="2" cellspacing="2" width="100%">
       <tbody>
         <tr>
-          <td valign="top">Method<br>
+          <td valign="top"><H4>Scope</H4>
           </td>
-          <td valign="top">URI Path<br>
+          <td valign="top"><H3>Method</H3>
           </td>
-          <td valign="top">Description<br>
+          <td valign="top"><H3>URI Path</H3>
+          </td>
+          <td valign="top"><H3>Description</H3>
           </td>
         </tr>
         <tr>
+          <td valign="top">GDP<br>
+          </td>
           <td valign="top">GET<br>
           </td>
           <td valign="top">gcl<br>
           </td>
-          <td valign="top"><span style="text-decoration: line-through;">Lists existing GCLs</span>&nbsp; [405 Method Not Allowed]<br>
+          <td valign="top"><span style="text-decoration: line-through;">Lists existing GCLs</span>&nbsp;<br>[405 Method Not Allowed]<br>
           </td>
         </tr>
         <tr>
+          <td valign="top">GDP<br>
+          </td>
           <td valign="top">POST<br>
           </td>
           <td valign="top">gcl<br>
           </td>
-          <td valign="top"><span style="text-decoration: line-through;">Create new GCL with random name</span>&nbsp; [405 Method Not Allowed]<br>
+          <td valign="top">Create new GCL with random name<br>
           </td>
         </tr>
         <tr>
-          <td valign="top">PUT, DELETE<br>
+          <td valign="top">GDP<br>
+          </td>
+          <td valign="top">PUT<br>
           </td>
           <td valign="top">gcl<br>
           </td>
-          <td valign="top">405 Method Not Allowed<br>
+          <td valign="top">Create new GCL with specified name<br>
           </td>
         </tr>
         <tr>
+          <td valign="top">GDP<br>
+          </td>
+          <td valign="top">DELETE<br>
+          </td>
+          <td valign="top">gcl<br>
+          </td>
+          <td valign="top"><span style="text-decoration: line-through;">Delete GCL</span><br>[405 Method Not Allowed]<br>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">GCL<br>
+          </td>
           <td valign="top">GET<br>
           </td>
           <td valign="top">gcl/&lt;id&gt;<br>
           </td>
-          <td valign="top"><span style="text-decoration: line-through;">Get metadata about GCL</span> &lt;id&gt;&nbsp; [405 Method Not Allowed]<br>
+          <td valign="top"><span style="text-decoration: line-through;">Get metadata from GCL &lt;id&gt;&nbsp</span><br>[405 Method Not Allowed]<br>
           </td>
         </tr>
         <tr>
+          <td valign="top">GCL<br>
+          </td>
           <td valign="top">POST</td>
           <td valign="top">gcl/&lt;id&gt;<br>
           </td>
-          <td valign="top">Add record to named GCL &lt;id&gt;<br>
+          <td valign="top">Append record to named GCL &lt;id&gt;<br>
           </td>
         </tr>
         <tr>
+          <td valign="top">GCL<br>
+          </td>
           <td valign="top">PUT<br>
           </td>
-          <td valign="top">gcl/&lt;id&gt;<br>
+          <td valign="top">gcl/&lt;id&gt;?recno=&lt;#&gt;<br>
           </td>
-          <td valign="top"><span style="text-decoration: line-through;">Create new GCL named &lt;id&gt; (sha256)</span>&nbsp; [405 Method Not Allowed]<br>
+          <td valign="top"><span style="text-decoration: line-through;">Idempotent append record to GCL &lt;id&gt; at recno position or report conflict</span>&nbsp;<br>[405 Method Not Allowed]<br>
           </td>
         </tr>
         <tr>
+          <td valign="top">GCL<br>
+          </td>
           <td valign="top">DELETE<br>
           </td>
           <td valign="top">gcl/&lt;id&gt;<br>
           </td>
-          <td valign="top"><span style="text-decoration: line-through;">Delete GCL &lt;id&gt;</span>&nbsp; [405 Method Not Allowed]<br>
+          <td valign="top">GCL is append-only, deletion not permitted<br>[405 Method Not Allowed]<br>
           </td>
         </tr>
         <tr>
+          <td valign="top">GCL<br>
+          </td>
           <td valign="top">GET<br>
           </td>
           <td valign="top">gcl/&lt;id&gt;?recno=&lt;#&gt;<br>
           </td>
-          <td valign="top">Read record recno from GCL &lt;id&gt; (returns raw
+          <td valign="top">Read recno from GCL &lt;id&gt;<br>(returns raw
             data)<br>
           </td>
         </tr>
         <tr>
+          <td valign="top">GCL<br>
+          </td>
           <td valign="top">GET<br>
           </td>
           <td valign="top">gcl/&lt;id&gt;?recno=&lt;#&gt;&amp;nrecs=&lt;#&gt;<br>
           </td>
-          <td valign="top">Read up to nrecs record from&nbsp; GCL &lt;id&gt;
-            starting at recno (returns JSON array)<br>
+          <td valign="top">Read up to nrecs record from GCL &lt;id&gt; starting at recno (returns JSON array).<br>
           </td>
         </tr>
         <tr>
+          <td valign="top">GCL<br>
+          </td>
           <td valign="top">GET<br>
           </td>
           <td valign="top">gcl/&lt;id&gt;?timeout=&lt;#&gt;<br>
           </td>
-          <td valign="top">Wait for new data to appear on GCL<br>
+          <td valign="top"><span style="text-decoration: line-through;">Wait for new data to appear on GCL</span><br>[405 Method Not Allowed]<br>
           </td>
         </tr>
         <tr>
+          <td valign="top">GCL<br>
+          </td>
           <td valign="top">GET<br>
           </td>
           <td valign="top">put/gcl/&lt;id&gt;?&lt;arguments&gt;<br>
           </td>
-          <td valign="top">Add JSON record to GCL &lt;id&gt; (deprecated:
+          <td valign="top"><span style="text-decoration: line-through;">Add JSON record to GCL &lt;id&gt;</span><br>(deprecated:
             violates REST standard)<br>
           </td>
         </tr>
         <tr>
+          <td valign="top">RESTful Server<br>
+          </td>
           <td valign="top">POST<br>
           </td>
           <td valign="top">kv<br>
@@ -437,6 +553,8 @@
           </td>
         </tr>
         <tr>
+          <td valign="top">RESTful Server<br>
+          </td>
           <td valign="top">GET<br>
           </td>
           <td valign="top">kv/&lt;key&gt;<br>
@@ -450,11 +568,8 @@
     <p><br>
     </p>
     <h2>4 Unresolved Issues</h2>
-    <p>How is GCL metadata actually handled?&nbsp; Perhaps series of name:value
-      pairs?<br>
-    </p>
-    <p>How does "GET as POST" work?<br>
-    </p>
     <p>Do subscriptions wait until all data is ready to return, or does it
-      return immediately as soon as any data appears?</p><p>How are signatures on POST methods handled?</p><p>How is authentication handled for sensitive operations, e.g., <br></p><h2> </h2>
+      return immediately as soon as any data appears?</p>
+	<p>How are signatures on POST methods handled?</p></p>
+	<h2> </h2>
 </body></html>
