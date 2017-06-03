@@ -450,6 +450,7 @@ process_gcl_create_req(scgi_request *req, const char *gclxname,
 	json_t *j_resp;
 	char *jbuf;
 	char sbuf[SCGI_MAX_OUTBUF_SIZE];
+        int p;
 	
 	// mandatory gclxname json obj already processed by caller to arrive here
 	j_unprocessed = json_object_size(j) - 1;
@@ -465,7 +466,7 @@ process_gcl_create_req(scgi_request *req, const char *gclxname,
 	options[opt++] = "/etc/gdp/keys";
 
 	// then add client requested options
-	for (int p = GCL_C_PARAM_SERV_MAX; p < GCL_C_PARAM_MAX; p++)
+	for (p = GCL_C_PARAM_SERV_MAX; p < GCL_C_PARAM_MAX; p++)
 	{
 		// borrowed
 		if ((j_temp = json_object_get(j, exec_gcl_create_param[p])) != NULL)
