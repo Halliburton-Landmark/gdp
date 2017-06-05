@@ -20,12 +20,14 @@ To run the the gdp-rest-testcases.py tests:
 # The gdp-rest-01.eecs.berkeley.edu host is not serving as a permanent
 # home for GCLs. For development and test purposes, gdplogd is started
 # befores the test suite run, but is always stopped at the end of each
-# test run, after which all GCLs and keys are cleaned off gdp-rest-01!
-# TODO: given the live and test binaries/libraries on the same host,
-# it has proven difficult to isolate the test bed completely without
-# cutting off the production services too; it would perhaps be wise to
-# enhance gdp_init() so development binaries could selectively limit
-# or disable zeroconf discovery of the real GDP.
+# test run, after which all GCLs are cleaned off gdp-rest-01! Since
+# active keys will be on gdp-rest-01 permanently, care should be taken
+# to only clean up test keys! TODO: given the live and test
+# binaries/libraries on the same host, it has proven difficult to
+# isolate the test bed completely without cutting off the production
+# services too; it would perhaps be useful to enhance gdp_init() so
+# development binaries could selectively limit or disable zeroconf
+# discovery of the real GDP.
 
 #
 # gdp-rest-01 development testbed

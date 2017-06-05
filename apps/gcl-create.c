@@ -607,6 +607,12 @@ main(int argc, char **argv)
 	{
 		// create a new GCL handle with a new name based on metadata
 		estat = gdp_gcl_create(NULL, logdiname, gmd, &gcl);
+		// NULL gclxname path will not use (rename) tempkeyfile, so remove it
+		if (tempkeyfile != NULL)
+		{
+			remove(tempkeyfile);
+			tempkeyfile = NULL;
+		}
 	}
 	else
 	{
@@ -665,6 +671,12 @@ fail1:
 	// free metadata, if set
 	if (gmd != NULL)
 		gdp_gclmd_free(gmd);
+	// if tempkeyfile did not get consumed (renamed), remove it
+	if (tempkeyfile != NULL)
+	{
+		remove(tempkeyfile);
+		tempkeyfile = NULL;
+	}
 
 fail0:
 	;				// avoid compiler error

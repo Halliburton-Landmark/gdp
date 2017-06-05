@@ -63,7 +63,7 @@ test_auth = None
 # [other_permanent_user_accounts_left_untouched]
 # $
 #
-# ...uncomment and edit the following test_auth:
+# ...fill in test_auth to match the above, and uncomment it
 #
 # test_auth = ("your_unique_testuser", "your_unique_testpassword")
 
@@ -83,20 +83,35 @@ def search_json_value(regexp, content):
     return value
 #
 
-# gdp-rest-01 (only) GCLs and keys cleanup
+# clean up test GCLs (defined to be gdp-rest-01 local GCLs), while
+# being careful to only remove keys which go with test GCLs, as all
+# other keys are for real GCLs located in the real GDP.
 def clean_gcls_and_keys():
-    print "Info: cleaning /var/swarm/gdp/gcls directory...",
-    subprocess.call([ "sudo", "-g", "gdp", "-u", "gdp",
-                      "/usr/bin/find", "/var/swarm/gdp/gcls/", 
-                      "-type", "f", "-name", "*",
-                      "-exec", "/bin/rm", "-f", "{}", ";"])
-    print "cleaned"
-    print "Info: cleaning /etc/gdp/keys directory...",
-    subprocess.call([ "sudo", "-g", "gdp", "-u", "gdp",
-                      "/usr/bin/find", "/etc/gdp/keys/", 
-                      "-type", "f", "-name", "*",
-                      "-exec", "/bin/rm", "-f", "{}", ";"])
-    print "cleaned"
+    output = subprocess.check_output([ "sudo", "-g", "gdp", "-u", "gdp",
+                                       "/usr/bin/find",
+                                       "/var/swarm/gdp/gcls/", 
+                                       "-type", "f", "-name", "*.gdpndx" ])
+
+    lines = output.splitlines()
+    for line in lines:
+        # find <gcl_id> in /var/swarm/gdp/gcls/<gcl_id>.gdpndx
+        gcl_id = line[24:-7]
+        # check expectations, where file removal is involved
+        if len(gcl_id) == 43:
+            print "Info: remove local GCL {}...".format(gcl_id),
+            subprocess.call([ "sudo", "-g", "gdp", "-u", "gdp",
+                              "/usr/bin/find", "/var/swarm/gdp/gcls/", 
+                              "-type", "f", "-name", gcl_id + "*",
+                              "-exec", "/bin/rm", "-f", "{}", ";"])
+            print "done"
+            print "Info: remove local key {}...".format(gcl_id),
+            subprocess.call([ "sudo", "-g", "gdp", "-u", "gdp",
+                              "/usr/bin/find", "/etc/gdp/keys/", 
+                              "-type", "f", "-name", gcl_id + ".pem",
+                              "-exec", "/bin/rm", "-f", "{}", ";"])
+            print "done"
+        else:
+            print "Error: cleanup has unexpected gcl_id: {}".format(gcl_id)
 
 #
 # HTTP/HTML responses
@@ -656,7 +671,7 @@ def test_put_12():
 
     detail = search_json_value(".*(\"detail.*\").*", page.content)
     print "{} detail: {}".format(test_case, detail),
-    if detail != "\"log server name is not valid\"":
+    if detail != "\"log server host not found\"":
         print "[FAILED]",
         passed = False
     print ""
@@ -1228,7 +1243,7 @@ def test_post_12():
 
     detail = search_json_value(".*(\"detail.*\").*", page.content)
     print "{} detail: {}".format(test_case, detail),
-    if detail != "\"log server name is not valid\"":
+    if detail != "\"log server host not found\"":
         print "[FAILED]",
         passed = False
     print ""
@@ -1265,9 +1280,6 @@ if subprocess.call("sudo systemctl is-active gdplogd",
     sys.exit(1)
 print "inactive (expected)"
 
-# gdp-rest-01 is not a permanent home for any GCLs - clean the directories
-clean_gcls_and_keys()
-
 print "starting gdplogd (sudo systemctl start gdplogd.service) ..."
 if subprocess.call("sudo systemctl start gdplogd.service",
                    shell=True) != 0:
@@ -1279,7 +1291,7 @@ print "started"
 # TEST run
 #
 
-# # HTTP PUT test suite
+# HTTP PUT test suite
 test_put_01()
 test_put_02()
 test_put_03()
@@ -1313,9 +1325,8 @@ if subprocess.call("sudo systemctl stop gdplogd.service",
     print "Error: systemctl stop gdplogd.service failed"
 print "stopped"
 
-# gdp-rest-01 is not a permanent home for any GCLs - clean the directories
 clean_gcls_and_keys()
-    
+
 dn.close()
 log.close()
 
