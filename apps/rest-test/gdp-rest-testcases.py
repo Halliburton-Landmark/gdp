@@ -38,6 +38,15 @@ import socket
 import subprocess
 
 #
+# sanity check invocations
+#
+testbed = socket.gethostname()
+if testbed != "gdp-rest-01":
+    print "host is {}".format(testbed)
+    print "Error: this script is only safe to run on the RESTful server"
+    sys.exit(1)
+
+#
 # Monitor the gdp-rest-v2.log for diagnostic detail
 #
 log_path = "/var/log/gdp/gdp-rest-v2.log"
@@ -49,10 +58,6 @@ fcntl.fcntl(log_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
 
 # dev null to silence subprocess output
 dn = open("/dev/null", "w")
-
-#
-# SHARED
-#
 
 test_auth = None
 #
@@ -72,16 +77,6 @@ if test_auth == None:
     sys.exit(1)
 
 json_header = { 'Content-type': 'application/json' }
-
-def search_json_value(regexp, content):
-    value = None
-    line_m = re.search(regexp, content)
-    if line_m != None:
-        json_value_m = re.search(".*\:.*(\".*\")", line_m.group(1))
-        if json_value_m != None:
-            value = json_value_m.group(1)
-    return value
-#
 
 # clean up test GCLs (defined to be gdp-rest-01 local GCLs), while
 # being careful to only remove keys which go with test GCLs, as all
@@ -113,28 +108,96 @@ def clean_gcls_and_keys():
         else:
             print "Error: cleanup has unexpected gcl_id: {}".format(gcl_id)
 
-#
-# HTTP/HTML responses
-#
-def page_display(resp_page):
-    if resp_page != None:
+
+def page_display(p):
+    if p != None:
         print "STATUS:"
-        print resp_page.status_code
+        print p.status_code
         print "HEADERS:"
-        print resp_page.headers
+        print p.headers
         print "CONTENT:"
-        print resp_page.content
+        print p.content
     else:
-        print "Error: no response page"
+        print "Error: no page"
 #
 
+def failed_page_display(p):
+    print "FAILED"
+    print "DIAGNOSTICS:"
+    page_display(p)
+    print "END DIAGNOSTICS"
 #
-# HTTP PUT
+
+def failed_log_and_page_display(p, l):
+    print "FAILURE DIAGNOSTICS:"
+    print "==== gdp-rest-v2.log:"
+    print l.read(-1)
+    print "==== end"
+
+    print "==== response page:"
+    page_display(p)
+    print "==== end"
+    print "END DIAGNOSTICS"
+#
+    
+def test_write(tc, tid, gid, rn):
+    json_body = {
+        tid : rn,
+        "gcl_id" : gid
+    }
+    page = requests.post("https://gdp-rest-01.eecs.berkeley.edu/gdp/v2/gcl/" +
+                         gid,
+                         auth = test_auth,
+                         timeout = 60,
+                         headers = json_header,
+                         data = json.dumps(json_body))
+    print "{} WRITE {}".format(tc, rn),
+    if page.status_code == 200:
+        print ""
+        return True
+    else:
+        failed_page_display(page)
+        return False
+#
+
+def test_read(tc, tid, gid, rn):
+    page = requests.get("https://gdp-rest-01.eecs.berkeley.edu/gdp/v2/gcl/" +
+                         gid + "?recno=" + rn,
+                         auth = test_auth,
+                         timeout = 60)
+    pj = page.json()
+    print "{} READ {}".format(tc, rn),
+    passed = False
+    if page.status_code == 200 and pj[tid] == rn:
+        print ""
+        return True
+    else:
+        failed_page_display(page)
+        return False
+#
+
+def test_log(tc, tid, gcl_id):
+    print "{} GCL {} write and read".format(tc, gcl_id)
+
+    if (test_write(tc, tid, gcl_id, "1") and
+        test_write(tc, tid, gcl_id, "2") and
+        test_write(tc, tid, gcl_id, "3") and
+        test_read(tc, tid, gcl_id, "3") and
+        test_read(tc, tid, gcl_id, "2") and
+        test_read(tc, tid, gcl_id, "1")):
+        print "{} PASSED".format(tc)
+    else:
+        print "{} FAILED GCL write and read".format(tc)
+#
+    
+#
+# HTTP PUT TESTS
 #
 
 def test_put_01():
     log.seek(0, os.SEEK_END)
     test_case = "TEST PUT 01:"
+    test_id = "test_put_01_log"
     print "{} HTTP PUT new log".format(test_case)
 
 
@@ -148,48 +211,27 @@ def test_put_01():
                         timeout = 60,
                         headers = json_header,
                         data = json.dumps(json_body))
-
-    passed = True
-    print "{} status code: {}".format(test_case, page.status_code),
-    if page.status_code != 201:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    gcl_name = search_json_value(".*(\"gcl_name.*\").*", page.content)
-    print "{} gcl_name: {}".format(test_case, gcl_name),
-    if gcl_name == None:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    gdplogd_name = search_json_value(".*(\"gdplogd_name.*\").*", page.content)
-    print "{} gdplogd_name: {}".format(test_case, gdplogd_name),
-    if gdplogd_name == None:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    print "{}".format(test_case),
-    if passed:
-        print "PASSED"
+    if page.status_code == 201:
+        pj = page.json()
+        gcl_name = pj["gcl_name"]
+        gdplogd_name = pj["gdplogd_name"]
+        if gcl_name != None and gdplogd_name != None:
+            print "{} PASSED \"{}\" \"{}\"".format(test_case,
+            gcl_name, gdplogd_name)
+            test_log(test_case, test_id, gcl_name)
+        else:
+            print "{} FAILED page: \"{}\" \"{}\"".format(test_case,
+                                                         gcl_name, gdplogd_name)
+            failed_log_and_page_display(page, log)
     else:
-        print "FAILED"
-        print "DIAGNOSTICS:"
-        print "==== gdp-rest-v2.log:"
-        print log.read(-1)
-        print "==== end"
-    
-        print "==== gdp-rest-01 response:"
-        page_display(page)
-        print "==== end"
-        print "END DIAGNOSTICS"
+        print "{} FAILED status code: {}".format(test_case, page.status_code)
+        failed_log_and_page_display(page, log)
 #
 
 def test_put_02():
     log.seek(0, os.SEEK_END)
     test_case = "TEST PUT 02:"
-    print "{} HTTP PUT existing (from TEST PUT 01) log".format(test_case)
+    print "{} HTTP PUT existing log (from TEST PUT 01)".format(test_case)
     
     json_body = {
         "external-name" : "edu.berkeley.eecs.gdp-rest.test_put_01",
@@ -201,37 +243,20 @@ def test_put_02():
                         timeout = 60,
                         headers = json_header,
                         data = json.dumps(json_body))
-
-    passed = True
-    print "{} status code: {}".format(test_case, page.status_code),
-    if page.status_code != 409:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    detail = search_json_value(".*(\"detail.*\").*", page.content)
-    print "{} detail: {}".format(test_case, detail),
-    if detail != "\"external-name already exists on gdplogd server\"":
-        print "[FAILED]",
-        passed = False
-    print ""
-    
-    print "{}".format(test_case),
-    if passed:
-        print "PASSED"
+    if page.status_code == 409:
+        pj = page.json()
+        detail = pj["detail"]
+        if detail == "external-name already exists on gdplogd server":
+            print "{} PASSED \"{}\"".format(test_case, detail)
+        else:
+            print "{} FAILED page: \"{}\"".format(test_case, detail)
+            failed_log_and_page_display(page, log)
+            
     else:
-        print "FAILED"
-        print "DIAGNOSTICS:"
-        print "==== gdp-rest-v2.log:"
-        print log.read(-1)
-        print "==== end"
-    
-        print "==== gdp-rest-01 response:"
-        page_display(page)
-        print "==== end"
-        print "END DIAGNOSTICS"
+        print "{} FAILED status code: {}".format(test_case, page.status_code)
+        failed_log_and_page_display(page, log)
 #
-
+        
 def test_put_03():
     log.seek(0, os.SEEK_END)
     test_case = "TEST PUT 03:"
@@ -246,35 +271,18 @@ def test_put_03():
                         timeout = 60,
                         headers = json_header,
                         data = json.dumps(json_body))
-
-    passed = True
-    print "{} status code: {}".format(test_case, page.status_code),
-    if page.status_code != 400:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    detail = search_json_value(".*(\"detail.*\").*", page.content)
-    print "{} detail: {}".format(test_case, detail),
-    if detail != "\"mandatory external-name not found\"":
-        print "[FAILED]",
-        passed = False
-    print ""
-    
-    print "{}".format(test_case),
-    if passed:
-        print "PASSED"
+    if page.status_code == 400:
+        pj = page.json()
+        detail = pj["detail"]
+        if detail == "mandatory external-name not found":
+            print "{} PASSED \"{}\"".format(test_case, detail)
+        else:
+            print "{} FAILED page: \"{}\"".format(test_case, detail)
+            failed_log_and_page_display(page, log)
+            
     else:
-        print "FAILED"
-        print "DIAGNOSTICS:"
-        print "==== gdp-rest-v2.log:"
-        print log.read(-1)
-        print "==== end"
-    
-        print "==== gdp-rest-01 response:"
-        page_display(page)
-        print "==== end"
-        print "END DIAGNOSTICS"
+        print "{} FAILED status code: {}".format(test_case, page.status_code)
+        failed_log_and_page_display(page, log)
 #
 
 def test_put_04():
@@ -286,35 +294,18 @@ def test_put_04():
                         auth = test_auth,
                         timeout = 60,
                         headers = json_header)
-
-    passed = True
-    print "{} status code: {}".format(test_case, page.status_code),
-    if page.status_code != 400:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    detail = search_json_value(".*(\"detail.*\").*", page.content)
-    print "{} detail: {}".format(test_case, detail),
-    if detail != "\"request body not recognized json format\"":
-        print "[FAILED]",
-        passed = False
-    print ""
-    
-    print "{}".format(test_case),
-    if passed:
-        print "PASSED"
+    if page.status_code == 400:
+        pj = page.json()
+        detail = pj["detail"]
+        if detail == "request body not recognized json format":
+            print "{} PASSED \"{}\"".format(test_case, detail)
+        else:
+            print "{} FAILED page: \"{}\"".format(test_case, detail)
+            failed_log_and_page_display(page, log)
+            
     else:
-        print "FAILED"
-        print "DIAGNOSTICS:"
-        print "==== gdp-rest-v2.log:"
-        print log.read(-1)
-        print "==== end"
-    
-        print "==== gdp-rest-01 response:"
-        page_display(page)
-        print "==== end"
-        print "END DIAGNOSTICS"
+        print "{} FAILED status code: {}".format(test_case, page.status_code)
+        failed_log_and_page_display(page, log)
 #
 
 def test_put_05():
@@ -325,40 +316,24 @@ def test_put_05():
     page = requests.put("https://gdp-rest-01.eecs.berkeley.edu/gdp/v2/gcl",
                         auth = test_auth,
                         timeout = 60)
-
-    passed = True
-    print "{} status code: {}".format(test_case, page.status_code),
-    if page.status_code != 400:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    detail = search_json_value(".*(\"detail.*\").*", page.content)
-    print "{} detail: {}".format(test_case, detail),
-    if detail != "\"request body not recognized json format\"":
-        print "[FAILED]",
-        passed = False
-    print ""
-    
-    print "{}".format(test_case),
-    if passed:
-        print "PASSED"
+    if page.status_code == 400:
+        pj = page.json()
+        detail = pj["detail"]
+        if detail == "request body not recognized json format":
+            print "{} PASSED \"{}\"".format(test_case, detail)
+        else:
+            print "{} FAILED page: \"{}\"".format(test_case, detail)
+            failed_log_and_page_display(page, log)
+            
     else:
-        print "FAILED"
-        print "DIAGNOSTICS:"
-        print "==== gdp-rest-v2.log:"
-        print log.read(-1)
-        print "==== end"
-    
-        print "==== gdp-rest-01 response:"
-        page_display(page)
-        print "==== end"
-        print "END DIAGNOSTICS"
+        print "{} FAILED status code: {}".format(test_case, page.status_code)
+        failed_log_and_page_display(page, log)
 #
 
 def test_put_06():
     log.seek(0, os.SEEK_END)
     test_case = "TEST PUT 06:"
+    test_id = "test_put_06_log"
     print "{} HTTP PUT new log, verify all valid options".format(test_case)
 
 
@@ -378,42 +353,21 @@ def test_put_06():
                         timeout = 60,
                         headers = json_header,
                         data = json.dumps(json_body))
-
-    passed = True
-    print "{} status code: {}".format(test_case, page.status_code),
-    if page.status_code != 201:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    gcl_name = search_json_value(".*(\"gcl_name.*\").*", page.content)
-    print "{} gcl_name: {}".format(test_case, gcl_name),
-    if gcl_name == None:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    gdplogd_name = search_json_value(".*(\"gdplogd_name.*\").*", page.content)
-    print "{} gdplogd_name: {}".format(test_case, gdplogd_name),
-    if gdplogd_name == None:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    print "{}".format(test_case),
-    if passed:
-        print "PASSED"
+    if page.status_code == 201:
+        pj = page.json()
+        gcl_name = pj["gcl_name"]
+        gdplogd_name = pj["gdplogd_name"]
+        if gcl_name != None and gdplogd_name != None:
+            print "{} PASSED \"{}\" \"{}\"".format(test_case,
+            gcl_name, gdplogd_name)
+            test_log(test_case, test_id, gcl_name)
+        else:
+            print "{} FAILED page: \"{}\" \"{}\"".format(test_case,
+                                                         gcl_name, gdplogd_name)
+            failed_log_and_page_display(page, log)
     else:
-        print "FAILED"
-        print "DIAGNOSTICS:"
-        print "==== gdp-rest-v2.log:"
-        print log.read(-1)
-        print "==== end"
-    
-        print "==== gdp-rest-01 response:"
-        page_display(page)
-        print "==== end"
-        print "END DIAGNOSTICS"
+        print "{} FAILED status code: {}".format(test_case, page.status_code)
+        failed_log_and_page_display(page, log)
 #
 
 def test_put_07():
@@ -431,35 +385,18 @@ def test_put_07():
                         timeout = 60,
                         headers = json_header,
                         data = json.dumps(json_body))
-
-    passed = True
-    print "{} status code: {}".format(test_case, page.status_code),
-    if page.status_code != 400:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    detail = search_json_value(".*(\"detail.*\").*", page.content)
-    print "{} detail: {}".format(test_case, detail),
-    if detail != "\"request contains unrecognized json objects\"":
-        print "[FAILED]",
-        passed = False
-    print ""
-    
-    print "{}".format(test_case),
-    if passed:
-        print "PASSED"
+    if page.status_code == 400:
+        pj = page.json()
+        detail = pj["detail"]
+        if detail == "request contains unrecognized json objects":
+            print "{} PASSED \"{}\"".format(test_case, detail)
+        else:
+            print "{} FAILED page: \"{}\"".format(test_case, detail)
+            failed_log_and_page_display(page, log)
+            
     else:
-        print "FAILED"
-        print "DIAGNOSTICS:"
-        print "==== gdp-rest-v2.log:"
-        print log.read(-1)
-        print "==== end"
-    
-        print "==== gdp-rest-01 response:"
-        page_display(page)
-        print "==== end"
-        print "END DIAGNOSTICS"
+        print "{} FAILED status code: {}".format(test_case, page.status_code)
+        failed_log_and_page_display(page, log)
 #
 
 def test_put_08():
@@ -477,35 +414,18 @@ def test_put_08():
                         timeout = 60,
                         headers = json_header,
                         data = json.dumps(json_body))
-
-    passed = True
-    print "{} status code: {}".format(test_case, page.status_code),
-    if page.status_code != 400:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    detail = search_json_value(".*(\"detail.*\").*", page.content)
-    print "{} detail: {}".format(test_case, detail),
-    if detail != "\"request contains unrecognized json objects\"":
-        print "[FAILED]",
-        passed = False
-    print ""
-    
-    print "{}".format(test_case),
-    if passed:
-        print "PASSED"
+    if page.status_code == 400:
+        pj = page.json()
+        detail = pj["detail"]
+        if detail == "request contains unrecognized json objects":
+            print "{} PASSED \"{}\"".format(test_case, detail)
+        else:
+            print "{} FAILED page: \"{}\"".format(test_case, detail)
+            failed_log_and_page_display(page, log)
+            
     else:
-        print "FAILED"
-        print "DIAGNOSTICS:"
-        print "==== gdp-rest-v2.log:"
-        print log.read(-1)
-        print "==== end"
-    
-        print "==== gdp-rest-01 response:"
-        page_display(page)
-        print "==== end"
-        print "END DIAGNOSTICS"
+        print "{} FAILED status code: {}".format(test_case, page.status_code)
+        failed_log_and_page_display(page, log)
 #
 
 def test_put_09():
@@ -523,35 +443,18 @@ def test_put_09():
                         timeout = 60,
                         headers = json_header,
                         data = json.dumps(json_body))
-
-    passed = True
-    print "{} status code: {}".format(test_case, page.status_code),
-    if page.status_code != 400:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    detail = search_json_value(".*(\"detail.*\").*", page.content)
-    print "{} detail: {}".format(test_case, detail),
-    if detail != "\"request contains unrecognized json objects\"":
-        print "[FAILED]",
-        passed = False
-    print ""
-    
-    print "{}".format(test_case),
-    if passed:
-        print "PASSED"
+    if page.status_code == 400:
+        pj = page.json()
+        detail = pj["detail"]
+        if detail == "request contains unrecognized json objects":
+            print "{} PASSED \"{}\"".format(test_case, detail)
+        else:
+            print "{} FAILED page: \"{}\"".format(test_case, detail)
+            failed_log_and_page_display(page, log)
+            
     else:
-        print "FAILED"
-        print "DIAGNOSTICS:"
-        print "==== gdp-rest-v2.log:"
-        print log.read(-1)
-        print "==== end"
-    
-        print "==== gdp-rest-01 response:"
-        page_display(page)
-        print "==== end"
-        print "END DIAGNOSTICS"
+        print "{} FAILED status code: {}".format(test_case, page.status_code)
+        failed_log_and_page_display(page, log)
 #
 
 def test_put_10():
@@ -569,35 +472,18 @@ def test_put_10():
                         timeout = 60,
                         headers = json_header,
                         data = json.dumps(json_body))
-
-    passed = True
-    print "{} status code: {}".format(test_case, page.status_code),
-    if page.status_code != 400:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    detail = search_json_value(".*(\"detail.*\").*", page.content)
-    print "{} detail: {}".format(test_case, detail),
-    if detail != "\"request contains unrecognized json objects\"":
-        print "[FAILED]",
-        passed = False
-    print ""
-    
-    print "{}".format(test_case),
-    if passed:
-        print "PASSED"
+    if page.status_code == 400:
+        pj = page.json()
+        detail = pj["detail"]
+        if detail == "request contains unrecognized json objects":
+            print "{} PASSED \"{}\"".format(test_case, detail)
+        else:
+            print "{} FAILED page: \"{}\"".format(test_case, detail)
+            failed_log_and_page_display(page, log)
+            
     else:
-        print "FAILED"
-        print "DIAGNOSTICS:"
-        print "==== gdp-rest-v2.log:"
-        print log.read(-1)
-        print "==== end"
-    
-        print "==== gdp-rest-01 response:"
-        page_display(page)
-        print "==== end"
-        print "END DIAGNOSTICS"
+        print "{} FAILED status code: {}".format(test_case, page.status_code)
+        failed_log_and_page_display(page, log)
 #
 
 def test_put_11():
@@ -615,35 +501,18 @@ def test_put_11():
                         timeout = 60,
                         headers = json_header,
                         data = json.dumps(json_body))
-
-    passed = True
-    print "{} status code: {}".format(test_case, page.status_code),
-    if page.status_code != 400:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    detail = search_json_value(".*(\"detail.*\").*", page.content)
-    print "{} detail: {}".format(test_case, detail),
-    if detail != "\"request contains unrecognized json objects\"":
-        print "[FAILED]",
-        passed = False
-    print ""
-    
-    print "{}".format(test_case),
-    if passed:
-        print "PASSED"
+    if page.status_code == 400:
+        pj = page.json()
+        detail = pj["detail"]
+        if detail == "request contains unrecognized json objects":
+            print "{} PASSED \"{}\"".format(test_case, detail)
+        else:
+            print "{} FAILED page: \"{}\"".format(test_case, detail)
+            failed_log_and_page_display(page, log)
+            
     else:
-        print "FAILED"
-        print "DIAGNOSTICS:"
-        print "==== gdp-rest-v2.log:"
-        print log.read(-1)
-        print "==== end"
-    
-        print "==== gdp-rest-01 response:"
-        page_display(page)
-        print "==== end"
-        print "END DIAGNOSTICS"
+        print "{} FAILED status code: {}".format(test_case, page.status_code)
+        failed_log_and_page_display(page, log)
 #
 
 def test_put_12():
@@ -661,44 +530,29 @@ def test_put_12():
                         timeout = 60,
                         headers = json_header,
                         data = json.dumps(json_body))
-
-    passed = True
-    print "{} status code: {}".format(test_case, page.status_code),
-    if page.status_code != 400:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    detail = search_json_value(".*(\"detail.*\").*", page.content)
-    print "{} detail: {}".format(test_case, detail),
-    if detail != "\"log server host not found\"":
-        print "[FAILED]",
-        passed = False
-    print ""
-    
-    print "{}".format(test_case),
-    if passed:
-        print "PASSED"
+    if page.status_code == 400:
+        pj = page.json()
+        detail = pj["detail"]
+        if detail == "log server host not found":
+            print "{} PASSED \"{}\"".format(test_case, detail)
+        else:
+            print "{} FAILED page: \"{}\"".format(test_case, detail)
+            failed_log_and_page_display(page, log)
+            
     else:
-        print "FAILED"
-        print "DIAGNOSTICS:"
-        print "==== gdp-rest-v2.log:"
-        print log.read(-1)
-        print "==== end"
-    
-        print "==== gdp-rest-01 response:"
-        page_display(page)
-        print "==== end"
-        print "END DIAGNOSTICS"
+        print "{} FAILED status code: {}".format(test_case, page.status_code)
+        failed_log_and_page_display(page, log)
 #
 
+
 #
-# HTTP POST
+# HTTP POST TESTS
 #
 
 def test_post_01():
     log.seek(0, os.SEEK_END)
     test_case = "TEST POST 01:"
+    test_id = "test_post_01_log"
     print "{} HTTP POST new log".format(test_case)
 
 
@@ -712,47 +566,27 @@ def test_post_01():
                         timeout = 60,
                         headers = json_header,
                         data = json.dumps(json_body))
-
-    passed = True
-    print "{} status code: {}".format(test_case, page.status_code),
-    if page.status_code != 201:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    gcl_name = search_json_value(".*(\"gcl_name.*\").*", page.content)
-    print "{} gcl_name: {}".format(test_case, gcl_name),
-    if gcl_name == None:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    gdplogd_name = search_json_value(".*(\"gdplogd_name.*\").*", page.content)
-    print "{} gdplogd_name: {}".format(test_case, gdplogd_name),
-    if gdplogd_name == None:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    print "{}".format(test_case),
-    if passed:
-        print "PASSED"
+    if page.status_code == 201:
+        pj = page.json()
+        gcl_name = pj["gcl_name"]
+        gdplogd_name = pj["gdplogd_name"]
+        if gcl_name != None and gdplogd_name != None:
+            print "{} PASSED \"{}\" \"{}\"".format(test_case,
+                                                   gcl_name, gdplogd_name)
+            test_log(test_case, test_id, gcl_name)
+        else:
+            print "{} FAILED page: \"{}\" \"{}\"".format(test_case,
+                                                         gcl_name, gdplogd_name)
+            failed_log_and_page_display(page, log)
     else:
-        print "FAILED"
-        print "DIAGNOSTICS:"
-        print "==== gdp-rest-v2.log:"
-        print log.read(-1)
-        print "==== end"
-    
-        print "==== gdp-rest-01 response:"
-        page_display(page)
-        print "==== end"
-        print "END DIAGNOSTICS"
+        print "{} FAILED status code: {}".format(test_case, page.status_code)
+        failed_log_and_page_display(page, log)
 #
 
 def test_post_02():
     log.seek(0, os.SEEK_END)
     test_case = "TEST POST 02:"
+    test_id = "test_post_02_log"
     print "{} HTTP POST new log".format(test_case)
 
 
@@ -766,42 +600,21 @@ def test_post_02():
                         timeout = 60,
                         headers = json_header,
                         data = json.dumps(json_body))
-
-    passed = True
-    print "{} status code: {}".format(test_case, page.status_code),
-    if page.status_code != 201:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    gcl_name = search_json_value(".*(\"gcl_name.*\").*", page.content)
-    print "{} gcl_name: {}".format(test_case, gcl_name),
-    if gcl_name == None:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    gdplogd_name = search_json_value(".*(\"gdplogd_name.*\").*", page.content)
-    print "{} gdplogd_name: {}".format(test_case, gdplogd_name),
-    if gdplogd_name == None:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    print "{}".format(test_case),
-    if passed:
-        print "PASSED"
+    if page.status_code == 201:
+        pj = page.json()
+        gcl_name = pj["gcl_name"]
+        gdplogd_name = pj["gdplogd_name"]
+        if gcl_name != None and gdplogd_name != None:
+            print "{} PASSED \"{}\" \"{}\"".format(test_case,
+            gcl_name, gdplogd_name)
+            test_log(test_case, test_id, gcl_name)
+        else:
+            print "{} FAILED page: \"{}\" \"{}\"".format(test_case,
+                                                         gcl_name, gdplogd_name)
+            failed_log_and_page_display(page, log)
     else:
-        print "FAILED"
-        print "DIAGNOSTICS:"
-        print "==== gdp-rest-v2.log:"
-        print log.read(-1)
-        print "==== end"
-    
-        print "==== gdp-rest-01 response:"
-        page_display(page)
-        print "==== end"
-        print "END DIAGNOSTICS"
+        print "{} FAILED status code: {}".format(test_case, page.status_code)
+        failed_log_and_page_display(page, log)
 #
 
 def test_post_03():
@@ -818,35 +631,18 @@ def test_post_03():
                         timeout = 60,
                         headers = json_header,
                         data = json.dumps(json_body))
-
-    passed = True
-    print "{} status code: {}".format(test_case, page.status_code),
-    if page.status_code != 400:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    detail = search_json_value(".*(\"detail.*\").*", page.content)
-    print "{} detail: {}".format(test_case, detail),
-    if detail != "\"POST external-name must have null value\"":
-        print "[FAILED]",
-        passed = False
-    print ""
-    
-    print "{}".format(test_case),
-    if passed:
-        print "PASSED"
+    if page.status_code == 400:
+        pj = page.json()
+        detail = pj["detail"]
+        if detail == "POST external-name must have null value":
+            print "{} PASSED \"{}\"".format(test_case, detail)
+        else:
+            print "{} FAILED page: \"{}\"".format(test_case, detail)
+            failed_log_and_page_display(page, log)
+            
     else:
-        print "FAILED"
-        print "DIAGNOSTICS:"
-        print "==== gdp-rest-v2.log:"
-        print log.read(-1)
-        print "==== end"
-    
-        print "==== gdp-rest-01 response:"
-        page_display(page)
-        print "==== end"
-        print "END DIAGNOSTICS"
+        print "{} FAILED status code: {}".format(test_case, page.status_code)
+        failed_log_and_page_display(page, log)
 #
 
 def test_post_04():
@@ -858,35 +654,18 @@ def test_post_04():
                         auth = test_auth,
                         timeout = 60,
                         headers = json_header)
-
-    passed = True
-    print "{} status code: {}".format(test_case, page.status_code),
-    if page.status_code != 400:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    detail = search_json_value(".*(\"detail.*\").*", page.content)
-    print "{} detail: {}".format(test_case, detail),
-    if detail != "\"request body not recognized json format\"":
-        print "[FAILED]",
-        passed = False
-    print ""
-    
-    print "{}".format(test_case),
-    if passed:
-        print "PASSED"
+    if page.status_code == 400:
+        pj = page.json()
+        detail = pj["detail"]
+        if detail == "request body not recognized json format":
+            print "{} PASSED \"{}\"".format(test_case, detail)
+        else:
+            print "{} FAILED page: \"{}\"".format(test_case, detail)
+            failed_log_and_page_display(page, log)
+            
     else:
-        print "FAILED"
-        print "DIAGNOSTICS:"
-        print "==== gdp-rest-v2.log:"
-        print log.read(-1)
-        print "==== end"
-    
-        print "==== gdp-rest-01 response:"
-        page_display(page)
-        print "==== end"
-        print "END DIAGNOSTICS"
+        print "{} FAILED status code: {}".format(test_case, page.status_code)
+        failed_log_and_page_display(page, log)
 #
 
 def test_post_05():
@@ -898,39 +677,24 @@ def test_post_05():
                         auth = test_auth,
                         timeout = 60)
 
-    passed = True
-    print "{} status code: {}".format(test_case, page.status_code),
-    if page.status_code != 400:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    detail = search_json_value(".*(\"detail.*\").*", page.content)
-    print "{} detail: {}".format(test_case, detail),
-    if detail != "\"request body not recognized json format\"":
-        print "[FAILED]",
-        passed = False
-    print ""
-    
-    print "{}".format(test_case),
-    if passed:
-        print "PASSED"
+    if page.status_code == 400:
+        pj = page.json()
+        detail = pj["detail"]
+        if detail == "request body not recognized json format":
+            print "{} PASSED \"{}\"".format(test_case, detail)
+        else:
+            print "{} FAILED page: \"{}\"".format(test_case, detail)
+            failed_log_and_page_display(page, log)
+            
     else:
-        print "FAILED"
-        print "DIAGNOSTICS:"
-        print "==== gdp-rest-v2.log:"
-        print log.read(-1)
-        print "==== end"
-    
-        print "==== gdp-rest-01 response:"
-        page_display(page)
-        print "==== end"
-        print "END DIAGNOSTICS"
+        print "{} FAILED status code: {}".format(test_case, page.status_code)
+        failed_log_and_page_display(page, log)
 #
 
 def test_post_06():
     log.seek(0, os.SEEK_END)
     test_case = "TEST POST 06:"
+    test_id = "test_post_06_log"
     print "{} HTTP POST new log, verify all valid options".format(test_case)
 
 
@@ -950,42 +714,21 @@ def test_post_06():
                         timeout = 60,
                         headers = json_header,
                         data = json.dumps(json_body))
-
-    passed = True
-    print "{} status code: {}".format(test_case, page.status_code),
-    if page.status_code != 201:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    gcl_name = search_json_value(".*(\"gcl_name.*\").*", page.content)
-    print "{} gcl_name: {}".format(test_case, gcl_name),
-    if gcl_name == None:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    gdplogd_name = search_json_value(".*(\"gdplogd_name.*\").*", page.content)
-    print "{} gdplogd_name: {}".format(test_case, gdplogd_name),
-    if gdplogd_name == None:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    print "{}".format(test_case),
-    if passed:
-        print "PASSED"
+    if page.status_code == 201:
+        pj = page.json()
+        gcl_name = pj["gcl_name"]
+        gdplogd_name = pj["gdplogd_name"]
+        if gcl_name != None and gdplogd_name != None:
+            print "{} PASSED \"{}\" \"{}\"".format(test_case,
+            gcl_name, gdplogd_name)
+            test_log(test_case, test_id, gcl_name)
+        else:
+            print "{} FAILED page: \"{}\" \"{}\"".format(test_case,
+                                                         gcl_name, gdplogd_name)
+            failed_log_and_page_display(page, log)
     else:
-        print "FAILED"
-        print "DIAGNOSTICS:"
-        print "==== gdp-rest-v2.log:"
-        print log.read(-1)
-        print "==== end"
-    
-        print "==== gdp-rest-01 response:"
-        page_display(page)
-        print "==== end"
-        print "END DIAGNOSTICS"
+        print "{} FAILED status code: {}".format(test_case, page.status_code)
+        failed_log_and_page_display(page, log)
 #
 
 def test_post_07():
@@ -1003,35 +746,18 @@ def test_post_07():
                         timeout = 60,
                         headers = json_header,
                         data = json.dumps(json_body))
-
-    passed = True
-    print "{} status code: {}".format(test_case, page.status_code),
-    if page.status_code != 400:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    detail = search_json_value(".*(\"detail.*\").*", page.content)
-    print "{} detail: {}".format(test_case, detail),
-    if detail != "\"request contains unrecognized json objects\"":
-        print "[FAILED]",
-        passed = False
-    print ""
-    
-    print "{}".format(test_case),
-    if passed:
-        print "PASSED"
+    if page.status_code == 400:
+        pj = page.json()
+        detail = pj["detail"]
+        if detail == "request contains unrecognized json objects":
+            print "{} PASSED \"{}\"".format(test_case, detail)
+        else:
+            print "{} FAILED page: \"{}\"".format(test_case, detail)
+            failed_log_and_page_display(page, log)
+            
     else:
-        print "FAILED"
-        print "DIAGNOSTICS:"
-        print "==== gdp-rest-v2.log:"
-        print log.read(-1)
-        print "==== end"
-    
-        print "==== gdp-rest-01 response:"
-        page_display(page)
-        print "==== end"
-        print "END DIAGNOSTICS"
+        print "{} FAILED status code: {}".format(test_case, page.status_code)
+        failed_log_and_page_display(page, log)
 #
 
 def test_post_08():
@@ -1049,35 +775,18 @@ def test_post_08():
                         timeout = 60,
                         headers = json_header,
                         data = json.dumps(json_body))
-
-    passed = True
-    print "{} status code: {}".format(test_case, page.status_code),
-    if page.status_code != 400:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    detail = search_json_value(".*(\"detail.*\").*", page.content)
-    print "{} detail: {}".format(test_case, detail),
-    if detail != "\"request contains unrecognized json objects\"":
-        print "[FAILED]",
-        passed = False
-    print ""
-    
-    print "{}".format(test_case),
-    if passed:
-        print "PASSED"
+    if page.status_code == 400:
+        pj = page.json()
+        detail = pj["detail"]
+        if detail == "request contains unrecognized json objects":
+            print "{} PASSED \"{}\"".format(test_case, detail)
+        else:
+            print "{} FAILED page: \"{}\"".format(test_case, detail)
+            failed_log_and_page_display(page, log)
+            
     else:
-        print "FAILED"
-        print "DIAGNOSTICS:"
-        print "==== gdp-rest-v2.log:"
-        print log.read(-1)
-        print "==== end"
-    
-        print "==== gdp-rest-01 response:"
-        page_display(page)
-        print "==== end"
-        print "END DIAGNOSTICS"
+        print "{} FAILED status code: {}".format(test_case, page.status_code)
+        failed_log_and_page_display(page, log)
 #
 
 def test_post_09():
@@ -1095,35 +804,18 @@ def test_post_09():
                         timeout = 60,
                         headers = json_header,
                         data = json.dumps(json_body))
-
-    passed = True
-    print "{} status code: {}".format(test_case, page.status_code),
-    if page.status_code != 400:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    detail = search_json_value(".*(\"detail.*\").*", page.content)
-    print "{} detail: {}".format(test_case, detail),
-    if detail != "\"request contains unrecognized json objects\"":
-        print "[FAILED]",
-        passed = False
-    print ""
-    
-    print "{}".format(test_case),
-    if passed:
-        print "PASSED"
+    if page.status_code == 400:
+        pj = page.json()
+        detail = pj["detail"]
+        if detail == "request contains unrecognized json objects":
+            print "{} PASSED \"{}\"".format(test_case, detail)
+        else:
+            print "{} FAILED page: \"{}\"".format(test_case, detail)
+            failed_log_and_page_display(page, log)
+            
     else:
-        print "FAILED"
-        print "DIAGNOSTICS:"
-        print "==== gdp-rest-v2.log:"
-        print log.read(-1)
-        print "==== end"
-    
-        print "==== gdp-rest-01 response:"
-        page_display(page)
-        print "==== end"
-        print "END DIAGNOSTICS"
+        print "{} FAILED status code: {}".format(test_case, page.status_code)
+        failed_log_and_page_display(page, log)
 #
 
 def test_post_10():
@@ -1141,35 +833,18 @@ def test_post_10():
                         timeout = 60,
                         headers = json_header,
                         data = json.dumps(json_body))
-
-    passed = True
-    print "{} status code: {}".format(test_case, page.status_code),
-    if page.status_code != 400:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    detail = search_json_value(".*(\"detail.*\").*", page.content)
-    print "{} detail: {}".format(test_case, detail),
-    if detail != "\"request contains unrecognized json objects\"":
-        print "[FAILED]",
-        passed = False
-    print ""
-    
-    print "{}".format(test_case),
-    if passed:
-        print "PASSED"
+    if page.status_code == 400:
+        pj = page.json()
+        detail = pj["detail"]
+        if detail == "request contains unrecognized json objects":
+            print "{} PASSED \"{}\"".format(test_case, detail)
+        else:
+            print "{} FAILED page: \"{}\"".format(test_case, detail)
+            failed_log_and_page_display(page, log)
+            
     else:
-        print "FAILED"
-        print "DIAGNOSTICS:"
-        print "==== gdp-rest-v2.log:"
-        print log.read(-1)
-        print "==== end"
-    
-        print "==== gdp-rest-01 response:"
-        page_display(page)
-        print "==== end"
-        print "END DIAGNOSTICS"
+        print "{} FAILED status code: {}".format(test_case, page.status_code)
+        failed_log_and_page_display(page, log)
 #
 
 def test_post_11():
@@ -1187,35 +862,18 @@ def test_post_11():
                         timeout = 60,
                         headers = json_header,
                         data = json.dumps(json_body))
-
-    passed = True
-    print "{} status code: {}".format(test_case, page.status_code),
-    if page.status_code != 400:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    detail = search_json_value(".*(\"detail.*\").*", page.content)
-    print "{} detail: {}".format(test_case, detail),
-    if detail != "\"request contains unrecognized json objects\"":
-        print "[FAILED]",
-        passed = False
-    print ""
-    
-    print "{}".format(test_case),
-    if passed:
-        print "PASSED"
+    if page.status_code == 400:
+        pj = page.json()
+        detail = pj["detail"]
+        if detail == "request contains unrecognized json objects":
+            print "{} PASSED \"{}\"".format(test_case, detail)
+        else:
+            print "{} FAILED page: \"{}\"".format(test_case, detail)
+            failed_log_and_page_display(page, log)
+            
     else:
-        print "FAILED"
-        print "DIAGNOSTICS:"
-        print "==== gdp-rest-v2.log:"
-        print log.read(-1)
-        print "==== end"
-    
-        print "==== gdp-rest-01 response:"
-        page_display(page)
-        print "==== end"
-        print "END DIAGNOSTICS"
+        print "{} FAILED status code: {}".format(test_case, page.status_code)
+        failed_log_and_page_display(page, log)
 #
 
 def test_post_12():
@@ -1233,60 +891,55 @@ def test_post_12():
                         timeout = 60,
                         headers = json_header,
                         data = json.dumps(json_body))
-
-    passed = True
-    print "{} status code: {}".format(test_case, page.status_code),
-    if page.status_code != 400:
-        print "[FAILED]",
-        passed = False
-    print ""
-
-    detail = search_json_value(".*(\"detail.*\").*", page.content)
-    print "{} detail: {}".format(test_case, detail),
-    if detail != "\"log server host not found\"":
-        print "[FAILED]",
-        passed = False
-    print ""
-    
-    print "{}".format(test_case),
-    if passed:
-        print "PASSED"
+    if page.status_code == 400:
+        pj = page.json()
+        detail = pj["detail"]
+        if detail == "log server host not found":
+            print "{} PASSED \"{}\"".format(test_case, detail)
+        else:
+            print "{} FAILED page: \"{}\"".format(test_case, detail)
+            failed_log_and_page_display(page, log)
+            
     else:
-        print "FAILED"
-        print "DIAGNOSTICS:"
-        print "==== gdp-rest-v2.log:"
-        print log.read(-1)
-        print "==== end"
-    
-        print "==== gdp-rest-01 response:"
-        page_display(page)
-        print "==== end"
-        print "END DIAGNOSTICS"
+        print "{} FAILED status code: {}".format(test_case, page.status_code)
+        failed_log_and_page_display(page, log)
+#
+
+
+#
+# RUN TESTS
 #
 
 #
-# TEST prep
+# preclean gdp-rest-01 v2 testbed (aborted test runs)
 #
-testbed = socket.gethostname()
-if testbed != "gdp-rest-01":
-    print "host is {}".format(testbed)
-    print "Error: this script is only safe to run on the RESTful server"
-    sys.exit(1)
+print "Info: stopping gdplogd.service (purge GCL cache from prior test runs)"
+subprocess.call("sudo systemctl stop gdplogd.service", shell=True)
+print "Info: stop gdp-rest-v2.service (purge GCL cache from prior test runs)"
+subprocess.call("sudo systemctl stop gdp-rest-v2.service", shell=True)
+print "Info: clean local GCLs (and their keys, but not production keys)"
+clean_gcls_and_keys()
 
-print "checking is-active gdplogd (sudo systemctl is-active gdplogd) ..."
-if subprocess.call("sudo systemctl is-active gdplogd",
-                   shell=True, stdout=dn, stderr=dn) != 3:
-    print "Error: gdplogd is already active on gdp-rest-01 (not normal case)"
+#
+# start v2 testbed
+#
+print "Info: start gdplogd.service (sudo systemctl)"
+if subprocess.call("sudo systemctl start gdplogd.service", shell=True) != 0:
+    print "Error: sudo systemctl start gdplogd.service failed"
     sys.exit(1)
-print "inactive (expected)"
+#
+log.seek(0, os.SEEK_END)
+print "Info: start gdp-rest-v2.service (sudo systemctl)"
+if subprocess.call("sudo systemctl start gdp-rest-v2.service", shell=True) != 0:
+    print "Error: sudo systemctl start gdp-rest-v2.service failed"
+    sys.exit(1)
+#
+m = re.search(".*could not initialize SCGI port.*", log.read(-1))
+if m != None:
+    print "Warning: gdp-rest has not released the SCGI port yet, wait and retry"
+    sys.exit(1)
+#
 
-print "starting gdplogd (sudo systemctl start gdplogd.service) ..."
-if subprocess.call("sudo systemctl start gdplogd.service",
-                   shell=True) != 0:
-    print "Error: systemctl start gdplogd.service failed"
-    sys.exit(1)
-print "started"
-    
 #
 # TEST run
 #
@@ -1319,11 +972,17 @@ test_post_10()
 test_post_11()
 test_post_12()
 
-print "stopping gdplogd (sudo systemctl stop gdplogd.service) ..."
-if subprocess.call("sudo systemctl stop gdplogd.service",
-                   shell=True) != 0:
-    print "Error: systemctl stop gdplogd.service failed"
-print "stopped"
+print "Info: stopping gdplogd.service (sudo systemctl) ...",
+if subprocess.call("sudo systemctl stop gdplogd.service", shell=True) != 0:
+    print "\nError: systemctl stop gdplogd.service failed"
+else:
+    print "stopped"
+
+print "Info: stopping gdp-rest-v2.service (sudo systemctl) ...",
+if subprocess.call("sudo systemctl stop gdp-rest-v2.service", shell=True) != 0:
+    print "\nError: systemctl stop gdp-rest-v2.service failed"
+else:
+    print "stopped"
 
 clean_gcls_and_keys()
 

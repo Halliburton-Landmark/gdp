@@ -607,12 +607,6 @@ main(int argc, char **argv)
 	{
 		// create a new GCL handle with a new name based on metadata
 		estat = gdp_gcl_create(NULL, logdiname, gmd, &gcl);
-		// NULL gclxname path will not use (rename) tempkeyfile, so remove it
-		if (tempkeyfile != NULL)
-		{
-			remove(tempkeyfile);
-			tempkeyfile = NULL;
-		}
 	}
 	else
 	{
@@ -636,7 +630,7 @@ main(int argc, char **argv)
 		size_t len;
 		gdp_pname_t pbuf;
 
-		gdp_printable_name(gcliname, pbuf);
+		gdp_printable_name(*gdp_gcl_getname(gcl), pbuf);
 		len = strlen(keyfile) + sizeof pbuf + 6;
 		finalkeyfile = ep_mem_malloc(len);
 		snprintf(finalkeyfile, len, "%s/%s.pem", keyfile, pbuf);
