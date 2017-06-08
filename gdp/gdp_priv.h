@@ -42,8 +42,6 @@
 
 #include <event2/buffer.h>
 
-#include <stdio.h>
-
 #if EP_OSCF_USE_VALGRIND
 # include <valgrind/helgrind.h>
 #else
@@ -51,12 +49,14 @@
 #endif
 
 typedef struct gdp_chan		gdp_chan_t;
+typedef struct gdp_cursor	gdp_cursor_t;
 typedef struct gdp_req		gdp_req_t;
 typedef struct gdp_gob		gdp_gob_t;
 typedef struct gdp_gin		gdp_gin_t;
 STAILQ_HEAD(gev_list, gdp_event);
 
 extern EP_THR		_GdpIoEventLoopThread;
+extern event_base_t	*_GdpIoEventBase;	// for all I/O events
 extern gdp_chan_t	*_GdpChannel;		// our primary app-level protocol port
 extern gdp_name_t	_GdpMyRoutingName;	// source name for PDUs
 extern bool			_GdpLibInitialized;	// are we initialized?
@@ -102,49 +102,6 @@ LIST_HEAD(req_head, gdp_req);
 #define GDP_PR_DETAILED		16		// detailed information
 #define GDP_PR_RECURSE		32		// recurse into substructures
 									// add N to recurse N+1 levels deep
-
-
-/*
-**  GDP Channels
-**
-**		These represent a communications path to the routing layer.
-**		At the moment those are connections.
-*/
-
-struct gdp_chan
-{
-	EP_THR_MUTEX		mutex;			// lock before changes
-	EP_THR_COND			cond;			// wake up after state change
-	int16_t				state;			// current state of channel
-	uint16_t			flags;			// status flags
-	struct bufferevent	*bev;			// associated bufferevent (socket)
-	struct req_head		reqs;			// reqs associated with this channel
-	void				(*close_cb)(	// called on channel close
-							gdp_chan_t *chan);
-	EP_STAT				(*advertise)(	// called to do our advertisements
-							int cmd);
-	void				(*process)(		// called to process a PDU
-							gdp_pdu_t *pdu,
-							gdp_chan_t *chan);
-	EP_THR				sub_thr_id;		// subscription poker thread id
-};
-
-/* Channel states */
-#define GDP_CHAN_UNCONNECTED	0		// channel is not connected yet
-#define GDP_CHAN_CONNECTING		1		// connection being initiated
-#define GDP_CHAN_CONNECTED		2		// channel is connected and active
-#define GDP_CHAN_ERROR			3		// channel has had error
-#define GDP_CHAN_CLOSING		4		// channel is closing
-
-/* Channel flags */
-#define GDP_CHAN_HAS_SUB_THR	0x0001	// subscription poker thread is running
-
-EP_STAT			_gdp_chan_open(				// open channel to routing layer
-						const char *gdpd_addr,
-						void (*process)(gdp_pdu_t *, gdp_chan_t *),
-						gdp_chan_t **pchan);
-void			_gdp_chan_close(			// close channel
-						gdp_chan_t **pchan);
 
 
 /*
@@ -696,8 +653,40 @@ void			_gdp_req_dump(				// print (debug) request
 void			_gdp_req_pr_stats(			// print (debug) statistics
 						FILE *fp);
 
-void			_gdp_chan_drain_input(		// drain all input from channel
-						gdp_chan_t *chan);
+
+/*
+**  Channel and I/O Event support
+*/
+
+// extended channel information (passed as channel "udata")
+struct gdp_chan_x
+{
+	struct req_head		reqs;			// reqs associated with this channel
+	EP_STAT				(*connect_cb)(	// called on connection established
+							gdp_chan_t *chan);
+};
+
+// functions used internally related to channel I/O
+EP_STAT			_gdp_io_recv(
+						gdp_cursor_t *cursor,
+						uint32_t flags);
+
+EP_STAT			_gdp_io_event(
+						gdp_chan_t *chan,
+						uint32_t flags);
+
+EP_STAT			_gdp_advertise_me(
+						gdp_chan_t *chan,
+						int cmd);
+
+// I/O event handling
+struct event_loop_info
+{
+	const char		*where;
+};
+
+void			*_gdp_run_event_loop(
+						void *eli_);
 
 
 /*
@@ -722,21 +711,6 @@ void			_gdp_register_cmdfuncs(
 const char		*_gdp_proto_cmd_name(		// return printable cmd name
 						uint8_t cmd);
 
-/*
-**  Initialization and Maintenance.
-*/
-
-void			_gdp_newname(gdp_name_t gname,
-						gdp_gclmd_t *gmd);
-
-void			_gdp_reclaim_resources(		// reclaim system resources
-						void *);				// unused
-
-void			_gdp_reclaim_resources_init(
-						void (*f)(int, short, void *));
-
-void			_gdp_dump_state(int plev);
-
 #define GDP_RECLAIM_AGE_DEF		300L		// default reclaim age (sec)
 
 
@@ -744,12 +718,18 @@ void			_gdp_dump_state(int plev);
 **  Advertising.
 */
 
+typedef EP_STAT	chan_advert_cb_t(			// advertise any known names
+						gdp_chan_t *chan,
+						int cmd);
+
 EP_STAT			_gdp_advertise(				// advertise resources (generic)
+						gdp_chan_t *chan,
 						EP_STAT (*func)(gdp_buf_t *, void *, int),
 						void *ctx,
 						int cmd);
 
 EP_STAT			_gdp_advertise_me(			// advertise me only
+						gdp_chan_t *chan,
 						int cmd);
 
 /*
@@ -766,6 +746,21 @@ void			_gdp_subscr_poke(			// test subscriptions still alive
 						gdp_chan_t *chan);
 
 /*
+**  Initialization and Maintenance.
+*/
+
+void			_gdp_newname(gdp_name_t gname,
+						gdp_gclmd_t *gmd);
+
+void			_gdp_reclaim_resources(		// reclaim system resources
+						void *);				// unused
+
+void			_gdp_reclaim_resources_init(
+						void (*f)(int, short, void *));
+
+void			_gdp_dump_state(int plev);
+
+/*
 **  Cryptography support
 */
 
@@ -774,20 +769,6 @@ EP_CRYPTO_KEY	*_gdp_crypto_skey_read(		// read a secret key
 						const char *ext);
 void			_gdp_sign_md(				// sign the metadata
 						gdp_gcl_t *gcl);
-
-/*
-**  Libevent support
-*/
-
-// callback info passed into event loops
-struct event_loop_info
-{
-	struct event_base	*evb;		// the event base for this loop
-	const char			*where;		// a name to convey in errors
-};
-
-
-EP_STAT			_gdp_evloop_init(void);		// start event loop
 
 
 /*

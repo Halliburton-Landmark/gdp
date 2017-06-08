@@ -75,9 +75,9 @@ advertise_all(gdp_buf_t *dbuf, void *ctx, int cmd)
 
 
 EP_STAT
-logd_advertise_all(int cmd)
+logd_advertise_all(gdp_chan_t *chan, int cmd)
 {
-	EP_STAT estat = _gdp_advertise(advertise_all, NULL, cmd);
+	EP_STAT estat = _gdp_advertise(chan, advertise_all, NULL, cmd);
 	if (ep_dbg_test(Dbg, 21))
 	{
 		char ebuf[100];
@@ -101,9 +101,9 @@ advertise_one(gdp_buf_t *dbuf, void *ctx, int cmd)
 }
 
 void
-logd_advertise_one(gdp_name_t gname, int cmd)
+logd_advertise_one(gdp_chan_t *chan, gdp_name_t gname, int cmd)
 {
-	EP_STAT estat = _gdp_advertise(advertise_one, gname, cmd);
+	EP_STAT estat = _gdp_advertise(chan, advertise_one, gname, cmd);
 	if (ep_dbg_test(Dbg, 11))
 	{
 		char ebuf[100];

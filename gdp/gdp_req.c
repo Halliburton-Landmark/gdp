@@ -34,6 +34,7 @@
 #include <sys/queue.h>
 
 #include "gdp.h"
+#include "gdp_chan.h"
 #include "gdp_event.h"
 #include "gdp_priv.h"
 
@@ -207,17 +208,26 @@ _gdp_req_new(int cmd,
 	//DEBUG: shouldn't this be in _gdp_req_send???
 	if (chan != NULL)
 	{
-		ep_thr_mutex_lock(&chan->mutex);
-		IF_LIST_CHECK_OK(&chan->reqs, req, chanlist, gdp_req_t)
+		gdp_chan_x_t *chanx;
+
+		_gdp_chan_lock(chan);
+		chanx = _gdp_chan_get_udata(chan);
+		if (EP_ASSERT_TEST(chanx != NULL))
 		{
-			LIST_INSERT_HEAD(&chan->reqs, req, chanlist);
+			estat = EP_STAT_ASSERT_ABORT;
+			goto fail0;
+		}
+		IF_LIST_CHECK_OK(&chanx->reqs, req, chanlist, gdp_req_t)
+		{
+			LIST_INSERT_HEAD(&chanx->reqs, req, chanlist);
 			req->flags |= GDP_REQ_ON_CHAN_LIST;
 		}
 		else
 		{
 			estat = EP_STAT_ASSERT_ABORT;
 		}
-		ep_thr_mutex_unlock(&chan->mutex);
+fail0:
+		_gdp_chan_unlock(chan);
 	}
 
 	// success
@@ -265,10 +275,10 @@ _gdp_req_free(gdp_req_t **reqp)
 	// remove the request from the channel subscription list
 	if (EP_UT_BITSET(GDP_REQ_ON_CHAN_LIST, req->flags))
 	{
-		ep_thr_mutex_lock(&req->chan->mutex);
+		_gdp_chan_lock(req->chan);
 		LIST_REMOVE(req, chanlist);
 		req->flags &= ~GDP_REQ_ON_CHAN_LIST;
-		ep_thr_mutex_unlock(&req->chan->mutex);
+		_gdp_chan_unlock(req->chan);
 	}
 
 	// remove the request from the GOB list

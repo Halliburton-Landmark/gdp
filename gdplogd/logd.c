@@ -31,6 +31,8 @@
 #include "logd.h"
 #include "logd_pubsub.h"
 
+#include <gdp/gdp_chan.h>
+
 #include <ep/ep_sd.h>
 #include <ep/ep_string.h>
 
@@ -58,7 +60,7 @@ void
 logd_sock_close_cb(gdp_chan_t *chan)
 {
 	// free any requests tied to this channel
-	gdp_req_t *req = LIST_FIRST(&chan->reqs);
+	gdp_req_t *req = LIST_FIRST(&_gdp_chan_get_udata(chan)->reqs);
 
 	while (req != NULL)
 	{
@@ -95,10 +97,11 @@ logd_reclaim_resources_callback(int fd, short what, void *ctx)
 
 
 void
-renew_advertisements(int fd, short what, void *u)
+renew_advertisements(int fd, short what, void *_chan)
 {
+	gdp_chan_t *chan = _chan;
 	ep_sd_notifyf("WATCHDOG=1\n");
-	(void) logd_advertise_all(GDP_CMD_ADVERTISE);
+	(void) logd_advertise_all(chan, GDP_CMD_ADVERTISE);
 }
 
 
@@ -129,7 +132,7 @@ logd_shutdown(void)
 	}
 
 	ep_dbg_cprintf(Dbg, 1, "\n\n*** Withdrawing all advertisements ***\n");
-	logd_advertise_all(GDP_CMD_WITHDRAW);
+	logd_advertise_all(_GdpChannel, GDP_CMD_WITHDRAW);
 }
 
 
@@ -312,7 +315,6 @@ main(int argc, char **argv)
 
 	progname = ep_app_getprogname();
 
-	// print our name as a reminder
 	if (myname == NULL)
 	{
 		if (progname != NULL)
@@ -324,6 +326,7 @@ main(int argc, char **argv)
 		}
 	}
 
+	// print our name as a reminder
 	{
 		gdp_pname_t pname;
 
@@ -375,33 +378,31 @@ main(int argc, char **argv)
 	// arrange to clean up resources periodically
 	_gdp_reclaim_resources_init(&logd_reclaim_resources_callback);
 
-	// initialize connection
-	void _gdp_pdu_process(gdp_pdu_t *, gdp_chan_t *);
+	// open the channel connection
 	phase = "connection to router";
 	_GdpChannel = NULL;
-	estat = _gdp_chan_open(router_addr, _gdp_pdu_process, &_GdpChannel);
+	estat = _gdp_chan_open(router_addr,			// IP of router
+						NULL,					// qos (unused as yet)
+						&_gdp_io_recv,			// receive callback
+						NULL,					// send callback
+						&_gdp_io_event,			// close/error/eof callback
+						&logd_advertise_all,	// advertise callback
+						NULL,					// udata
+						&_GdpChannel);			// output: new channel
 	EP_STAT_CHECK(estat, goto fail0);
-	_GdpChannel->close_cb = &logd_sock_close_cb;
-	_GdpChannel->advertise = &logd_advertise_all;
 
-	// start the event loop
-	phase = "start event loop";
-	estat = _gdp_evloop_init();
-	EP_STAT_CHECK(estat, goto fail0);
-
-	// advertise all of our GCLs
-	phase = "advertise GCLs";
-	estat = logd_advertise_all(GDP_CMD_ADVERTISE);
-	EP_STAT_CHECK(estat, goto fail0);
+	// GCLs will be advertised when connection is established
 
 	// arrange to re-advertise on a regular basis
+	//XXX This should probably be in the channel code itself, since it
+	//XXX is really a router function.
 	{
 		long adv_intvl = ep_adm_getlongparam(
 								"swarm.gdplogd.advertise.interval", 150);
 		if (adv_intvl > 0)
 		{
-			struct event *advtimer = event_new(GdpIoEventBase, -1, EV_PERSIST,
-											&renew_advertisements, NULL);
+			struct event *advtimer = event_new(_GdpIoEventBase, -1, EV_PERSIST,
+											&renew_advertisements, _GdpChannel);
 			struct timeval tv = { adv_intvl, 0 };
 			event_add(advtimer, &tv);
 		}
@@ -415,12 +416,11 @@ main(int argc, char **argv)
 	*/
 
 	ep_sd_notifyf("READY=1\n");
-
-	pthread_join(_GdpIoEventLoopThread, NULL);
+	_gdp_run_event_loop(NULL);
 
 	// should never get here
 	ep_sd_notifyf("STOPPING=1\n");
-	ep_app_fatal("Fell out of GdpIoEventLoopThread");
+	ep_app_fatal("Fell out of _gdp_run_event_loop");
 
 fail0:
 	{
