@@ -292,8 +292,7 @@ acknak(gdp_req_t *req, const char *where, bool reuse_pdu)
 
 			// move the contents of the response dbuf into the user dbuf
 			gdp_buf_reset(user_dbuf);
-			gdp_buf_move(user_dbuf, req->rpdu->datum->dbuf,
-					gdp_buf_getlength(req->rpdu->datum->dbuf));
+			gdp_buf_move(user_dbuf, req->rpdu->datum->dbuf, -1);
 
 			// we can now discard the response dbuf entirely and replace it
 			gdp_buf_free(req->rpdu->datum->dbuf);
@@ -305,10 +304,7 @@ acknak(gdp_req_t *req, const char *where, bool reuse_pdu)
 			{
 				gdp_buf_reset(user_sig);
 				if (req->rpdu->datum->sig != NULL)
-				{
-					gdp_buf_move(user_sig, req->rpdu->datum->sig,
-							gdp_buf_getlength(req->rpdu->datum->sig));
-				}
+					gdp_buf_move(user_sig, req->rpdu->datum->sig, -1);
 			}
 			if (req->rpdu->datum->sig != NULL)
 				gdp_buf_free(req->rpdu->datum->sig);
@@ -892,11 +888,13 @@ _gdp_req_dispatch(gdp_req_t *req, int cmd)
 */
 
 EP_STAT
-_gdp_advertise(EP_STAT (*func)(gdp_buf_t *, void *, int), void *ctx, int cmd)
+_gdp_advertise(gdp_chan_t *chan,
+			EP_STAT (*func)(gdp_buf_t *, void *, int),
+			void *ctx,
+			int cmd)
 {
 	EP_STAT estat = EP_STAT_OK;
 	gdp_req_t *req;
-	gdp_chan_t *chan = _GdpChannel;
 	uint32_t reqflags = 0;
 
 	ep_dbg_cprintf(Dbg, 39, "_gdp_advertise(%d):\n", cmd);
@@ -934,7 +932,7 @@ fail0:
 */
 
 EP_STAT
-_gdp_advertise_me(int cmd)
+_gdp_advertise_me(gdp_chan_t *chan, int cmd)
 {
-	return _gdp_advertise(NULL, NULL, cmd);
+	return _gdp_advertise(chan, NULL, NULL, cmd);
 }

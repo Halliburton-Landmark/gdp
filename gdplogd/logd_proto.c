@@ -245,6 +245,7 @@ cmd_create(gdp_req_t *req)
 	gdp_gcl_t *gcl = NULL;
 	gdp_gclmd_t *gmd;
 	gdp_name_t gclname;
+	gdp_chan_t *chan = _GdpChannel;
 	int i;
 
 	if (!GDP_NAME_SAME(req->cpdu->dst, _GdpMyRoutingName))
@@ -313,7 +314,7 @@ cmd_create(gdp_req_t *req)
 	}
 
 	// advertise this new GCL
-	logd_advertise_one(gcl->name, GDP_CMD_ADVERTISE);
+	logd_advertise_one(chan, gcl->name, GDP_CMD_ADVERTISE);
 
 	// cache the open GCL Handle for possible future use
 	EP_ASSERT(gdp_name_is_valid(gcl->name));

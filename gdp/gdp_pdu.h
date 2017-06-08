@@ -81,18 +81,18 @@
 **			"seq" since this is a lower-level concept that is
 **			subsumed by TCP.
 **
-**		The structure of an on-the-wire PDU is (showing length & offset):
-**			1	0	protocol version and format
-**			1	1	time to live (in hops)
-**			1	2	reserved
-**			1	3	command or ack/nak
-**			32	4	destination address
-**			32	36	source address
-**			4	68	request id
-**			2	72	signature length & digest algorithm
-**			1	74	optionals length (in 32 bit words)
-**			1	75	flags (indicate presence/lack of optional fields)
-**			4	76	length of data portion
+**		The structure of a PDU is shown below.  This does not show
+**		the source and destination address, which are passed in from
+**		the layer below --- that is, if this is a "Layer 5" or "Session
+**		Layer" protocol, then "Layer 4" or "Transport Layer" deals
+**		with the addressing.
+**			1	0	protocol version
+**			1	1	command or ack/nak
+**			4	2	request id
+**			2	6	signature length & digest algorithm
+**			1	8	optionals length (in 32 bit words)
+**			1	9	flags (indicate presence/lack of optional fields)
+**			4	10	length of data portion
 **			[8	__	record number (optional)]
 **			[8	__	sequence number (optional)]
 **			[16	__	commit timestamp (optional)]
@@ -114,20 +114,20 @@ typedef struct gdp_pdu
 	gdp_chan_t				*chan;		// I/O channel for this PDU entry
 	bool					inuse:1;	// indicates that this is allocated
 
+	// copied from lower layer
+	gdp_name_t				dst;		// destination address
+	gdp_name_t				src;		// source address
+
 	// PDU data
-	uint8_t				ver;		//  0 protocol version and format
-	uint8_t				ttl;		//  1 time to live
-	uint8_t				rsvd1;		//  2 reserved
-	uint8_t				cmd;		//  3 command or ack/nak
-	gdp_name_t			dst;		//  4 destination address
-	gdp_name_t			src;		// 36 source address
-	gdp_rid_t			rid;		// 68 request id (GDP_PDU_NO_RID => none)
-	uint8_t				olen;		// 74 optionals length (in 32-bit words)
-	uint8_t				flags;		// 75 see below
-	gdp_seqno_t			seqno;		// ?? sequence number (XXX used?)
+	uint8_t					ver;		//  0 protocol version and format
+	uint8_t					cmd;		//  1 command or ack/nak
+	gdp_rid_t				rid;		//  2 request id (or GDP_PDU_NO_RID)
+	uint8_t					olen;		//  8 optionals length (in 32-bit words)
+	uint8_t					flags;		//  9 see below
+	gdp_seqno_t				seqno;		// ?? sequence number (XXX used?)
 
 	// data length, recno, timestamp, signature, and data are in the datum
-	gdp_datum_t			*datum;		// pointer to data record
+	gdp_datum_t				*datum;		// pointer to data record
 } gdp_pdu_t;
 
 
@@ -144,8 +144,8 @@ typedef struct gdp_pdu
 /***** manifest constants *****/
 
 // size of fixed size part of header
-// (ver, ttl, rsvd, cmd, dst, src, rid, sigalg, siglen, olen, flags, dlen)
-#define _GDP_PDU_FIXEDHDRSZ		(1+1+1+1+32+32+4+1+1+1+1+4)
+// (ver, cmd, rid, siglen, olen, flags, dlen)
+#define _GDP_PDU_FIXEDHDRSZ		(1+1+4+2+1+1+4)
 
 //* maximum size of options portion
 #define _GDP_PDU_MAXOPTSZ		(255 * 4)
@@ -253,16 +253,9 @@ void		_gdp_pdu_out_hard(			// send a PDU to a network buffer
 				gdp_chan_t *,			// the network channel
 				EP_CRYPTO_MD *);		// the crypto context for signing
 
-EP_STAT		_gdp_pdu_hdr_in(			// read a PDU from a network buffer
-				gdp_pdu_t *,			// the buffer to store the result
-				gdp_chan_t *,			// the network channel
-				size_t *pdu_sz_p,		// store the size of the pdu
-				uint64_t *dlen_p);		// store the size of the data
-
-
 EP_STAT		_gdp_pdu_in(				// read a PDU from a network buffer
 				gdp_pdu_t *,			// the buffer to store the result
-				gdp_chan_t *);			// the network channel
+				gdp_cursor_t *);		// the input cursor
 
 void		_gdp_pdu_dump(
 				const gdp_pdu_t *pdu,

@@ -271,8 +271,9 @@ sub_reclaim_resources(gdp_chan_t *chan)
 				"sub_reclaim_resources: timeout = %ld\n", timeout);
 	}
 
-	ep_thr_mutex_lock(&chan->mutex);
-	for (req = LIST_FIRST(&chan->reqs); req != NULL; req = nextreq)
+	ep_thr_mutex_lock(&_GdpSubscriptionMutex);
+	for (req = LIST_FIRST(&_GdpSubscriptionRequests); req != NULL;
+											req = nextreq)
 	{
 		int istat;
 
@@ -333,5 +334,5 @@ sub_reclaim_resources(gdp_chan_t *chan)
 		if (req != NULL)
 			_gdp_req_unlock(req);
 	}
-	ep_thr_mutex_unlock(&chan->mutex);
+	ep_thr_mutex_unlock(&_GdpSubscriptionMutex);
 }

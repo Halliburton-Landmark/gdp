@@ -163,7 +163,7 @@ admin_init(void)
 	if (stats_intvl > 0)
 	{
 		struct timeval tv = { stats_intvl, 0 };
-		struct event *evtimer = event_new(GdpIoEventBase, -1,
+		struct event *evtimer = event_new(_GdpIoEventBase, -1,
 									EV_PERSIST, &admin_probe, NULL);
 		event_add(evtimer, &tv);
 	}

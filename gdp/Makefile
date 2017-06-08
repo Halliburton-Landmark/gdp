@@ -86,6 +86,7 @@ OBJS_MOST=	\
 	gdp_gcl_ops.o \
 	gdp_gclmd.o \
 	gdp_datum.o \
+	gdp_ioloop.o \
 	gdp_main.o \
 	gdp_pdu.o \
 	gdp_proto.o \
@@ -108,6 +109,7 @@ PUBHFILES=	\
 	gdp_zc_server.h \
 
 PRIVHFILES=	\
+	gdp_chan.h \
 	gdp_event.h \
 	gdp_gclmd.h \
 	gdp_pdu.h \

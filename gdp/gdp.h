@@ -186,7 +186,7 @@ typedef void			(*gdp_event_cbfunc_t)(	// the callback function
 **	Public globals and functions
 */
 
-extern struct event_base		*GdpIoEventBase;	// the base for GDP I/O events
+//extern struct event_base		*GdpIoEventBase;	// the base for GDP I/O events
 
 // initialize the library
 extern EP_STAT	gdp_init(

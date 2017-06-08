@@ -38,18 +38,17 @@
 **	----- END LICENSE BLOCK -----
 */
 
-#include <ep/ep.h>
+#include "gdp.h"
+#include "gdp_chan.h"
+#include "gdp_gclmd.h"
+#include "gdp_stat.h"
+#include "gdp_priv.h"
+
 #include <ep/ep_app.h>
 #include <ep/ep_b64.h>
 #include <ep/ep_dbg.h>
 #include <ep/ep_string.h>
 
-#include "gdp.h"
-#include "gdp_gclmd.h"
-#include "gdp_stat.h"
-#include "gdp_priv.h"
-
-#include <event2/event.h>
 #include <openssl/sha.h>
 
 #include <errno.h>
@@ -308,34 +307,36 @@ gdp_exit_debug(void)
 EP_STAT
 gdp_init(const char *router_addr)
 {
-	EP_STAT estat;
+	EP_STAT estat = EP_STAT_OK;
+	struct event_loop_info *eli;
 
-	if (_GdpLibInitialized)
-		return EP_STAT_OK;
+	if (_GdpLibInitialized)				// set in gdp_lib_init
+		goto done;
 
-	// set up global state, event loop, etc.
+	// set up global state, event loop, etc. (shared with gdplogd)
 	estat = gdp_lib_init(NULL);
 	EP_STAT_CHECK(estat, goto fail0);
 
-	// initialize connection
+	// open at least one channel to the routing subsystem
 	_GdpChannel = NULL;
-	estat = _gdp_chan_open(router_addr, &_gdp_pdu_process, &_GdpChannel);
+	estat = _gdp_chan_open(router_addr,			// IP of router
+						NULL,					// qos (unused as yet)
+						&_gdp_io_recv,			// receive callback
+						NULL,					// send callback
+						&_gdp_io_event,			// close/error/eof callback
+						&_gdp_advertise_me,		// advertise callback
+						NULL,					// udata
+						&_GdpChannel);			// output: new channel
 	EP_STAT_CHECK(estat, goto fail0);
-	_GdpChannel->advertise = &_gdp_advertise_me;
 
-	// start the event loop
-	estat = _gdp_evloop_init();
-	EP_STAT_CHECK(estat, goto fail0);
-
-	// advertise ourselves
-	estat = _gdp_advertise_me(GDP_CMD_ADVERTISE);
-	if (!EP_STAT_ISOK(estat))
+	eli = ep_mem_zalloc(sizeof *eli);
+	if (ep_thr_spawn(&_GdpIoEventLoopThread, &_gdp_run_event_loop, eli) != 0)
 	{
-		if (_GdpChannel->bev != NULL)
-			bufferevent_free(_GdpChannel->bev);
-		ep_mem_free(_GdpChannel);
-		_GdpChannel = NULL;
-		goto fail0;
+		char ebuf[100];
+
+		estat = ep_stat_from_errno(errno);
+		ep_app_severe("cannot spawn event i/o thread: %s",
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 
 	// do some optional status printing on exit
@@ -344,11 +345,13 @@ gdp_init(const char *router_addr)
 	_GdpLibInitialized = true;
 
 fail0:
+done:
+	if (ep_dbg_test(Dbg, 4))
 	{
 		char ebuf[200];
 
-		ep_dbg_cprintf(Dbg, 4, "gdp_init: %s\n",
-				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		ep_dbg_printf("gdp_init: %s\n",
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 	return estat;
 }

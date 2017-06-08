@@ -46,8 +46,9 @@
 #include <ep/ep_stat.h>
 
 #include "gdp.h"
-#include "gdp_priv.h"
+#include "gdp_chan.h"
 #include "gdp_pdu.h"
+#include "gdp_priv.h"
 
 #include <event2/event.h>
 
@@ -79,16 +80,17 @@ _gdp_pdu_dump(const gdp_pdu_t *pdu, FILE *fp)
 	}
 
 	int len = _GDP_PDU_FIXEDHDRSZ + pdu->olen;
-	fprintf(fp, "\n\tv=%d, ttl=%d, rsvd1=%d, cmd=%d=%s",
-				pdu->ver, pdu->ttl, pdu->rsvd1,
-				pdu->cmd, _gdp_proto_cmd_name(pdu->cmd));
+	fprintf(fp, "\n\tver=%d, cmd=%d=%s",
+				pdu->ver, pdu->cmd, _gdp_proto_cmd_name(pdu->cmd));
 	fprintf(fp, "\n\tdst=");
 	gdp_print_name(pdu->dst, fp);
 	fprintf(fp, "\n\tsrc=");
 	gdp_print_name(pdu->src, fp);
-	fprintf(fp, "\n\trid=%u, olen=%d, chan=%p, seqno=%" PRIgdp_seqno
-				"\n\tflags=",
-				pdu->rid, pdu->olen, pdu->chan, pdu->seqno);
+	fprintf(fp, "\n\trid=%u, olen=%d, seqno=%" PRIgdp_seqno "\n\tflags=",
+				pdu->rid, pdu->olen, pdu->seqno);
+//	fprintf(fp, "\n\trid=%u, olen=%d, chan=%p, seqno=%" PRIgdp_seqno
+//				"\n\tflags=",
+//				pdu->rid, pdu->olen, pdu->chan, pdu->seqno);
 	ep_prflags(pdu->flags, PduFlags, fp);
 	fprintf(fp, "\n\tdatum=%p", pdu->datum);
 	if (pdu->datum != NULL)
@@ -168,41 +170,8 @@ send_data(gdp_buf_t *obuf,
 **		Outputs PDU, including all the data in the dbuf.
 */
 
-#define PUT16(v) \
-		{ \
-			*pbp++ = ((v) >> 8) & 0xff; \
-			*pbp++ = ((v) & 0xff); \
-		}
-#define PUT32(v) \
-		{ \
-			*pbp++ = ((v) >> 24) & 0xff; \
-			*pbp++ = ((v) >> 16) & 0xff; \
-			*pbp++ = ((v) >> 8) & 0xff; \
-			*pbp++ = ((v) & 0xff); \
-		}
-#define PUT48(v) \
-		{ \
-			*pbp++ = ((v) >> 40) & 0xff; \
-			*pbp++ = ((v) >> 32) & 0xff; \
-			*pbp++ = ((v) >> 24) & 0xff; \
-			*pbp++ = ((v) >> 16) & 0xff; \
-			*pbp++ = ((v) >> 8) & 0xff; \
-			*pbp++ = ((v) & 0xff); \
-		}
-#define PUT64(v) \
-		{ \
-			*pbp++ = ((v) >> 56) & 0xff; \
-			*pbp++ = ((v) >> 48) & 0xff; \
-			*pbp++ = ((v) >> 40) & 0xff; \
-			*pbp++ = ((v) >> 32) & 0xff; \
-			*pbp++ = ((v) >> 24) & 0xff; \
-			*pbp++ = ((v) >> 16) & 0xff; \
-			*pbp++ = ((v) >> 8) & 0xff; \
-			*pbp++ = ((v) & 0xff); \
-		}
-
-#define OOFF		74		// offset of olen from beginning of pdu
-#define FOFF		75		// offset of flags from beginning of pdu
+#define OOFF		8		// offset of olen from beginning of pdu
+#define FOFF		9		// offset of flags from beginning of pdu
 
 EP_STAT
 _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
@@ -225,7 +194,7 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 		return GDP_STAT_DEAD_DAEMON;
 	}
 
-	obuf = bufferevent_get_output(chan->bev);
+	obuf = gdp_buf_new();
 
 	if (!gdp_name_is_valid(pdu->src))
 	{
@@ -237,8 +206,8 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 		flockfile(ep_dbg_getfile());
 	if (ep_dbg_test(DbgOut, 18))
 	{
-		ep_dbg_printf("_gdp_pdu_out, fd = %d, basemd = %p:",
-				bufferevent_getfd(chan->bev), basemd);
+		ep_dbg_printf("_gdp_pdu_out, chan = %p, basemd = %p:",
+				chan, basemd);
 		if (ep_dbg_test(DbgOut, 22))
 		{
 			ep_dbg_printf("\n");
@@ -253,16 +222,17 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 	if (basemd != NULL)
 	{
 		// compute the signature
-		uint8_t recnobuf[8];		// 64 bits
-		uint8_t *pbp = recnobuf;
-		size_t reclen;
 		EP_CRYPTO_MD *md = ep_crypto_md_clone(basemd);
-		gdp_datum_t *datum = pdu->datum;
-		size_t siglen = sizeof sigbuf;
 
 		if (md != NULL)
 		{
-			PUT64(pdu->datum->recno);
+			gdp_datum_t *datum = pdu->datum;
+			size_t siglen = sizeof sigbuf;
+			uint8_t recnobuf[8];		// 64 bits
+			uint8_t *pbp = recnobuf;
+			size_t reclen;
+
+			PUT64(datum->recno);
 			ep_crypto_sign_update(md, &recnobuf, sizeof recnobuf);
 			reclen = gdp_buf_getlength(datum->dbuf);
 			ep_crypto_sign_update(md, gdp_buf_getptr(datum->dbuf, reclen),
@@ -293,22 +263,8 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 	else
 		*pbp++ = pdu->ver;
 
-	// time to live (in hops)
-	*pbp++ = pdu->ttl;
-
-	// reserved field
-	*pbp++ = pdu->rsvd1;
-
 	// command
 	*pbp++ = pdu->cmd;
-
-	// destination address
-	memcpy(pbp, pdu->dst, sizeof pdu->dst);
-	pbp += sizeof pdu->dst;
-
-	// source address
-	memcpy(pbp, pdu->src, sizeof pdu->src);
-	pbp += sizeof pdu->src;
 
 	// request id
 	PUT32(pdu->rid);
@@ -374,7 +330,6 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 	ep_dbg_cprintf(DbgOut, 32, "_gdp_pdu_out: sending PDU:\n");
 
 	// send header
-	gdp_buf_lock(obuf);
 	estat = send_data(obuf, pbuf, hdrlen,
 					"header", offset, EP_HEXDUMP_HEX);
 	offset += pbp - pbuf;
@@ -432,12 +387,13 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 fail0:
 	if (ep_dbg_test(DbgOut, 1))
 		funlockfile(ep_dbg_getfile());
-	if (!EP_STAT_ISOK(estat))
+	if (EP_STAT_ISOK(estat))
 	{
-		// flush buffer so we send nothing once the buffer is unlocked
-		gdp_buf_drain(obuf, gdp_buf_getlength(obuf));
+		// actually send this all to the channel
+		_gdp_chan_send(chan, NULL, pdu->src, pdu->dst, obuf);
 	}
-	gdp_buf_unlock(obuf);
+
+	gdp_buf_free(obuf);
 
 	return estat;
 }
@@ -469,46 +425,12 @@ _gdp_pdu_out_hard(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *md)
 **	XXX This can probably done more efficiently using gdp_buf_peek.
 */
 
-#define GET16(v) \
-		{ \
-				v  = *pbp++ << 8; \
-				v |= *pbp++; \
-		}
-#define GET32(v) \
-		{ \
-				v  = *pbp++ << 24; \
-				v |= *pbp++ << 16; \
-				v |= *pbp++ << 8; \
-				v |= *pbp++; \
-		}
-#define GET48(v) \
-		{ \
-				v  = ((uint64_t) *pbp++) << 40; \
-				v |= ((uint64_t) *pbp++) << 32; \
-				v |= ((uint64_t) *pbp++) << 24; \
-				v |= ((uint64_t) *pbp++) << 16; \
-				v |= ((uint64_t) *pbp++) << 8; \
-				v |= ((uint64_t) *pbp++); \
-		}
-#define GET64(v) \
-		{ \
-				v  = ((uint64_t) *pbp++) << 56; \
-				v |= ((uint64_t) *pbp++) << 48; \
-				v |= ((uint64_t) *pbp++) << 40; \
-				v |= ((uint64_t) *pbp++) << 32; \
-				v |= ((uint64_t) *pbp++) << 24; \
-				v |= ((uint64_t) *pbp++) << 16; \
-				v |= ((uint64_t) *pbp++) << 8; \
-				v |= ((uint64_t) *pbp++); \
-		}
 
-
-// read the fixed header portion in; shared with routing code
+// read the fixed header portion in
 EP_STAT
 _gdp_pdu_hdr_in(gdp_pdu_t *pdu,
-		gdp_chan_t *chan,
-		size_t *pduszp,
-		uint64_t *dlenp)
+		gdp_cursor_t *cursor,
+		uint32_t *dlenp)
 {
 	uint64_t dlen;
 	uint8_t pbuf[_GDP_PDU_MAXHDRSZ];
@@ -516,7 +438,7 @@ _gdp_pdu_hdr_in(gdp_pdu_t *pdu,
 	gdp_buf_t *ibuf;
 	size_t needed;
 
-	ibuf = bufferevent_get_input(chan->bev);
+	ibuf = _gdp_cursor_get_buf(cursor);
 
 	// see if the fixed part of the header is all in
 	needed = gdp_buf_peek(ibuf, pbuf, _GDP_PDU_FIXEDHDRSZ);
@@ -537,7 +459,7 @@ _gdp_pdu_hdr_in(gdp_pdu_t *pdu,
 	}
 
 	// hack: store metadata
-	pdu->chan = chan;
+	//XXX pdu->chan = chan;
 
 	// read the fixed part of the PDU header in
 	pbp = pbuf;
@@ -560,13 +482,7 @@ _gdp_pdu_hdr_in(gdp_pdu_t *pdu,
 	}
 
 	// ok, we recognize it
-	pdu->ttl = *pbp++;
-	pdu->rsvd1 = *pbp++;
 	pdu->cmd = *pbp++;
-	memcpy(pdu->dst, pbp, sizeof pdu->dst);
-	pbp += sizeof pdu->dst;
-	memcpy(pdu->src, pbp, sizeof pdu->src);
-	pbp += sizeof pdu->src;
 	GET32(pdu->rid);
 	uint16_t sigtmp;
 	GET16(sigtmp);
@@ -597,7 +513,6 @@ _gdp_pdu_hdr_in(gdp_pdu_t *pdu,
 	// figure out how much additional data we will need
 	needed += pdu->olen + dlen + pdu->datum->siglen;
 	*dlenp = dlen;
-	*pduszp = needed;
 
 	// see if the entire PDU (header + data) is available
 	if (gdp_buf_getlength(ibuf) < needed)
@@ -623,24 +538,23 @@ _gdp_pdu_hdr_in(gdp_pdu_t *pdu,
 }
 
 EP_STAT
-_gdp_pdu_in(gdp_pdu_t *pdu, gdp_chan_t *chan)
+_gdp_pdu_in(gdp_pdu_t *pdu, gdp_cursor_t *cursor)
 {
 	EP_STAT estat = EP_STAT_OK;
 	size_t sz;
 	uint8_t pbuf[_GDP_PDU_MAXHDRSZ];
 	uint8_t *pbp;
 	gdp_buf_t *ibuf;
-	size_t needed;
-	uint64_t dlen;
+	uint32_t dlen;
 
 	EP_ASSERT_POINTER_VALID(pdu);
 
 	ep_dbg_cprintf(DbgIn, 30, "\n\t>>>>>  _gdp_pdu_in  >>>>>\n");
 	EP_ASSERT(pdu->datum != NULL);
 	EP_ASSERT(pdu->datum->dbuf != NULL);
-	ibuf = bufferevent_get_input(chan->bev);
+	ibuf = _gdp_cursor_get_buf(cursor);
 
-	estat = _gdp_pdu_hdr_in(pdu, chan, &needed, &dlen);
+	estat = _gdp_pdu_hdr_in(pdu, cursor, &dlen);
 	EP_STAT_CHECK(estat, return estat);
 
 	// the entire PDU is now in ibuf
@@ -791,7 +705,6 @@ _gdp_pdu_new(void)
 	// initialize the PDU
 	memset(pdu, 0, sizeof *pdu);
 	pdu->ver = GDP_PROTO_CUR_VERSION;
-	pdu->ttl = GDP_TTL_DEFAULT;
 	pdu->datum = gdp_datum_new();
 	pdu->inuse = true;
 

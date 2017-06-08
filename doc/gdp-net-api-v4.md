@@ -1,7 +1,7 @@
 % What I Want to See in a Network API
   for the GDP
 % Eric Allman
-% 2017-05-24
+% 2017-06-07
 
 ***This is a proposal, not a specification***
 
@@ -35,8 +35,8 @@ seems to be somewhat inverted in that the routing commands
 live on top of the reliable transmission layer.  This is part
 of the legacy of the "overlay network" model.
 
-For the purposes of this document, "I", "me", and "my" refer
-to the user of this API.  "You" and "your" refer to the
+For the purposes of this document, "I", "me", "my", and "up" refer
+to the user of this API.  "You", "your", and "down" refer to the
 implementer of the API.  "Payload" is an opaque blob for you;
 the term is approximately equal to "PDU".
 
@@ -123,7 +123,8 @@ Design/Implementation Notes:
 * This interface uses `libevent` (see <http://libevent.org>).
   There is really no way around my picking the library without
   inverting the control flow, which would leave us forced to
-  use threads.
+  use threads.  As a result, `libevent` semantics are built
+  into this proposed API.
 
 Documentation Notes:
 
@@ -187,9 +188,22 @@ channel when I start up.
 #### \_gdp\_chan\_open (constructor)
 
 ~~~
+	typedef EP_STAT cursor_recv_cb_t(
+			gdp_cursor_t *cursor,
+			uint32_t recv_flags);
+	typedef EP_STAT chan_send_cb(
+			gdp_chan_t *chan,
+			gdp_buf_t *payload),
+	typedef EP_STAT chan_ioevent_cb(
+			gdp_chan_t *chan,
+			int ioevent_flags);
+
 	EP_STAT _gdp_chan_open(
 			const char *addrspec,
 			void *qos,
+			chan_recv_cb_t *cursor_recv_cb,
+			chan_send_cb_t *chan_send_cb,
+			chan_ioevent_cb_t *chan_ioevent_cb,
 			void *udata,
 			gdp_chan_t **chan);
 ~~~
@@ -199,9 +213,39 @@ the result in `*chan`.  The format is a semicolon-delimited list of
 `hostname:port` entries.  The entries in the list should be tried
 in order.  If `addrspec` is NULL, the `swarm.gdp.routers`
 runtime parameter is used.  The `qos` parameter is intended to
-hold specifications (e.g., QoS requirements), but for now I promise to
-pass it as `NULL`.  The `udata` parameter is saved and is available
-to any callbacks on this channel.
+hold additional open parameters (e.g., QoS requirements), but for now
+I promise to pass it as `NULL`.  The callbacks are described below.
+The `udata` parameter is saved and is available to callbacks on this
+channel.
+
+**`cursor_recv_cb`**:  When a new PDU is ready to read on the
+associated channel (as encapsulated into `cursor`, call
+`cursor_recv_cb`, including the total size of the payload (not
+necessarily what is available for read right now).  The `cursor`
+is a handle created by the network layer that I must pass into
+`_gdp_cursor_recv` (see below) during the lifetime of this callback
+in order to actually read the data, and that I promise to never
+use outside this callback.
+
+**`chan_send_cb`**: The `gdp_send_cb` is not used at this time; for
+now, if it is non-NULL `_gdp_chan_open` should return
+`GDP_STAT_NOT_IMPLEMENTED`.  The parameters to this function are
+subject to change.
+
+**`chan_ioevent_cb`**: When a channel is closed by the other end of
+the connection, or on I/O error, `gdp_close_cb` is called.  The
+`ioevent_flags` parameter is from the following set:
+
+| Flag			| Meaning					|
+|-----------------------|-----------------------------------------------|
+| `GDP_IOEVENT_CONNECT`	| Connection established			|
+| `GDP_IOEVENT_EOF`	| End of file on channel (i.e., it was closed)	|
+| `GDP_IOEVENT_ERROR`	| Error occurred on channel			|
+
+Note that this is a bitmap; multiple flags may be set on a single call.
+
+> [[Nitesh brings up the question of `dst` filtering.  It isn't clear
+which side of the interface this belongs on.]]
 
 #### \_gdp\_chan\_close (destructor)
 
@@ -213,49 +257,6 @@ to any callbacks on this channel.
 Deallocate `chan`.  All resources are freed.  I promise I will not
 attempt to use `chan` after it is freed.
 
-#### \_gdp\_chan\_set\_callbacks (chan::set_callbacks)
-
-> [[Need callbacks for received data, failure on a connection.
-Anything else?]]
-
-~~~
-	typedef EP_STAT chan_recv_cb_t(
-			gdp_chan_t *chan,
-			gdp_cursor_t *cursor,
-			gdp_name_t *src,
-			gdp_name_t *dst,
-			size_t payload_len);
-	typedef EP_STAT gdp_send_cb(
-			gdp_chan_t *chan,
-			gdp_buf_t *payload),
-	typedef EP_STAT (*gdp_close_cb)(
-			gdp_chan_t *chan,
-			int what);
-
-	EP_STAT _gdp_chan_set_callbacks(
-			gdp_chan_t *chan,
-			chan_recv_cb_t *gdp_recv_cb,
-			chan_send_cb_t *gdp_send_cb,
-			chan_close_cb_t *gdp_close_cb);
-~~~
-
-When a new PDU is ready to read on `chan`, call `gdp_recv_cb`,
-including the total size of the payload (not necessarily what is
-available for read right now).  The `cursor` is a handle created
-by the network layer that I must pass into `_gdp_cursor_recv` (see below)
-during the lifetime of this callback in order to actually read the
-data, and that I promise to never use outside this callback.
-
-The `gdp_send_cb` is not used at this time; for now, if it is non-NULL
-`_gdp_chan_set_callbacks` should return `GDP_STAT_NOT_IMPLEMENTED`.
-The parameters to this function are subject to change.
-
-When a channel is closed by the other end of the connection, or on
-I/O error, `gdp_close_cb` is called.  the `what` parameter is from
-the same set of values, i.e., `GDP_IOEVENT_CLOSE` or `GDP_IOEVENT_ERROR`.
-
-> [[Nitesh brings up the question of `dst` filtering.  It isn't clear
-which side of the interface this belongs on.]]
 
 
 #### \_gdp\_chan\_get\_udata (chan::get_udata)
@@ -320,7 +321,7 @@ from a given server.
 that can be passed to `_gdp_chan_withdraw` or is the gname enough?]]
 
 
-### Sending and Receiving Messages
+### Sending Messages
 
 #### \_gdp\_chan\_send (chan::send)
 
@@ -335,12 +336,16 @@ that can be passed to `_gdp_chan_withdraw` or is the gname enough?]]
 
 Sends the entire contents of `payload` to the indicated `dst` over
 `chan`.  The source address is specified by `src`.
+
 > [[Does this clear `payload` or leave it unchanged?]]
 
 The `target` give clues as to exactly where to deliver the
 message.  For example, it might be any replica of a given log,
 all replicas of a given log (e.g., for quorum read), or a specific
-replica.  How it is specified is _for further study_.
+replica.  It can also be used to indicate the equivalent of IPv4
+"type of service" (precedence, reliability, etc).  How it is specified
+is _for further study_.  For now, I promise to pass in NULL; if it
+is not NULL, `GDP_STAT_NOT_IMPLEMENTED` should be returned.
 
 > [[Issue: There are issues regarding allowing an arbitrary `src` that
 need to be explored.  You should never be permitted to send from
@@ -374,64 +379,72 @@ This will certainly need support to set up a multicast channel,
 probably with "new", "join", "leave", and "free" style interface.
 
 
-#### \_gdp\_cursor\_recv (cursor::recv)
+### Receiving Messages (cursor operations)
 
-This can only be called within a receive callback.  It acts on a
-cursor rather than on the channel itself.  It is not necessary for
-the entire payload to be in memory for this call to return data,
-nor is it necessary to read the entire payload at once.
+Message data is returned via a cursor, not a channel.  This
+allows long messages to be returned in "chunks".
+
+All of these routines should only be called from within
+`cursor_recv_cb`.  The basic model is that the network layer
+("you") invokes the callback when there is new data to be read
+for a message on a channel.
+
+I then do whatever processing is needed on that data.  It is not
+required that the entire message be read before the callback is
+invoked.  However, if the callback returns without consuming
+data and new data arrives, it will be appended to the existing
+data buffer.
+
+#### \_gdp\_cursor\_get\_buf (cursor::get\_buf)
 
 ~~~
-	EP_STAT _gdp_cursor_recv(
+	gdp_buf_t *_gdp_cursor_get_buf(
 			gdp_cursor_t *cursor,
-			gdp_buf_t *payload,
-			size_t *payload_len,
 			uint32_t flags);
 ~~~
 
-Read up to `*payload_len` octets from `cursor` into `payload`.
-Returns the number of octets actually read into `*payload_len`.
-If `payload` already has data, the new data is appended.
+Returns the (read-only) data buffer associated with the cursor.
+This can only be called within a `cursor_recv_cb` callback, and the
+resulting buffer must not be used outside of that callback.
+If the callback does not consume the buffer data before returning,
+any new data for that cursor will be appended to the buffer and
+the callback will be invoked again.
+
+The flags are:
+
+| Name				| Meaning				|
+|-------------------------------|---------------------------------------|
+| `GDP_CURSOR_PARTIAL`		| Partial data; continuation expected	|
+| `GDP_CURSOR_CONTINUATION`	| This data is continuation data	|
+| `GDP_CURSOR_READ_ERROR`	| A read error occurred (see below)	|
 
 Data read from a cursor is guaranteed to be presented in the
 same order it was written with no duplicates or dropouts.
 There is no such "in order" guarantee between different payloads.
+If there is a read error on a partially delivered message, this
+callback will be invoked one more time with the `GDP_CURSOR_READ_ERROR`
+flag set.  Error detail may be exposed via `_gdp_cursor_get_estat`.
 
-* If all data for the entire PDU has been read, returns `EP_STAT_OK`.
-* If data remains to be read, returns `GDP_STAT_KEEP_READING`
-  (this is an information status, not an error).
-* If the PDU is complete, but there is no additional data available
-  at this moment, returns `GDP_STAT_READ_LATER`.  (this is an
-  information status, not an error).
-* If a fragment of payload cannot be read, returns
-  `GDP_STAT_PDU_READ_FAIL` and any remainder of the payload is discarded.
+#### \_gdp\_cursor\_get\_payload\_size (cursor::get\_payload\_size)
 
-> [[Include a timeout, or is it sufficient to say that if
-`*len` ≠ 0 it will return immediately? And the semantics imply
-that it wcan return at any time once it has at least one
-octet.]]
+~~~
+	size_t _gdp_cursor_get_payload_size(
+			gdp_cursor_t *cursor);
+~~~
 
-> [[Should it wait until at least one octet is read?
-This should never happen, since it can only be called during a
-receive callback, which asserts that at least some data is
-available.]]
+Returns the size of the complete payload.  Note that this is may be
+greater than the amount of the payload in the current buffer.
 
-> [[If I try to read a portion of the PDU that is not yet available
-should it block or return a different status code (which would
-mean that the callback would be invoked again when more data
-became available)?  If it fails there should be some way to say
-"no, I really want to block."]]
+#### \_gdp\_cursor\_get\_chan (cursor::get_chan)
 
-Flags:
+~~~
+	gdp_chan_t *_gdp_cursor_get_chan(
+			gdp_cursor_t *cursor);
+~~~
 
-| Flag Name		| Meaning				|
-|-----------------------|---------------------------------------|
-| `GDP_CURSOR_BLOCK`	| Block until all PDU data is read	|
+Returns the channel associated with `cursor`.
 
-
-### Utilities
-
-#### \_gdp\_cursor\_get\_endpoints (cursor::get_endpoints)
+#### \_gdp\_cursor\_get\_endpoints (cursor::get\_endpoints)
 
 ~~~
 	EP_STAT _gdp_cursor_get_endpoints(
@@ -443,7 +456,57 @@ Flags:
 Returns the endpoints of the given `cursor` into `src` and `dst`.
 These will be the same as passed to `gdp_recv_cb`.
 
-It isn't clear this function is needed.
+#### \_gdp\_cursor\_get\_estat (cursor::get\_estat)
+
+~~~
+	EP_STAT _gdp_cursor_get_estat(
+			gdp_cursor_t *cursor);
+~~~
+
+Returns the error status associated with the last input on the
+`cursor`.  Normally of interest if `GDP_CURSOR_READ_ERROR` is set
+in the flags.
+
+#### \_gdp\_cursor\_set\_udata (cursor::set\_udata)
+
+~~~
+	void _gdp_cursor_set_udata(
+			gdp_cursor_t *cursor,
+			void *udata);
+~~~
+
+Sets a user-defined field in the cursor to `udata`.  The lifetime of
+that data is limited to one message.  It may be used for carrying
+state between partial messages.
+
+It is the responsibility of the caller to clean up this data (e.g.
+free any allocated memory) before the cursor is destroyed.
+
+#### \_gdp\_cursor\_get\_udata (cursor::get\_udata)
+
+~~~
+	void *_gdp_cursor_set_udata(
+			gdp_cursor_t *cursor);
+~~~
+
+Returns the user-defined field set by `_gdp_cursor_set_udata`.
+If no user data has been set, returns NULL.
+
+
+### Utilities
+
+
+#### \_gdp\_chan\_lock, \_gdp\_chan\_unlock (chan::lock, chan::unlock)
+
+~~~
+	void _gdp_chan_lock(
+			gdp_cursor_t *cursor);
+
+	void _gdp_chan_unlock(
+			gdp_cursor_t *cursor);
+~~~
+
+Lock or unlock a `cursor`.  This is a mutex lock.
 
 
 ## Status Codes

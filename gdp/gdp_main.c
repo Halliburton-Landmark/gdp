@@ -31,6 +31,7 @@
 */
 
 #include "gdp.h"
+#include "gdp_chan.h"
 #include "gdp_event.h"
 #include "gdp_priv.h"
 #include "gdp_version.h"
@@ -53,10 +54,10 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.main", "GDP initialization and main loop");
 static EP_DBG	DbgEvLock = EP_DBG_INIT("gdp.libevent.locks", "GDP libevent lock debugging");
 static EP_DBG	DbgProcResp = EP_DBG_INIT("gdp.response", "GDP response processing");
 
-struct event_base	*GdpIoEventBase;	// the base for GDP I/O events
+struct event_base	*_GdpIoEventBase;	// the base for GDP I/O events
 gdp_name_t			_GdpMyRoutingName;	// source name for PDUs
-bool				_GdpLibInitialized;	// are we initialized?
 gdp_chan_t			*_GdpChannel;		// our primary app-level protocol port
+bool				_GdpLibInitialized;	// are we initialized?
 
 
 /*
@@ -266,10 +267,19 @@ find_req_in_channel_list(
 {
 	EP_STAT estat = EP_STAT_OK;
 	gdp_req_t *req;
+	gdp_chan_x_t *chanx;
 
 	ep_dbg_cprintf(DbgProcResp, 14, "find_req_in_channel_list: searching\n");
-	ep_thr_mutex_lock(&chan->mutex);
-	LIST_FOREACH(req, &chan->reqs, chanlist)
+	_gdp_chan_lock(chan);
+	chanx = _gdp_chan_get_udata(chan);
+	if (EP_ASSERT_TEST(chanx != NULL))
+	{
+		req = NULL;
+		estat = EP_STAT_ASSERT_ABORT;
+		goto fail0;
+	}
+
+	LIST_FOREACH(req, &chanx->reqs, chanlist)
 	{
 		if (req->rpdu != NULL &&
 				req->rpdu->rid == rpdu->rid &&
@@ -284,7 +294,8 @@ find_req_in_channel_list(
 		else
 			ep_dbg_printf("    ... found req @ %p\n", req);
 	}
-	ep_thr_mutex_unlock(&chan->mutex);
+fail0:
+	_gdp_chan_unlock(chan);
 
 	// request should be locked for symmetry with _gdp_req_find
 	if (req != NULL)
@@ -295,7 +306,8 @@ find_req_in_channel_list(
 				"find_req_in_channel_list: _gdp_req_lock => %s\n",
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
-	*reqp = req;
+	if (EP_STAT_ISOK(estat))
+		*reqp = req;
 	return estat;
 }
 
@@ -606,7 +618,7 @@ _gdp_reclaim_resources_init(void (*f)(int, short, void *))
 		gc_intvl = ep_adm_getlongparam("swarm.gdp.reclaim.interval", 15L);
 
 	struct timeval tv = { gc_intvl, 0 };
-	struct event *evtimer = event_new(GdpIoEventBase, -1, EV_PERSIST,
+	struct event *evtimer = event_new(_GdpIoEventBase, -1, EV_PERSIST,
 								f, NULL);
 	event_add(evtimer, &tv);
 }
@@ -634,17 +646,16 @@ event_loop_timeout(int fd, short what, void *eli_)
 	ep_dbg_cprintf(Dbg, 79, "%s event loop timeout\n", eli->where);
 }
 
-static void *
-run_event_loop(void *eli_)
+void *
+_gdp_run_event_loop(void *eli_)
 {
 	struct event_loop_info *eli = eli_;
-	struct event_base *evb = eli->evb;
 	long evdelay = ep_adm_getlongparam("swarm.gdp.event.loopdelay", 100000L);
 
 	// keep the loop alive if EVLOOP_NO_EXIT_ON_EMPTY isn't available
 	long ev_timeout = ep_adm_getlongparam("swarm.gdp.event.looptimeout", 30L);
 	struct timeval tv = { ev_timeout, 0 };
-	struct event *evtimer = event_new(evb, -1, EV_PERSIST,
+	struct event *evtimer = event_new(_GdpIoEventBase, -1, EV_PERSIST,
 			&event_loop_timeout, eli);
 	event_add(evtimer, &tv);
 
@@ -654,7 +665,7 @@ run_event_loop(void *eli_)
 		{
 			ep_dbg_printf("gdp_event_loop: starting up %s base loop\n",
 					eli->where);
-			event_base_dump_events(evb, ep_dbg_getfile());
+			event_base_dump_events(_GdpIoEventBase, ep_dbg_getfile());
 		}
 
 		ep_thr_mutex_lock(&GdpIoEventLoopRunningMutex);
@@ -663,9 +674,9 @@ run_event_loop(void *eli_)
 		ep_thr_mutex_unlock(&GdpIoEventLoopRunningMutex);
 
 #ifdef EVLOOP_NO_EXIT_ON_EMPTY
-		event_base_loop(evb, EVLOOP_NO_EXIT_ON_EMPTY);
+		event_base_loop(_GdpIoEventBase, EVLOOP_NO_EXIT_ON_EMPTY);
 #else
-		event_base_loop(evb, 0);
+		event_base_loop(_GdpIoEventBase, 0);
 #endif
 
 		GdpIoEventLoopRunning = false;
@@ -674,12 +685,12 @@ run_event_loop(void *eli_)
 		{
 			ep_dbg_printf("gdp_event_loop: %s event_base_loop returned\n",
 					eli->where);
-			if (event_base_got_break(evb))
+			if (event_base_got_break(_GdpIoEventBase))
 				ep_dbg_printf(" ... as a result of loopbreak\n");
-			if (event_base_got_exit(evb))
+			if (event_base_got_exit(_GdpIoEventBase))
 				ep_dbg_printf(" ... as a result of loopexit\n");
 		}
-		if (event_base_got_exit(evb))
+		if (event_base_got_exit(_GdpIoEventBase))
 		{
 			// the GDP daemon went away
 			break;
@@ -695,14 +706,12 @@ run_event_loop(void *eli_)
 
 static EP_STAT
 _gdp_start_event_loop_thread(EP_THR *thr,
-		struct event_base *evb,
 		const char *where)
 {
 	struct event_loop_info *eli = ep_mem_malloc(sizeof *eli);
 
-	eli->evb = evb;
 	eli->where = where;
-	if (ep_thr_spawn(thr, run_event_loop, eli) != 0)
+	if (ep_thr_spawn(thr, _gdp_run_event_loop, eli) != 0)
 		return init_error("cannot create event loop thread", where);
 	else
 		return EP_STAT_OK;
@@ -713,7 +722,7 @@ _gdp_start_event_loop_thread(EP_THR *thr,
 **   Logging callback for event library (for debugging).
 */
 
-static EP_DBG	EvlibDbg = EP_DBG_INIT("gdp.evlib", "GDP Eventlib");
+static EP_DBG	EvlibDbg = EP_DBG_INIT("gdp.libevent", "GDP Libevent");
 
 static void
 evlib_log_cb(int severity, const char *msg)
@@ -825,7 +834,6 @@ gdp_lib_init(const char *myname)
 {
 	EP_STAT estat = EP_STAT_OK;
 	const char *progname;
-	static bool initialized = false;
 
 	ep_dbg_cprintf(Dbg, 4, "_gdp_lib_init(%s)\n\t%s\n",
 			myname == NULL ? "NULL" : myname,
@@ -835,7 +843,7 @@ gdp_lib_init(const char *myname)
 	ep_lib_init(EP_LIB_USEPTHREADS);
 
 	ep_thr_mutex_lock(&GdpInitMutex);
-	if (initialized)
+	if (_GdpLibInitialized)
 		goto done;
 
 	if (ep_dbg_test(EvlibDbg, 80))
@@ -941,23 +949,23 @@ gdp_lib_init(const char *myname)
 	event_set_log_callback(evlib_log_cb);
 
 	// set up the event base
-	if (GdpIoEventBase == NULL)
+	if (_GdpIoEventBase == NULL)
 	{
 		// Initialize for I/O events
 		struct event_config *ev_cfg = event_config_new();
 
 		event_config_require_features(ev_cfg, 0);
-		GdpIoEventBase = event_base_new_with_config(ev_cfg);
-		if (GdpIoEventBase == NULL)
+		_GdpIoEventBase = event_base_new_with_config(ev_cfg);
+		if (_GdpIoEventBase == NULL)
 			estat = init_error("could not create event base", "gdp_lib_init");
 		event_config_free(ev_cfg);
 		EP_STAT_CHECK(estat, goto fail0);
 
 		// add a debugging signal to print out some internal data structures
 #ifdef SIGINFO
-		event_add(evsignal_new(GdpIoEventBase, SIGINFO, siginfo, NULL), NULL);
+		event_add(evsignal_new(_GdpIoEventBase, SIGINFO, siginfo, NULL), NULL);
 #endif
-		event_add(evsignal_new(GdpIoEventBase, SIGUSR1, siginfo, NULL), NULL);
+		event_add(evsignal_new(_GdpIoEventBase, SIGUSR1, siginfo, NULL), NULL);
 	}
 
 done:
@@ -969,7 +977,7 @@ done:
 	}
 
 fail0:
-	initialized = true;
+	_GdpLibInitialized = true;
 	ep_thr_mutex_unlock(&GdpInitMutex);
 	return estat;
 }
@@ -986,8 +994,7 @@ _gdp_evloop_init(void)
 	if (!GdpIoEventLoopRunning)
 	{
 		// create a thread to run the event loop
-		estat = _gdp_start_event_loop_thread(&_GdpIoEventLoopThread,
-											GdpIoEventBase, "I/O");
+		estat = _gdp_start_event_loop_thread(&_GdpIoEventLoopThread, "I/O");
 	}
 
 	while (!GdpIoEventLoopRunning)

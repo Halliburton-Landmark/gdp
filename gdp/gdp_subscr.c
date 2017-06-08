@@ -43,6 +43,9 @@
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.subscr", "GDP subscriptions");
 
 
+static bool			SubscriptionThreadRunning;
+static EP_THR		SubscriptionThreadId;
+
 /*
 **  Subscription disappeared; remove it from list
 */
@@ -112,16 +115,14 @@ subscr_resub(gdp_req_t *req)
 */
 
 static void *
-subscr_poker_thread(void *chan_)
+subscr_poker_thread(void *unused)
 {
-	gdp_chan_t *chan = chan_;
 	long delta_poke = ep_adm_getlongparam("swarm.gdp.subscr.pokeintvl",
 							GDP_SUBSCR_REFRESH_DEF);
 	long delta_dead = ep_adm_getlongparam("swarm.gdp.subscr.deadintvl",
 							GDP_SUBSCR_TIMEOUT_DEF);
 
 	ep_dbg_cprintf(Dbg, 10, "Starting subscription poker thread\n");
-	chan->flags |= GDP_CHAN_HAS_SUB_THR;
 
 	// loop forever poking subscriptions
 	for (;;)
@@ -147,7 +148,8 @@ subscr_poker_thread(void *chan_)
 		do
 		{
 			estat = EP_STAT_OK;
-			for (req = LIST_FIRST(&chan->reqs); req != NULL; req = nextreq)
+			for (req = LIST_FIRST(&_GdpSubscriptionRequests); req != NULL;
+													req = nextreq)
 			{
 				estat = _gdp_req_lock(req);
 				EP_STAT_CHECK(estat, break);
@@ -263,23 +265,23 @@ _gdp_gcl_subscribe(gdp_req_t *req,
 			long poke = ep_adm_getlongparam("swarm.gdp.subscr.pokeintvl", 60L);
 			bool spawnthread = false;
 
-			ep_thr_mutex_lock(&req->chan->mutex);
-			if (poke > 0 && !EP_UT_BITSET(GDP_CHAN_HAS_SUB_THR, req->chan->flags))
+			ep_thr_mutex_lock(&_GdpSubscriptionMutex);
+			if (poke > 0 && !SubscriptionThreadRunning)
 			{
 				spawnthread = true;
-				req->chan->flags |= GDP_CHAN_HAS_SUB_THR;
+				SubscriptionThreadRunning = true;
 			}
-			ep_thr_mutex_unlock(&req->chan->mutex);
 			if (spawnthread)
 			{
-				int istat = ep_thr_spawn(&req->chan->sub_thr_id,
-									subscr_poker_thread, req->chan);
+				int istat = ep_thr_spawn(&SubscriptionThreadId,
+									subscr_poker_thread, NULL);
 				if (istat != 0)
 				{
 					EP_STAT spawn_stat = ep_stat_from_errno(istat);
 					ep_log(spawn_stat, "_gdp_gcl_subscribe: thread spawn failure");
 				}
 			}
+			ep_thr_mutex_unlock(&_GdpSubscriptionMutex);
 		}
 	}
 

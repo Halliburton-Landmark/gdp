@@ -38,6 +38,7 @@
 #include <ep/ep_thr.h>
 
 typedef struct evbuffer	gdp_buf_t;
+#define GDP_BUF_FROM_EVBUFFER(x)		(x)
 
 extern gdp_buf_t	*gdp_buf_new(void);			// create new buffer
 
@@ -64,6 +65,9 @@ extern size_t		gdp_buf_read(				// read data from buffer
 						gdp_buf_t *buf,
 						void *out,
 						size_t sz);
+
+extern int			gdp_buf_getchar(			// read single byte from buffer
+						gdp_buf_t *buf);
 
 extern size_t		gdp_buf_peek(				// peek into buffer
 						gdp_buf_t *buf,

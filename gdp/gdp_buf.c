@@ -135,6 +135,23 @@ gdp_buf_read(gdp_buf_t *buf, void *out, size_t sz)
 }
 
 /*
+**  Get a single byte from buffer.
+**		Returns EOF if no data is available.
+*/
+
+int
+gdp_buf_getchar(gdp_buf_t *buf)
+{
+	uint8_t cbuf[1];
+	int istat = evbuffer_remove(buf, cbuf, 1);
+	DIAGNOSE("getchar", istat);
+	if (istat <= 0)
+		return EOF;
+	else
+		return cbuf[0];
+}
+
+/*
 **  "Peek" at data in a buffer.
 **		Like read, but leaves the buffer intact.
 */
@@ -211,6 +228,8 @@ gdp_buf_printf(gdp_buf_t *buf, const char *fmt, ...)
 int
 gdp_buf_move(gdp_buf_t *obuf, gdp_buf_t *ibuf, size_t sz)
 {
+	if (sz == -1)
+		sz = gdp_buf_getlength(ibuf);
 	return evbuffer_remove_buffer(ibuf, obuf, sz);
 }
 
@@ -220,24 +239,24 @@ gdp_buf_move(gdp_buf_t *obuf, gdp_buf_t *ibuf, size_t sz)
 */
 
 // helper routine to minimize #ifdefs
+# ifndef LIBEVENT_USE_EVBUFFER_ADD_BUFFER_REFERENCE
+#  define LIBEVENT_USE_EVBUFFER_ADD_BUFFER_REFERENCE	0
+# endif
+
 static int
 _gdp_buf_raw_copy(gdp_buf_t *obuf, gdp_buf_t *ibuf)
 {
 	int istat = -1;
 
-#if LIBEVENT_VERSION_NUMBER > 0x02010100
-# ifndef LIBEVENT_USE_EVBUFFER_ADD_BUFFER_REFERENCE
-#  define LIBEVENT_USE_EVBUFFER_ADD_BUFFER_REFERENCE	0
-# endif
+#if LIBEVENT_VERSION_NUMBER > 0x02010100	// 2.1.1-alpha
 # if LIBEVENT_USE_EVBUFFER_ADD_BUFFER_REFERENCE
 	// efficient, but has semantic quirks: "a buffer that has already been
 	// the outbuf of one evbuffer_add_buffer_reference call cannot be the
 	// inbuf of another"
 	istat = evbuffer_add_buffer_reference(ibuf, obuf);
 # else
-
 	// Alternative implementation should evbuffer_add_buffer_reference not work.
-	// This physically copies the data (twice).
+	// This physically copies the data (twice --- ugh).
 	int nleft = evbuffer_get_length(ibuf);
 	struct evbuffer_ptr bufpos;
 
