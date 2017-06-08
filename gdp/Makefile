@@ -87,6 +87,7 @@ OBJS_MOST=	\
 	gdp_gob_mgmt.o \
 	gdp_gob_ops.o \
 	gdp_datum.o \
+	gdp_ioloop.o \
 	gdp_main.o \
 	gdp_pdu.o \
 	gdp_proto.o \

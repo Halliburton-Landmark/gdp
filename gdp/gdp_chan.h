@@ -175,7 +175,7 @@ void			_gdp_cursor_get_endpoints(	// return src & dst
 						gdp_name_t *src,
 						gdp_name_t *dst);
 
-size_t			_gdp_cursor_get_payload_len(	// return total len of payload
+size_t			_gdp_cursor_get_payload_size(	// return total len of payload
 						gdp_cursor_t *cursor);
 
 EP_STAT			_gdp_cursor_get_estat(		// get status of last input op

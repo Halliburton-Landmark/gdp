@@ -276,7 +276,7 @@ which side of the interface this belongs on.]]
 Deallocate `chan`.  All resources are freed.  I promise I will not
 attempt to use `chan` after it is freed.
 
-#### \_gdp\_chan\_get\_cdata (chan::get_cdata)
+#### \_gdp\_chan\_get\_cdata (chan::get\_cdata)
 
 > [[Need callbacks for received data, failure on a connection.
 Anything else?]]
@@ -379,6 +379,7 @@ that can be passed to `_gdp_chan_withdraw` or is the gname enough?]]
 
 Sends the entire contents of `payload` to the indicated `dst` over
 `chan`.  The source address is specified by `src`.
+
 > [[Does this clear `payload` or leave it unchanged?]]
 
 > [[Does this clear `payload` or leave it unchanged?]]
