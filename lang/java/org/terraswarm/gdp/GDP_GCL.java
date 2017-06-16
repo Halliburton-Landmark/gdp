@@ -223,13 +223,17 @@ public class GDP_GCL {
     public void close() {
         // If close() is called twice, then the C code aborts the process.
         // See https://gdp.cs.berkeley.edu/redmine/issues/83
-        if (gclh != null) {
-            // Remove ourselves from the global list.
-            _allGclhs.remove(gclh);
-        
-            // Free the associated gdp_gcl_t.
-            Gdp07Library.INSTANCE.gdp_gcl_close(gclh);
-            gclh = null;
+
+        //  Added synchronization, see https://gdp.cs.berkeley.edu/redmine/issues/107
+        synchronized (gclh) {
+            if (gclh != null) {
+                // Remove ourselves from the global list.
+                _allGclhs.remove(gclh);
+                
+                // Free the associated gdp_gcl_t.
+                Gdp07Library.INSTANCE.gdp_gcl_close(gclh);
+                gclh = null;
+            }
         }
     }
 
