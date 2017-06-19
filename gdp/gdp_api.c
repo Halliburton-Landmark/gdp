@@ -521,7 +521,6 @@ EP_STAT
 gdp_init(const char *router_addr)
 {
 	EP_STAT estat = EP_STAT_OK;
-	struct event_loop_info *eli;
 
 	if (_GdpLibInitialized)				// set in gdp_lib_init
 		goto done;
@@ -529,6 +528,9 @@ gdp_init(const char *router_addr)
 	// set up global state, event loop, etc. (shared with gdplogd)
 	estat = gdp_lib_init(NULL);
 	EP_STAT_CHECK(estat, goto fail0);
+
+	gdp_chan_x_t *chanx = ep_mem_zalloc(sizeof *chanx);
+	LIST_INIT(&chanx->reqs);
 
 	// open at least one channel to the routing subsystem
 	_GdpChannel = NULL;
@@ -538,12 +540,11 @@ gdp_init(const char *router_addr)
 						NULL,					// send callback
 						&_gdp_io_event,			// close/error/eof callback
 						&_gdp_advertise_me,		// advertise callback
-						NULL,					// udata
+						chanx,					// udata
 						&_GdpChannel);			// output: new channel
 	EP_STAT_CHECK(estat, goto fail0);
 
-	eli = ep_mem_zalloc(sizeof *eli);
-	if (ep_thr_spawn(&_GdpIoEventLoopThread, &_gdp_run_event_loop, eli) != 0)
+	if (ep_thr_spawn(&_GdpIoEventLoopThread, &_gdp_run_event_loop, NULL) != 0)
 	{
 		char ebuf[100];
 

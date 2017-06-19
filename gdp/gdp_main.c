@@ -330,7 +330,7 @@ find_req_in_channel_list(
 
 	ep_dbg_cprintf(DbgProcResp, 14, "find_req_in_channel_list: searching\n");
 	_gdp_chan_lock(chan);
-	chanx = _gdp_chan_get_udata(chan);
+	chanx = _gdp_chan_get_cdata(chan);
 	if (EP_ASSERT_TEST(chanx != NULL))
 	{
 		req = NULL;
@@ -763,32 +763,28 @@ static EP_THR_MUTEX		GdpIoEventLoopRunningMutex	EP_THR_MUTEX_INITIALIZER;
 static EP_THR_COND		GdpIoEventLoopRunningCond	EP_THR_COND_INITIALIZER;
 
 static void
-event_loop_timeout(int fd, short what, void *eli_)
+event_loop_timeout(int fd, short what, void *unused)
 {
-	struct event_loop_info *eli = eli_;
-
-	ep_dbg_cprintf(Dbg, 79, "%s event loop timeout\n", eli->where);
+	ep_dbg_cprintf(Dbg, 79, "event loop timeout\n");
 }
 
 void *
 _gdp_run_event_loop(void *eli_)
 {
-	struct event_loop_info *eli = eli_;
 	long evdelay = ep_adm_getlongparam("swarm.gdp.event.loopdelay", 100000L);
 
 	// keep the loop alive if EVLOOP_NO_EXIT_ON_EMPTY isn't available
 	long ev_timeout = ep_adm_getlongparam("swarm.gdp.event.looptimeout", 30L);
 	struct timeval tv = { ev_timeout, 0 };
 	struct event *evtimer = event_new(_GdpIoEventBase, -1, EV_PERSIST,
-			&event_loop_timeout, eli);
+			&event_loop_timeout, NULL);
 	event_add(evtimer, &tv);
 
 	for (;;)
 	{
 		if (ep_dbg_test(Dbg, 20))
 		{
-			ep_dbg_printf("gdp_event_loop: starting up %s base loop\n",
-					eli->where);
+			ep_dbg_printf("gdp_event_loop: starting up base loop\n");
 			event_base_dump_events(_GdpIoEventBase, ep_dbg_getfile());
 		}
 
@@ -807,8 +803,7 @@ _gdp_run_event_loop(void *eli_)
 
 		if (ep_dbg_test(Dbg, 1))
 		{
-			ep_dbg_printf("gdp_event_loop: %s event_base_loop returned\n",
-					eli->where);
+			ep_dbg_printf("gdp_event_loop: event_base_loop returned\n");
 			if (event_base_got_break(_GdpIoEventBase))
 				ep_dbg_printf(" ... as a result of loopbreak\n");
 			if (event_base_got_exit(_GdpIoEventBase))
@@ -829,14 +824,11 @@ _gdp_run_event_loop(void *eli_)
 }
 
 static EP_STAT
-_gdp_start_event_loop_thread(EP_THR *thr,
-		const char *where)
+_gdp_start_event_loop_thread(EP_THR *thr)
 {
-	struct event_loop_info *eli = ep_mem_malloc(sizeof *eli);
-
-	eli->where = where;
-	if (ep_thr_spawn(thr, _gdp_run_event_loop, eli) != 0)
-		return init_error("cannot create event loop thread", where);
+	if (ep_thr_spawn(thr, _gdp_run_event_loop, NULL) != 0)
+		return init_error("cannot create event loop thread",
+						"_gdp_start_event_loop_thread");
 	else
 		return EP_STAT_OK;
 }
@@ -1098,7 +1090,10 @@ gdp_lib_init(const char *myname)
 		event_add(evsignal_new(_GdpIoEventBase, SIGUSR1, siginfo, NULL), NULL);
 	}
 
+	estat = _gdp_chan_init(_GdpIoEventBase, NULL);
+
 done:
+fail0:
 	{
 		char ebuf[200];
 
@@ -1106,7 +1101,6 @@ done:
 					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 
-fail0:
 	_GdpLibInitialized = true;
 	ep_thr_mutex_unlock(&GdpInitMutex);
 	return estat;
@@ -1124,7 +1118,7 @@ _gdp_evloop_init(void)
 	if (!GdpIoEventLoopRunning)
 	{
 		// create a thread to run the event loop
-		estat = _gdp_start_event_loop_thread(&_GdpIoEventLoopThread, "I/O");
+		estat = _gdp_start_event_loop_thread(&_GdpIoEventLoopThread);
 	}
 
 	while (!GdpIoEventLoopRunning)
@@ -1132,5 +1126,86 @@ _gdp_evloop_init(void)
 						&GdpIoEventLoopRunningMutex, NULL);
 	ep_thr_mutex_unlock(&GdpIoEventLoopRunningMutex);
 
+	return estat;
+}
+
+
+/*
+*/
+
+
+/*
+**  Data Ready (Receive) callback
+**
+**		Called whenever there is input from the channel.
+**		It is up to this routine to actually read the data from the
+**		chan level buffer into active memory.
+*/
+
+EP_STAT
+_gdp_io_recv(
+		gdp_cursor_t *cursor,
+		uint32_t flags)
+{
+	gdp_buf_t *ibuf;
+	size_t payload_len;
+	EP_STAT estat;
+
+	if (EP_UT_BITSET(GDP_CURSOR_PARTIAL, flags))
+		return EP_STAT_OK;			// need entire payload
+
+	ibuf = _gdp_cursor_get_buf(cursor);
+	payload_len = _gdp_cursor_get_payload_len(cursor);
+	EP_ASSERT_ELSE(gdp_buf_getlength(ibuf) >= payload_len, return EP_STAT_OK);
+
+	gdp_pdu_t *pdu = _gdp_pdu_new();
+	_gdp_cursor_get_endpoints(cursor, &pdu->src, &pdu->dst);
+	//pdu->payload_len = payload_len;
+	estat = _gdp_pdu_in(pdu, cursor);
+	return estat;
+}
+
+
+/*
+**  Data Event callback
+**
+**		Typically connects, disconnects, and errors
+**
+**		Following is a list of actions that should be undertaken in
+**		response to various events:
+**
+**		Event					Client Action				Gdplogd Action
+**
+**		connection established	advertise one				advertise all
+**								re-subscribe all
+**
+**		connection lost [1]		retry open					retry open
+**
+**		data available			process command/ack			process command/ack
+**
+**		write complete			anything needed?			anything needed?
+**
+**		advertise timeout		re-advertise me				re-advertise all
+**
+**		connection close		withdraw me					withdraw all
+**
+**		[1] Should be handled automatically by the channel layer, but should
+**		generate a "connection established" event.
+*/
+
+EP_STAT
+_gdp_io_event(
+		gdp_chan_t *chan,
+		uint32_t what)
+{
+	EP_STAT estat = EP_STAT_OK;
+
+	if (EP_UT_BITSET(BEV_EVENT_CONNECTED, what))
+	{
+		// connection up; do advertising and resend subscriptions (if any)
+		gdp_chan_x_t *cx = _gdp_chan_get_cdata(chan);
+		if (cx->connect_cb != NULL)
+			estat = (*cx->connect_cb)(chan);
+	}
 	return estat;
 }

@@ -170,8 +170,8 @@ struct gob_phys_impl
 						gdp_gob_t *gob);
 	EP_STAT		(*delete)(
 						gdp_gob_t *gob);
-	void		(*foreach)(
-						void (*func)(
+	EP_STAT		(*foreach)(
+						EP_STAT (*func)(
 							gdp_name_t name,
 							void *ctx),
 						void *ctx);

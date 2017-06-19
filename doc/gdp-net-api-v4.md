@@ -1,7 +1,7 @@
 % What I Want to See in a Network API
   for the GDP
 % Eric Allman
-% 2017-06-07
+% 2017-06-16
 
 ***This is a proposal, not a specification***
 
@@ -147,13 +147,18 @@ a model of how this would map into an OO environment.
 
 * `gdp_chan_t` contains the state of the channel itself.  It is
   opaque to "my side" of the API.
+* `gdp_chan_x_t` contains "My" private data.  This evaluates to
+  `struct gdp_chan_x`, which I must define if I want to dereference
+  that structure.  It is opaque to you.
 * `gdp_cursor_t` is opaque to "my side" of the API; it provides a
   streaming interface to a payload while the client is receiving.
   Internally ("your side") it is fair game for other use, in
   particular, it may be useful on the sending side.
+* `gdp_cursor_x_t` is the cursor equivalent of `gdp_chan_x_t`.
 * `gdp_buf_t` implements dynamically allocated, variable sized
   buffers (already exists; based on `libevent`).  Details of that
-  interface are not included here.
+  interface are not included here (but are described in the "GDP
+  Programmatic API" document).
 * `gdp_name_t` is the 256-bit version of a GDP name.
 * `gdp_adcert_t` is whatever information is needed to advertise
   a GDPname.  This is _for further study_.
@@ -188,23 +193,28 @@ channel when I start up.
 #### \_gdp\_chan\_open (constructor)
 
 ~~~
-	typedef EP_STAT cursor_recv_cb_t(
+	typedef EP_STAT gdp_cursor_recv_cb_t(
 			gdp_cursor_t *cursor,
 			uint32_t recv_flags);
-	typedef EP_STAT chan_send_cb(
+	typedef EP_STAT gdp_chan_send_cb_t(
 			gdp_chan_t *chan,
-			gdp_buf_t *payload),
-	typedef EP_STAT chan_ioevent_cb(
+			gdp_buf_t *payload);
+	typedef EP_STAT gdp_chan_ioevent_cb_t(
 			gdp_chan_t *chan,
 			int ioevent_flags);
+	typedef EP_STAT gdp_chan_advert_func_t(
+			gdp_chan_t *chan,
+			int action,
+			void *adata);
 
 	EP_STAT _gdp_chan_open(
 			const char *addrspec,
 			void *qos,
-			chan_recv_cb_t *cursor_recv_cb,
-			chan_send_cb_t *chan_send_cb,
-			chan_ioevent_cb_t *chan_ioevent_cb,
-			void *udata,
+			gdp_cursor_recv_cb_t *cursor_recv_cb,
+			gdp_chan_send_cb_t *chan_send_cb,
+			gdp_chan_ioevent_cb_t *chan_ioevent_cb,
+			gdp_chan_advert_func_t *advert_func,
+			gdp_chan_x_t *cdata,
 			gdp_chan_t **chan);
 ~~~
 
@@ -215,7 +225,7 @@ in order.  If `addrspec` is NULL, the `swarm.gdp.routers`
 runtime parameter is used.  The `qos` parameter is intended to
 hold additional open parameters (e.g., QoS requirements), but for now
 I promise to pass it as `NULL`.  The callbacks are described below.
-The `udata` parameter is saved and is available to callbacks on this
+The `cdata` parameter is saved and is available to callbacks on this
 channel.
 
 **`cursor_recv_cb`**:  When a new PDU is ready to read on the
@@ -259,14 +269,14 @@ attempt to use `chan` after it is freed.
 
 
 
-#### \_gdp\_chan\_get\_udata (chan::get_udata)
+#### \_gdp\_chan\_get\_cdata (chan::get_cdata)
 
 ~~~
-	void *_gdp_chan_get_udata(
+	void *_gdp_chan_get_cdata(
 			gdp_chan_t *chan);
 ~~~
 
-Returns the `udata` associated with `chan`.
+Returns the `cdata` associated with `chan`.
 
 
 ### Advertising and Certificates
@@ -274,14 +284,32 @@ Returns the `udata` associated with `chan`.
 > [[Who is responsible for certificate management and advertisements?
 I guess that's likely to be me.  Drat.]]
 
+Note that the naive implementation of this interface would cause at
+least one round trip for each known name.  This will be particularly
+expensive for log servers with large numbers of logs.  One possible
+solution is to allow batching of advertisements, so the caller does
+something like:
+
+~~~
+	_gdp_chan_advertise(chan, gnameA, ...);
+	...
+	_gdp_chan_advertise(chan, gnameZ, ...);
+	_gdp_chan_advert_commit(chan);
+~~~
+
+This would cause an actual send to the routing layer.  This would
+mean that challenge callbacks would not be synchronous with the
+`_gdp_chan_advertise` calls.
+
 #### \_gdp\_chan\_advertise (chan::advertise)
 
 _This interface is still under development._
 
 ~~~
-	// challenge/response callback function type
-	typedef EP_STAT (*advert_cr_cb_t)(
+	// advertising challenge/response callback function type
+	typedef EP_STAT (*chan_advert_cr_t)(
 			gdp_chan_t *chan,
+			gdp_name_t gname,
 			int action,
 			void *cdata,
 			void *adata);
@@ -290,19 +318,21 @@ _This interface is still under development._
 	EP_STAT _gdp_chan_advertise(
 			gdp_chan_t *chan,
 			gdp_name_t gname,
-			gdp_adcert_t *adcert,
-			gdp_cr_func_t *challenge_cb,
+			gdp_chan_adcert_t *adcert,
+			gdp_advert_cr_t *challenge_cb,
 			void *adata);
 ~~~
 
 Advertises the name `gname` on the given `chan`.  If a certificate
 needs to be presented, it should be passed as `adcert`.  If the
 underlying layer needs further interaction (e.g., for challenge/response)
-it should call `challenge_cb`.
+it should call `challenge_cb`.  The `adata` is passed through untouched.
 
-The callback function is passed the `chan`, an `action` **to be
-determined**, and any challenge data needed in order to continue as
-`cdata`.  The `adata` field is passed directly from `_gdp_chan_advertise`.
+If the routing subsystem challenges `adcert` the `challenge_cb`
+function will be invoked with the `chan`, the `gname` being
+challenged, an `action` **to be determined**, any challenge data
+issued by the router side as `cdata`, and the `adata` field directly
+from `_gdp_chan_advertise`.
 
 > [[What is `adcert` exactly?  Where does it come from?]]
 
@@ -311,7 +341,8 @@ determined**, and any challenge data needed in order to continue as
 ~~~
 	EP_STAT _gdp_chan_withdraw(
 			gdp_chan_t *chan,
-			gdp_name_t gname);
+			gdp_name_t gname,
+			void *adata);
 ~~~
 
 Withdraw a previous advertisement, for example, if a log is removed
@@ -319,6 +350,8 @@ from a given server.
 
 > [[Question: should `_gdp_chan_advertise` return a data structure
 that can be passed to `_gdp_chan_withdraw` or is the gname enough?]]
+
+> [[Question: is there any point in sending `adata` here?]]
 
 
 ### Sending Messages
@@ -496,13 +529,13 @@ If no user data has been set, returns NULL.
 ### Utilities
 
 
-#### \_gdp\_chan\_lock, \_gdp\_chan\_unlock (chan::lock, chan::unlock)
+#### \_gdp\_cursor\_lock, \_gdp\_cursor\_unlock (cursor::lock, cursor::unlock)
 
 ~~~
-	void _gdp_chan_lock(
+	void _gdp_cursor_lock(
 			gdp_cursor_t *cursor);
 
-	void _gdp_chan_unlock(
+	void _gdp_cursor_unlock(
 			gdp_cursor_t *cursor);
 ~~~
 

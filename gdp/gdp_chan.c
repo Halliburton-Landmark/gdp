@@ -50,7 +50,11 @@
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.chan", "GDP channel processing");
 
 
+#if ___OLD_ROUTER___
+#define GDP_CHAN_PROTO_VERSION	3			// protocol version number in PDU
+#else
 #define GDP_CHAN_PROTO_VERSION	4			// protocol version number in PDU
+#endif
 
 static struct event_base	*EventBase;
 static EP_STAT				chan_reopen(gdp_chan_t *);
@@ -61,19 +65,19 @@ static EP_STAT				chan_reopen(gdp_chan_t *);
 
 struct gdp_chan
 {
-	EP_THR_MUTEX		mutex;			// data structure lock
-	EP_THR_COND			cond;			// wake up after state change
-	int16_t				state;			// current state of channel (see below)
-	uint16_t			flags;			// status flags
-	struct bufferevent	*bev;			// associated bufferevent (socket)
-	char				*router_addr;	// text version of router address
-	gdp_chan_x_t		*udata;			// arbitrary user data
+	EP_THR_MUTEX			mutex;			// data structure lock
+	EP_THR_COND				cond;			// wake up after state change
+	int16_t					state;			// current state of channel
+	uint16_t				flags;			// status flags
+	struct bufferevent		*bev;			// associated bufferevent (socket)
+	char					*router_addr;	// text version of router address
+	gdp_chan_x_t			*cdata;			// arbitrary user data
 
 	// callbacks
-	cursor_recv_cb_t	*recv_cb;		// receive callback
-	chan_send_cb_t		*send_cb;		// send callback
-	chan_advert_cb_t	*advert_cb;		// advertising callback
-	chan_ioevent_cb_t	*ioevent_cb;	// close/error/eof callback
+	gdp_cursor_recv_cb_t	*recv_cb;		// receive callback
+	gdp_chan_send_cb_t		*send_cb;		// send callback
+	gdp_chan_advert_func_t	*advert_cb;		// advertising function
+	gdp_chan_ioevent_cb_t	*ioevent_cb;	// close/error/eof callback
 };
 
 /* Channel states */
@@ -124,7 +128,20 @@ struct gdp_cursor
 **		with low order bits indicating the router command.
 */
 
+#if ___OLD_ROUTER___
+#define MIN_HEADER_LENGTH	(1+1+1+1+32+32+4+1+1+1+1+4)
+#else
 #define MIN_HEADER_LENGTH	(1 + 1 + 1 + 1 + 4 + 32 + 32)
+#endif
+#define MAX_HEADER_LENGTH	(255 * 4)
+
+static uint8_t	RoutingLayerAddr[32] =
+	{
+		0xff, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff, 0x00,
+		0xff, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff, 0x00,
+		0xff, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff, 0x00,
+		0xff, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff, 0x00,
+	};
 
 
 /*
@@ -406,7 +423,7 @@ chan_event_cb(struct bufferevent *bev, short events, void *ctx)
 				ep_time_nanosleep(delay * INT64_C(1000000));
 			estat = chan_reopen(chan);
 		} while (!EP_STAT_ISOK(estat));
-		(*chan->advert_cb)(chan, GDP_CMD_ADVERTISE);
+		(*chan->advert_cb)(chan, GDP_CMD_ADVERTISE, ctx);
 	}
 }
 
@@ -685,11 +702,11 @@ EP_STAT
 _gdp_chan_open(
 		const char *router_addr,
 		void *qos,
-		cursor_recv_cb_t *recv_cb,
-		chan_send_cb_t *send_cb,
-		chan_ioevent_cb_t *ioevent_cb,
-		chan_advert_cb_t *advert_cb,
-		gdp_chan_x_t *udata,
+		gdp_cursor_recv_cb_t *recv_cb,
+		gdp_chan_send_cb_t *send_cb,
+		gdp_chan_ioevent_cb_t *ioevent_cb,
+		gdp_chan_advert_func_t *advert_func,
+		gdp_chan_x_t *cdata,
 		gdp_chan_t **pchan)
 {
 	EP_STAT estat;
@@ -697,16 +714,15 @@ _gdp_chan_open(
 
 	// allocate a new channel structure
 	chan = ep_mem_zalloc(sizeof *chan);
-	//XXX LIST_INIT(&chan->reqs);
 	ep_thr_mutex_init(&chan->mutex, EP_THR_MUTEX_DEFAULT);
 	ep_thr_mutex_setorder(&chan->mutex, GDP_MUTEX_LORDER_CHAN);
 	ep_thr_cond_init(&chan->cond);
 	chan->state = GDP_CHAN_CONNECTING;
 	chan->recv_cb = recv_cb;
 	//chan->send_cb = send_cb;
-	chan->advert_cb = advert_cb;
+	chan->advert_cb = advert_func;
 	chan->ioevent_cb = ioevent_cb;
-	chan->udata = udata;
+	chan->cdata = cdata;
 	if (router_addr != NULL)
 		chan->router_addr = ep_mem_strdup(router_addr);
 
@@ -768,6 +784,97 @@ _gdp_chan_send(gdp_chan_t *chan,
 			gdp_name_t dst,
 			gdp_buf_t *payload)
 {
+	char pb[MAX_HEADER_LENGTH];
+	char *pbp = pb;
+	EP_STAT estat = EP_STAT_OK;
+	int i;
+
+	// build the header in memory
+	PUT8(GDP_CHAN_PROTO_VERSION);		// version number
+	PUT8(15);							// time to live
+	PUT8(0);							// type of service
+	PUT8(18);							// header length (= 72 / 4)
+	PUT32(gdp_buf_getlength(payload));
+	memcpy(pbp, dst, sizeof (gdp_name_t));
+	pbp += sizeof (gdp_name_t);
+	memcpy(pbp, src, sizeof (gdp_name_t));
+	pbp += sizeof (gdp_name_t);
+
+	// now write it to the socket
+	i = bufferevent_write(chan->bev, pb, pbp - pb);
+	if (i < 0)
+	{
+		estat = GDP_STAT_PDU_WRITE_FAIL;
+		goto fail0;
+	}
+
+	// and the payload
+	i = bufferevent_write_buffer(chan->bev, payload);
+	if (i < 0)
+	{
+		estat = GDP_STAT_PDU_WRITE_FAIL;
+		goto fail0;
+	}
+
+fail0:
+	return estat;
+}
+
+
+/*
+**  Advertising primitives
+*/
+
+EP_STAT
+_gdp_chan_advertise(
+			gdp_chan_t *chan,
+			gdp_name_t gname,
+			gdp_adcert_t *adcert,
+			gdp_chan_advert_cr_t *challenge_cb,
+			void *adata)
+{
+	EP_STAT estat = EP_STAT_OK;
+	gdp_req_t *req;
+	uint32_t reqflags = 0;
+	gdp_pname_t pname;
+
+	ep_dbg_cprintf(Dbg, 39, "_gdp_chan_advertise(%s):",
+			gdp_printable_name(gname, pname));
+
+	// create a new request and point it at the routing layer
+	estat = _gdp_req_new(GDP_CMD_ADVERTISE, NULL, chan, NULL, reqflags, &req);
+	EP_STAT_CHECK(estat, goto fail0);
+	memcpy(req->cpdu->dst, RoutingLayerAddr, sizeof req->cpdu->dst);
+
+	// send the request
+	estat = _gdp_req_send(req);
+
+	// there is no reply
+	_gdp_req_free(&req);
+
+fail0:
+	if (ep_dbg_test(Dbg, 21))
+	{
+		char ebuf[100];
+
+		ep_dbg_printf("_gdp_advertise => %s\n",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
+
+	return estat;
+}
+
+
+EP_STAT
+_gdp_chan_withdraw(
+			gdp_chan_t *chan,
+			gdp_name_t gname,
+			void *adata)
+{
+	gdp_pname_t pname;
+
+	ep_dbg_cprintf(Dbg, 39, "_gdp_chan_withdraw(%s):",
+			gdp_printable_name(gname, pname));
 	return GDP_STAT_NOT_IMPLEMENTED;
 }
 
@@ -777,9 +884,9 @@ _gdp_chan_send(gdp_chan_t *chan,
 */
 
 gdp_chan_x_t *
-_gdp_chan_get_udata(gdp_chan_t *chan)
+_gdp_chan_get_cdata(gdp_chan_t *chan)
 {
-	return chan->udata;
+	return chan->cdata;
 }
 
 
