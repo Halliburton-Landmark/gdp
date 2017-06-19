@@ -2381,12 +2381,15 @@ disk_newsegment(gdp_gcl_t *gcl)
 
 /*
 **  GCL_PHYSFOREACH --- call function for each GCL in directory
+**
+**		Return the highest severity error code found
 */
 
-static void
-disk_foreach(void (*func)(gdp_name_t, void *), void *ctx)
+static EP_STAT
+disk_foreach(EP_STAT (*func)(gdp_name_t, void *), void *ctx)
 {
 	int subdir;
+	EP_STAT estat = EP_STAT_OK;
 
 	for (subdir = 0; subdir < 0x100; subdir++)
 	{
@@ -2428,10 +2431,15 @@ disk_foreach(void (*func)(gdp_name_t, void *), void *ctx)
 			EP_STAT_CHECK(estat, continue);
 
 			// now call the function
-			(*func)((uint8_t *) gname, ctx);
+			EP_STAT tstat = (*func)((uint8_t *) gname, ctx);
+
+			// adjust return status only if new one more severe than existing
+			if (EP_STAT_SEVERITY(tstat) > EP_STAT_SEVERITY(estat))
+				estat = tstat;
 		}
 		closedir(dir);
 	}
+	return estat;
 }
 
 

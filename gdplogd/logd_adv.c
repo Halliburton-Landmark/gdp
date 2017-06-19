@@ -34,6 +34,7 @@
 #include "logd.h"
 
 #include <gdp/gdp.h>
+#include <gdp/gdp_chan.h>
 #include <gdp/gdp_priv.h>
 
 #include <ep/ep_dbg.h>
@@ -43,67 +44,32 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.advertise",
 							"GDP GCL Advertisements");
 
 
-/*
-**  Advertise all known GCLs
-*/
-
-static void
-adv_addone(gdp_name_t gname, void *ctx)
+typedef struct gdp_advert_x
 {
-	gdp_buf_t *b = ctx;
-	int i;
+	gdp_chan_t		*chan;
+	gdp_adcert_t	*adcert;
+	gdp_chan_advert_cr_t	*challenge_cb;
+} gdp_advert_x_t;
 
-	if (ep_dbg_test(Dbg, 54))
-	{
-		gdp_pname_t pname;
-
-		ep_dbg_printf("\tAdvertise %s\n", gdp_printable_name(gname, pname));
-	}
-
-	i = gdp_buf_write(b, gname, sizeof (gdp_name_t));
-	if (i < 0)
-		ep_dbg_cprintf(Dbg, 1, "logd_adv_addone: gdp_buf_write failure\n");
-}
-
-
-static EP_STAT
-advertise_all(gdp_buf_t *dbuf, void *ctx, int cmd)
-{
-	GdpDiskImpl.foreach(adv_addone, dbuf);
-	return EP_STAT_OK;
-}
-
-
-EP_STAT
-logd_advertise_all(gdp_chan_t *chan, int cmd)
-{
-	EP_STAT estat = _gdp_advertise(chan, advertise_all, NULL, cmd);
-	if (ep_dbg_test(Dbg, 21))
-	{
-		char ebuf[100];
-
-		ep_dbg_printf("logd_advertise_all => %s\n",
-				ep_stat_tostr(estat, ebuf, sizeof ebuf));
-	}
-	return estat;
-}
 
 
 /*
 **  Advertise a new GCL
 */
 
-static EP_STAT
-advertise_one(gdp_buf_t *dbuf, void *ctx, int cmd)
-{
-	gdp_buf_write(dbuf, ctx, sizeof (gdp_name_t));
-	return EP_STAT_OK;
-}
-
 void
 logd_advertise_one(gdp_chan_t *chan, gdp_name_t gname, int cmd)
 {
-	EP_STAT estat = _gdp_advertise(chan, advertise_one, gname, cmd);
+	EP_STAT estat;
+	gdp_adcert_t *adcert = NULL;					//XXX XXX
+	gdp_chan_advert_cr_t *challenge_cb = NULL;		//XXX XXX
+	void *adata = NULL;								//XXX XXX
+
+	if (cmd == GDP_CMD_ADVERTISE)
+		estat = _gdp_chan_advertise(chan, gname, adcert, challenge_cb, adata);
+	else
+		estat = _gdp_chan_withdraw(chan, gname, adata);
+
 	if (ep_dbg_test(Dbg, 11))
 	{
 		char ebuf[100];
@@ -113,4 +79,82 @@ logd_advertise_one(gdp_chan_t *chan, gdp_name_t gname, int cmd)
 				gdp_printable_name(gname, pname),
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
+}
+
+
+/*
+**  Advertise all known GCLs
+*/
+
+static EP_STAT
+advertise_one(gdp_name_t gname, void *ctx)
+{
+	gdp_advert_x_t *ax = ctx;
+	EP_STAT estat;
+
+	estat = _gdp_chan_advertise(ax->chan, gname, ax->adcert,
+							ax->challenge_cb, ax);
+
+	if (ep_dbg_test(Dbg, 54))
+	{
+		gdp_pname_t pname;
+		char ebuf[100];
+
+		ep_dbg_printf("\tAdvertise %s => %s\n",
+				gdp_printable_name(gname, pname),
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
+	return estat;
+}
+
+static EP_STAT
+withdraw_one(gdp_name_t gname, void *ctx)
+{
+	gdp_advert_x_t *ax = ctx;
+	EP_STAT estat;
+
+	estat = _gdp_chan_withdraw(ax->chan, gname, ax);
+
+	if (ep_dbg_test(Dbg, 54))
+	{
+		gdp_pname_t pname;
+		char ebuf[100];
+
+		ep_dbg_printf("\tWithdraw %s => %s\n",
+				gdp_printable_name(gname, pname),
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
+	return estat;
+}
+
+
+EP_STAT
+logd_advertise_all(gdp_chan_t *chan, int cmd)
+{
+	EP_STAT estat;
+	gdp_adcert_t *adcert = NULL;					//XXX XXX
+	gdp_chan_advert_cr_t *challenge_cb = NULL;		//XXX XXX
+	void *adata = NULL;								//XXX XXX
+
+	if (cmd == GDP_CMD_ADVERTISE)
+	{
+		estat = _gdp_chan_advertise(chan, _GdpMyRoutingName, adcert,
+									challenge_cb, adata);
+
+		GdpDiskImpl.foreach(advertise_one, adata);
+	}
+	else
+	{
+		GdpDiskImpl.foreach(withdraw_one, adata);
+		estat = _gdp_chan_withdraw(chan, _GdpMyRoutingName, adata);
+	}
+
+	if (ep_dbg_test(Dbg, 21))
+	{
+		char ebuf[100];
+
+		ep_dbg_printf("logd_advertise_all => %s\n",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
+	return estat;
 }

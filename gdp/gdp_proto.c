@@ -34,6 +34,7 @@
 */
 
 #include "gdp.h"
+#include "gdp_chan.h"
 #include "gdp_event.h"
 #include "gdp_priv.h"
 
@@ -47,14 +48,6 @@
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.proto", "GDP protocol processing");
 static EP_DBG	DbgCmdTrace = EP_DBG_INIT("gdp.proto.command.trace",
 							"GDP command execution tracing");
-
-static uint8_t	RoutingLayerAddr[32] =
-	{
-		0xff, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff, 0x00,
-		0xff, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff, 0x00,
-		0xff, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff, 0x00,
-		0xff, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff, 0x00,
-	};
 
 
 
@@ -884,55 +877,13 @@ _gdp_req_dispatch(gdp_req_t *req, int cmd)
 
 
 /*
-**  Advertise our existence (and possibly more!)
-*/
-
-EP_STAT
-_gdp_advertise(gdp_chan_t *chan,
-			EP_STAT (*func)(gdp_buf_t *, void *, int),
-			void *ctx,
-			int cmd)
-{
-	EP_STAT estat = EP_STAT_OK;
-	gdp_req_t *req;
-	uint32_t reqflags = 0;
-
-	ep_dbg_cprintf(Dbg, 39, "_gdp_advertise(%d):\n", cmd);
-
-	// create a new request and point it at the routing layer
-	estat = _gdp_req_new(cmd, NULL, chan, NULL, reqflags, &req);
-	EP_STAT_CHECK(estat, goto fail0);
-	memcpy(req->cpdu->dst, RoutingLayerAddr, sizeof req->cpdu->dst);
-
-	// add any additional information to advertisement
-	if (func != NULL)
-		estat = func(req->cpdu->datum->dbuf, ctx, cmd);
-
-	// send the request
-	estat = _gdp_req_send(req);
-
-	// there is no reply
-	_gdp_req_free(&req);
-
-fail0:
-	if (ep_dbg_test(Dbg, 21))
-	{
-		char ebuf[100];
-
-		ep_dbg_printf("_gdp_advertise => %s\n",
-				ep_stat_tostr(estat, ebuf, sizeof ebuf));
-	}
-
-	return estat;
-}
-
-
-/*
 **  Advertise me only
 */
 
 EP_STAT
-_gdp_advertise_me(gdp_chan_t *chan, int cmd)
+_gdp_advertise_me(gdp_chan_t *chan, int cmd, void *adata)
 {
-	return _gdp_advertise(chan, NULL, NULL, cmd);
+	gdp_chan_advert_cr_t *cr_cb = NULL;			//XXX XXX
+	gdp_adcert_t *adcert = NULL;				//XXX XXX
+	return _gdp_chan_advertise(chan, _GdpMyRoutingName, adcert, cr_cb, adata);
 }

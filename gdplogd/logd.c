@@ -60,7 +60,7 @@ void
 logd_sock_close_cb(gdp_chan_t *chan)
 {
 	// free any requests tied to this channel
-	gdp_req_t *req = LIST_FIRST(&_gdp_chan_get_udata(chan)->reqs);
+	gdp_req_t *req = LIST_FIRST(&_gdp_chan_get_cdata(chan)->reqs);
 
 	while (req != NULL)
 	{
@@ -380,6 +380,10 @@ main(int argc, char **argv)
 
 	// open the channel connection
 	phase = "connection to router";
+
+	gdp_chan_x_t *chanx = ep_mem_zalloc(sizeof *chanx);
+	LIST_INIT(&chanx->reqs);
+
 	_GdpChannel = NULL;
 	estat = _gdp_chan_open(router_addr,			// IP of router
 						NULL,					// qos (unused as yet)

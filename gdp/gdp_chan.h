@@ -48,21 +48,40 @@
 #include "gdp_priv.h"
 
 
-//typedef struct gdp_chan	gdp_chan_t;			// defined in gdp_priv.h
-//typedef struct gdp_cursor	gdp_cursor_t;		// defined in gdp_priv.h
-typedef struct gdp_adcert	gdp_adcert_t;
-typedef struct gdp_target	gdp_target_t;		//XXX as yet undefined
-typedef struct gdp_chan_x	gdp_chan_x_t;		// for chan "udata"
-typedef struct gdp_cursor_x	gdp_cursor_x_t;		// for cursor "udata"
+/*
+**  Prototypes for type declarations.  These are for the most part
+**  opaque, so the structure itself is defined where the datatype
+**  is actually implemented.
+*/
 
-// various callback function types
-typedef EP_STAT		advert_cr_cb_t(			// advertising challenge/response
+//typedef struct gdp_chan		gdp_chan_t;			// defined in gdp_priv.h
+typedef struct gdp_chan_x		gdp_chan_x_t;		// for chan private "udata"
+//typedef struct gdp_cursor		gdp_cursor_t;		// defined in gdp_priv.h
+typedef struct gdp_cursor_x		gdp_cursor_x_t;		// for cursor priv "udata"
+typedef struct gdp_target		gdp_target_t;		//XXX as yet undefined
+typedef struct gdp_adcert		gdp_adcert_t;		// advertising cert
+
+
+/*
+**  Callback function declarations to simplify later declarations.
+*/
+
+// called to issue advertisements (initial open or reopen)
+typedef EP_STAT		gdp_chan_advert_func_t(
 							gdp_chan_t *chan,
+							int action,				// to be defined
+							void *adata);			// passed in on open
+
+// if router challenges, call this function
+typedef EP_STAT		gdp_chan_advert_cr_t(
+							gdp_chan_t *chan,
+							gdp_name_t gname,
 							int action,
 							void *ndata,
-							void *udata);
+							void *cdata);
 
-typedef EP_STAT		cursor_recv_cb_t(		// received data
+// called when data is received
+typedef EP_STAT		gdp_cursor_recv_cb_t(
 							gdp_cursor_t *cursor,
 							uint32_t flags);
 
@@ -71,21 +90,22 @@ typedef EP_STAT		cursor_recv_cb_t(		// received data
 #define GDP_CURSOR_CONTINUATION	0x00000002		// second & subsequent calls
 #define GDP_CURSOR_READ_ERROR	0x00000004		// read failed (see estat)
 
-typedef EP_STAT		chan_send_cb_t(			// sent data
+// called when data can be sent (unused at this time; will probably change)
+typedef EP_STAT		gdp_chan_send_cb_t(
 							gdp_chan_t *chan,
 							gdp_buf_t *payload);
 
-typedef EP_STAT		chan_ioevent_cb_t(		// close, error, or eof
+// called on other channel events, e.g., close, error, or eof
+typedef EP_STAT		gdp_chan_ioevent_cb_t(
 							gdp_chan_t *chan,
 							uint32_t flags);
 
-// chan_ioevent_cb flags:
+// gdp_chan_ioevent_cb flags:
 #define GDP_IOEVENT_USER_CLOSE	0					// user close
 #define GDP_IOEVENT_CONNECTED	BEV_EVENT_CONNECTED	// connection established
 #define GDP_IOEVENT_EOF			BEV_EVENT_EOF		// end of file on channel
 #define GDP_IOEVENT_ERROR		BEV_EVENT_ERROR		// error on channel
 
-// chan_advert_cb_t defined in gdp_priv.h
 
 /*
 **  Channel operations.
@@ -98,11 +118,11 @@ EP_STAT			_gdp_chan_init(				// initialize channel subsystem
 EP_STAT			_gdp_chan_open(				// open channel to routing layer
 						const char *gdpd_addr,
 						void *qos,
-						cursor_recv_cb_t *recv_cb,
-						chan_send_cb_t *send_cb,
-						chan_ioevent_cb_t *ioevent_cb,	// close, error, eof
-						chan_advert_cb_t *advert_cb,
-						gdp_chan_x_t *udata,
+						gdp_cursor_recv_cb_t *recv_cb,
+						gdp_chan_send_cb_t *send_cb,
+						gdp_chan_ioevent_cb_t *ioevent_cb,
+						gdp_chan_advert_func_t *advert_func,
+						gdp_chan_x_t *cdata,
 						gdp_chan_t **pchan);
 
 EP_STAT			_gdp_chan_close(			// close channel
@@ -115,19 +135,20 @@ EP_STAT			_gdp_chan_send(				// send data to channel
 						gdp_name_t dst,
 						gdp_buf_t *payload);
 
-gdp_chan_x_t	*_gdp_chan_get_udata(		// get user data from channel
+gdp_chan_x_t	*_gdp_chan_get_cdata(		// get user data from channel
 						gdp_chan_t *chan);
 
 EP_STAT			_gdp_chan_advertise(		// advertise name
 						gdp_chan_t *chan,
 						gdp_name_t gname,
 						gdp_adcert_t *adcert,
-						advert_cr_cb_t *challenge_cb,
-						void *udata);
+						gdp_chan_advert_cr_t *challenge_cb,
+						void *adata);
 
 EP_STAT			_gdp_chan_withdraw(			// withdraw advertisement
 						gdp_chan_t *chan,
-						gdp_name_t gname);
+						gdp_name_t gname,
+						void *adata);
 
 void			_gdp_chan_lock(				// lock the channel
 						gdp_chan_t *chan);
@@ -154,7 +175,7 @@ void			_gdp_cursor_get_endpoints(	// return src & dst
 						gdp_name_t *src,
 						gdp_name_t *dst);
 
-size_t			_gdp_cursor_get_payload_len(	// return total length of payload
+size_t			_gdp_cursor_get_payload_len(	// return total len of payload
 						gdp_cursor_t *cursor);
 
 EP_STAT			_gdp_cursor_get_estat(		// get status of last input op
@@ -167,17 +188,6 @@ void			_gdp_cursor_set_udata(		// set cursor user data
 gdp_cursor_x_t	*_gdp_cursor_get_udata(		// get cursor user data
 						gdp_cursor_t *cursor);
 
-
-/*
-**  Libevent support
-*/
-
-//EP_STAT			_gdp_evloop_init(void);		// start event loop
-
-//EP_STAT			_gdp_ioloop_init(			// initialize I/O event loop
-//						const char *router_addr,
-//						chan_advert_cb_t *advert_cb,
-//						chan_ioevent_cb_t *ioevent_cb);
 
 /*
 **  Low level bit twiddling support for cracking protocol

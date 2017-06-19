@@ -166,8 +166,8 @@ struct gcl_phys_impl
 						gdp_gclmd_t **gmdp);
 	EP_STAT		(*newsegment)(
 						gdp_gcl_t *gcl);
-	void		(*foreach)(
-						void (*func)(
+	EP_STAT		(*foreach)(
+						EP_STAT (*func)(
 							gdp_name_t name,
 							void *ctx),
 						void *ctx);

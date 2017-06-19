@@ -197,7 +197,7 @@ _gdp_req_new(int cmd,
 		gdp_chan_x_t *chanx;
 
 		_gdp_chan_lock(chan);
-		chanx = _gdp_chan_get_udata(chan);
+		chanx = _gdp_chan_get_cdata(chan);
 		if (EP_ASSERT_TEST(chanx != NULL))
 		{
 			estat = EP_STAT_ASSERT_ABORT;

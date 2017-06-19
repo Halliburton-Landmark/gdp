@@ -129,12 +129,12 @@ struct gdp_datum
 				 (datum)->dbuf != NULL &&								\
 				 (datum)->inuse)
 
-extern void		_gdp_datum_dump(		// dump data record (for debugging)
-					const gdp_datum_t *datum,	// message to print
-					FILE *fp);					// file to print it to
+void			_gdp_datum_dump(		// dump data record (for debugging)
+						const gdp_datum_t *datum,	// message to print
+						FILE *fp);					// file to print it to
 
-extern gdp_datum_t	*gdp_datum_dup(		// duplicate a datum
-					const gdp_datum_t *datum);
+gdp_datum_t		*gdp_datum_dup(		// duplicate a datum
+						const gdp_datum_t *datum);
 
 
 
@@ -565,10 +565,6 @@ EP_STAT			_gdp_io_event(
 						gdp_chan_t *chan,
 						uint32_t flags);
 
-EP_STAT			_gdp_advertise_me(
-						gdp_chan_t *chan,
-						int cmd);
-
 // I/O event handling
 struct event_loop_info
 {
@@ -608,19 +604,10 @@ const char		*_gdp_proto_cmd_name(		// return printable cmd name
 **  Advertising.
 */
 
-typedef EP_STAT	chan_advert_cb_t(			// advertise any known names
-						gdp_chan_t *chan,
-						int cmd);
-
-EP_STAT			_gdp_advertise(				// advertise resources (generic)
-						gdp_chan_t *chan,
-						EP_STAT (*func)(gdp_buf_t *, void *, int),
-						void *ctx,
-						int cmd);
-
 EP_STAT			_gdp_advertise_me(			// advertise me only
 						gdp_chan_t *chan,
-						int cmd);
+						int cmd,
+						void *ctx);
 
 /*
 **  Subscriptions.
