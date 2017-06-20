@@ -48,6 +48,11 @@
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.gcl.ops", "GCL operations for GDP");
 
+static EP_THR_MUTEX		GclFreeListMutex
+								EP_THR_MUTEX_INITIALIZER2(GDP_MUTEX_LORDER_LEAF);
+static LIST_HEAD(gcl_free_head, gdp_gcl)
+						GclFreeList = LIST_HEAD_INITIALIZER(GclFreeList);
+
 
 /*
 **	CREATE_GCL_NAME -- create a name for a new GCL
@@ -80,16 +85,28 @@ EP_STAT
 _gdp_gcl_newhandle(gdp_name_t gcl_name, gdp_gcl_t **pgcl)
 {
 	EP_STAT estat = EP_STAT_OK;
-	gdp_gcl_t *gcl;
+	gdp_gcl_t *gcl = NULL;
 
-	// allocate the memory to hold the gcl_handle
-	gcl = ep_mem_zalloc(sizeof *gcl);
+	ep_thr_mutex_lock(&GclFreeListMutex);
+	if (!LIST_EMPTY(&GclFreeList))
+	{
+		gcl = LIST_FIRST(&GclFreeList);
+		LIST_REMOVE(gcl, ulist);
+	}
+	ep_thr_mutex_unlock(&GclFreeListMutex);
+
 	if (gcl == NULL)
-		goto fail1;
+	{
+		// allocate the memory to hold the gcl_handle
+		gcl = ep_mem_zalloc(sizeof *gcl);
+		if (gcl == NULL)
+			goto fail1;
 
-	if (ep_thr_mutex_init(&gcl->mutex, EP_THR_MUTEX_DEFAULT) != 0)
-		goto fail1;
-	ep_thr_mutex_setorder(&gcl->mutex, GDP_MUTEX_LORDER_GCL);
+		if (ep_thr_mutex_init(&gcl->mutex, EP_THR_MUTEX_DEFAULT) != 0)
+			goto fail1;
+		ep_thr_mutex_setorder(&gcl->mutex, GDP_MUTEX_LORDER_GCL);
+	}
+
 	LIST_INIT(&gcl->reqs);
 	gcl->refcnt = 1;
 
@@ -154,8 +171,6 @@ _gdp_gcl_freehandle(gdp_gcl_t *gcl)
 		ep_crypto_md_free(gcl->digest);
 	gcl->digest = NULL;
 
-	ep_thr_mutex_destroy(&gcl->mutex);
-
 	// if there is any "extra" data, drop that
 	//		(redundant; should be done by the freefunc)
 	if (gcl->x != NULL)
@@ -164,9 +179,11 @@ _gdp_gcl_freehandle(gdp_gcl_t *gcl)
 		gcl->x = NULL;
 	}
 
-	// finally release the memory for the handle itself
+	// drop this (now empty) GCL handle on the free list
 	gcl->flags = 0;
-	ep_mem_free(gcl);
+	ep_thr_mutex_lock(&GclFreeListMutex);
+	LIST_INSERT_HEAD(&GclFreeList, gcl, ulist);
+	ep_thr_mutex_unlock(&GclFreeListMutex);
 }
 
 /*

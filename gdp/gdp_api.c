@@ -65,14 +65,45 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.api", "C API for GDP");
 static EP_THR_MUTEX		OpenMutex		EP_THR_MUTEX_INITIALIZER;
 
 
-// simplify debugging
-#define PRSTAT(estat, where)												\
-			if (ep_dbg_test(Dbg, EP_STAT_ISOK(estat) ? 39 : 11))			\
-			{																\
-				char ebuf[100];												\
-				ep_dbg_printf("<<< %s: %s\n",								\
-						where, ep_stat_tostr(estat, ebuf, sizeof ebuf));	\
-			}
+/*
+**  Simplify debugging
+*/
+
+
+static void
+prstat(EP_STAT estat, const gdp_gcl_t *gcl, const char *where)
+{
+	int dbglev = 2;
+	char ebuf[100];
+
+	if (EP_STAT_ISOK(estat))
+		dbglev = 39;
+	else if (EP_STAT_ISWARN(estat))
+		dbglev = 11;
+	if (gcl != NULL)
+	{
+		ep_dbg_cprintf(Dbg, dbglev, "<<< %s: %s\n",
+				where, ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
+	else
+	{
+		ep_dbg_cprintf(Dbg, dbglev, "<<< %s(%s): %s\n",
+				where, gcl->pname, ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
+}
+
+static EP_STAT
+bad_gcl(const gdp_gcl_t *gcl, const char *where)
+{
+	EP_STAT estat;
+
+	if (gcl == NULL)
+		estat = GDP_STAT_NULL_GCL;
+	else
+		estat = GDP_STAT_GCL_NOT_OPEN;
+	prstat(estat, gcl, where);
+	return estat;
+}
 
 
 
@@ -83,6 +114,11 @@ static EP_THR_MUTEX		OpenMutex		EP_THR_MUTEX_INITIALIZER;
 const gdp_name_t *
 gdp_gcl_getname(const gdp_gcl_t *gcl)
 {
+	if (!GDP_GCL_ISGOOD(gcl))
+	{
+		(void) bad_gcl(gcl, "gdp_gcl_getname");
+		return NULL;
+	}
 	return &gcl->name;
 }
 
@@ -227,8 +263,11 @@ gdp_name_is_valid(const gdp_name_t name)
 gdp_recno_t
 gdp_gcl_getnrecs(const gdp_gcl_t *gcl)
 {
-	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
-					return GDP_PDU_NO_RECNO);
+	if (!GDP_GCL_ISGOOD(gcl))
+	{
+		(void) bad_gcl(gcl, "gdp_gcl_getnrecs");
+		return GDP_PDU_NO_RECNO;
+	}
 	return gcl->nrecs;
 }
 
@@ -242,6 +281,7 @@ gdp_gcl_print(
 		const gdp_gcl_t *gcl,
 		FILE *fp)
 {
+	// _gdp_gcl_dump handles null gcl properly
 	_gdp_gcl_dump(gcl, fp, GDP_PR_PRETTY, 0);
 }
 
@@ -312,12 +352,11 @@ gdp_gcl_create(gdp_name_t gclname,
 				gdp_gcl_t **pgcl)
 {
 	EP_STAT estat;
-	char ebuf[100];
 	gdp_name_t namebuf;
 
 	ep_dbg_cprintf(Dbg, 19, "\n>>> gdp_gcl_create\n");
 	estat = GDP_CHECK_INITIALIZED;		// make sure gdp_init is done
-	EP_STAT_CHECK(estat, return estat);
+	EP_STAT_CHECK(estat, goto fail0);
 
 	if (gclname == NULL)
 	{
@@ -332,8 +371,12 @@ gdp_gcl_create(gdp_name_t gclname,
 		(*pgcl)->iomode = GDP_MODE_ANY;
 		_gdp_gcl_unlock(*pgcl);
 	}
-	ep_dbg_cprintf(Dbg, 8, "<<< gdp_gcl_create: %s\n",
-				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	else
+	{
+		*pgcl = NULL;
+	}
+fail0:
+	prstat(estat, *pgcl, "gdp_gcl_create");
 	return estat;
 }
 
@@ -390,7 +433,7 @@ gdp_gcl_open(gdp_name_t name,
 	gcl = _gdp_gcl_cache_get(name, mode);
 	if (gcl != NULL)
 	{
-		// just increase the reference count and return it
+		// reference count has been bumped in _gdp_gcl_cache_get
 		ep_dbg_cprintf(Dbg, 10, "gdp_gcl_open(%s): using existing GCL @ %p\n",
 				gcl->pname, gcl);
 		gcl->iomode |= mode;
@@ -415,19 +458,16 @@ gdp_gcl_open(gdp_name_t name,
 			_gdp_reclaim_resources_init(NULL);
 		}
 		*pgcl = gcl;
-		_gdp_gcl_unlock(gcl);
-		ep_dbg_cprintf(Dbg, 8, "<<< gdp_gcl_open(%s): OK\n", gcl->pname);
-	}
-	else
-	{
-		char ebuf[100];
-		ep_dbg_cprintf(Dbg, 8, "<<< gdp_gcl_open(%s): %s\n", gcl->pname,
-				ep_stat_tostr(estat, ebuf, sizeof ebuf));
-		_gdp_gcl_freehandle(gcl);
-		gcl = NULL;
 	}
 
 fail0:
+	prstat(estat, gcl, "gdp_gcl_open");
+	if (gcl == NULL)
+		;				// do nothing
+	else if (EP_STAT_ISOK(estat))
+		_gdp_gcl_unlock(gcl);
+	else
+		_gdp_gcl_freehandle(gcl);
 	ep_thr_mutex_unlock(&OpenMutex);
 	return estat;
 }
@@ -441,12 +481,12 @@ EP_STAT
 gdp_gcl_close(gdp_gcl_t *gcl)
 {
 	EP_STAT estat;
-	char ebuf[100];
 
+	if (!GDP_GCL_ISGOOD(gcl))
+		return bad_gcl(gcl, "gdp_gcl_close");
 	ep_dbg_cprintf(Dbg, 19, "\n>>> gdp_gcl_close(%s)\n", gcl->pname);
 	estat = _gdp_gcl_close(gcl, _GdpChannel, 0);
-	ep_dbg_cprintf(Dbg, 8, "<<< gdp_gcl_close(%s): %s\n", gcl->pname,
-				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	prstat(estat, gcl, "gdp_gcl_close");
 	return estat;
 }
 
@@ -461,10 +501,12 @@ gdp_gcl_append(gdp_gcl_t *gcl, gdp_datum_t *datum)
 	EP_STAT estat;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_append\n");
+	if (!GDP_GCL_ISGOOD(gcl))
+		return bad_gcl(gcl, "gdp_gcl_append");
 	_gdp_gcl_lock(gcl);
 	estat = _gdp_gcl_append(gcl, datum, _GdpChannel, 0);
 	_gdp_gcl_unlock(gcl);
-	PRSTAT(estat, "gdp_gcl_append");
+	prstat(estat, gcl, "gdp_gcl_append");
 	return estat;
 }
 
@@ -482,10 +524,12 @@ gdp_gcl_append_async(gdp_gcl_t *gcl,
 	EP_STAT estat;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_append_async\n");
+	if (!GDP_GCL_ISGOOD(gcl))
+		return bad_gcl(gcl, "gdp_gcl_append_async");
 	_gdp_gcl_lock(gcl);
 	estat = _gdp_gcl_append_async(gcl, datum, cbfunc, udata, _GdpChannel, 0);
 	_gdp_gcl_unlock(gcl);
-	PRSTAT(estat, "gdp_gcl_append_async");
+	prstat(estat, gcl, "gdp_gcl_append_async");
 	return estat;
 }
 
@@ -510,15 +554,17 @@ gdp_gcl_read(gdp_gcl_t *gcl,
 {
 	EP_STAT estat;
 
-	EP_ASSERT_POINTER_VALID(datum);
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_read\n");
+	EP_ASSERT_POINTER_VALID(datum);
+	if (!GDP_GCL_ISGOOD(gcl))
+		return bad_gcl(gcl, "gdp_gcl_read");
 	gdp_datum_reset(datum);
 	datum->recno = recno;
 
 	_gdp_gcl_lock(gcl);
 	estat = _gdp_gcl_read(gcl, datum, _GdpChannel, 0);
 	_gdp_gcl_unlock(gcl);
-	PRSTAT(estat, "gdp_gcl_read");
+	prstat(estat, gcl, "gdp_gcl_read");
 	return estat;
 }
 
@@ -543,15 +589,17 @@ gdp_gcl_read_ts(gdp_gcl_t *gcl,
 {
 	EP_STAT estat;
 
-	EP_ASSERT_POINTER_VALID(datum);
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_read_ts\n");
+	EP_ASSERT_POINTER_VALID(datum);
+	if (!GDP_GCL_ISGOOD(gcl))
+		return bad_gcl(gcl, "gdp_gcl_read_ts");
 	memcpy(&datum->ts, ts, sizeof datum->ts);
 	datum->recno = GDP_PDU_NO_RECNO;
 
 	_gdp_gcl_lock(gcl);
 	estat = _gdp_gcl_read(gcl, datum, _GdpChannel, 0);
 	_gdp_gcl_unlock(gcl);
-	PRSTAT(estat, "gdp_gcl_read_ts");
+	prstat(estat, gcl, "gdp_gcl_read_ts");
 	return estat;
 }
 
@@ -572,10 +620,12 @@ gdp_gcl_read_async(gdp_gcl_t *gcl,
 	EP_STAT estat;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_read_async\n");
+	if (!GDP_GCL_ISGOOD(gcl))
+		return bad_gcl(gcl, "gdp_gcl_read_async");
 	_gdp_gcl_lock(gcl);
 	estat = _gdp_gcl_read_async(gcl, recno, cbfunc, cbarg, _GdpChannel);
 	_gdp_gcl_unlock(gcl);
-	PRSTAT(estat, "gdp_gcl_read_async");
+	prstat(estat, gcl, "gdp_gcl_read_async");
 	return estat;
 }
 
@@ -597,6 +647,8 @@ gdp_gcl_subscribe(gdp_gcl_t *gcl,
 	gdp_req_t *req;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_subscribe\n");
+	if (!GDP_GCL_ISGOOD(gcl))
+		return bad_gcl(gcl, "gdp_gcl_subscribe");
 
 	// create the subscribe request
 	_gdp_gcl_lock(gcl);
@@ -613,7 +665,7 @@ gdp_gcl_subscribe(gdp_gcl_t *gcl,
 	estat = _gdp_gcl_subscribe(req, numrecs, timeout, cbfunc, cbarg);
 fail0:
 	_gdp_gcl_unlock(gcl);
-	PRSTAT(estat, "gdp_gcl_subscribe");
+	prstat(estat, gcl, "gdp_gcl_subscribe");
 	return estat;
 }
 
@@ -634,6 +686,8 @@ gdp_gcl_subscribe_ts(gdp_gcl_t *gcl,
 	gdp_req_t *req;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_subscribe_ts\n");
+	if (!GDP_GCL_ISGOOD(gcl))
+		return bad_gcl(gcl, "gdp_gcl_subscribe_ts");
 
 	// create the subscribe request
 	_gdp_gcl_lock(gcl);
@@ -650,7 +704,7 @@ gdp_gcl_subscribe_ts(gdp_gcl_t *gcl,
 	estat = _gdp_gcl_subscribe(req, numrecs, timeout, cbfunc, cbarg);
 fail0:
 	_gdp_gcl_unlock(gcl);
-	PRSTAT(estat, "gdp_gcl_subscribe_ts");
+	prstat(estat, gcl, "gdp_gcl_subscribe_ts");
 	return estat;
 }
 
@@ -673,6 +727,8 @@ gdp_gcl_multiread(gdp_gcl_t *gcl,
 	gdp_req_t *req;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_multiread\n");
+	if (!GDP_GCL_ISGOOD(gcl))
+		return bad_gcl(gcl, "gdp_gcl_multiread");
 
 	// create the multiread request
 	_gdp_gcl_lock(gcl);
@@ -689,7 +745,7 @@ gdp_gcl_multiread(gdp_gcl_t *gcl,
 	estat = _gdp_gcl_subscribe(req, numrecs, NULL, cbfunc, cbarg);
 fail0:
 	_gdp_gcl_unlock(gcl);
-	PRSTAT(estat, "gdp_gcl_multiread");
+	prstat(estat, gcl, "gdp_gcl_multiread");
 	return estat;
 }
 
@@ -712,6 +768,8 @@ gdp_gcl_multiread_ts(gdp_gcl_t *gcl,
 	gdp_req_t *req;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_multiread_ts\n");
+	if (!GDP_GCL_ISGOOD(gcl))
+		return bad_gcl(gcl, "gdp_gcl_multiread_ts");
 
 	// create the multiread request
 	_gdp_gcl_lock(gcl);
@@ -728,7 +786,7 @@ gdp_gcl_multiread_ts(gdp_gcl_t *gcl,
 	estat = _gdp_gcl_subscribe(req, numrecs, NULL, cbfunc, cbarg);
 fail0:
 	_gdp_gcl_unlock(gcl);
-	PRSTAT(estat, "gdp_gcl_multiread_ts");
+	prstat(estat, gcl, "gdp_gcl_multiread_ts");
 	return estat;
 }
 
@@ -744,10 +802,12 @@ gdp_gcl_getmetadata(gdp_gcl_t *gcl,
 	EP_STAT estat;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_getmetadata\n");
+	if (!GDP_GCL_ISGOOD(gcl))
+		return bad_gcl(gcl, "gdp_gcl_getmetadata");
 	_gdp_gcl_lock(gcl);
 	estat = _gdp_gcl_getmetadata(gcl, gmdp, _GdpChannel, 0);
 	_gdp_gcl_unlock(gcl);
-	PRSTAT(estat, "gdp_gcl_getmetadata");
+	prstat(estat, gcl, "gdp_gcl_getmetadata");
 	return estat;
 }
 
@@ -765,10 +825,13 @@ gdp_gcl_newsegment(gdp_gcl_t *gcl)
 	EP_STAT estat;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_newsegment\n");
+	if (!GDP_GCL_ISGOOD(gcl))
+		return bad_gcl(gcl, "gdp_gcl_newsegment");
+
 	_gdp_gcl_lock(gcl);
 	estat = _gdp_gcl_newsegment(gcl, _GdpChannel, 0);
 	_gdp_gcl_unlock(gcl);
-	PRSTAT(estat, "gdp_gcl_newsegment");
+	prstat(estat, gcl, "gdp_gcl_newsegment");
 	return estat;
 }
 
@@ -783,7 +846,12 @@ gdp_gcl_set_append_filter(gdp_gcl_t *gcl,
 		void *filterdata)
 {
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_set_append_filter\n");
-	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
+	if (!GDP_GCL_ISGOOD(gcl))
+	{
+		(void) bad_gcl(gcl, "gdp_gcl_set_append_filter");
+		return;
+	}
+
 	_gdp_gcl_lock(gcl);
 	gcl->apndfilter = appendfilter;
 	gcl->apndfpriv = filterdata;
@@ -801,7 +869,12 @@ gdp_gcl_set_read_filter(gdp_gcl_t *gcl,
 		void *filterdata)
 {
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_set_read_filter\n");
-	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
+	if (!GDP_GCL_ISGOOD(gcl))
+	{
+		(void) bad_gcl(gcl, "gdp_gcl_set_read_filter");
+		return;
+	}
+
 	_gdp_gcl_lock(gcl);
 	gcl->readfilter = readfilter;
 	gcl->readfpriv = filterdata;
@@ -825,6 +898,7 @@ gdp_gcl_open_info_new(void)
 void
 gdp_gcl_open_info_free(gdp_gcl_open_info_t *info)
 {
+	//XXX should check for info == NULL here
 	if (info->signkey != NULL)
 		ep_crypto_key_free(info->signkey);
 	ep_mem_free(info);
@@ -834,6 +908,7 @@ EP_STAT
 gdp_gcl_open_info_set_signing_key(gdp_gcl_open_info_t *info,
 		EP_CRYPTO_KEY *skey)
 {
+	//XXX should check for info == NULL here
 	info->signkey = skey;
 	return EP_STAT_OK;
 }
@@ -847,6 +922,7 @@ gdp_gcl_open_info_set_signkey_cb(
 					EP_CRYPTO_KEY **skey),
 				void *signkey_udata)
 {
+	//XXX should check for info == NULL here
 	info->signkey_cb = signkey_cb;
 	info->signkey_udata = signkey_udata;
 	return EP_STAT_OK;
@@ -857,6 +933,7 @@ gdp_gcl_open_info_set_caching(
 		gdp_gcl_open_info_t *info,
 		bool keep_in_cache)
 {
+	//XXX should check for info == NULL here
 	info->keep_in_cache = keep_in_cache;
 	return EP_STAT_OK;
 }

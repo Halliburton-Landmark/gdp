@@ -222,8 +222,6 @@ struct gdp_gcl
 #define GDP_GCL_ISGOOD(gcl)												\
 				((gcl) != NULL &&										\
 				 EP_UT_BITSET(GCLF_INUSE, (gcl)->flags))
-#define GDP_ASSERT_GCL_ISGOOD(gcl)										\
-				(EP_ASSERT(GDP_GCL_ISGOOD(gcl))
 
 
 /*
