@@ -77,8 +77,8 @@ typedef EP_STAT		gdp_chan_advert_cr_t(
 							gdp_chan_t *chan,
 							gdp_name_t gname,
 							int action,
-							void *ndata,
-							void *cdata);
+							void *cdata,
+							void *adata);
 
 // called when data is received
 typedef EP_STAT		gdp_cursor_recv_cb_t(

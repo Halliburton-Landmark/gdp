@@ -96,7 +96,7 @@ struct gdp_cursor
 {
 	SLIST_ENTRY(gdp_cursor) next;		// linked list pointer
 	gdp_chan_t			*chan;			// associated channel
-	uint32_t			payload_len;	// total payload length
+	uint32_t			payload_size;	// total payload length
 	gdp_name_t			src;			// source name for this cursor
 	gdp_name_t			dst;			// destination name for this cursor
 	gdp_buf_t			*ibuf;			// input buffer
@@ -108,13 +108,14 @@ struct gdp_cursor
 /*
 **  On-the-Wire PDU Format
 **
-**		Currently with no attempt at compression.
+**		Currently does not attempt compression.  This is not
+**		the final design!
 **
 **		off	len	meaning
 **		---	---	-------
 **		0	1	version (must be 4)
 **		1	1	time to live in hops
-**		2	1	type of service (for now, must be zero)
+**		2	1	type of service (see below)
 **		3	1	header length in units of 32 bits (= H / 4)
 **		4	4	payload (SDU) length
 **		8	32	destination address
@@ -124,8 +125,10 @@ struct gdp_cursor
 **
 **		Type of Service is intended for future expansion, and for now
 **		clients should always send this as zero.  However, if the
-**		high order bit is set it indicates router-to-router traffic
-**		with low order bits indicating the router command.
+**		high order bit is set it indicates that the rest of the octet
+**		is intended for interpretation by the router.  This can be
+**		used for client-router advertisements and router-router
+**		traffic.
 */
 
 #if ___OLD_ROUTER___
@@ -151,7 +154,7 @@ static uint8_t	RoutingLayerAddr[32] =
 EP_STAT
 _gdp_chan_init(
 		struct event_base *evbase,
-		void *unused)
+		void *options_unused)
 {
 	if (evbase == NULL)
 		return EP_STAT_ABORT;
@@ -262,14 +265,14 @@ read_header(gdp_cursor_t *cursor)
 	if (gdp_buf_getlength(ibuf) < hdr_len)
 		return GDP_STAT_KEEP_READING;
 
-	GET32(cursor->payload_len);
+	GET32(cursor->payload_size);
 	memcpy(cursor->src, pbp, sizeof cursor->src);
 	pbp += sizeof cursor->src;
 	memcpy(cursor->dst, pbp, sizeof cursor->dst);
 	pbp += sizeof cursor->dst;
 
 	// XXX hack: only return entire PDU
-	if (gdp_buf_getlength(ibuf) < hdr_len + cursor->payload_len)
+	if (gdp_buf_getlength(ibuf) < hdr_len + cursor->payload_size)
 		return GDP_STAT_KEEP_READING;
 
 	// consume entire header
@@ -777,12 +780,13 @@ _gdp_chan_close(gdp_chan_t *chan)
 **  _GDP_CHAN_SEND --- send a message to a channel
 */
 
-EP_STAT
-_gdp_chan_send(gdp_chan_t *chan,
+static EP_STAT
+send_helper(gdp_chan_t *chan,
 			gdp_target_t *target,
 			gdp_name_t src,
 			gdp_name_t dst,
-			gdp_buf_t *payload)
+			gdp_buf_t *payload,
+			int tos)
 {
 	char pb[MAX_HEADER_LENGTH];
 	char *pbp = pb;
@@ -792,7 +796,7 @@ _gdp_chan_send(gdp_chan_t *chan,
 	// build the header in memory
 	PUT8(GDP_CHAN_PROTO_VERSION);		// version number
 	PUT8(15);							// time to live
-	PUT8(0);							// type of service
+	PUT8(tos);							// type of service
 	PUT8(18);							// header length (= 72 / 4)
 	PUT32(gdp_buf_getlength(payload));
 	memcpy(pbp, dst, sizeof (gdp_name_t));
@@ -818,6 +822,16 @@ _gdp_chan_send(gdp_chan_t *chan,
 
 fail0:
 	return estat;
+}
+
+EP_STAT
+_gdp_chan_send(gdp_chan_t *chan,
+			gdp_target_t *target,
+			gdp_name_t src,
+			gdp_name_t dst,
+			gdp_buf_t *payload)
+{
+	return send_helper(chan, target, src, dst, payload, 0);
 }
 
 
@@ -920,9 +934,9 @@ _gdp_cursor_get_endpoints(
 
 
 size_t
-_gdp_cursor_get_payload_len(gdp_cursor_t *cursor)
+_gdp_cursor_get_payload_size(gdp_cursor_t *cursor)
 {
-	return cursor->payload_len;
+	return cursor->payload_size;
 }
 
 
