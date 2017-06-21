@@ -154,11 +154,11 @@ _gdp_gcl_freehandle(gdp_gcl_t *gcl)
 	// drop it from the name -> handle cache
 	_gdp_gcl_cache_drop(gcl);
 
-	// should be inacessible now
-	_gdp_gcl_unlock(gcl);
-
 	// release any remaining requests
 	_gdp_req_freeall(&gcl->reqs, NULL);
+
+	// should be inacessible now
+	_gdp_gcl_unlock(gcl);
 
 	// free any additional per-GCL resources
 	if (gcl->freefunc != NULL)
