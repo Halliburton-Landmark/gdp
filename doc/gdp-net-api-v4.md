@@ -1,7 +1,7 @@
 % What I Want to See in a Network API
   for the GDP
 % Eric Allman
-% 2017-06-16
+% 2017-06-21
 
 ***This is a proposal, not a specification***
 
@@ -162,6 +162,9 @@ a model of how this would map into an OO environment.
 * `gdp_name_t` is the 256-bit version of a GDP name.
 * `gdp_adcert_t` is whatever information is needed to advertise
   a GDPname.  This is _for further study_.
+* `gdp_target_t` is intended for specifying clues as to where to
+  deliver a message, for example, any replica, all replicas,
+  or a specific replica.  It is undefined as yet.
 
 
 ### Initialization
@@ -229,13 +232,9 @@ The `cdata` parameter is saved and is available to callbacks on this
 channel.
 
 **`cursor_recv_cb`**:  When a new PDU is ready to read on the
-associated channel (as encapsulated into `cursor`, call
-`cursor_recv_cb`, including the total size of the payload (not
-necessarily what is available for read right now).  The `cursor`
-is a handle created by the network layer that I must pass into
-`_gdp_cursor_recv` (see below) during the lifetime of this callback
-in order to actually read the data, and that I promise to never
-use outside this callback.
+associated channel (as encapsulated into `cursor`), call
+`cursor_recv_cb`.  Details are described under "Receiving
+Messages" below.
 
 **`chan_send_cb`**: The `gdp_send_cb` is not used at this time; for
 now, if it is non-NULL `_gdp_chan_open` should return
@@ -253,6 +252,16 @@ the connection, or on I/O error, `gdp_close_cb` is called.  The
 | `GDP_IOEVENT_ERROR`	| Error occurred on channel			|
 
 Note that this is a bitmap; multiple flags may be set on a single call.
+
+**`chan_advert_func`**: Invoked when advertising or withdrawal needs to
+take place.  Advertising is required when the channel is connected,
+either for the first time or when a reconnection is required.
+Withdrawal takes place when the client explicitly requests it or
+when the client is shutting down.  The `action` parameter specifies
+whether this is for advertisement or withdrawal.
+
+> [[Is `chan_advert_func` required?  The conditions can probably be
+determined from `chan_ioevent_cb`.]]
 
 > [[Nitesh brings up the question of `dst` filtering.  It isn't clear
 which side of the interface this belongs on.]]
@@ -272,7 +281,7 @@ attempt to use `chan` after it is freed.
 #### \_gdp\_chan\_get\_cdata (chan::get_cdata)
 
 ~~~
-	void *_gdp_chan_get_cdata(
+	gdp_chan_x_t *_gdp_chan_get_cdata(
 			gdp_chan_t *chan);
 ~~~
 
@@ -307,7 +316,7 @@ _This interface is still under development._
 
 ~~~
 	// advertising challenge/response callback function type
-	typedef EP_STAT (*chan_advert_cr_t)(
+	typedef EP_STAT (*gdp_chan_advert_cr_t)(
 			gdp_chan_t *chan,
 			gdp_name_t gname,
 			int action,
@@ -361,7 +370,7 @@ that can be passed to `_gdp_chan_withdraw` or is the gname enough?]]
 ~~~
 	EP_STAT _gdp_chan_send(
 			gdp_chan_t *chan,
-			gdp_XXX_t *target,
+			gdp_target_t *target,
 			gdp_name_t src,
 			gdp_name_t dst,
 			gdp_buf_t *payload);
@@ -415,12 +424,15 @@ probably with "new", "join", "leave", and "free" style interface.
 ### Receiving Messages (cursor operations)
 
 Message data is returned via a cursor, not a channel.  This
-allows long messages to be returned in "chunks".
+allows long messages to be returned in "chunks".  When data is
+available for reading, the network layer ("you") will invoke
+`cursor_recv_cb` with the cursor and flags:
 
-All of these routines should only be called from within
-`cursor_recv_cb`.  The basic model is that the network layer
-("you") invokes the callback when there is new data to be read
-for a message on a channel.
+| Name				| Meaning				|
+|-------------------------------|---------------------------------------|
+| `GDP_CURSOR_PARTIAL`		| Partial data; continuation expected	|
+| `GDP_CURSOR_CONTINUATION`	| This data is continuation data	|
+| `GDP_CURSOR_READ_ERROR`	| A read error occurred (see below)	|
 
 I then do whatever processing is needed on that data.  It is not
 required that the entire message be read before the callback is
@@ -432,8 +444,7 @@ data buffer.
 
 ~~~
 	gdp_buf_t *_gdp_cursor_get_buf(
-			gdp_cursor_t *cursor,
-			uint32_t flags);
+			gdp_cursor_t *cursor);
 ~~~
 
 Returns the (read-only) data buffer associated with the cursor.
@@ -443,13 +454,9 @@ If the callback does not consume the buffer data before returning,
 any new data for that cursor will be appended to the buffer and
 the callback will be invoked again.
 
-The flags are:
-
-| Name				| Meaning				|
-|-------------------------------|---------------------------------------|
-| `GDP_CURSOR_PARTIAL`		| Partial data; continuation expected	|
-| `GDP_CURSOR_CONTINUATION`	| This data is continuation data	|
-| `GDP_CURSOR_READ_ERROR`	| A read error occurred (see below)	|
+The buffer returned uses the existing interface as described in
+"GDP Programmatic API", including the ability to get the amount
+of the available data, read data in various ways, and peek at data.
 
 Data read from a cursor is guaranteed to be presented in the
 same order it was written with no duplicates or dropouts.
@@ -518,7 +525,7 @@ free any allocated memory) before the cursor is destroyed.
 #### \_gdp\_cursor\_get\_udata (cursor::get\_udata)
 
 ~~~
-	void *_gdp_cursor_set_udata(
+	void *_gdp_cursor_get_udata(
 			gdp_cursor_t *cursor);
 ~~~
 
@@ -529,19 +536,29 @@ If no user data has been set, returns NULL.
 ### Utilities
 
 
-#### \_gdp\_cursor\_lock, \_gdp\_cursor\_unlock (cursor::lock, cursor::unlock)
+#### \_gdp\_chan\_lock, \_gdp\_chan\_unlock (chan::lock, chan::unlock)
 
 ~~~
-	void _gdp_cursor_lock(
-			gdp_cursor_t *cursor);
+	void _gdp_chan_lock(
+			gdp_chan_t *chan);
 
-	void _gdp_cursor_unlock(
-			gdp_cursor_t *cursor);
+	void _gdp_chan_unlock(
+			gdp_chan_t *chan);
 ~~~
 
-Lock or unlock a `cursor`.  This is a mutex lock.
+Lock or unlock a `chan`.  This is a mutex lock.
+
+> [[Can this be done implicitly?  What in particular is it for?
+Should there be an equivalent for cursors?]]
 
 
 ## Status Codes
 
-Later.
+To be completed.
+
+* `GDP_STAT_KEEP_READING`
+* `GDP_STAT_PDU_VERSION_MISMATCH`
+* `GDP_STAT_PDU_CORRUPT`
+* `GDP_STAT_NOTFOUND`
+* `GDP_STAT_PDU_WRITE_FAIL`
+* `GDP_STAT_NOT_IMPLEMENTED`
