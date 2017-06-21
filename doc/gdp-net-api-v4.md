@@ -539,7 +539,7 @@ If no user data has been set, returns NULL.
 ### Utilities
 
 
-#### \_gdp\_cursor\_lock, \_gdp\_cursor\_unlock (cursor::lock, cursor::unlock)
+#### \_gdp\_chan\_lock, \_gdp\_chan\_unlock (chan::lock, chan::unlock)
 
 ~~~
 	void _gdp_chan_lock(
