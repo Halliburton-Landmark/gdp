@@ -336,8 +336,13 @@ do_multiread(gdp_gcl_t *gcl,
 	// now start reading the events that will be generated
 	if (!use_callbacks)
 	{
+		uint32_t ndone = 0;
 		for (;;)
 		{
+			// for testing: force early termination and close
+			if (ep_dbg_test(Dbg, 127) && ++ndone >= numrecs)
+				break;
+
 			// get the next incoming event
 			gdp_event_t *gev = gdp_event_next(NULL, 0);
 
@@ -698,6 +703,15 @@ fail0:
 		EP_STAT close_stat = gdp_gcl_close(gcl);
 		if (!EP_STAT_ISOK(close_stat))
 			ep_app_message(close_stat, "cannot close GCL");
+	}
+
+	// this sleep is to watch for any extraneous results coming back
+	if (ep_dbg_test(Dbg, 126))
+	{
+		int sleep_time = 40;
+		ep_dbg_printf("Sleeping for %d seconds\n", sleep_time);
+		while (sleep_time-- > 0)
+			ep_time_nanosleep(INT64_C(1000000000));		// one second
 	}
 
 	if (ep_dbg_test(Dbg, 10))
