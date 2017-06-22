@@ -308,7 +308,7 @@ _gdp_gcl_unsubscribe(
 			estat = _gdp_req_lock(req);
 			EP_STAT_CHECK(estat, break);
 			nextreq = LIST_NEXT(req, gcllist);
-			if (!GDP_NAME_SAME(req->cpdu->dst, dest))
+			if (!GDP_NAME_SAME(req->rpdu->dst, dest))
 			{
 				_gdp_req_unlock(req);
 				continue;
