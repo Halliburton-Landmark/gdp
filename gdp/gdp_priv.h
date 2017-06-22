@@ -364,10 +364,6 @@ EP_STAT			_gdp_gcl_subscribe(			// subscribe to data
 						gdp_event_cbfunc_t cbfunc,
 						void *cbarg);
 
-EP_STAT			_gdp_gcl_unsubscribe(		// unsubscribe
-						gdp_gcl_t *gcl,			// the GCL with the subscription
-						gdp_name_t dest);		// the name of the subscriber
-
 EP_STAT			_gdp_gcl_getmetadata(		// retrieve metadata
 						gdp_gcl_t *gcl,
 						gdp_gclmd_t **gmdp,

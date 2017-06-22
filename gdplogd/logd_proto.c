@@ -439,7 +439,7 @@ cmd_close(gdp_req_t *req)
 	}
 
 	// remove any subscriptions
-	_gdp_gcl_unsubscribe(req->gcl, req->cpdu->src);
+	sub_end_all_subscriptions(req->gcl, req->cpdu->src);
 
 	//return number of records
 	req->rpdu->datum->recno = req->gcl->nrecs;

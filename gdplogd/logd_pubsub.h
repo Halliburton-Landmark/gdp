@@ -36,12 +36,15 @@
 #define SUB_DEFAULT_TIMEOUT		600		// default subscription timeout (10m)
 
 // notify all subscribers that new data is available (or shutdown required)
-extern void	sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd);
+void			sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd);
 
 // terminate a subscription
-extern void	sub_end_subscription(gdp_req_t *req);
+void			sub_end_subscription(gdp_req_t *req);
+
+// terminate all subscriptions for a given {gcl, client} pair
+EP_STAT			sub_end_all_subscriptions(gdp_gcl_t *gcl, gdp_name_t dest);
 
 // reclaim subscription resources
-extern void	sub_reclaim_resources(gdp_chan_t *chan);
+void			sub_reclaim_resources(gdp_chan_t *chan);
 
 #endif // _GDPD_PUBSUB_H_
