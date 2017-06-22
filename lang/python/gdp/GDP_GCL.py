@@ -27,12 +27,29 @@
 # ----- END LICENSE BLOCK -----                                               
 
 
+import weakref
 from MISC import *
 from GDP_NAME import *
 from GDP_DATUM import *
 from GDP_GCLMD import *
 from GDP_GCL_OPEN_INFO import *
 
+### From https://stackoverflow.com/questions/19443440/
+class WeakMethod(object):
+    """A callable object. Takes one argument to init: 'object.method'.
+    Once created, call this object -- MyWeakMethod() --
+    and pass args/kwargs as you normally would.
+    """
+    def __init__(self, object_dot_method):
+        self.target = weakref.proxy(object_dot_method.__self__)
+        self.method = weakref.proxy(object_dot_method.__func__)
+        ###Older versions of Python can use 'im_self' and 'im_func'
+        ###in place of '__self__' and '__func__' respectively
+
+    def __call__(self, *args, **kwargs):
+        """Call the method with args and kwargs as needed."""
+        return self.method(self.target, *args, **kwargs)
+### End
 
 class GDP_GCL(object):
 
@@ -116,18 +133,28 @@ class GDP_GCL(object):
         check_EP_STAT(estat)
 
         if addressof(__ptr.contents) in cls.object_dir.keys():
-            newobj = cls.object_dir[addressof(__ptr.contents)]
+            ## need the '()' because we store weakrefs in object_dir
+            newobj = cls.object_dir[addressof(__ptr.contents)]()
+            ## the following assertion should hold, because anytime a GDP_GCL
+            ## object is freed, object_dir is also cleaned up. IF object_dir
+            ## has a pointer, that means the object hasn't been claimed by GC.
+            assert newobj is not None
             return newobj
         else:
             # create a new instance
             newobj = super(GDP_GCL, cls).__new__(cls)
             newobj.ptr = __ptr
             newobj.gdp_gcl_open_info = __gdp_gcl_open_info
-            newobj.get_next_event = newobj.__get_next_event
-            cls.object_dir[addressof(__ptr.contents)] = newobj
+            cls.object_dir[addressof(__ptr.contents)] = weakref.ref(newobj)
             return newobj
 
         assert False    # should never get here
+
+
+    def __init__(self, *args):
+        ## Create the instance method 'get_next_event', in addition to
+        ## already existing class method
+        self.get_next_event = WeakMethod(self.__get_next_event)
 
 
     def __del__(self):
@@ -575,7 +602,8 @@ class GDP_GCL(object):
         gcl_ptr = __func2(event_ptr)
 
         # now find this in the dictionary
-        gcl_handle = cls.object_dir.get(addressof(gcl_ptr.contents), None)
+        ## => need the '()' because we store weakrefs in object_dir
+        gcl_handle = cls.object_dir.get(addressof(gcl_ptr.contents), None)()
 
         # also get the associated datum object
         __func3 = gdp.gdp_event_getdatum
@@ -630,5 +658,8 @@ class GDP_GCL(object):
     def __get_next_event(self, timeout):
         """ Get events for this particular GCL """
         event = self._helper_get_next_event(self.ptr, timeout)
-        if event is not None: assert event["gcl_handle"] == self
+        if event is not None:
+            ## the crazy '__repr__.__self__' is needed, because there's no
+            ## unproxy. See https://stackoverflow.com/questions/10246116
+            assert event["gcl_handle"] == self.__repr__.__self__
         return event
