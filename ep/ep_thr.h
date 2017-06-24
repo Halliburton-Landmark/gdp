@@ -187,12 +187,10 @@ extern bool	ep_thr_mutex_assert_isunlocked(
 extern bool	ep_thr_mutex_assert_i_own(
 			EP_THR_MUTEX *, const char *, const char *, int);
 
-# define	EP_THR_MUTEX_ASSERT_ISLOCKED(m, r)				\
-			if (!ep_thr_mutex_assert_islocked(m, #m, __FILE__, __LINE__))	\
-			{	r;	}
-# define	EP_THR_MUTEX_ASSERT_ISUNLOCKED(m, r)			\
-			if (!ep_thr_mutex_assert_isunlocked(m, #m, __FILE__, __LINE__))	\
-			{	r;	}
+# define	EP_THR_MUTEX_ASSERT_ISLOCKED(m)				\
+			ep_thr_mutex_assert_islocked(m, #m, __FILE__, __LINE__)
+# define	EP_THR_MUTEX_ASSERT_ISUNLOCKED(m)			\
+			ep_thr_mutex_assert_isunlocked(m, #m, __FILE__, __LINE__)
 #else
 # define	ep_thr_mutex_assert_islocked(m, i, f, l)	true
 # define	ep_thr_mutex_assert_isunlocked(m, i, f, l)	true

@@ -316,7 +316,7 @@ cmd_create(gdp_req_t *req)
 	logd_advertise_one(gcl->name, GDP_CMD_ADVERTISE);
 
 	// cache the open GCL Handle for possible future use
-	EP_ASSERT_INSIST(gdp_name_is_valid(gcl->name));
+	EP_ASSERT(gdp_name_is_valid(gcl->name));
 	_gdp_gcl_cache_add(gcl, gcl->iomode);
 
 	// pass any creation info back to the caller
@@ -892,7 +892,7 @@ cmd_subscribe(gdp_req_t *req)
 	EP_TIME_SPEC timeout;
 
 	if (req->gcl != NULL)
-		EP_THR_MUTEX_ASSERT_ISLOCKED(&req->gcl->mutex, );
+		EP_THR_MUTEX_ASSERT_ISLOCKED(&req->gcl->mutex);
 
 	req->rpdu->cmd = GDP_ACK_SUCCESS;
 

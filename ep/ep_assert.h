@@ -32,53 +32,49 @@
 /*
 **  ASSERTIONS
 **
-**	There are two types of assertions, designed to make recovery
-**	possible under some circumstances.  The first are fatal
-**	assertions:
+**	Normally assertions are _not_ fatal.  This can be changed either
+**	by the swarm.gdp.debug.assert.allabort runtime parameter or
+**	by setting the EpAssertAllAbort global variable.  If either
+**	is set, then all assertions (actually all calls to
+**	_ep_assert_printv) cause immediate death.  This is to simplify
+**	debugging, where ignoring an assertion could result in cascading
+**	failures.
+**
+**	There are multiple ways to test assertions.
 **
 **		EP_ASSERT(condition)
 **
-**	If condition is not satisfied, a message is printed and the
-**	process exits.
+**	If condition evaluates false, a message is printed and the
+**	macro returns false, unless one of the previously mentioned
+**	parameters indicate that abort should be immediate, in which
+**	case the process exits.
 **
-**		EP_ASSERT_TEST(condition)
+**	Since the EP_ASSERT returns the boolean result of the condition
+**	(equivalent to returning !!condition), recovery can be
+**	performed by testing the result, e.g.,
 **
-**	If condition is not satisfied, a message is printed and the
-**	assertion call returns true, otherwise false.  The intent is
-**	so it can be used as follows:
+**		if (!EP_ASSERT(condition))
+**			do recovery;
 **
-**		if (EP_ASSERT_TEST(condition))
-**			do cleanup;
+**	A bit of syntactic sugar permits us to use:
 **
-**	A bit of syntactic sugar permits us to include:
+**		EP_ASSERT_ELSE(condition, do recovery)
 **
-**		EP_ASSERT_ELSE(condition, recovery)
-**
-**	If condition is not satisfied, a message is printed and the
-**	recovery action (which may be limited C code) is executed.  It
-**	is nearly equivalent to:
-**
-**		if (EP_ASSERT_TEST(condition))
-**			recovery;
-**
-**	If the condition test is inapppriate, just the error action
+**	If the condition test is unneeded, just the error action
 **	can be performed using EP_ASSERT_FAILURE or EP_ASSERT_PRINT;
-**	the first aborts the process and the second returns, both
-**	after printing an assertion failure message.
+**	the first aborts the process (unconditionally) and the second
+**	behaves like EP_ASSERT with a false condition.
 **
 **	If the EpAssertInfo function pointer is set, that function
 **	will be called as part of the process of printing the error.
-**	It can be used to dump global state.
+**	It can be used to dump global state.  It is called before
+**	EpAssertAllAbort is tested, so it can set that variable true
+**	if it wants the process to exit immediately.
 **
-**	If EpAssertAbort is set, that function is called immediately
-**	before the process exits.  If it returns, abort(3) is called.
-**	It could, for example, kill the current thread as opposed to
-**	the current process.
-**
-**	If _EP_CCCF_ASSERT_ALL_ABORT is set during compilation, then
-**	all assertions (actually all calls to _ep_assert_printv) cause
-**	immediate death.  This is to simplify debugging, where
-**	ignoring an assertion could result in cascading failures.
+**	If the process does abort and EpAssertAbort is set, that
+**	function is called immediately before the process exits.
+**	If it returns, abort(3) is called.  It could, for example,
+**	kill the current thread as opposed to the current process.
 **
 **	If _EP_CCCF_ASSERT_NONE is set during compilation, then all
 **	assertions are compiled out.
@@ -95,11 +91,12 @@
 // assert that an expression must be true
 #define EP_ASSERT(e)							\
 		((e)							\
-			? ((void) 0)					\
-			: ep_assert_failure(__FILE__, __LINE__,		\
-					"%s", #e))
+			? (true)					\
+			: (ep_assert_print(__FILE__, __LINE__,		\
+					"%s", #e), false))
 
-// test for condition
+// test for condition (a bit odd because the macro is true if the
+// expression is false)  [DEPRECATED]
 #define EP_ASSERT_TEST(e)						\
 		((e)							\
 			? (false)					\
@@ -121,11 +118,11 @@
 #define EP_ASSERT_FAILURE(...)						\
 		ep_assert_failure(__FILE__, __LINE__, __VA_ARGS__)
 
-// print assertion failure and continue
+// print assertion failure and optionally continue
 #define EP_ASSERT_PRINT(...)						\
 		ep_assert_print(__FILE__, __LINE__, __VA_ARGS__)
 
-// called if the assertion failed
+// force abort due to assertion failure (should be called ep_assert_abort)
 extern void EP_TYPE_PRINTFLIKE(3, 4)
 		ep_assert_failure(
 			const char *file,
@@ -134,7 +131,7 @@ extern void EP_TYPE_PRINTFLIKE(3, 4)
 			...)
 			EP_ATTR_NORETURN;
 
-// print an assertion failure, but do not abort
+// print an assertion failure, but generally won't cause an abort
 extern void	ep_assert_printv(
 			const char *file,
 			int line,
@@ -150,7 +147,7 @@ extern void EP_TYPE_PRINTFLIKE(3, 4)
 
 #else // _EP_CCCF_ASSERT_NONE
 
-#define EP_ASSERT(e)
+#define EP_ASSERT(e)			true
 #define EP_ASSERT_TEST(e)		false
 #define EP_ASSERT_ELSE(e, r)
 #define EP_ASSERT_FAILURE(...)

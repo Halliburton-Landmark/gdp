@@ -285,12 +285,12 @@ gdp_datum_copy(gdp_datum_t *to, const gdp_datum_t *from)
 	to->inuse = from->inuse;
 	if (from->dbuf != NULL)
 	{
-		if (!EP_ASSERT_TEST(to->dbuf != NULL))
+		if (EP_ASSERT(to->dbuf != NULL))
 			gdp_buf_copy(to->dbuf, from->dbuf);
 	}
 	if (from->sig != NULL)
 	{
-		if (!EP_ASSERT_TEST(to->sig != NULL))
+		if (EP_ASSERT(to->sig != NULL))
 			gdp_buf_copy(to->sig, from->sig);
 	}
 }

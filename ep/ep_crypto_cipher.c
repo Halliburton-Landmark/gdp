@@ -184,7 +184,7 @@ ep_crypto_cipher_crypt(
 	}
 
 	rval += olen;
-	EP_ASSERT_ENSURE(rval >= 0);
+	EP_ASSERT(rval >= 0);
 	return EP_STAT_FROM_INT(rval);
 }
 
@@ -206,7 +206,7 @@ ep_crypto_cipher_update(
 		return EP_STAT_CRYPTO_CIPHER;
 	}
 
-	EP_ASSERT_ENSURE(olen >= 0 && olen <= outlen);
+	EP_ASSERT(olen >= 0 && olen <= outlen);
 	return EP_STAT_FROM_INT(olen);
 }
 
@@ -236,6 +236,6 @@ ep_crypto_cipher_final(
 		return EP_STAT_CRYPTO_CIPHER;
 	}
 
-	EP_ASSERT_ENSURE(olen >= 0);
+	EP_ASSERT(olen >= 0);
 	return EP_STAT_FROM_INT(olen);
 }

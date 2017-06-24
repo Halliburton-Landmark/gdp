@@ -125,7 +125,7 @@ ep_assert_print(
 **
 **  EP_ASSERT_FAILURE -- internal routine to raise an assertion failure
 **
-**	ep_assert_nofail variant prints message but returns
+**	ep_assert_print variant prints message but returns
 **
 **	Parameters:
 **		file -- which file contained the assertion

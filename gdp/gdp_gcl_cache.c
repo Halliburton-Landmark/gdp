@@ -125,7 +125,7 @@ _gdp_gcl_cache_add(gdp_gcl_t *gcl, gdp_iomode_t mode)
 	// sanity checks
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
 	EP_ASSERT_ELSE(gdp_name_is_valid(gcl->name), return);
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
 
 	ep_dbg_cprintf(Dbg, 49, "_gdp_gcl_cache_add(%p): adding\n", gcl);
 	if (EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
@@ -274,13 +274,14 @@ void
 _gdp_gcl_cache_drop(gdp_gcl_t *gcl)
 {
 	EP_ASSERT_ELSE(gcl != NULL, return);
-	if (EP_ASSERT_TEST(GDP_GCL_ISGOOD(gcl)))
+	if (!EP_ASSERT(GDP_GCL_ISGOOD(gcl)))
 	{
 		// GCL is in some random state --- we need the name at least
+		// (this may crash)
 		EP_ASSERT_ELSE(gdp_name_is_valid(gcl->name), return);
 	}
 
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
 
 	if (!EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
 	{
@@ -321,7 +322,8 @@ _gdp_gcl_touch(gdp_gcl_t *gcl)
 	struct timeval tv;
 
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, return);
+	if (!EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex))
+		return;
 
 	if (!EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
 	{
@@ -602,7 +604,7 @@ void
 _gdp_gcl_incref(gdp_gcl_t *gcl)
 {
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
 
 	gcl->refcnt++;
 	_gdp_gcl_touch(gcl);

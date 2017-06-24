@@ -83,8 +83,8 @@ _gdp_invoke(gdp_req_t *req)
 	EP_ASSERT_POINTER_VALID(req);
 	if (req->gcl != NULL)
 	{
-		EP_ASSERT_ELSE(GDP_GCL_ISGOOD(req->gcl), );
-		EP_THR_MUTEX_ASSERT_ISLOCKED(&req->gcl->mutex, );
+		EP_ASSERT(GDP_GCL_ISGOOD(req->gcl));
+		EP_THR_MUTEX_ASSERT_ISLOCKED(&req->gcl->mutex);
 	}
 	cmdname = _gdp_proto_cmd_name(req->cpdu->cmd);
 	if (ep_dbg_test(Dbg, 10))
@@ -102,7 +102,7 @@ _gdp_invoke(gdp_req_t *req)
 		}
 	}
 	EP_ASSERT_ELSE(req->state == GDP_REQ_ACTIVE, return EP_STAT_ASSERT_ABORT);
-	//EP_ASSERT_REQUIRE(ep_thr_mutex_islocked(&req->mutex));
+	//EP_ASSERT(ep_thr_mutex_islocked(&req->mutex));
 
 	// scale timeout to milliseconds
 	delta_to = ep_adm_getlongparam("swarm.gdp.invoke.timeout", 10000L);
@@ -330,7 +330,7 @@ acknak(gdp_req_t *req, const char *where, bool reuse_pdu)
 			// point the new PDU at the old datum
 			req->rpdu->datum = req->cpdu->datum;
 			req->cpdu->datum = NULL;
-			(void) EP_ASSERT_TEST(req->rpdu->datum->inuse);
+			EP_ASSERT(req->rpdu->datum->inuse);
 		}
 	}
 	return EP_STAT_OK;

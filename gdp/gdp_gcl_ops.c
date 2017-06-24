@@ -148,7 +148,7 @@ _gdp_gcl_freehandle(gdp_gcl_t *gcl)
 	// this is a forced free, so ignore existing refcnts, etc.
 	gcl->refcnt = 0;
 
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
 	gcl->flags |= GCLF_DROPPING | GCLF_ISLOCKED;
 
 	// drop it from the name -> handle cache
@@ -350,7 +350,7 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 	// send the request across to the log daemon
 	errno = 0;				// avoid spurious messages
 	reqflags |= GDP_REQ_ROUTEFAIL;			// don't retry on router errors
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
 	estat = _gdp_req_new(cmd, gcl, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 	estat = _gdp_invoke(req);

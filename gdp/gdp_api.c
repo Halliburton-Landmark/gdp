@@ -448,7 +448,7 @@ gdp_gcl_open(gdp_name_t name,
 		_gdp_gcl_lock(gcl);
 		gcl->iomode = mode;
 		estat = _gdp_gcl_open(gcl, cmd, info, _GdpChannel, GDP_REQ_ALLOC_RID);
-		EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
+		EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
 	}
 	if (EP_STAT_ISOK(estat))
 	{

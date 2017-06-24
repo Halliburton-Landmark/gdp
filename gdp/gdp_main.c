@@ -145,13 +145,13 @@ gdp_pdu_proc_cmd(void *cpdu_)
 
 	gcl = _gdp_gcl_cache_get(cpdu->dst, 0);
 	if (gcl != NULL)
-		EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
+		EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
 
 	ep_dbg_cprintf(Dbg, 43,
 			"gdp_pdu_proc_cmd: allocating new req for GCL %p\n", gcl);
 	estat = _gdp_req_new(cmd, gcl, cpdu->chan, cpdu, GDP_REQ_CORE, &req);
 	EP_STAT_CHECK(estat, goto fail0);
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex, );
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex);
 
 	ep_dbg_cprintf(Dbg, 40, "gdp_pdu_proc_cmd >>> req=%p\n", req);
 
@@ -384,7 +384,7 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 			_gdp_pdu_free(rpdu);
 			return;
 		}
-		else if (EP_ASSERT_TEST(req->state != GDP_REQ_FREE))
+		else if (!EP_ASSERT(req->state != GDP_REQ_FREE))
 		{
 			if (ep_dbg_test(DbgProcResp, 1))
 			{

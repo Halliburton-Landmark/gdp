@@ -70,9 +70,9 @@ subscr_resub(gdp_req_t *req)
 
 	ep_dbg_cprintf(Dbg, 39, "subscr_resub: refreshing req@%p\n", req);
 	EP_ASSERT_ELSE(req != NULL, return EP_STAT_ASSERT_ABORT);
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex, );
-	EP_ASSERT_ELSE(req->gcl != NULL, );
-	EP_ASSERT_ELSE(req->cpdu != NULL, );
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex);
+	EP_ASSERT_ELSE(req->gcl != NULL, return EP_STAT_ASSERT_ABORT);
+	EP_ASSERT_ELSE(req->cpdu != NULL, return EP_STAT_ASSERT_ABORT);
 
 	req->state = GDP_REQ_ACTIVE;
 	req->cpdu->cmd = GDP_CMD_SUBSCRIBE;

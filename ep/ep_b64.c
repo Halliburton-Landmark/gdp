@@ -97,7 +97,7 @@ ep_b64_enc_len(size_t bsize, const char *encoding)
 static char
 getenc(int b, const char *encoding)
 {
-	EP_ASSERT_REQUIRE(b >= 0 && b < 64);
+	EP_ASSERT(b >= 0 && b < 64);
 
 	if (b == 62)
 		return encoding[0];
@@ -183,7 +183,7 @@ ep_b64_encode(const void *bbin, size_t bsize,
 	}
 
 	// success!
-	EP_ASSERT_ENSURE(tx < tsize);
+	EP_ASSERT(tx < tsize);
 	txt[tx] = '\0';
 	return EP_STAT_FROM_INT((unsigned long) tx);
 }

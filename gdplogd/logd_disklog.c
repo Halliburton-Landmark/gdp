@@ -762,7 +762,7 @@ fail1:
 	ep_dbg_cprintf(Dbg, 9, "segment_open: closing fp %p (error)\n", seg->fp);
 	fclose(seg->fp);
 fail0:
-	EP_ASSERT_ENSURE(!EP_STAT_ISOK(estat));
+	EP_ASSERT(!EP_STAT_ISOK(estat));
 	return estat;
 }
 
@@ -844,7 +844,7 @@ segment_get(gdp_gcl_t *gcl, int segno)
 		phys->segments[segno] = seg = segment_alloc(segno);
 	}
 
-	EP_ASSERT_ENSURE(seg != NULL);
+	EP_ASSERT(seg != NULL);
 	return seg;
 }
 
@@ -1730,7 +1730,7 @@ disk_open(gdp_gcl_t *gcl)
 	ep_dbg_cprintf(Dbg, 20, "disk_open(%s)\n", gcl->pname);
 
 	// allocate space for physical data
-	EP_ASSERT_REQUIRE(GETPHYS(gcl) == NULL);
+	EP_ASSERT(GETPHYS(gcl) == NULL);
 	phase = "physinfo_alloc";
 	gcl->x->physinfo = phys = physinfo_alloc(gcl);
 	if (phys == NULL)
@@ -2000,7 +2000,7 @@ disk_read_by_recno(gdp_gcl_t *gcl,
 		{
 			fprintf(stderr, "datum->siglen = %d, sizeof read_buffer = %zd\n",
 					datum->siglen, sizeof read_buffer);
-			EP_ASSERT_INSIST(datum->siglen <= sizeof read_buffer);
+			EP_ASSERT(datum->siglen <= sizeof read_buffer);
 		}
 		if (datum->sig == NULL)
 			datum->sig = gdp_buf_new();
@@ -2211,7 +2211,7 @@ disk_append(gdp_gcl_t *gcl,
 			if (slen > 0)
 				ep_hexdump(p, slen, ep_dbg_getfile(), EP_HEXDUMP_ASCII, 0);
 		}
-		EP_ASSERT_INSIST(datum->siglen == slen);
+		EP_ASSERT(datum->siglen == slen);
 		if (slen > 0 && p != NULL)
 			fwrite(p, slen, 1, seg->fp);
 		record_size += slen;
