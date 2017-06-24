@@ -178,7 +178,7 @@ assertion_dump(void)
 
 	// check to see if we are in a tight loop
 	int max_asserts = ep_adm_getintparam("swarm.gdplogd.assert.maxasserts", 0);
-	if (max_asserts >= 0 && ++n_assertions > max_asserts)
+	if (max_asserts > 0 && ++n_assertions >= max_asserts)
 	{
 		// make things abort now
 		EpAssertAllAbort = true;
