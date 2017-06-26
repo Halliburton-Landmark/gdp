@@ -106,7 +106,10 @@ git clone repoman@repo.eecs.berkeley.edu:projects/swarmlab/gdp.git</code></pre>
 <p>We need to import the package <code>gdp</code> to begin with.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="op">&gt;&gt;&gt;</span> <span class="im">import</span> gdp</code></pre></div>
 <p>Once imported, we need to initialize the GDP package by calling <code>gdp_init()</code>. An optional argument to <code>gdp_init()</code> is the address of a GDP-router. If no address provided, a default value of the parameter <code>swarm.gdp.routers</code> is used as configured by EP library. (See README for details).</p>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="op">&gt;&gt;&gt;</span> gdp.gdp_init()</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="op">&gt;&gt;&gt;</span> <span class="co"># the following picks a router based on EP library configuration</span>
+<span class="op">&gt;&gt;&gt;</span> gdp.gdp_init()
+<span class="op">&gt;&gt;&gt;</span> <span class="co"># For a specific router, use the following:</span>
+<span class="op">&gt;&gt;&gt;</span> <span class="co"># gdp.gdp_init(&#39;gdp-01.eecs.berkeley.edu:8007&#39;)</span></code></pre></div>
 <p>As mentioned earlier, we support human readable names for logs. The mechanism for translating a human readable name to a 256-bit name is probably going to change in the future, however, it is our hope that it should be a simple change. The Python wrapper uses instances of class <code>gdp.GDP_NAME</code> for a name, which could be initialized using a human readable name.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="op">&gt;&gt;&gt;</span> <span class="co"># Create a GDP_NAME object from a human readable python string</span>
 <span class="op">&gt;&gt;&gt;</span> gcl_name <span class="op">=</span> gdp.GDP_NAME(<span class="st">&quot;edu.berkeley.eecs.mor.01&quot;</span>)</code></pre></div>

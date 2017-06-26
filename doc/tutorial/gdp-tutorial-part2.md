@@ -128,7 +128,10 @@ address provided, a default value of the parameter `swarm.gdp.routers` is used
 as configured by EP library. (See README for details).
 
 ```python
+>>> # the following picks a router based on EP library configuration
 >>> gdp.gdp_init()
+>>> # For a specific router, use the following:
+>>> # gdp.gdp_init('gdp-01.eecs.berkeley.edu:8007')
 ```
 
 As mentioned earlier, we support human readable names for logs. The mechanism
