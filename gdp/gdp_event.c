@@ -69,10 +69,18 @@ _gdp_event_new(gdp_event_t **gevp)
 {
 	gdp_event_t *gev = NULL;
 
-	ep_thr_mutex_lock(&FreeListMutex);
-	if ((gev = STAILQ_FIRST(&FreeList)) != NULL)
-		STAILQ_REMOVE_HEAD(&FreeList, queue);
-	ep_thr_mutex_unlock(&FreeListMutex);
+	for (;;)
+	{
+		ep_thr_mutex_lock(&FreeListMutex);
+		if ((gev = STAILQ_FIRST(&FreeList)) != NULL)
+			STAILQ_REMOVE_HEAD(&FreeList, queue);
+		ep_thr_mutex_unlock(&FreeListMutex);
+		if (gev == NULL || gev->type == _GDP_EVENT_FREE)
+			break;
+
+		// error: abandon this event
+		EP_ASSERT_PRINT("_gdp_event_new: allocated event %p on free list", gev);
+	}
 	if (gev == NULL)
 	{
 		gev = ep_mem_zalloc(sizeof *gev);
@@ -96,11 +104,16 @@ gdp_event_free(gdp_event_t *gev)
 	EP_ASSERT_POINTER_VALID(gev);
 
 	ep_dbg_cprintf(Dbg, 48, "gdp_event_free(%p)\n", gev);
+	if (gev->type == _GDP_EVENT_FREE)
+	{
+		ep_dbg_cprintf(Dbg, 1, "gdp_event_free(%p): already free\n", gev);
+		return EP_STAT_ASSERT_ABORT;
+	}
 
+	gev->type = _GDP_EVENT_FREE;
 	if (gev->datum != NULL)
 		gdp_datum_free(gev->datum);
 	gev->datum = NULL;
-	gev->type = _GDP_EVENT_FREE;
 	ep_thr_mutex_lock(&FreeListMutex);
 	STAILQ_INSERT_HEAD(&FreeList, gev, queue);
 	ep_thr_mutex_unlock(&FreeListMutex);
@@ -170,7 +183,10 @@ gdp_event_next(gdp_gcl_t *gcl, EP_TIME_SPEC *timeout)
 	}
 
 	if (gev != NULL)
+	{
+		EP_ASSERT(gev->type != _GDP_EVENT_FREE);
 		STAILQ_REMOVE(&ActiveList, gev, gdp_event, queue);
+	}
 fail0:
 	ep_thr_mutex_unlock(&ActiveListMutex);
 
@@ -194,6 +210,11 @@ _gdp_event_trigger(gdp_event_t *gev)
 	ep_dbg_cprintf(Dbg, 48,
 			"_gdp_event_trigger: adding event %p (%d) to %s list\n",
 			gev, gev->type, gev->cb == NULL ? "active" : "callback");
+	if (gev->type == _GDP_EVENT_FREE)
+	{
+		ep_dbg_cprintf(Dbg, 1, "_gdp_event_trigger(%p): event is free\n", gev);
+		return;
+	}
 
 	if (gev->cb == NULL)
 	{
@@ -265,7 +286,8 @@ _gdp_event_thread(void *ctx)
 		EP_ASSERT(gev->type != _GDP_EVENT_FREE);
 
 		// now invoke it
-		(*gev->cb)(gev);
+		if (gev->cb != NULL)
+			(*gev->cb)(gev);
 
 		// don't forget to clean up (unless it's already free)
 		if (gev->type != _GDP_EVENT_FREE)
