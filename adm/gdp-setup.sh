@@ -70,7 +70,8 @@ case "$OS" in
 	package pandoc
 	if [ "$PKGMGR" = "brew" ]
 	then
-		package mosquitto warn "Homebrew doesn't support Avahi."
+		package mosquitto
+		warn "Homebrew doesn't support Avahi."
 		info "Avahi is used for Zeroconf (automatic client"
 		info "configuration.  Under Darwin, Avahi is difficult"
 		info "to build without editing files.  To build gdp without"
