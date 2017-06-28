@@ -12,10 +12,10 @@
     </author>
 
     <copyright>
-      <year>2008, 2014&ndash;2016 Eric P. Allman. All rights reserved.</year>
+      <year>2008, 2014&ndash;2017 Eric P. Allman. All rights reserved.</year>
     </copyright>
 
-    <date>2016-03-29</date>
+    <date>2017-06-28</date>
   </articleinfo>
 
   <section>
@@ -1718,17 +1718,29 @@ EP_STAT                 ep_crypto_cipher_final(
     void
     ep_dbg_getfile(void)                // return current debug output file</programlisting>
 
-    <para>Assertions all in &lt;ep/ep_assert.h&gt;:</para>
+    <para>Assertions are intended to catch "cannot happen" cases. They are not
+    necessarily fatal, depending on configuration controlled by administrative
+    parameters: <parameter>libep.assert.maxfailures</parameter> specifies the
+    number of assertion failures that will be tolerated before the process
+    aborts; however, every <parameter>libep.assert.resetinterval</parameter>
+    seconds the failure count is reset. For example, if
+    <parameter>libep.assert.maxfailures</parameter> is one, all assertion
+    failures are fatal. It defaults to zero (no assertions are fatal);
+    <parameter>libep.assert.resetinterval</parameter> defines to 60 (one
+    minute).</para>
 
     <programlisting>    #include &lt;ep/ep_assert.h&gt;
 
-    EP_ASSERT(condition)                // print and abort if condition not satisfied
-
-    EP_ASSERT_TEST(condition)           // print and return true if condition not satisfied
+    EP_ASSERT(condition)                // fail if condition is false; returns the condition itself
 
     EP_ASSERT_ELSE(condition, recovery) // print and run recovery code if condition not satisfied
 
     EP_ASSERT_PRINT(                    // print assertion failure message
+            const char *msg,               // message to print
+            ...)                           // arguments to message
+    ep_assert_print(                    // print assertion failure with extra info and message
+            const char *file,              // file name
+            int line,                      // line number
             const char *msg,               // message to print
             ...)                           // arguments to message
 
@@ -1745,11 +1757,24 @@ EP_STAT                 ep_crypto_cipher_final(
     void    (*EpAssertAbort)(void)      // function to call before aborting
     bool    EpAssertAllAbort            // if set, all assertions are immediately fatal</programlisting>
 
-    <para>Processes can abort as though they got an assertion failure by
-    calling <function>ep_assert_failure</function>. The macro
-    <function>EP_ASSERT_FAILURE</function> does the same thing, but provides
-    the <parameter>file</parameter> name and <parameter>line</parameter>
-    number in the same way as the assertion calls. If the
+    <para>Programs may try to recover from assertion failures by testing the
+    result of <function>EP_ASSERT</function>, which will be true if the
+    condition holds. For example, either of these return an error code if a
+    pointer is <constant>NULL</constant>:</para>
+
+    <programlisting>    if (!EP_ASSERT(p != NULL))
+        return EP_STAT_ASSERT_ABORT;
+
+    EP_ASSERT_ELSE(p != NULL, return EP_STAT_ASSERT_ABORT);</programlisting>
+
+    <para>Processes can force an abort as though they got an assertion failure
+    by calling <function>ep_assert_failure</function>. Note that this does not
+    attempt any recovery; <function>ep_assert_print</function> does the same
+    thing but does not abort. The macros
+    <function>EP_ASSERT_FAILURE</function> and
+    <function>EP_ASSERT_PRINT</function> do the same thing, but provide the
+    <parameter>file</parameter> name and <parameter>line</parameter> number in
+    the same way as the assertion tests. If the
     <varname>EpAssertInfo</varname> variable is set, that function will be
     called after printing the message but before aborting. It can be used to
     dump process state for debugging. If the <varname>EpAssertAbort</varname>

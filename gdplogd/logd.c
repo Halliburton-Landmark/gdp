@@ -171,38 +171,7 @@ sigabort(int sig)
 static void
 assertion_dump(void)
 {
-	static EP_TIME_SPEC base_time = {EP_TIME_NOTIME, 0, 0};
-	static int n_assertions = 0;
-
 	_gdp_dump_state(GDP_PR_DETAILED);
-
-	// check to see if we are in a tight loop
-	int max_asserts = ep_adm_getintparam("swarm.gdplogd.assert.maxasserts", 0);
-	if (max_asserts > 0 && ++n_assertions >= max_asserts)
-	{
-		// make things abort now
-		EpAssertAllAbort = true;
-	}
-
-	if (!EP_TIME_IS_VALID(&base_time))
-	{
-		ep_time_now(&base_time);
-	}
-	else
-	{
-		// reset assertion count every so often
-		EP_TIME_SPEC delta, target;
-		ep_time_from_nsec(
-				-ep_adm_getlongparam("swarm.gdplogd.assert.resetinterval", 60)
-						SECONDS,
-				&delta);
-		ep_time_deltanow(&delta, &target);
-		if (ep_time_before(&base_time, &target))
-		{
-			ep_time_now(&base_time);
-			n_assertions = 0;
-		}
-	}
 }
 
 

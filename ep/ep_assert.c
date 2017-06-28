@@ -33,10 +33,13 @@
 #include <ep_assert.h>
 #include <ep_stat.h>
 #include <ep_string.h>
+#include <ep_time.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+
+#define SECONDS			* INT64_C(1000000000)
 
 
 void	(*EpAssertInfo)(void) = NULL;	// can be used to dump state
@@ -85,6 +88,9 @@ ep_assert_printv(
 	const char *msg,
 	va_list av)
 {
+	static EP_TIME_SPEC base_time = {EP_TIME_NOTIME, 0, 0};
+	static int n_assertions = 0;
+
 	// log something here?
 
 	flockfile(stderr);
@@ -103,8 +109,39 @@ ep_assert_printv(
 	// for debugging
 	ep_assert_breakpoint();
 
-	if (EpAssertAllAbort)
+	// if configuration demands it, die now
+	if (EpAssertAllAbort ||
+	    ep_adm_getboolparam("libep.assert.allabort", false))
 		assert_abort();
+
+	// if no recent failures, reset the clock
+	if (!EP_TIME_IS_VALID(&base_time))
+	{
+		ep_time_now(&base_time);
+	}
+	else
+	{
+		// reset assertion count every so often
+		EP_TIME_SPEC delta, target;
+		ep_time_from_nsec(
+			-ep_adm_getlongparam("libep.assert.resetinterval", 60)
+					SECONDS,
+			&delta);
+		ep_time_deltanow(&delta, &target);
+		if (ep_time_before(&base_time, &target))
+		{
+			ep_time_now(&base_time);
+			n_assertions = 0;
+		}
+	}
+
+	// if too many recent failures, force an abort
+	int max_fails = ep_adm_getintparam("libep.assert.maxfailures", 0);
+	if (max_fails > 0 && ++n_assertions >= max_fails)
+	{
+		// make things abort now
+		assert_abort();
+	}
 }
 
 void

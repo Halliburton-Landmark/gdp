@@ -56,6 +56,19 @@ are ignored.
 The GDP code uses libep, a general-purpose support library
 that is not specifically associated with the GDP.
 .Bl -tag
+.
+.It libep.assert.maxfailures
+If at least this number of assertion failures occur,
+the process will abort,
+even if the assertion has a recovery action.
+If zero, non-fatal assertions will never abort.
+If one, all assertions are fatal.
+Defaults to 0.
+.
+.It libep.assert.resetinterval
+The assertion count is set to zero after this time interval (in seconds).
+Defaults to 60 (one minute).
+.
 .It libep.crypto.dev
 If set, try to use the hardware crypto acceleration provided by
 .Pa /dev/crypto .
@@ -64,6 +77,7 @@ Defaults to
 See
 .Xr crypto 4
 for more information.
+.
 .It libep.dbg.file
 Where to write debugging output.
 Values may be
@@ -72,6 +86,7 @@ Values may be
 or a writable file.
 Defaults to
 .Qq stderr .
+.
 .It libep.log.facility
 The
 .Xr syslog 3
@@ -90,8 +105,10 @@ or
 Generally only used for debugging.
 Defaults to
 .Qq default .
+.
 .It libep.thr.pool.max_workers
 .ns
+.
 .It libep.thr.pool.min_workers
 When a thread pool is created, the application can specify
 the minimum and maximum number of threads in the pool.
@@ -102,6 +119,7 @@ If the application doesn't choose these values,
 these parameters come into play.
 They default to one initial thread
 and up two twice the number of CPU cores that are available.
+.
 .It libep.time.accuracy
 In the libep world,
 times are allowed to include an estimate of accuracy.
