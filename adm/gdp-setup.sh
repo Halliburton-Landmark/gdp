@@ -71,6 +71,11 @@ case "$OS" in
 	if [ "$PKGMGR" = "brew" ]
 	then
 		package mosquitto
+
+		warn "Homebrew doesn't install OpenSSL in system directories."
+		info "I'll try to compensate, but it may cause linking problems."
+		info "Macports does not seem to have this problem."
+
 		warn "Homebrew doesn't support Avahi."
 		info "Avahi is used for Zeroconf (automatic client"
 		info "configuration.  Under Darwin, Avahi is difficult"

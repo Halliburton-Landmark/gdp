@@ -37,6 +37,7 @@ DESTDIR=
 LOCALROOT=	/usr
 LOCAL1=		/usr/local
 LOCAL2=		/opt/local
+LOCAL3=		/usr/local/opt/openssl
 
 # These generally do not need to be changed
 INSTALLROOT=	${DESTDIR}${LOCALROOT}
@@ -194,10 +195,12 @@ INCROOT=	..
 INCSEARCH=	${INCLOCAL} \
 		-I${INCROOT} \
 		-I${LOCAL1}/include \
-		-I${LOCAL2}/include
+		-I${LOCAL2}/include \
+		-I${LOCAL3}/include
 LIBSEARCH=	${LIBLOCAL} \
 		-L${LOCAL1}/lib \
-		-L${LOCAL2}/lib
+		-L${LOCAL2}/lib \
+		-L${LOCAL3}/lib
 INCS=		${INCSEARCH}
 CFLAGS+=	${COPTS} ${INCS} -I${CURDIR} -I.. -fPIC
 RM=		rm

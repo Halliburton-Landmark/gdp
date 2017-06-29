@@ -36,6 +36,7 @@ DESTDIR=
 LOCALROOT=	/usr
 LOCAL1=		/usr/local
 LOCAL2=		/opt/local
+LOCAL3=		/usr/local/opt/openssl
 
 # These generally do not need to be changed
 INSTALLROOT=	${DESTDIR}${LOCALROOT}
@@ -123,13 +124,12 @@ PUBALL=		${SCRIPTS} ${MANALL} ${INCALL} ${LIBALL}
 # "make all" targets (may be overlap)
 ALL=		${CLEANALL} ${PUBALL}
 
-LOCAL1=		/usr/local
-LOCAL2=		/opt/local
 INCROOT=	..
 INCSEARCH=	${INCLOCAL} \
 		-I${INCROOT} \
 		-I${LOCAL1}/include \
-		-I${LOCAL2}/include
+		-I${LOCAL2}/include \
+		-I${LOCAL3}/include
 LIBROOT=	${INCROOT}
 LIBCRYPTO=	-lcrypto
 LIBEVENT2=	-levent -levent_pthreads
@@ -140,7 +140,8 @@ INCS=		${INCSEARCH} ${INCEP} ${INCEVENT2} ${INCAVAHI}
 LIBSEARCH=	${LIBLOCAL} \
 		-L${LIBROOT}/ep \
 		-L${LOCAL1}/lib \
-		-L${LOCAL2}/lib
+		-L${LOCAL2}/lib \
+		-L${LOCAL3}/lib
 LDFLAGS+= 	${LIBSEARCH}
 LDLIBS=		${LIBEP} \
 		${LIBEVENT2} \

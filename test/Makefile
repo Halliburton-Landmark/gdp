@@ -68,17 +68,20 @@ INSTALL=	install
 
 LOCAL1=		/usr/local
 LOCAL2=		/opt/local
+LOCAL3=		/usr/local/opt/openssl
 INCROOT=	..
 INCSEARCH=	${INCLOCAL} \
 		-I${INCROOT} \
 		-I${LOCAL1}/include \
-		-I${LOCAL2}/include
+		-I${LOCAL2}/include \
+		-I${LOCAL3}/include
 LIBROOT=	${INCROOT}
 LIBSEARCH=	${LIBLOCAL} \
 		-L${LIBROOT}/gdp \
 		-L${LIBROOT}/ep \
 		-L${LOCAL1}/lib \
-		-L${LOCAL2}/lib
+		-L${LOCAL2}/lib \
+		-L${LOCAL3}/lib
 INCGDP=		-I${INCROOT}
 LIBGDP=		-lgdp
 INCEP=
