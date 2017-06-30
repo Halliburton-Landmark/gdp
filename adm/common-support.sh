@@ -20,6 +20,7 @@ Whi='[0;37m';     BWhi='[1;37m';    UWhi='[4;37m';    IWhi='[0;97m';    BIWh
 
 #################### FUNCTIONS ####################
 
+: ${quiet:=false}
 
 # Error/Information messages
 info() {
@@ -249,9 +250,9 @@ check_os() {
 
 # check to make sure we understand this OS and OSVER; choose PKGMGR & INITsys
 set_pkgmgr() {
-    PKGMGR=$OS
+    : ${PKGMGR:=$OS}
     INITguess=""
-    case $OS in
+    case $PKGMGR in
       "debian"|"ubuntu")
 	    PKGMGR=debian
 	    if expr $OSVER \>= 160400 > /dev/null
@@ -277,7 +278,18 @@ set_pkgmgr() {
 	    ;;
 
       "darwin")
-	    if type brew > /dev/null 2>&1 && [ ! -z "`brew config`" ]; then
+	    if type port > /dev/null 2>&1 && port installed | grep -q .; then
+		    PKGMGR=macports
+	    fi
+	    if type brew > /dev/null 2>&1 && [ ! -z "`brew config`" ]
+	    then
+		if [ "$PKGMGR" = "macports" ]; then
+		    warn "You seem to have both macports and homebrew installed."
+		    warn "They conflict with each other, and you may break all your"
+		    warn "packages if you try to use them at the same time."
+		    warn "Please choose one or the other.  Macports seems to work better."
+		    fatal "Set envar PKGMGR to 'brew' or 'macports' to choose."
+		fi
 		PKGMGR=brew
 		brew=`which brew`
 		if [ -f $brew ]; then
@@ -289,17 +301,6 @@ set_pkgmgr() {
 		    else
 			brew update
 		    fi
-		fi
-	    fi
-	    if type port > /dev/null 2>&1 && port installed | grep -q .; then
-		if [ "$PKGMGR" = "brew" ]; then
-		    warn "You seem to have both macports and homebrew installed."
-		    warn "They conflict with each other, and you may break all your"
-		    warn "packages if you try to use them at the same time."
-		    warn "Please choose one or the other."
-		    fatal "Set envar PKGMGR to 'brew' or 'macports' to choose."
-		else
-		    PKGMGR=macports
 		fi
 	    fi
 	    if [ "$PKGMGR" = "darwin" ]; then
@@ -331,26 +332,6 @@ set_pkgmgr() {
 
 
 #################### END OF FUNCTIONS ####################
-
-args=`getopt q $*`
-if [ $? != 0 ]
-then
-    fatal "Usage: $0 [-q]"
-    exit 64
-fi
-set -- $args
-quiet=false
-for i
-do
-    case "$i"
-    in
-	-q)
-	    quiet=true
-	    shift;;
-	--)
-	    shift; break;;
-    esac
-done
 
 configure_defaults
 set_os
