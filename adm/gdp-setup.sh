@@ -18,18 +18,25 @@ info "Installing packages needed by GDP for $OS"
 info "Updating the package database"
 case "$PKGMGR" in
     "brew")
-	brewUser=`ls -l $brew | awk '{print $3}'`
-	# Only use sudo to update brew if the brew binary is owned by root.
-	# This avoids "Cowardly refusing to 'sudo brew update'"
-	if [ "$brewUser" = "root" ]; then
-	    sudo brew update
-	else
-	    brew update
+	brew=`which brew`
+	if [ -f $brew ]; then
+		brewUser=`ls -l $brew | awk '{print $3}'`
+		# Only use sudo to update brew if the brew binary is owned by
+		# root.  This avoids "Cowardly refusing to 'sudo brew update'"
+		if [ "$brewUser" = "root" ]; then
+		    sudo brew update
+		else
+		    brew update
+		fi
 	fi
 	;;
 
     "macports")
 	sudo port selfupdate
+	;;
+
+    "brewports")
+	fatal "You must choose between Homebrew and Macports.  Macports suggested."
 	;;
 esac
 

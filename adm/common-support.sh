@@ -284,23 +284,14 @@ set_pkgmgr() {
 	    if type brew > /dev/null 2>&1 && [ ! -z "`brew config`" ]
 	    then
 		if [ "$PKGMGR" = "macports" ]; then
+		    PKGMGR=brewports
 		    warn "You seem to have both macports and homebrew installed."
 		    warn "They conflict with each other, and you may break all your"
 		    warn "packages if you try to use them at the same time."
 		    warn "Please choose one or the other.  Macports seems to work better."
 		    fatal "Set envar PKGMGR to 'brew' or 'macports' to choose."
-		fi
-		PKGMGR=brew
-		brew=`which brew`
-		if [ -f $brew ]; then
-		    brewUser=`ls -l $brew | awk '{print $3}'`
-		    # Only use sudo to update brew if the brew binary is owned by root.
-		    # This avoids "Cowardly refusing to 'sudo brew update'"
-		    if [ "$brewUser" = "root" ]; then
-			sudo brew update
-		    else
-			brew update
-		    fi
+		else
+		    PKGMGR=brew
 		fi
 	    fi
 	    if [ "$PKGMGR" = "darwin" ]; then
