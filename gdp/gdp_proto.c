@@ -113,7 +113,7 @@ _gdp_invoke(gdp_req_t *req)
 	retries = ep_adm_getintparam("swarm.gdp.invoke.retries", 3);
 	if (retries < 1)
 		retries = 1;
-	while (retries-- > 0)
+	do
 	{
 		/*
 		**  Top Half: sending the command
@@ -185,10 +185,6 @@ _gdp_invoke(gdp_req_t *req)
 				// route failure on open: don't retry
 				break;
 			}
-			else if (retries <= 0)
-			{
-				break;
-			}
 		}
 		else
 		{
@@ -196,17 +192,15 @@ _gdp_invoke(gdp_req_t *req)
 			estat = _gdp_req_unsend(req);
 			if (!EP_STAT_ISOK(estat))
 				break;
-			if (retries <= 0)
+			estat = GDP_STAT_INVOKE_TIMEOUT;
+			if (retries > 1)
 			{
-				estat = GDP_STAT_INVOKE_TIMEOUT;
-				break;
+				// if ETIMEDOUT, maybe the router had a glitch:
+				//   wait and try again
+				ep_time_nanosleep(retry_delay MILLISECONDS);
 			}
-
-			// if ETIMEDOUT, maybe the router had a glitch:
-			//   wait and try again
-			ep_time_nanosleep(retry_delay MILLISECONDS);
 		}
-	}
+	} while (--retries > 0);
 
 	// if we had any pending asynchronous events, deliver them
 	_gdp_event_trigger_pending(&req->events);
