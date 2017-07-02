@@ -83,6 +83,7 @@ static struct ep_stat_to_string Stats[] =
 	{ GDP_STAT_RECORD_DUPLICATED,		"record duplicated",				},
 	{ GDP_STAT_DATUM_REQUIRED,			"missing required datum",			},
 	{ GDP_STAT_CORRUPT_TIDX,			"corrupt timestamp index",			},
+	{ GDP_STAT_INVOKE_TIMEOUT,			"GDP command timeout",				},
 
 	{ GDP_STAT_NAK_BADREQ,				"400 bad request",					},
 	{ GDP_STAT_NAK_UNAUTH,				"401 unauthorized",					},

@@ -194,8 +194,13 @@ _gdp_invoke(gdp_req_t *req)
 		{
 			// do a retry, after re-locking the GCL
 			estat = _gdp_req_unsend(req);
-			if (!EP_STAT_ISOK(estat) || retries <= 0)
+			if (!EP_STAT_ISOK(estat))
 				break;
+			if (retries <= 0)
+			{
+				estat = GDP_STAT_INVOKE_TIMEOUT;
+				break;
+			}
 
 			// if ETIMEDOUT, maybe the router had a glitch:
 			//   wait and try again
