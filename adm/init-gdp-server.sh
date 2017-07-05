@@ -36,10 +36,10 @@ GDP_SRC_ROOT=`pwd`
 : ${GDPLOGD_LOG:=$GDP_LOG_DIR/gdplogd.log}
 : ${GDP_REST_INSTALL:=false}
 
-if [ ! -x $GDP_ROOT/sbin/gdplogd -o ! -x $GDP_ROOT/sbin/gdp-rest ]
+if [ ! -x $GDP_ROOT/sbin/gdplogd ]
 then
-	warn "It appears GDP server code (gdplogd and gdp-rest) are not yet"
-	warn "installed in $GDP_ROOT/sbin.  These should be installed by"
+	warn "It appears the GDP log server (gdplogd) is not yet"
+	warn "installed in $GDP_ROOT/sbin.  It should be installed by"
 	warn "\"sudo make install\""
 	info "Press <return> to continue, ^C to abort"
 	read nothing
