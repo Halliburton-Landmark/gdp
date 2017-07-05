@@ -17,7 +17,9 @@ packages (which includes Ubuntu).
 If you are running on any system other than Debian, you have to
 compile from source code.  At the time of this writing, the GDP
 also compiles on MacOS, FreeBSD, and RedHat.  For details on
-compiling from source, see `README-compiling.md`.
+compiling from source, see
+https://gdp.cs.berkeley.edu/redmine/projects/gdp/wiki/Compiling_the_GDP_from_Source
+(probably more up to date) or `README-compiling.md`.
 
 In most cases you will only need the client libraries and
 applications.  Specifically, you do not need to run your own

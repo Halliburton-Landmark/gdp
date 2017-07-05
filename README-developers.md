@@ -30,7 +30,7 @@ a binary will show you which debug flags are available
 including a short description.  (The `what` program isn't available
 on Linux; it can be simulated using `strings | grep '@(#)'`).
 
-To enable debugging for all patterns, use "`*=`_level_", for
-example "`*=18`".
+To enable debugging for all patterns, use "`*=`_level_" or
+just "_level_", for example "`*=18`" or "`18`".
 
 <!-- vim: set ai sw=4 sts=4 ts=4 : -->
