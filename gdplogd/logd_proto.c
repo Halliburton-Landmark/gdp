@@ -493,8 +493,11 @@ cmd_read(gdp_req_t *req)
 	ep_thr_mutex_unlock(&req->rpdu->datum->mutex);
 
 	// deliver "record expired" as "not found"
-	if (EP_STAT_IS_SAME(estat, GDP_STAT_RECORD_EXPIRED))
+	if (EP_STAT_IS_SAME(estat, GDP_STAT_RECORD_EXPIRED) ||
+		EP_STAT_IS_SAME(estat, GDP_STAT_RECORD_MISSING))
+	{
 		estat = GDP_STAT_NAK_GONE;
+	}
 
 fail0:
 	_gdp_gcl_decref(&req->gcl);
