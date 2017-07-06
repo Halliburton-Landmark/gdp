@@ -147,6 +147,7 @@ _gdp_gcl_cache_add(gdp_gcl_t *gcl, gdp_iomode_t mode)
 		_gdp_gcl_dump(gcl, stderr, GDP_PR_DETAILED, 0);
 		fprintf(stderr, "Existing ");
 		_gdp_gcl_dump(g2, stderr, GDP_PR_DETAILED, 0);
+		// we don't free g2 in case someone else has the pointer
 	}
 
 	// ... and the LRU list
