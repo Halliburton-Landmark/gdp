@@ -831,25 +831,27 @@ _gdp_req_dispatch(gdp_req_t *req, int cmd)
 {
 	EP_STAT estat;
 	dispatch_ent_t *d;
+	gdp_pname_t pname;
 
-	if (ep_dbg_test(Dbg, 18) || ep_dbg_test(DbgCmdTrace, 40))
+	if (req->gcl != NULL)
+		memcpy(pname, req->gcl->pname, sizeof pname);
+	else
+		pname[0] = '\0';
+	if (ep_dbg_test(Dbg, 28) || ep_dbg_test(DbgCmdTrace, 28))
 	{
 		flockfile(ep_dbg_getfile());
-		ep_dbg_printf("_gdp_req_dispatch >>> %s (%d)",
-				_gdp_proto_cmd_name(cmd), cmd);
-		if (ep_dbg_test(Dbg, 18))
-		{
-			if (req->gcl != NULL)
-			{
+		ep_dbg_printf("_gdp_req_dispatch >>> %s",
+				_gdp_proto_cmd_name(cmd));
+		if (pname[0] != '\0')
+			ep_dbg_printf("(%s)", req->gcl->pname);
+		if (req->gcl != NULL && ep_dbg_test(Dbg, 70))
 				ep_dbg_printf(" [gcl->refcnt %d]", req->gcl->refcnt);
-			}
-			if (ep_dbg_test(Dbg, 30))
-			{
-				ep_dbg_printf(", ");
-				_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
-			}
-		}
 		ep_dbg_printf("\n");
+		if (ep_dbg_test(Dbg, 51))
+		{
+			ep_dbg_printf("    ");
+			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+		}
 		funlockfile(ep_dbg_getfile());
 	}
 
@@ -859,16 +861,18 @@ _gdp_req_dispatch(gdp_req_t *req, int cmd)
 	else
 		estat = (*d->func)(req);
 
-	if (ep_dbg_test(Dbg, 18))
+	if (ep_dbg_test(Dbg, 18) || ep_dbg_test(DbgCmdTrace, 18))
 	{
 		char ebuf[200];
 
 		flockfile(ep_dbg_getfile());
 		ep_dbg_printf("_gdp_req_dispatch <<< %s",
 				_gdp_proto_cmd_name(cmd));
-		if (req->gcl != NULL)
+		if (pname[0] != '\0')
+			ep_dbg_printf("(%s)", pname);
+		if (req->gcl != NULL && ep_dbg_test(Dbg, 70))
 			ep_dbg_printf(" [gcl->refcnt %d]", req->gcl->refcnt);
-		ep_dbg_printf("\n    %s\n", ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		ep_dbg_printf(": %s\n", ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		if (ep_dbg_test(Dbg, 70))
 		{
 			ep_dbg_printf("    ");
