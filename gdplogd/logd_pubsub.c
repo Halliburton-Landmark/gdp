@@ -183,7 +183,7 @@ sub_end_subscription(gdp_req_t *req)
 	if (EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
 		LIST_REMOVE(req, gcllist);
 	req->flags &= ~GDP_REQ_ON_GCL_LIST;
-	_gdp_gcl_decref(&req->gcl);			//DEBUG: is this appropriate?
+	_gdp_gcl_decref(&req->gcl);
 
 	// send an "end of subscription" event
 	req->rpdu->cmd = GDP_ACK_DELETED;
