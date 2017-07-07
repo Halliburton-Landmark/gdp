@@ -716,15 +716,6 @@ fail0:
 			ep_time_nanosleep(INT64_C(1000000000));		// one second
 	}
 
-	if (ep_dbg_test(Dbg, 10))
-	{
-		// cheat here and use internal interface
-		extern void _gdp_req_pr_stats(FILE *);
-		_gdp_req_pr_stats(ep_dbg_getfile());
-		extern void _gdp_gcl_pr_stats(FILE *);
-		_gdp_gcl_pr_stats(ep_dbg_getfile());
-	}
-
 	// might as well let the user know what's going on....
 	if (EP_STAT_ISFAIL(estat))
 		ep_app_message(estat, "exiting after %d records", NRead);

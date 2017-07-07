@@ -295,6 +295,16 @@ gdp_gcl_print(
 **		to advertise more than their own name.
 */
 
+static void
+gdp_exit_debug(void)
+{
+	if (ep_dbg_test(Dbg, 10))
+	{
+		_gdp_req_pr_stats(ep_dbg_getfile());
+		_gdp_gcl_pr_stats(ep_dbg_getfile());
+	}
+}
+
 EP_STAT
 gdp_init(const char *router_addr)
 {
@@ -327,6 +337,9 @@ gdp_init(const char *router_addr)
 		_GdpChannel = NULL;
 		goto fail0;
 	}
+
+	// do some optional status printing on exit
+	atexit(gdp_exit_debug);
 
 	_GdpLibInitialized = true;
 
