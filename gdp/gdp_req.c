@@ -287,6 +287,7 @@ _gdp_req_free(gdp_req_t **reqp)
 
 	// dereference the gcl
 	// (refcnt may be zero if called from _gdp_gcl_freehandle)
+	req->gcl = NULL;			//XXX temp to repair build while fixing bug
 	if (req->gcl != NULL && req->gcl->refcnt > 0)
 		_gdp_gcl_decref(&req->gcl);
 
