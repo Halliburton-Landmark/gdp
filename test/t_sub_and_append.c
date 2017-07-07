@@ -64,5 +64,9 @@ main(int argc, char **argv)
 	ep_app_info("sleeping");
 	sleep(5);
 
+	ep_app_info("closing");
+	estat = gdp_gcl_close(gcl);
+	test_message(estat, "gdp_gcl_close");
+
 	return 0;
 }
