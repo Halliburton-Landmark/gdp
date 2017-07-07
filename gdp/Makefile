@@ -82,6 +82,7 @@ OBJS_MOST=	\
 	gdp_crypto.o \
 	gdp_event.o \
 	gdp_gcl_cache.o \
+	gdp_gcl_mgmt.o \
 	gdp_gcl_ops.o \
 	gdp_gclmd.o \
 	gdp_datum.o \
