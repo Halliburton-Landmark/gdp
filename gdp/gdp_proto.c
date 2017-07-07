@@ -870,6 +870,8 @@ _gdp_req_dispatch(gdp_req_t *req, int cmd)
 				_gdp_proto_cmd_name(cmd));
 		if (pname[0] != '\0')
 			ep_dbg_printf("(%s)", pname);
+		else if (req->gcl != NULL && req->gcl->pname[0] != '\0')
+			ep_dbg_printf("(%s)", req->gcl->pname);
 		if (req->gcl != NULL && ep_dbg_test(Dbg, 70))
 			ep_dbg_printf(" [gcl->refcnt %d]", req->gcl->refcnt);
 		ep_dbg_printf(": %s\n", ep_stat_tostr(estat, ebuf, sizeof ebuf));
