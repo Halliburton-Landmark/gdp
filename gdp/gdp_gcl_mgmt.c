@@ -61,6 +61,8 @@ static EP_THR_MUTEX		GclFreeListMutex
 static LIST_HEAD(gcl_free_head, gdp_gcl)
 						GclFreeList = LIST_HEAD_INITIALIZER(GclFreeList);
 
+static int				NGclsAllocated = 0;
+
 
 /*
 **	_GDP_GCL_NEWHANDLE --- create a new gcl_handle & initialize
@@ -102,6 +104,7 @@ _gdp_gcl_newhandle(gdp_name_t gcl_name, gdp_gcl_t **pgcl)
 
 	LIST_INIT(&gcl->reqs);
 	gcl->refcnt = 1;
+	NGclsAllocated++;
 
 	// create a name if we don't have one passed in
 	if (gcl_name == NULL || !gdp_name_is_valid(gcl_name))
@@ -178,6 +181,7 @@ _gdp_gcl_freehandle(gdp_gcl_t *gcl)
 	ep_thr_mutex_lock(&GclFreeListMutex);
 	LIST_INSERT_HEAD(&GclFreeList, gcl, ulist);
 	ep_thr_mutex_unlock(&GclFreeListMutex);
+	NGclsAllocated--;
 }
 
 
@@ -414,4 +418,15 @@ _gdp_gcl_decref_trace(
 		_gdp_gcl_freehandle(gcl);
 	else if (!EP_UT_BITSET(GCLF_KEEPLOCKED, gcl->flags))
 		_gdp_gcl_unlock_trace(gcl, file, line, id);
+}
+
+
+/*
+**  Print statistics (for debugging)
+*/
+
+void
+_gdp_gcl_pr_stats(FILE *fp)
+{
+	fprintf(fp, "GCLs Allocated: %d\n", NGclsAllocated);
 }

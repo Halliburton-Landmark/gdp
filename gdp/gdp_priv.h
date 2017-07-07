@@ -287,6 +287,9 @@ void			_gdp_gcl_decref_trace(		// decrease reference count (trace)
 
 #define _gdp_gcl_decref(g)		_gdp_gcl_decref_trace(g, __FILE__, __LINE__, #g)
 
+void			_gdp_gcl_pr_stats(			// print (debug) statistics
+						FILE *fp);
+
 /*
 **  Other GCL handling.  These are shared between client access
 **  and the GDP daemon.

@@ -721,6 +721,8 @@ fail0:
 		// cheat here and use internal interface
 		extern void _gdp_req_pr_stats(FILE *);
 		_gdp_req_pr_stats(ep_dbg_getfile());
+		extern void _gdp_gcl_pr_stats(FILE *);
+		_gdp_gcl_pr_stats(ep_dbg_getfile());
 	}
 
 	// might as well let the user know what's going on....

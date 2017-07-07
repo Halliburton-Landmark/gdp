@@ -793,6 +793,7 @@ _gdp_dump_state(int plev)
 	ep_dbg_backtrace();
 	fprintf(stderr, "\n<<< Statistics >>>\n");
 	_gdp_req_pr_stats(stderr);
+	_gdp_gcl_pr_stats(stderr);
 	funlockfile(stderr);
 }
 
