@@ -569,8 +569,13 @@ main(int argc, char **argv)
 
 		if (!EP_STAT_ISOK(estat))
 		{
-			ep_app_abort("Couldn't write secret key to %s",
-					localkeyfile);
+			char ebuf[200];
+
+			// remove the zero length key file
+			unlink(localkeyfile);
+
+			ep_app_abort("Couldn't write secret key to %s: %s",
+					localkeyfile, ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		}
 	}
 
