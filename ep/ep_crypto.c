@@ -70,13 +70,35 @@ ep_crypto_init(uint32_t flags)
 **  Internal helper for printing errors.
 */
 
-void *
-_ep_crypto_error(const char *msg, ...)
+EP_STAT
+_ep_crypto_error(EP_STAT def_stat, const char *msg, ...)
 {
 	static bool initialized = false;
+	EP_STAT estat = def_stat;
+	unsigned long ssl_err;
 
+	// try to decode SSL error codes (too many to count)
+	ssl_err = ERR_peek_error();
+	switch (ERR_GET_REASON(ssl_err))
+	{
+	 case UI_R_RESULT_TOO_SMALL:
+		estat = EP_STAT_CRYPTO_TOOSMALL;
+		break;
+
+	 case UI_R_RESULT_TOO_LARGE:
+		estat = EP_STAT_CRYPTO_TOOLARGE;
+		break;
+	}
+
+	if (ep_dbg_test(Dbg, 17))
+	{
+		char ebuf[200];
+
+		ep_dbg_printf("_ep_crypto_error: SSL error %ld => %s\n",
+				ssl_err, ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
 	if (!ep_dbg_test(Dbg, 9))
-		return NULL;
+		return estat;
 
 	// load openssl error strings if not already done
 	if (!initialized)
@@ -95,5 +117,5 @@ _ep_crypto_error(const char *msg, ...)
 	if (ep_dbg_test(Dbg, 31))
 		ep_dbg_backtrace();
 
-	return NULL;
+	return estat;
 }

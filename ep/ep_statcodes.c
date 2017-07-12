@@ -64,6 +64,9 @@ static struct ep_stat_to_string	Stats[] =
     { EP_STAT_CRYPTO_KEYCREATE,	"cannot create new cryptographic key",	},
     { EP_STAT_CRYPTO_KEYCOMPAT,	"incompatible cryptographic keys",	},
     { EP_STAT_CRYPTO_CIPHER,	"symmetric cipher failure",		},
+    { EP_STAT_CRYPTO_TOOSMALL,	"key or password too short",		},
+    { EP_STAT_CRYPTO_TOOLARGE,	"key or password too long",		},
+    { EP_STAT_CRYPTO_FAIL,	"unknown cryptographic failure",	},
 
     { EP_STAT_OK,		NULL,					}
 };

@@ -51,16 +51,26 @@ ep_crypto_vrfy_new(EP_CRYPTO_KEY *pkey, int md_alg_id)
 
 	md_alg = _ep_crypto_md_getalg_byid(md_alg_id);
 	if (md_alg == NULL)
-		return _ep_crypto_error("unknown digest algorithm %d",
+	{
+		(void) _ep_crypto_error(EP_STAT_CRYPTO_DIGEST,
+				"unknown digest algorithm %d",
 				md_alg_id);
+		return NULL;
+	}
 	md = EVP_MD_CTX_create();
 	if (md == NULL)
-		return _ep_crypto_error("cannot create message digest for verification");
+	{
+		(void) _ep_crypto_error(EP_STAT_CRYPTO_DIGEST,
+				"cannot create message digest for verification");
+		return NULL;
+}
 	istat = EVP_DigestVerifyInit(md, NULL, md_alg, NULL, pkey);
 	if (istat != 1)
 	{
 		ep_crypto_md_free(md);
-		return _ep_crypto_error("cannot initialize digest for verification");
+		(void) _ep_crypto_error(EP_STAT_CRYPTO_DIGEST,
+				"cannot initialize digest for verification");
+		return NULL;
 	}
 	return md;
 }
@@ -78,8 +88,8 @@ ep_crypto_vrfy_update(EP_CRYPTO_MD *md, void *dbuf, size_t dbufsize)
 	istat = EVP_DigestVerifyUpdate(md, dbuf, dbufsize);
 	if (istat != 1)
 	{
-		(void) _ep_crypto_error("cannot update verify digest");
-		return EP_STAT_CRYPTO_VRFY;
+		return _ep_crypto_error(EP_STAT_CRYPTO_VRFY,
+				"cannot update verify digest");
 	}
 	return EP_STAT_OK;
 }
@@ -107,14 +117,14 @@ ep_crypto_vrfy_final(EP_CRYPTO_MD *md, void *obuf, size_t obufsize)
 	else if (istat == 0)
 	{
 		// signature verification failure
-		(void) _ep_crypto_error("signature invalid");
-		return EP_STAT_CRYPTO_BADSIG;
+		return _ep_crypto_error(EP_STAT_CRYPTO_BADSIG,
+				"signature invalid");
 	}
 	else
 	{
 		// more serious error
-		(void) _ep_crypto_error("cannot finalize verify digest");
-		return EP_STAT_CRYPTO_VRFY;
+		return _ep_crypto_error(EP_STAT_CRYPTO_VRFY,
+				"cannot finalize verify digest");
 	}
 }
 

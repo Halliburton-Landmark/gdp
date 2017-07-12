@@ -334,7 +334,9 @@ EP_STAT			ep_crypto_cipher_final(
 **  Error Handling (private)
 */
 
-void	*_ep_crypto_error(const char *msg, ...);
+EP_STAT			_ep_crypto_error(
+				EP_STAT estat_default,
+				const char *msg, ...);
 
 
 /*

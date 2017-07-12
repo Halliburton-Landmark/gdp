@@ -57,19 +57,29 @@ ep_crypto_sign_new(EP_CRYPTO_KEY *skey, int md_alg_id)
 
 	md_alg = _ep_crypto_md_getalg_byid(md_alg_id);
 	if (md_alg == NULL)
-		return _ep_crypto_error("ep_crypto_sign_new: "
+	{
+		(void) _ep_crypto_error(EP_STAT_CRYPTO_SIGN,
+				"ep_crypto_sign_new: "
 				"unknown digest algorithm %d",
 				md_alg_id);
+		return NULL;
+	}
 	md = EVP_MD_CTX_create();
 	if (md == NULL)
-		return _ep_crypto_error("ep_crypto_sign_new: "
+	{
+		(void) _ep_crypto_error(EP_STAT_CRYPTO_SIGN,
+				"ep_crypto_sign_new: "
 				"cannot create message digest for signing");
+		return NULL;
+	}
 	istat = EVP_DigestSignInit(md, NULL, md_alg, NULL, skey);
 	if (istat != 1)
 	{
 		ep_crypto_md_free(md);
-		return _ep_crypto_error("ep_crypto_sign_new: "
+		(void) _ep_crypto_error(EP_STAT_CRYPTO_SIGN,
+				"ep_crypto_sign_new: "
 				"cannot initialize digest for signing");
+		return NULL;
 	}
 	return md;
 }
@@ -87,9 +97,9 @@ ep_crypto_sign_update(EP_CRYPTO_MD *md, void *dbuf, size_t dbufsize)
 	istat = EVP_DigestSignUpdate(md, dbuf, dbufsize);
 	if (istat != 1)
 	{
-		(void) _ep_crypto_error("ep_crypto_sign_update: "
+		(void) _ep_crypto_error(EP_STAT_CRYPTO_SIGN,
+				"ep_crypto_sign_update: "
 				"cannot update signing digest");
-		return EP_STAT_CRYPTO_SIGN;
 	}
 	return EP_STAT_OK;
 }
@@ -113,9 +123,9 @@ ep_crypto_sign_final(EP_CRYPTO_MD *md, void *sbuf, size_t *sbufsize)
 	istat = EVP_DigestSignFinal(md, sbuf, sbufsize);
 	if (istat != 1)
 	{
-		(void) _ep_crypto_error("ep_crypto_sign_final: "
+		return _ep_crypto_error(EP_STAT_CRYPTO_SIGN,
+				"ep_crypto_sign_final: "
 				"cannot finalize signing digest");
-		return EP_STAT_CRYPTO_SIGN;
 	}
 	return EP_STAT_OK;
 }

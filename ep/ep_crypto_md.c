@@ -84,7 +84,9 @@ _ep_crypto_md_getalg_byid(int md_alg_id)
 		return EVP_ripemd160();
 
 	  default:
-		return _ep_crypto_error("unknown digest algorithm %d", md_alg_id);
+		(void) _ep_crypto_error(EP_STAT_CRYPTO_DIGEST,
+				"unknown digest algorithm %d", md_alg_id);
+		return NULL;
 	}
 }
 
@@ -105,12 +107,18 @@ ep_crypto_md_new(int md_alg_id)
 		return NULL;		// error already given
 	md = EVP_MD_CTX_create();
 	if (md == NULL)
-		return _ep_crypto_error("cannot create new message digest");
+	{
+		(void) _ep_crypto_error(EP_STAT_CRYPTO_DIGEST,
+				"cannot create new message digest");
+		return NULL;
+	}
 	istat = EVP_DigestInit_ex(md, md_alg, NULL);
 	if (istat != 1)
 	{
 		EVP_MD_CTX_destroy(md);
-		return _ep_crypto_error("cannot initialize message digest");
+		(void) _ep_crypto_error(EP_STAT_CRYPTO_DIGEST,
+				"cannot initialize message digest");
+		return NULL;
 	}
 	return md;
 }
@@ -125,12 +133,18 @@ ep_crypto_md_clone(EP_CRYPTO_MD *oldmd)
 {
 	EP_CRYPTO_MD *md = EVP_MD_CTX_create();
 	if (md == NULL)
-		return _ep_crypto_error("cannot create cloned message digest");
+	{
+		(void) _ep_crypto_error(EP_STAT_CRYPTO_DIGEST,
+				"cannot create cloned message digest");
+		return NULL;
+	}
 	int istat = EVP_MD_CTX_copy_ex(md, oldmd);
 	if (istat != 1)
 	{
 		EVP_MD_CTX_destroy(md);
-		return _ep_crypto_error("cannot clone message digest");
+		(void) _ep_crypto_error(EP_STAT_CRYPTO_DIGEST,
+				"cannot clone message digest");
+		return NULL;
 	}
 
 	return md;
@@ -149,8 +163,8 @@ ep_crypto_md_update(EP_CRYPTO_MD *md, void *data, size_t dsize)
 	istat = EVP_DigestUpdate(md, data, dsize);
 	if (istat != 1)
 	{
-		(void) _ep_crypto_error("cannot update digest");
-		return EP_STAT_CRYPTO_DIGEST;
+		return _ep_crypto_error(EP_STAT_CRYPTO_DIGEST,
+				"cannot update digest");
 	}
 	return EP_STAT_OK;
 }
@@ -173,8 +187,8 @@ ep_crypto_md_final(EP_CRYPTO_MD *md, void *dbuf, size_t *dbufsize)
 	istat = EVP_DigestFinal_ex(md, dbuf, &dbsize);
 	if (istat != 1)
 	{
-		(void) _ep_crypto_error("cannot finalize digest");
-		return EP_STAT_CRYPTO_DIGEST;
+		return _ep_crypto_error(EP_STAT_CRYPTO_DIGEST,
+				"cannot finalize digest");
 	}
 	*dbufsize = dbsize;
 	return EP_STAT_OK;

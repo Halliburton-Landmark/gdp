@@ -235,7 +235,9 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 		ep_crypto_key_free(pubkey);
 		if (!EP_STAT_ISOK(estat))
 		{
-			(void) _ep_crypto_error("public & secret keys are not compatible");
+			// XXX: cheat: use internal interface
+			(void) _ep_crypto_error(estat,
+							"public & secret keys are not compatible");
 			goto fail0;
 		}
 	}

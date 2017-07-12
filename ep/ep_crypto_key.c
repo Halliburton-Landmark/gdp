@@ -67,32 +67,36 @@ static EP_STAT
 generate_rsa_key(EP_CRYPTO_KEY *key, int keylen, int keyexp)
 {
 	RSA *rsakey;
+	EP_STAT estat;
 
 	if (keyexp <= 0)
 		keyexp = ep_adm_getintparam("libep.crypto.rsa.key.exponent",
 					3);
 	if (keylen < EP_CRYPTO_KEY_MINLEN_RSA)
 	{
-		_ep_crypto_error("insecure RSA key length %d; %d min",
+		estat = _ep_crypto_error(EP_STAT_CRYPTO_TOOSMALL,
+				"insecure RSA key length %d; %d min",
 				keylen, EP_CRYPTO_KEY_MINLEN_RSA);
 		goto fail0;
 	}
 	rsakey = RSA_generate_key(keylen, keyexp, NULL, NULL);
 	if (rsakey == NULL)
 	{
-		_ep_crypto_error("cannot generate RSA key");
+		estat = _ep_crypto_error(EP_STAT_CRYPTO_KEYCREATE,
+				"cannot generate RSA key");
 		goto fail0;
 	}
 	if (EVP_PKEY_assign_RSA(key, rsakey) != 1)
 	{
-		_ep_crypto_error("cannot save RSA key");
+		estat = _ep_crypto_error(EP_STAT_CRYPTO_KEYCREATE,
+				"cannot save RSA key");
 		goto fail0;
 	}
 
 	return EP_STAT_OK;
 
 fail0:
-	return EP_STAT_CRYPTO_KEYCREATE;
+	return estat;
 }
 #endif
 
@@ -105,31 +109,35 @@ static EP_STAT
 generate_dsa_key(EP_CRYPTO_KEY *key, int keylen)
 {
 	DSA *dsakey;
+	EP_STAT estat;
 
 	// generate new parameter block
 	dsakey = DSA_new();
 	if (DSA_generate_parameters_ex(dsakey, keylen,
 			NULL, 0, NULL, NULL, NULL) != 1)
 	{
-		_ep_crypto_error("cannot initialize DSA parameters");
+		estat = _ep_crypto_error(EP_STAT_CRYPTO_KEYCREATE,
+				"cannot initialize DSA parameters");
 		goto fail0;
 	}
 
 	if (DSA_generate_key(dsakey) != 1)
 	{
-		_ep_crypto_error("cannot generate DSA key");
+		estat = _ep_crypto_error(EP_STAT_CRYPTO_KEYCREATE,
+				"cannot generate DSA key");
 		goto fail0;
 	}
 	if (EVP_PKEY_assign_DSA(key, dsakey) != 1)
 	{
-		_ep_crypto_error("cannot save DSA key");
+		estat = _ep_crypto_error(EP_STAT_CRYPTO_KEYCREATE,
+				"cannot save DSA key");
 		goto fail0;
 	}
 
 	return EP_STAT_OK;
 
 fail0:
-	return EP_STAT_CRYPTO_KEYCREATE;
+	return estat;
 }
 #endif
 
@@ -160,29 +168,35 @@ generate_dh_key(EP_CRYPTO_KEY *key, ...)
 static EP_STAT
 generate_ec_key(EP_CRYPTO_KEY *key, const char *curve)
 {
+	EP_STAT estat;
+
 	if (curve == NULL)
 		curve = ep_adm_getstrparam("libep.crypto.key.ec.curve",
 				"sect283r1");
 	int nid = OBJ_txt2nid(curve);
 	if (nid == NID_undef)
 	{
-		_ep_crypto_error("unknown EC curve name %s", curve);
+		estat = _ep_crypto_error(EP_STAT_CRYPTO_KEYCREATE,
+				"unknown EC curve name %s", curve);
 		goto fail0;
 	}
 	EC_KEY *eckey = EC_KEY_new_by_curve_name(nid);
 	if (eckey == NULL)
 	{
-		_ep_crypto_error("cannot create EC key");
+		estat = _ep_crypto_error(EP_STAT_CRYPTO_KEYCREATE,
+				"cannot create EC key");
 		goto fail0;
 	}
 	if (!EC_KEY_generate_key(eckey))
 	{
-		_ep_crypto_error("cannot generate EC key");
+		estat = _ep_crypto_error(EP_STAT_CRYPTO_KEYCREATE,
+				"cannot generate EC key");
 		goto fail1;
 	}
 	if (EVP_PKEY_assign_EC_KEY(key, eckey) != 1)
 	{
-		_ep_crypto_error("cannot assign EC key");
+		estat = _ep_crypto_error(EP_STAT_CRYPTO_KEYCREATE,
+				"cannot assign EC key");
 		goto fail1;
 	}
 	return EP_STAT_OK;
@@ -191,7 +205,7 @@ fail1:
 	EC_KEY_free(eckey);
 
 fail0:
-	return EP_STAT_CRYPTO_KEYCREATE;
+	return estat;
 }
 #endif
 
@@ -203,7 +217,11 @@ ep_crypto_key_create(int keytype, int keylen, int keyexp, const char *curve)
 
 	key = EVP_PKEY_new();
 	if (key == NULL)
-		return _ep_crypto_error("Cannot create new keypair");
+	{
+		(void) _ep_crypto_error(EP_STAT_CRYPTO_KEYCREATE,
+				"Cannot create new keypair");
+		return NULL;
+	}
 
 	switch (keytype)
 	{
@@ -232,7 +250,9 @@ ep_crypto_key_create(int keytype, int keylen, int keyexp, const char *curve)
 #endif
 
 	  default:
-		return _ep_crypto_error("unrecognized key type %d", keytype);
+		(void) _ep_crypto_error(EP_STAT_CRYPTO_KEYTYPE,
+				"unrecognized key type %d", keytype);
+		return NULL;
 	}
 	if (EP_STAT_ISOK(estat))
 		return key;
@@ -325,7 +345,8 @@ cipher_byid(int id)
 		return NULL;
 	const EVP_CIPHER *enc = EVP_get_cipherbyname(s);
 	if (enc == NULL)
-		_ep_crypto_error("keyenc_byid: unknown EVP cipher %s", s);
+		(void) _ep_crypto_error(EP_STAT_CRYPTO_KEYTYPE,
+				"keyenc_byid: unknown EVP cipher %s", s);
 	return enc;
 }
 
@@ -349,7 +370,8 @@ ep_crypto_key_print(
 
 	if (bio == NULL)
 	{
-		_ep_crypto_error("ep_crypto_key_print: cannot allocate bio");
+		(void) _ep_crypto_error(EP_STAT_OUT_OF_MEMORY,
+				"ep_crypto_key_print: cannot allocate bio");
 		return;
 	}
 	if (EP_UT_BITSET(EP_CRYPTO_F_SECRET, flags))
@@ -357,7 +379,8 @@ ep_crypto_key_print(
 	else
 		istat = EVP_PKEY_print_public(bio, key, off, NULL);
 	if (istat != 1)
-		_ep_crypto_error("ep_crypto_key_print: cannot print");
+		(void) _ep_crypto_error(EP_STAT_CRYPTO_KEYFORM,
+				"ep_crypto_key_print: cannot print");
 	BIO_free(bio);
 }
 
@@ -380,7 +403,11 @@ key_read_bio(BIO *bio,
 			filename, keyform, flags);
 	EP_ASSERT(bio != NULL);
 	if (keyform <= 0)
-		return _ep_crypto_error("keyform must be specified");
+	{
+		(void) _ep_crypto_error(EP_STAT_CRYPTO_KEYFORM,
+				"keyform must be specified");
+		return NULL;
+	}
 
 	if (keyform == EP_CRYPTO_KEYFORM_PEM)
 	{
@@ -399,12 +426,18 @@ key_read_bio(BIO *bio,
 	}
 	else
 	{
-		return _ep_crypto_error("unknown key format %d", keyform);
+		(void) _ep_crypto_error(EP_STAT_CRYPTO_KEYFORM,
+				"unknown key format %d", keyform);
+		return NULL;
 	}
 
 	if (key == NULL)
-		return _ep_crypto_error("cannot read %s key from %s",
+	{
+		(void) _ep_crypto_error(EP_STAT_CRYPTO_CONVERT,
+				"cannot read %s key from %s",
 				pubsec, filename);
+		return NULL;
+	}
 	return key;
 }
 
@@ -450,11 +483,19 @@ ep_crypto_key_read_file(
 			keyform = ep_crypto_keyform_fromstring(++p);
 	}
 	if (keyform <= 0)
-		return _ep_crypto_error("keyform must be specified");
+	{
+		(void) _ep_crypto_error(EP_STAT_CRYPTO_KEYFORM,
+				"keyform must be specified");
+		return NULL;
+	}
 
 	fp = fopen(filename, "r");
 	if (fp == NULL)
-		return _ep_crypto_error("cannot open key file %s", filename);
+	{
+		(void) _ep_crypto_error(EP_STAT_CRYPTO_CONVERT,
+				"cannot open key file %s", filename);
+		return NULL;
+	}
 	key = ep_crypto_key_read_fp(fp, filename, keyform, flags);
 	fclose(fp);
 	return key;
@@ -502,19 +543,21 @@ key_write_bio(EP_CRYPTO_KEY *key,
 {
 	const char *pubsec = EP_UT_BITSET(EP_CRYPTO_F_SECRET, flags) ?
 		"secret" : "public";
+	const char *keyform_str;
 	int istat;
 
 	EP_ASSERT(bio != NULL);
 
 	if (keyform <= 0)
 	{
-		(void) _ep_crypto_error("keyform must be specified");
-		return EP_STAT_CRYPTO_CONVERT;
+		return _ep_crypto_error(EP_STAT_CRYPTO_CONVERT,
+				"keyform must be specified");
 	}
 
 	if (keyform == EP_CRYPTO_KEYFORM_PEM)
 	{
 		// easy case
+		keyform_str = "PEM";
 		if (EP_UT_BITSET(EP_CRYPTO_F_SECRET, flags))
 		{
 			const EVP_CIPHER *enc = cipher_byid(keyenc);
@@ -528,15 +571,16 @@ key_write_bio(EP_CRYPTO_KEY *key,
 		}
 		if (istat != 1)
 		{
-			(void) _ep_crypto_error("cannot write %s PEM key",
+			return _ep_crypto_error(EP_STAT_CRYPTO_CONVERT,
+					"cannot write %s PEM key",
 					pubsec);
-			return EP_STAT_CRYPTO_CONVERT;
 		}
 		goto finis;
 	}
 #if _EP_CRYPTO_INCLUDE_DER
 	else if (keyform == EP_CRYPTO_KEYFORM_DER)
 	{
+		keyform_str = "DER";
 		if (EP_UT_BITSET(EP_CRYPTO_F_SECRET, flags))
 		{
 			if (keyenc != EP_CRYPTO_SYMKEY_NONE &&
@@ -551,18 +595,19 @@ key_write_bio(EP_CRYPTO_KEY *key,
 		{
 			istat = i2d_PUBKEY_bio(bio, key);
 		}
-		if (istat != 1)
-		{
-			(void) _ep_crypto_error("cannot write %s DER key",
-					pubsec);
-			return EP_STAT_CRYPTO_CONVERT;
-		}
 	}
 #endif // _EP_CRYPTO_INCLUDE_DER
 	else
 	{
-		(void) _ep_crypto_error("unknown key format %d", keyform);
-		return EP_STAT_CRYPTO_KEYFORM;
+		return _ep_crypto_error(EP_STAT_CRYPTO_KEYFORM,
+				"unknown key format %d", keyform);
+	}
+
+	if (istat != 1)
+	{
+		return _ep_crypto_error(EP_STAT_CRYPTO_CONVERT,
+				"cannot write %s %s key",
+				pubsec, keyform_str);
 	}
 
 finis:
@@ -595,7 +640,8 @@ ep_crypto_key_write_fp(EP_CRYPTO_KEY *key,
 
 	if (fp == NULL)
 	{
-		(void) _ep_crypto_error("ep_crypto_key_write_fp: "
+		return _ep_crypto_error(EP_STAT_CRYPTO_CONVERT,
+				"ep_crypto_key_write_fp: "
 				"file pointer must be specified");
 		return EP_STAT_CRYPTO_CONVERT;
 	}
@@ -631,9 +677,9 @@ ep_crypto_key_write_mem(EP_CRYPTO_KEY *key,
 
 		if (len > buflen)
 		{
-			(void) _ep_crypto_error("external keyform too long, wants %z, needs %z",
+			return _ep_crypto_error(EP_STAT_CRYPTO_CONVERT,
+					"external keyform too long, wants %z, needs %z",
 					len, buflen);
-			estat = EP_STAT_CRYPTO_CONVERT;
 		}
 		else
 		{

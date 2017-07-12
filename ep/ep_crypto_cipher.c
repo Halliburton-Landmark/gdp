@@ -74,9 +74,10 @@ evp_cipher_type(uint32_t cipher)
 		return EVP_aes_256_ofb();
 	}
 
-	return _ep_crypto_error("ep_crypto_cipher_new: "
-			"unknown cipher type 0x%x",
+	(void) _ep_crypto_error(EP_STAT_CRYPTO_KEYTYPE,
+			"ep_crypto_cipher_new: unknown cipher type 0x%x",
 			cipher);
+	return NULL;
 }
 
 
@@ -110,8 +111,10 @@ ep_crypto_cipher_new(
 	if (EVP_CipherInit_ex(&ctx->ctx, ciphertype, engine, key, iv, enc) <= 0)
 	{
 		ep_crypto_cipher_free(ctx);
-		return _ep_crypto_error("ep_crypto_cipher_new: "
+		(void) _ep_crypto_error(EP_STAT_CRYPTO_CIPHER,
+				"ep_crypto_cipher_new: "
 				"cannot initialize for encryption");
+		return NULL;
 	}
 
 	return ctx;
@@ -129,7 +132,8 @@ void
 ep_crypto_cipher_free(EP_CRYPTO_CIPHER_CTX *ctx)
 {
 	if (EVP_CIPHER_CTX_cleanup(&ctx->ctx) <= 0)
-		(void) _ep_crypto_error("cannot cleanup cipher context");
+		(void) _ep_crypto_error(EP_STAT_CRYPTO_FAIL,
+				"cannot cleanup cipher context");
 	ep_mem_free(ctx);
 }
 
@@ -162,25 +166,25 @@ ep_crypto_cipher_crypt(
 	if (outlen < inlen + EVP_CIPHER_CTX_key_length(&ctx->ctx))
 	{
 		// potential buffer overflow
-		_ep_crypto_error("cp_crypto_cipher_crypt: "
+		return _ep_crypto_error(EP_STAT_BUF_OVERFLOW,
+				"cp_crypto_cipher_crypt: "
 				"short output buffer (%d < %d + %d)",
 			outlen, inlen, EVP_CIPHER_CTX_key_length(&ctx->ctx));
-		return EP_STAT_BUF_OVERFLOW;
 	}
 
 	if (EVP_CipherUpdate(&ctx->ctx, out, &olen, in, inlen) <= 0)
 	{
-		_ep_crypto_error("ep_crypto_cipher_crypt: "
+		return _ep_crypto_error(EP_STAT_CRYPTO_CIPHER,
+				"ep_crypto_cipher_crypt: "
 				"cannot encrypt/decrypt");
-		return EP_STAT_CRYPTO_CIPHER;
 	}
 	rval = olen;
 	out += olen;
 	if (EVP_CipherFinal_ex(&ctx->ctx, out, &olen) <= 0)
 	{
-		_ep_crypto_error("ep_crypto_cipher_crypt: "
+		return _ep_crypto_error(EP_STAT_CRYPTO_CIPHER,
+				"ep_crypto_cipher_crypt: "
 				"cannot finalize encrypt/decrypt");
-		return EP_STAT_CRYPTO_CIPHER;
 	}
 
 	rval += olen;
@@ -201,9 +205,9 @@ ep_crypto_cipher_update(
 
 	if (EVP_CipherUpdate(&ctx->ctx, out, &olen, in, inlen) <= 0)
 	{
-		_ep_crypto_error("ep_crypto_cipher_update: "
+		return _ep_crypto_error(EP_STAT_CRYPTO_CIPHER,
+				"ep_crypto_cipher_update: "
 				"cannot encrypt/decrypt");
-		return EP_STAT_CRYPTO_CIPHER;
 	}
 
 	EP_ASSERT(olen >= 0 && olen <= outlen);
@@ -223,17 +227,17 @@ ep_crypto_cipher_final(
 	if (outlen < EVP_CIPHER_CTX_key_length(&ctx->ctx))
 	{
 		// potential buffer overflow
-		_ep_crypto_error("ep_crypto_cipher_final: "
+		return _ep_crypto_error(EP_STAT_BUF_OVERFLOW,
+				"ep_crypto_cipher_final: "
 				"short output buffer (%d < %d)",
 				outlen, EVP_CIPHER_CTX_key_length(&ctx->ctx));
-		return EP_STAT_BUF_OVERFLOW;
 	}
 
 	if (EVP_CipherFinal_ex(&ctx->ctx, out, &olen) <= 0)
 	{
-		_ep_crypto_error("ep_crypto_cipher_final: "
+		return _ep_crypto_error(EP_STAT_CRYPTO_CIPHER,
+				"ep_crypto_cipher_final: "
 				"cannot finalize encrypt/decrypt");
-		return EP_STAT_CRYPTO_CIPHER;
 	}
 
 	EP_ASSERT(olen >= 0);
