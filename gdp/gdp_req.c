@@ -285,12 +285,6 @@ _gdp_req_free(gdp_req_t **reqp)
 		req->flags &= ~GDP_REQ_ON_GCL_LIST;
 	}
 
-	// dereference the gcl
-	// (refcnt may be zero if called from _gdp_gcl_freehandle)
-	req->gcl = NULL;			//XXX temp to repair build while fixing bug
-	if (req->gcl != NULL && req->gcl->refcnt > 0)
-		_gdp_gcl_decref(&req->gcl);
-
 	// remove any pending events from the request
 	{
 		gdp_event_t *gev;
@@ -305,6 +299,7 @@ _gdp_req_free(gdp_req_t **reqp)
 		_gdp_pdu_free(req->cpdu);
 	req->rpdu = req->cpdu = NULL;
 
+	req->gcl = NULL;
 	req->state = GDP_REQ_FREE;
 	req->flags = 0;
 	req->md = NULL;

@@ -33,8 +33,6 @@
 #ifndef _GDPD_PUBSUB_H_
 #define _GDPD_PUBSUB_H_
 
-#define SUB_DEFAULT_TIMEOUT		600		// default subscription timeout (10m)
-
 // notify all subscribers that new data is available (or shutdown required)
 void			sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd);
 
