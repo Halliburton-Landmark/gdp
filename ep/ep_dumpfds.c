@@ -55,7 +55,7 @@ ep_app_dumpfds(FILE *fp)
 		if (++j > 10)
 		{
 			fprintf(fp, "\n");
-			j = 0;
+			j = 1;
 		}
 		fprintf(fp, " %3d", i);
 		if ((sbuf.st_mode & S_IFMT) == S_IFSOCK)
