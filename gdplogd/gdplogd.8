@@ -194,20 +194,6 @@ The old record with the same number will not be accessible.
 Allow gaps in record numbers.
 This will likely confuse readers who try to read the record
 that does not exist.
-.
-.It swarm.gdplogd.subscr.timeout
-How old a subscription can be (in seconds) without being refreshed
-and still be considered active.
-Any subscriptions that are not renewed in this interval
-are considered dead and are removed from the subscription list.
-Should be greater than two times
-.Va swarm.gdp.subscr.refresh .
-Defaults to the value of
-.Va swarm.gdp.subscr.timeout
-(which should probably be preferred over this name).
-See
-.Xr gdp 7
-for more information.
 .El
 .
 .Sh SEE ALSO
