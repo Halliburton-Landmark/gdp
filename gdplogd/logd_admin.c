@@ -290,7 +290,7 @@ admin_post_statsv(
 **  Periodic probe of system status (should probably be in thread)
 */
 
-static void
+static EP_STAT
 post_one_log(gdp_name_t gdpname, void *ctx)
 {
 	gdp_gcl_t *gcl;
@@ -334,6 +334,7 @@ post_one_log(gdp_name_t gdpname, void *ctx)
 				"in-cache", "false",
 				NULL, NULL);
 	}
+	return EP_STAT_OK;
 }
 
 

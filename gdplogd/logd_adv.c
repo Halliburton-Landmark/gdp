@@ -129,12 +129,11 @@ withdraw_one(gdp_name_t gname, void *ctx)
 
 
 EP_STAT
-logd_advertise_all(gdp_chan_t *chan, int cmd)
+logd_advertise_all(gdp_chan_t *chan, int cmd, void *adata)
 {
 	EP_STAT estat;
 	gdp_adcert_t *adcert = NULL;					//XXX XXX
 	gdp_chan_advert_cr_t *challenge_cb = NULL;		//XXX XXX
-	void *adata = NULL;								//XXX XXX
 
 	if (cmd == GDP_CMD_ADVERTISE)
 	{

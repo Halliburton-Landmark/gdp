@@ -1025,7 +1025,7 @@ _gdp_io_recv(
 		return EP_STAT_OK;			// need entire payload
 
 	ibuf = _gdp_cursor_get_buf(cursor);
-	payload_len = _gdp_cursor_get_payload_len(cursor);
+	payload_len = _gdp_cursor_get_payload_size(cursor);
 	EP_ASSERT_ELSE(gdp_buf_getlength(ibuf) >= payload_len, return EP_STAT_OK);
 
 	gdp_pdu_t *pdu = _gdp_pdu_new();
