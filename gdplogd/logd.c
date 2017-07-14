@@ -101,7 +101,7 @@ renew_advertisements(int fd, short what, void *_chan)
 {
 	gdp_chan_t *chan = _chan;
 	ep_sd_notifyf("WATCHDOG=1\n");
-	(void) logd_advertise_all(chan, GDP_CMD_ADVERTISE);
+	(void) logd_advertise_all(chan, GDP_CMD_ADVERTISE, NULL);
 }
 
 
@@ -132,7 +132,7 @@ logd_shutdown(void)
 	}
 
 	ep_dbg_cprintf(Dbg, 1, "\n\n*** Withdrawing all advertisements ***\n");
-	logd_advertise_all(_GdpChannel, GDP_CMD_WITHDRAW);
+	logd_advertise_all(_GdpChannel, GDP_CMD_WITHDRAW, NULL);
 }
 
 

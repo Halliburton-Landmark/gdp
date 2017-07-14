@@ -125,14 +125,20 @@ extern EP_STAT	dispatch_cmd(			// dispatch a request
 **  Advertisements
 */
 
-extern EP_STAT	logd_advertise_all(gdp_chan_t *chan, int cmd);
+extern EP_STAT	logd_advertise_all(
+						gdp_chan_t *chan,
+						int cmd,
+						void *adata);
 
-extern void		logd_advertise_one(gdp_chan_t *chan, gdp_name_t name, int cmd);
+extern void		logd_advertise_one(
+						gdp_chan_t *chan,
+						gdp_name_t name,
+						int cmd);
 
 extern void		sub_send_message_notification(
-					gdp_req_t *req,
-					gdp_datum_t *datum,
-					int cmd);
+						gdp_req_t *req,
+						gdp_datum_t *datum,
+						int cmd);
 
 /*
 **  Physical Implementation --- these are the routines that implement the
