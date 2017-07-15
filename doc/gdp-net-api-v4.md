@@ -143,28 +143,44 @@ The parenthetical comments in the titles are intended to provide
 a model of how this would map into an OO environment.
 
 
-### Data Types
+### Data Types and Conventions
+
+The following data structures are opaque to "my side" of the API,
+but can be defined arbitrarily by "your side":
 
 * `gdp_chan_t` contains the state of the channel itself.  It is
   opaque to "my side" of the API.
-* `gdp_chan_x_t` contains "My" private data.  This evaluates to
-  `struct gdp_chan_x`, which I must define if I want to dereference
-  that structure.  It is opaque to you.
 * `gdp_cursor_t` is opaque to "my side" of the API; it provides a
   streaming interface to a payload while the client is receiving.
   Internally ("your side") it is fair game for other use, in
   particular, it may be useful on the sending side.
-* `gdp_cursor_x_t` is the cursor equivalent of `gdp_chan_x_t`.
-* `gdp_buf_t` implements dynamically allocated, variable sized
-  buffers (already exists; based on `libevent`).  Details of that
-  interface are not included here (but are described in the "GDP
-  Programmatic API" document).
-* `gdp_name_t` is the 256-bit version of a GDP name.
 * `gdp_adcert_t` is whatever information is needed to advertise
   a GDPname.  This is _for further study_.
+* `gdp_adchallenge_t` is data associated with a challenge/response
+  interaction when doing advertising.
 * `gdp_target_t` is intended for specifying clues as to where to
   deliver a message, for example, any replica, all replicas,
   or a specific replica.  It is undefined as yet.
+
+The following data structures are opaque to "your side" of the API,
+but I can define to suit my needs:
+
+* `gdp_chan_x_t` contains "My" private data.  This evaluates to
+  `struct gdp_chan_x`, which I must define if I want to dereference
+  that structure.  It is normally referred to as `cdata` in the
+  descriptions below.
+* `gdp_cursor_x_t` is the cursor equivalent of `gdp_chan_x_t`.
+  It is normally referred to as `udata` in the descriptons
+  below.
+* `gdp_advert_x_t` is the same for advertisements.  It is
+  normally referred to as `adata` in the descriptions below.
+
+These data structures are opaque to both of us; their interfaces
+are described in the "GDP Programmatic API" document:
+
+* `gdp_buf_t` implements dynamically allocated, variable sized
+  buffers (already exists; based on `libevent`).
+* `gdp_name_t` is the 256-bit version of a GDP name.
 
 
 ### Initialization
@@ -177,7 +193,7 @@ I promise to call this routine on startup:
 ~~~
 	EP_STAT _gdp_chan_init(
 			struct event_base *evbase,
-			void *options);
+			gdp_chan_init_t *options);
 ~~~
 
 The `evbase` parameter is a `libevent` event base that I will
@@ -208,11 +224,11 @@ channel when I start up.
 	typedef EP_STAT gdp_chan_advert_func_t(
 			gdp_chan_t *chan,
 			int action,
-			void *adata);
+			gdp_chan_advert_x_t *adata);
 
 	EP_STAT _gdp_chan_open(
 			const char *addrspec,
-			void *qos,
+			gdp_chan_qos_t *qos,
 			gdp_cursor_recv_cb_t *cursor_recv_cb,
 			gdp_chan_send_cb_t *chan_send_cb,
 			gdp_chan_ioevent_cb_t *chan_ioevent_cb,
@@ -224,10 +240,17 @@ channel when I start up.
 Creates a channel to a GDP switch located at `addrspec` and stores
 the result in `*chan`.  The format is a semicolon-delimited list of
 `hostname:port` entries.  The entries in the list should be tried
-in order.  If `addrspec` is NULL, the `swarm.gdp.routers`
-runtime parameter is used.  The `qos` parameter is intended to
-hold additional open parameters (e.g., QoS requirements), but for now
-I promise to pass it as `NULL`.  The callbacks are described below.
+in order.  If `addrspec` is NULL, Zeroconf should be tried if enabled,
+and if that fails the `swarm.gdp.routers` runtime parameter is used.
+If that is not set, `_gdp_chan_open` may try a default.  If it
+cannot connect, it should return a status related to the reason
+(i.e., one based on a Posix `errno`) or `GDP_STAT_CHAN_NOT_CONNECTED`.
+
+The `qos` parameter is intended to hold additional open parameters
+(e.g., QoS requirements), but for now I promise to pass it as `NULL`.
+
+The callbacks are described below.
+
 The `cdata` parameter is saved and is available to callbacks on this
 channel.
 
@@ -236,8 +259,9 @@ associated channel (as encapsulated into `cursor`), call
 `cursor_recv_cb`.  Details are described under "Receiving
 Messages" below.
 
-**`chan_send_cb`**: The `gdp_send_cb` is not used at this time; for
-now, if it is non-NULL `_gdp_chan_open` should return
+**`chan_send_cb`**:  The intent is that this will be called when
+the network is able to accept more data.  It is not used at this
+time.  For now, if it is non-NULL `_gdp_chan_open` should return
 `GDP_STAT_NOT_IMPLEMENTED`.  The parameters to this function are
 subject to change.
 
@@ -321,8 +345,8 @@ _This interface is still under development._
 			gdp_chan_t *chan,
 			gdp_name_t gname,
 			int action,
-			void *cdata,
-			void *adata);
+			gdp_adchallenge_t *acdata,
+			gdp_advert_x_t *adata);
 
 	// advertisement method
 	EP_STAT _gdp_chan_advertise(
@@ -330,7 +354,7 @@ _This interface is still under development._
 			gdp_name_t gname,
 			gdp_chan_adcert_t *adcert,
 			gdp_advert_cr_t *challenge_cb,
-			void *adata);
+			gdp_advert_x_t *adata);
 ~~~
 
 Advertises the name `gname` on the given `chan`.  If a certificate
@@ -341,10 +365,12 @@ it should call `challenge_cb`.  The `adata` is passed through untouched.
 If the routing subsystem challenges `adcert` the `challenge_cb`
 function will be invoked with the `chan`, the `gname` being
 challenged, an `action` **to be determined**, any challenge data
-issued by the router side as `cdata`, and the `adata` field directly
+issued by the router side as `acdata`, and the `adata` field directly
 from `_gdp_chan_advertise`.
 
 > [[What is `adcert` exactly?  Where does it come from?]]
+
+> [[We still need to explain how `acdata` is used.]]
 
 #### \_gdp\_chan\_withdraw (chan::withdraw)
 
@@ -352,7 +378,7 @@ from `_gdp_chan_advertise`.
 	EP_STAT _gdp_chan_withdraw(
 			gdp_chan_t *chan,
 			gdp_name_t gname,
-			void *adata);
+			gdp_advert_x_t *adata);
 ~~~
 
 Withdraw a previous advertisement, for example, if a log is removed
@@ -443,6 +469,11 @@ invoked.  However, if the callback returns without consuming
 data and new data arrives, it will be appended to the existing
 data buffer.
 
+> [[This seems baroque, and doesn't deal with the case where more
+data comes in while `cursor_recv_cb` is running (i.e, if the underlying
+buffer changes while the callback is running.  Avoiding race conditions
+is hard with this interface.  There has to be a better way.]]
+
 #### \_gdp\_cursor\_get\_buf (cursor::get\_buf)
 
 ~~~
@@ -515,7 +546,7 @@ in the flags.
 ~~~
 	void _gdp_cursor_set_udata(
 			gdp_cursor_t *cursor,
-			void *udata);
+			gdp_cursor_x_t *udata);
 ~~~
 
 Sets a user-defined field in the cursor to `udata`.  The lifetime of
@@ -528,7 +559,7 @@ free any allocated memory) before the cursor is destroyed.
 #### \_gdp\_cursor\_get\_udata (cursor::get\_udata)
 
 ~~~
-	void *_gdp_cursor_get_udata(
+	gdp_cursor_x_t *_gdp_cursor_get_udata(
 			gdp_cursor_t *cursor);
 ~~~
 
