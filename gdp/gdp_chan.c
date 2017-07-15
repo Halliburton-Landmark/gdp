@@ -274,7 +274,7 @@ _gdp_chan_open(const char *gdp_addr,
 				sizeof abuf);
 	}
 
-	ep_dbg_cprintf(Dbg, 8, "_gdp_chan_open(%s)\n", abuf);
+	ep_dbg_cprintf(Dbg, 28, "_gdp_chan_open(%s)\n", abuf);
 
 	// strip off addresses and try them
 	estat = GDP_STAT_NOTFOUND;				// anything that is not OK
