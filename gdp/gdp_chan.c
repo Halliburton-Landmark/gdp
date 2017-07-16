@@ -887,7 +887,7 @@ _gdp_chan_withdraw(
 {
 	gdp_pname_t pname;
 
-	ep_dbg_cprintf(Dbg, 39, "_gdp_chan_withdraw(%s):",
+	ep_dbg_cprintf(Dbg, 39, "_gdp_chan_withdraw(%s)\n",
 			gdp_printable_name(gname, pname));
 	return GDP_STAT_NOT_IMPLEMENTED;
 }

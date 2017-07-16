@@ -620,7 +620,7 @@ _gdp_pdu_in(gdp_pdu_t *pdu, gdp_cursor_t *cursor)
 		size_t l;
 
 		ep_dbg_cprintf(DbgIn, 38,
-				"_gdp_pdu_in: reading %zd data bytes (%zd available)\n",
+				"_gdp_pdu_in: reading %" PRIu32 " data bytes (%zd available)\n",
 				dlen, gdp_buf_getlength(ibuf));
 		l = gdp_buf_move(pdu->datum->dbuf, ibuf, dlen);
 		if (ep_dbg_test(DbgIn, 39))
@@ -632,7 +632,7 @@ _gdp_pdu_in(gdp_pdu_t *pdu, gdp_cursor_t *cursor)
 		{
 			// should never happen since we already have all the data in memory
 			ep_dbg_cprintf(DbgIn, 2,
-					"_gdp_pdu_in: cannot read all data; wanted %zd, got %zd\n",
+					"_gdp_pdu_in: cannot read all data; wanted %" PRIu32 ", got %zd\n",
 					dlen, l);
 		}
 		sz += l;

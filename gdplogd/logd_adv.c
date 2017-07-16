@@ -44,12 +44,14 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.advertise",
 							"GDP GCL Advertisements");
 
 
-typedef struct gdp_advert_x
+typedef struct gdp_advert_x	gdp_advert_x_t;
+
+struct gdp_advert_x
 {
-	gdp_chan_t		*chan;
-	gdp_adcert_t	*adcert;
+	gdp_chan_t				*chan;
+	gdp_adcert_t			*adcert;
 	gdp_chan_advert_cr_t	*challenge_cb;
-} gdp_advert_x_t;
+};
 
 
 
@@ -63,12 +65,15 @@ logd_advertise_one(gdp_chan_t *chan, gdp_name_t gname, int cmd)
 	EP_STAT estat;
 	gdp_adcert_t *adcert = NULL;					//XXX XXX
 	gdp_chan_advert_cr_t *challenge_cb = NULL;		//XXX XXX
-	void *adata = NULL;								//XXX XXX
+	gdp_advert_x_t advert;
+
+	memset(&advert, 0, sizeof advert);
+	advert.chan = chan;
 
 	if (cmd == GDP_CMD_ADVERTISE)
-		estat = _gdp_chan_advertise(chan, gname, adcert, challenge_cb, adata);
+		estat = _gdp_chan_advertise(chan, gname, adcert, challenge_cb, &advert);
 	else
-		estat = _gdp_chan_withdraw(chan, gname, adata);
+		estat = _gdp_chan_withdraw(chan, gname, &advert);
 
 	if (ep_dbg_test(Dbg, 11))
 	{
@@ -87,9 +92,9 @@ logd_advertise_one(gdp_chan_t *chan, gdp_name_t gname, int cmd)
 */
 
 static EP_STAT
-advertise_one(gdp_name_t gname, void *ctx)
+advertise_one(gdp_name_t gname, void *ax_)
 {
-	gdp_advert_x_t *ax = ctx;
+	gdp_advert_x_t *ax = ax_;
 	EP_STAT estat;
 
 	estat = _gdp_chan_advertise(ax->chan, gname, ax->adcert,
@@ -108,10 +113,13 @@ advertise_one(gdp_name_t gname, void *ctx)
 }
 
 static EP_STAT
-withdraw_one(gdp_name_t gname, void *ctx)
+withdraw_one(gdp_name_t gname, void *ax_)
 {
-	gdp_advert_x_t *ax = ctx;
+	gdp_advert_x_t *ax = ax_;
 	EP_STAT estat;
+
+	if (!EP_ASSERT(ax != NULL))
+		return EP_STAT_ASSERT_ABORT;
 
 	estat = _gdp_chan_withdraw(ax->chan, gname, ax);
 
@@ -129,23 +137,36 @@ withdraw_one(gdp_name_t gname, void *ctx)
 
 
 EP_STAT
-logd_advertise_all(gdp_chan_t *chan, int cmd, void *adata)
+logd_advertise_all(gdp_chan_t *chan, int cmd, void *adata_unused)
 {
 	EP_STAT estat;
 	gdp_adcert_t *adcert = NULL;					//XXX XXX
 	gdp_chan_advert_cr_t *challenge_cb = NULL;		//XXX XXX
+	gdp_advert_x_t advert;
+
+	memset(&advert, 0, sizeof advert);
+	advert.chan = chan;
 
 	if (cmd == GDP_CMD_ADVERTISE)
 	{
+		// advertise me ...
 		estat = _gdp_chan_advertise(chan, _GdpMyRoutingName, adcert,
-									challenge_cb, adata);
+									challenge_cb, &advert);
 
-		GdpDiskImpl.foreach(advertise_one, adata);
+		// ... and all of my logs
+		EP_STAT tstat = GdpDiskImpl.foreach(advertise_one, &advert);
+		if (EP_STAT_SEVERITY(tstat) > EP_STAT_SEVERITY(estat))
+			estat = tstat;
 	}
 	else
 	{
-		GdpDiskImpl.foreach(withdraw_one, adata);
-		estat = _gdp_chan_withdraw(chan, _GdpMyRoutingName, adata);
+		// withdraw log advertisements ...
+		estat = GdpDiskImpl.foreach(withdraw_one, &advert);
+
+		// ... and finally myself
+		EP_STAT tstat = _gdp_chan_withdraw(chan, _GdpMyRoutingName, &advert);
+		if (EP_STAT_SEVERITY(tstat) > EP_STAT_SEVERITY(estat))
+			estat = tstat;
 	}
 
 	if (ep_dbg_test(Dbg, 21))
