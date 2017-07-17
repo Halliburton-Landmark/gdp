@@ -49,11 +49,12 @@ GDP clients and servers ("my side" of the API) see:
 
 * A message-based interface (i.e., PDUs are delimited by the
   network layer).
-* Fragmentation, flow control, etc. already handled.
-* Individual PDUs delivered reliably, that is, fragments of
-  PDUs will be delivered in order, fragments will not be
-  duplicated, and an error will be delivered if a fragment
-  is lost.
+* Reliable data transmission:
+    + Fragmentation, flow control, etc. already handled.
+    + Individual PDUs delivered reliably, that is, fragments of
+      PDUs will be delivered in order, fragments will not be
+      duplicated, and an error will be delivered if a fragment
+      is lost.
 * Different PDUs may be delivered out of order.
 * PDU sizes are not inherently limited by underlying MTUs.
 
@@ -239,7 +240,7 @@ channel when I start up.
 
 Creates a channel to a GDP switch located at `addrspec` and stores
 the result in `*chan`.  The format is a semicolon-delimited list of
-`hostname:port` entries.  The entries in the list should be tried
+`hostname[:port]` entries.  The entries in the list should be tried
 in order.  If `addrspec` is NULL, Zeroconf should be tried if enabled,
 and if that fails the `swarm.gdp.routers` runtime parameter is used.
 If that is not set, `_gdp_chan_open` may try a default.  If it
@@ -248,6 +249,7 @@ cannot connect, it should return a status related to the reason
 
 The `qos` parameter is intended to hold additional open parameters
 (e.g., QoS requirements), but for now I promise to pass it as `NULL`.
+If it non-NULL, you should return `GDP_STAT_NOT_IMPLEMENTED`.
 
 The callbacks are described below.
 
@@ -287,8 +289,11 @@ whether this is for advertisement or withdrawal.
 > [[Is `chan_advert_func` required?  The conditions can probably be
 determined from `chan_ioevent_cb`.]]
 
+> [[Who handles re-advertisements, i.e., renewing leases?]]
+
 > [[Nitesh brings up the question of `dst` filtering.  It isn't clear
-which side of the interface this belongs on.]]
+which side of the interface this belongs on.  Probably on your side
+since DoS mitigation should be as low level as possible.]]
 
 #### \_gdp\_chan\_close (destructor)
 
@@ -301,9 +306,6 @@ Deallocate `chan`.  All resources are freed.  I promise I will not
 attempt to use `chan` after it is freed.
 
 #### \_gdp\_chan\_get\_cdata (chan::get\_cdata)
-
-> [[Need callbacks for received data, failure on a connection.
-Anything else?]]
 
 ~~~
 	gdp_chan_x_t *_gdp_chan_get_cdata(
@@ -406,9 +408,8 @@ that can be passed to `_gdp_chan_withdraw` or is the gname enough?]]
 Sends the entire contents of `payload` to the indicated `dst` over
 `chan`.  The source address is specified by `src`.
 
-> [[Does this clear `payload` or leave it unchanged?]]
-
-> [[Does this clear `payload` or leave it unchanged?]]
+> [[Does this clear `payload` or leave it unchanged?  Should
+probably clear it as the data is sent and acknowledged.]]
 
 The `target` give clues as to exactly where to deliver the
 message.  For example, it might be any replica of a given log,
@@ -596,3 +597,4 @@ To be completed.
 * `GDP_STAT_NOTFOUND`
 * `GDP_STAT_PDU_WRITE_FAIL`
 * `GDP_STAT_NOT_IMPLEMENTED`
+* `GDP_STAT_CHAN_NOT_CONNECTED`
