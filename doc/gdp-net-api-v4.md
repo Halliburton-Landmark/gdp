@@ -23,7 +23,8 @@ new problems, so this **WILL** change.]]
 
 > [[NOTE: "PDU", "blob", and "payload" are used somewhat interchangeably,
 with a bit of "message" thrown in for good measure.  This is a bug,
-not a feature.]]
+not a feature.  However, they differ from a "packet", which is a
+property of the underlying physical medium.]]
 
 
 ## Key Points
@@ -35,8 +36,9 @@ seems to be somewhat inverted in that the routing commands
 live on top of the reliable transmission layer.  This is part
 of the legacy of the "overlay network" model.
 
-For the purposes of this document, "I", "me", "my", and "up" refer
-to the user of this API.  "You", "your", and "down" refer to the
+For the purposes of this document, "I", "me", "my", "up", and
+"application direction" refer to the user of this API.
+"You", "your", "down", and "network direction" refer to the
 implementer of the API.  "Payload" is an opaque blob for you;
 the term is approximately equal to "PDU".
 
@@ -94,7 +96,7 @@ that this layer will not rely on threads in client processes to
 make it possible to run in low-end (non-MMU) processors.
 _Note: this is a change from the V3 design, which assumes a
 dedicated thread for I/O.  This is intended to support Kubi's
-dream of the GDP on an Arduino-class platform._
+dream of a semantically limited GDP on an Arduino-class platform._
 
 Issues that we should consider:
 
@@ -151,10 +153,10 @@ but can be defined arbitrarily by "your side":
 
 * `gdp_chan_t` contains the state of the channel itself.  It is
   opaque to "my side" of the API.
-* `gdp_cursor_t` is opaque to "my side" of the API; it provides a
-  streaming interface to a payload while the client is receiving.
-  Internally ("your side") it is fair game for other use, in
-  particular, it may be useful on the sending side.
+* `gdp_cursor_t` provides a handle to a streaming interface to a
+  payload while the client is receiving.  Internally ("your side")
+  it is fair game for other use, in particular, it may be useful
+  on the sending side.  It is opaque to "my side" of the API.
 * `gdp_adcert_t` is whatever information is needed to advertise
   a GDPname.  This is _for further study_.
 * `gdp_adchallenge_t` is data associated with a challenge/response
@@ -163,8 +165,9 @@ but can be defined arbitrarily by "your side":
   deliver a message, for example, any replica, all replicas,
   or a specific replica.  It is undefined as yet.
 
-The following data structures are opaque to "your side" of the API,
-but I can define to suit my needs:
+The following data structures are opaque to "your side" of the API
+(i.e., you can never dereference them), but I can define to suit
+my needs:
 
 * `gdp_chan_x_t` contains "My" private data.  This evaluates to
   `struct gdp_chan_x`, which I must define if I want to dereference
@@ -173,8 +176,9 @@ but I can define to suit my needs:
 * `gdp_cursor_x_t` is the cursor equivalent of `gdp_chan_x_t`.
   It is normally referred to as `udata` in the descriptons
   below.
-* `gdp_advert_x_t` is the same for advertisements.  It is
-  normally referred to as `adata` in the descriptions below.
+* `gdp_advert_x_t` is my data structure used to pass information
+  vis-a-vis advertising.  It is normally referred to as `adata`
+  in the descriptions below.
 
 These data structures are opaque to both of us; their interfaces
 are described in the "GDP Programmatic API" document:
@@ -224,8 +228,7 @@ channel when I start up.
 			int ioevent_flags);
 	typedef EP_STAT gdp_chan_advert_func_t(
 			gdp_chan_t *chan,
-			int action,
-			gdp_chan_advert_x_t *adata);
+			int action);
 
 	EP_STAT _gdp_chan_open(
 			const char *addrspec,
@@ -254,7 +257,7 @@ If it non-NULL, you should return `GDP_STAT_NOT_IMPLEMENTED`.
 The callbacks are described below.
 
 The `cdata` parameter is saved and is available to callbacks on this
-channel.
+channel.  It is opaque on the network side.
 
 **`cursor_recv_cb`**:  When a new PDU is ready to read on the
 associated channel (as encapsulated into `cursor`), call
@@ -268,7 +271,7 @@ time.  For now, if it is non-NULL `_gdp_chan_open` should return
 subject to change.
 
 **`chan_ioevent_cb`**: When a channel is closed by the other end of
-the connection, or on I/O error, `gdp_close_cb` is called.  The
+the connection, or on I/O error, `gdp_ioevent_cb` is called.  The
 `ioevent_flags` parameter is from the following set:
 
 | Flag			| Meaning					|
@@ -438,7 +441,7 @@ since it limits the size of any single record stored in the GDP.]]
 	EP_STAT _gdp_chan_multicast(
 			gdp_chan_t *chan,
 			gdp_name_t src,
-			gdp_XXX_t multicast_addr,
+			gdp_mcaddr_t multicast_addr,
 			gdp_buf_t *payload);
 ~~~
 
@@ -469,6 +472,9 @@ required that the entire message be read before the callback is
 invoked.  However, if the callback returns without consuming
 data and new data arrives, it will be appended to the existing
 data buffer.
+
+I promise to never call these functions or reference a cursor except
+from within `cursor_recv_cb`.
 
 > [[This seems baroque, and doesn't deal with the case where more
 data comes in while `cursor_recv_cb` is running (i.e, if the underlying
