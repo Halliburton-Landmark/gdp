@@ -1,7 +1,7 @@
 % What I Want to See in a Network API
   for the GDP
 % Eric Allman
-% 2017-07-14
+% 2017-07-19
 
 ***This is a proposal, not a specification***
 
@@ -64,8 +64,6 @@ The network ("your side" of the API) sees (that is, I will give
 you):
 
 * Source and destination GDPnames (256-bit).
-* A dynamically sized buffer in which to read or store a
-  payload, which you must treat as an opaque blob.
 * Advertisements of known GDPnames, authenticated using a
   certificate-based scheme, still not fully defined.
 * Probably some hints vis-a-vis client expectations such as
@@ -74,6 +72,7 @@ you):
   events.  I may register my own events in the same event
   base.
 * _Other information to be determined._
+* I will run the event loop base as appropriate.
 
 Your side is responsible for:
 
@@ -96,7 +95,9 @@ that this layer will not rely on threads in client processes to
 make it possible to run in low-end (non-MMU) processors.
 _Note: this is a change from the V3 design, which assumes a
 dedicated thread for I/O.  This is intended to support Kubi's
-dream of a semantically limited GDP on an Arduino-class platform._
+dream of a semantically limited GDP in a single-threaded
+environment such as an Arduino._  However, some GDP applications
+may still use dedicated threads for I/O or other functions.
 
 Issues that we should consider:
 
@@ -184,7 +185,7 @@ These data structures are opaque to both of us; their interfaces
 are described in the "GDP Programmatic API" document:
 
 * `gdp_buf_t` implements dynamically allocated, variable sized
-  buffers (already exists; based on `libevent`).
+  buffers (already exists; based on `libevent` `evbuffer`s).
 * `gdp_name_t` is the 256-bit version of a GDP name.
 
 
@@ -473,8 +474,12 @@ invoked.  However, if the callback returns without consuming
 data and new data arrives, it will be appended to the existing
 data buffer.
 
+
 I promise to never call these functions or reference a cursor except
-from within `cursor_recv_cb`.
+from within `cursor_recv_cb`.  You must ensure that no data is added
+to the associated buffer (returned by `_gdp_cursor_get_buf`) while
+that callback is running.  [The routines `gdp_buf_lock` and
+`gdp_buf_unlock` can be helpful in multithreaded environments.]
 
 > [[This seems baroque, and doesn't deal with the case where more
 data comes in while `cursor_recv_cb` is running (i.e, if the underlying
@@ -604,3 +609,103 @@ To be completed.
 * `GDP_STAT_PDU_WRITE_FAIL`
 * `GDP_STAT_NOT_IMPLEMENTED`
 * `GDP_STAT_CHAN_NOT_CONNECTED`
+
+## Usage
+
+This section is pseudocode for me to explore how the interface is
+used in different environments.  It is not intended to be tutorial
+in nature.
+
+* `renewal_thread` renews advertisements and subscriptions.
+    + Does it also reclaim resources?
+    + Should there be different intervals for different operations?
+
+### Regular application (I/O in subordinate thread)
+
+#### Startup
+
+~~~
+	spawn(event_loop)
+	_gdp_chan_open
+	advertise(me)
+	spawn(renewal_thread)
+	return to application
+~~~
+
+#### \_gdp\_invoke
+
+~~~
+	send command
+	while (!done)
+		wait on CV
+	process PDU
+~~~
+
+#### gdp\_event\_next
+
+~~~
+	while (!command on queue)
+		wait on CV
+	return first event
+~~~
+
+
+### Log daemon (I/O in main thread)
+
+#### Startup
+
+~~~
+	_gdp_chan_open
+	advertise (all)
+	spawn(renewal_thread)
+	event_loop
+~~~
+
+#### \_gdp\_invoke
+
+~~~
+	send command
+	while (!done)
+		process single event
+	spawn(process PDU)
+~~~
+
+#### gdp\_event\_next
+
+Is this even meaningful?  The log daemon won't be taking async events,
+will it?
+
+~~~
+	while (!command on queue)
+		process single event
+	return first event
+~~~
+
+
+### Single threaded app
+
+#### Startup
+
+~~~
+	_gdp_chan_open
+	advertise(me)
+	libevent_add_timer(do_renewal)
+	return to application
+~~~
+
+#### \_gdp\_invoke
+
+~~~
+	send command
+	while (!done)
+		process single event
+	process PDU
+~~~
+
+#### gdp\_event\_next
+
+~~~
+	while (!command on queue)
+		process single event
+	return first event
+~~~
