@@ -627,7 +627,7 @@ in nature.
 ~~~
 	spawn(event_loop)
 	_gdp_chan_open
-	advertise(me)
+	advertise(me)			<== implicit in _gdp_chan_open
 	spawn(renewal_thread)
 	return to application
 ~~~
@@ -652,34 +652,32 @@ in nature.
 
 ### Log daemon (I/O in main thread)
 
+NOTA BENE: `_gdp_invoke` and `gdp_event_next` may not be called
+from the I/O thread (here or in the base case) since there
+would be no way to set the condition variable to continue and
+read the response.
+
+DOES NOT WORK.  There is no event loop running for the advertisement,
+hence no way to do the C-R.  Maybe just fall back to existing
+implementation (spawn I/O thread, initial thread initializes and
+sleeps forever).
+
 #### Startup
 
 ~~~
 	_gdp_chan_open
-	advertise (all)
+	advertise (all)			<== implicit in _gdp_chan_open
 	spawn(renewal_thread)
 	event_loop
 ~~~
 
 #### \_gdp\_invoke
 
-~~~
-	send command
-	while (!done)
-		process single event
-	spawn(process PDU)
-~~~
+Same as base case.
 
 #### gdp\_event\_next
 
-Is this even meaningful?  The log daemon won't be taking async events,
-will it?
-
-~~~
-	while (!command on queue)
-		process single event
-	return first event
-~~~
+Same as base case.
 
 
 ### Single threaded app
