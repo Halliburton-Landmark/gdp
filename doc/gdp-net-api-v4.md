@@ -71,11 +71,14 @@ you):
 * A `libevent` event base to be used for registering I/O
   events.  I may register my own events in the same event
   base.
+* Callbacks for functions that require higher level interaction,
+  such as advertisements.
 * _Other information to be determined._
 * I will run the event loop base as appropriate.
 
 Your side is responsible for:
 
+* Advertising of known names, including refreshing leases.
 * Routing.
 * Retransmissions, etc.
 * Reestablishing dropped connections (e.g., in presence of
@@ -175,7 +178,7 @@ my needs:
   that structure.  It is normally referred to as `cdata` in the
   descriptions below.
 * `gdp_cursor_x_t` is the cursor equivalent of `gdp_chan_x_t`.
-  It is normally referred to as `udata` in the descriptons
+  It is normally referred to as `udata` in the descriptions
   below.
 * `gdp_advert_x_t` is my data structure used to pass information
   vis-a-vis advertising.  It is normally referred to as `adata`
@@ -284,16 +287,11 @@ the connection, or on I/O error, `gdp_ioevent_cb` is called.  The
 Note that this is a bitmap; multiple flags may be set on a single call.
 
 **`chan_advert_func`**: Invoked when advertising or withdrawal needs to
-take place.  Advertising is required when the channel is connected,
-either for the first time or when a reconnection is required.
+take place.  Advertising is required when the channel is connected or
+reconnected and in periodic lease updates.
 Withdrawal takes place when the client explicitly requests it or
 when the client is shutting down.  The `action` parameter specifies
 whether this is for advertisement or withdrawal.
-
-> [[Is `chan_advert_func` required?  The conditions can probably be
-determined from `chan_ioevent_cb`.]]
-
-> [[Who handles re-advertisements, i.e., renewing leases?]]
 
 > [[Nitesh brings up the question of `dst` filtering.  It isn't clear
 which side of the interface this belongs on.  Probably on your side
@@ -474,17 +472,19 @@ invoked.  However, if the callback returns without consuming
 data and new data arrives, it will be appended to the existing
 data buffer.
 
+You must ensure that data read from a cursor is presented in the
+same order it was written with no duplicates or dropouts.
+There is no such "in order" guarantee between different payloads.
+If there is a read error on a partially delivered message, this
+callback will be invoked one more time with the `GDP_CURSOR_READ_ERROR`
+flag set.  Error detail may be exposed via `_gdp_cursor_get_estat`.
 
-I promise to never call these functions or reference a cursor except
-from within `cursor_recv_cb`.  You must ensure that no data is added
+I promise to never call the following functions or reference a cursor
+except from within `cursor_recv_cb`.
+You must ensure that no data is added
 to the associated buffer (returned by `_gdp_cursor_get_buf`) while
 that callback is running.  [The routines `gdp_buf_lock` and
-`gdp_buf_unlock` can be helpful in multithreaded environments.]
-
-> [[This seems baroque, and doesn't deal with the case where more
-data comes in while `cursor_recv_cb` is running (i.e, if the underlying
-buffer changes while the callback is running.  Avoiding race conditions
-is hard with this interface.  There has to be a better way.]]
+`gdp_buf_unlock` may be helpful in multithreaded environments.]
 
 #### \_gdp\_cursor\_get\_buf (cursor::get\_buf)
 
@@ -504,13 +504,6 @@ The buffer returned uses the existing interface as described in
 "GDP Programmatic API", including the ability to get the amount
 of the available data, read data in various ways, and peek at data.
 
-Data read from a cursor is guaranteed to be presented in the
-same order it was written with no duplicates or dropouts.
-There is no such "in order" guarantee between different payloads.
-If there is a read error on a partially delivered message, this
-callback will be invoked one more time with the `GDP_CURSOR_READ_ERROR`
-flag set.  Error detail may be exposed via `_gdp_cursor_get_estat`.
-
 #### \_gdp\_cursor\_get\_payload\_size (cursor::get\_payload\_size)
 
 ~~~
@@ -519,7 +512,7 @@ flag set.  Error detail may be exposed via `_gdp_cursor_get_estat`.
 ~~~
 
 Returns the size of the complete payload.  Note that this is may be
-greater than the amount of the payload in the current buffer.
+greater than the amount of the payload in the current cursor buffer.
 
 #### \_gdp\_cursor\_get\_chan (cursor::get_chan)
 
@@ -610,100 +603,30 @@ To be completed.
 * `GDP_STAT_NOT_IMPLEMENTED`
 * `GDP_STAT_CHAN_NOT_CONNECTED`
 
-## Usage
 
-This section is pseudocode for me to explore how the interface is
-used in different environments.  It is not intended to be tutorial
-in nature.
+## Implementation Notes
 
-* `renewal_thread` renews advertisements and subscriptions.
-    + Does it also reclaim resources?
-    + Should there be different intervals for different operations?
+These are primarily notes to myself, so don't be concerned if the
+are hard to understand.
 
-### Regular application (I/O in subordinate thread)
-
-#### Startup
+__Example startup__ (multi-threaded, my code).  In pseudo-code:
 
 ~~~
+	_gdp_chan_init
+		registers I/O events
+	register timeout events
 	spawn(event_loop)
 	_gdp_chan_open
-	advertise(me)			<== implicit in _gdp_chan_open
-	spawn(renewal_thread)
+		(causes advertisements to be sent)
 	return to application
 ~~~
 
-#### \_gdp\_invoke
+The event loop must be running before `_gdp_chan_open` so advertisement
+I/O can be handled as events.
 
-~~~
-	send command
-	while (!done)
-		wait on CV
-	process PDU
-~~~
-
-#### gdp\_event\_next
-
-~~~
-	while (!command on queue)
-		wait on CV
-	return first event
-~~~
-
-
-### Log daemon (I/O in main thread)
-
-NOTA BENE: `_gdp_invoke` and `gdp_event_next` may not be called
-from the I/O thread (here or in the base case) since there
-would be no way to set the condition variable to continue and
-read the response.
-
-DOES NOT WORK.  There is no event loop running for the advertisement,
-hence no way to do the C-R.  Maybe just fall back to existing
-implementation (spawn I/O thread, initial thread initializes and
-sleeps forever).
-
-#### Startup
-
-~~~
-	_gdp_chan_open
-	advertise (all)			<== implicit in _gdp_chan_open
-	spawn(renewal_thread)
-	event_loop
-~~~
-
-#### \_gdp\_invoke
-
-Same as base case.
-
-#### gdp\_event\_next
-
-Same as base case.
-
-
-### Single threaded app
-
-#### Startup
-
-~~~
-	_gdp_chan_open
-	advertise(me)
-	libevent_add_timer(do_renewal)
-	return to application
-~~~
-
-#### \_gdp\_invoke
-
-~~~
-	send command
-	while (!done)
-		process single event
-	process PDU
-~~~
-
-#### gdp\_event\_next
-
-~~~
-	while (!command on queue)
-		process single event
-	return first event
-~~~
+For __single threaded apps__, all condition variables must be replaced.
+Unlike mutexes, they can't just turn into no-ops.  In some cases
+(notably `_gdp_invoke` and `gdp_event_next`) they turn into single
+calls to the event loop (with some trickiness around timeouts).
+In other cases (e.g., `chan->cond`) they should disappear
+entirely.
