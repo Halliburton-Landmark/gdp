@@ -43,7 +43,7 @@ install: ${DOCDIR} ${PUBALL}
 	cp ${PUBALL} ${DOCDIR}
 
 PANDOC=		pandoc
-PANFLAGS=	-sS -c gdpdoc.css
+PANFLAGS=	-sS -c gdpdoc.css --self-contained
 
 .SUFFIXES: .md .html
 
