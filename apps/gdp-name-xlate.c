@@ -77,8 +77,10 @@ void
 usage(void)
 {
 	fprintf(stderr,
-			"Usage: %s [-D dbgspec] gdp_name\n"
-			"    -D  set debugging flags\n",
+			"Usage: %s [-b] [-D dbgspec] [-h] gdp_name\n"
+			"    -b  print printable base64 name\n"
+			"    -D  set debugging flags\n"
+			"    -h  print hexadecimal name\n",
 			ep_app_getprogname());
 	exit(EX_USAGE);
 }
@@ -91,13 +93,23 @@ main(int argc, char **argv)
 	bool show_usage = false;
 	gdp_name_t gdpiname;
 	gdp_pname_t gdppname;
+	bool show_b64 = false;
+	bool show_hex = false;
 
-	while ((opt = getopt(argc, argv, "D:")) > 0)
+	while ((opt = getopt(argc, argv, "bD:h")) > 0)
 	{
 		switch (opt)
 		{
+			case 'b':
+				show_b64 = true;
+				break;
+
 			case 'D':
 				ep_dbg_set(optarg);
+				break;
+
+			case 'h':
+				show_hex = true;
 				break;
 
 			default:
@@ -115,12 +127,25 @@ main(int argc, char **argv)
 	if (parse_hex(argv[0], gdpiname) != 0)
 		gdp_parse_name(argv[0], gdpiname);
 	gdp_printable_name(gdpiname, gdppname);
-	fprintf(stdout,
-			"printable: %s\n"
-			"hex:       ",
-			gdppname);
-	for (i = 0; i < sizeof gdpiname; i++)
-		fprintf(stdout, "%02x", gdpiname[i]);
-	fprintf(stdout, "\n");
+	if (show_b64)
+	{
+		fprintf(stdout, "%s\n", gdppname);
+	}
+	else if (show_hex)
+	{
+		for (i = 0; i < sizeof gdpiname; i++)
+			fprintf(stdout, "%02x", gdpiname[i]);
+		fprintf(stdout, "\n");
+	}
+	else
+	{
+		fprintf(stdout,
+				"printable: %s\n"
+				"hex:       ",
+				gdppname);
+		for (i = 0; i < sizeof gdpiname; i++)
+			fprintf(stdout, "%02x", gdpiname[i]);
+		fprintf(stdout, "\n");
+	}
 	exit(EX_OK);
 }
