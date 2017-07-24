@@ -20,7 +20,8 @@ ALLDIRS=	${BINDIR} \
 		${MANDIR}/man7 \
 		${MANDIR}/man8
 
-INSTALL=	install
+INSTALLFLAGS=
+INSTALL=	install ${INSTALLFLAGS}
 
 LOCAL1=		/usr/local
 LOCAL2=		/opt/local

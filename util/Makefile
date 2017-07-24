@@ -26,7 +26,8 @@ ALLDIRS=	${BINDIR} \
 		${MANDIR}/man1 \
 		${MANDIR}/man8 \
 
-INSTALL=	install
+INSTALLFLAGS=
+INSTALL=	install ${INSTALLFLAGS}
 MKDIR=		mkdir -p
 
 all:		${ALL}

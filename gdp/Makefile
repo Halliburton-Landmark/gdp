@@ -165,7 +165,8 @@ MKDIR=		mkdir -p
 RANLIB=		ranlib
 SHARED=		-shared ${CRYPTOLFLAGS}
 #SHARED=		-shared ${CRYPTOLFLAGS} -Wl,-soname,$@
-INSTALL=	install
+INSTALLFLAGS=
+INSTALL=	install ${INSTALLFLAGS}
 
 all: ${ALL}
 
