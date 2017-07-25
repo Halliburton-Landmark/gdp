@@ -361,6 +361,7 @@ _gdp_gcl_close(gdp_gcl_t *gcl,
 
 	// release resources held by this handle
 	_gdp_req_free(&req);
+	_gdp_event_free_all(gcl);
 finis:
 fail0:
 	_gdp_gcl_decref(&gcl);

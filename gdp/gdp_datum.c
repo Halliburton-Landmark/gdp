@@ -199,6 +199,9 @@ gdp_datum_print(const gdp_datum_t *datum, FILE *fp, uint32_t flags)
 	if (quiet && (debug || EP_UT_BITSET(GDP_DATUM_PRMETAONLY, flags)))
 		quiet = false;
 
+	if (!EP_ASSERT(fp != NULL))
+		return;
+
 	flockfile(fp);
 	if (debug)
 		fprintf(fp, "datum @ %p: ", datum);

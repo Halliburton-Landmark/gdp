@@ -101,7 +101,8 @@ _gdp_event_new(gdp_event_t **gevp)
 EP_STAT
 gdp_event_free(gdp_event_t *gev)
 {
-	EP_ASSERT_POINTER_VALID(gev);
+	if (!EP_ASSERT_POINTER_VALID(gev))
+		return EP_STAT_NULL_POINTER;
 
 	ep_dbg_cprintf(Dbg, 48, "gdp_event_free(%p)\n", gev);
 	if (gev->type == _GDP_EVENT_FREE)
@@ -193,6 +194,35 @@ fail0:
 	// the callback must call gdp_event_free(gev)
 	ep_dbg_cprintf(Dbg, 52, "gdp_event_next => %p\n", gev);
 	return gev;
+}
+
+
+/*
+**  Free all events associated with a given GCL.
+**		Used when closing a log.
+*/
+
+EP_STAT
+_gdp_event_free_all(gdp_gcl_t *gcl)
+{
+	gdp_event_t *gev, *next_gev;
+
+	GDP_GCL_CHECK_RETURN_STAT(gcl);
+
+	ep_thr_mutex_lock(&ActiveListMutex);
+	for (gev = STAILQ_FIRST(&ActiveList); gev != NULL; gev = next_gev)
+	{
+		next_gev = STAILQ_NEXT(gev, queue);
+		if (gev->gcl != gcl)
+			continue;
+		else if (gev->type == _GDP_EVENT_FREE)
+			STAILQ_REMOVE(&ActiveList, gev, gdp_event, queue);
+		else
+			gdp_event_free(gev);
+	}
+	ep_thr_mutex_unlock(&ActiveListMutex);
+
+	return EP_STAT_OK;
 }
 
 

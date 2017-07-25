@@ -50,6 +50,7 @@ static struct ep_stat_to_string	Stats[] =
     { EP_STAT_DNS_NOTFOUND,	"DNS error: name not found",		},
     { EP_STAT_DNS_FAILURE,	"DNS error: lookup failed",		},
     { EP_STAT_ASSERT_ABORT,	"assertion failure",			},
+    { EP_STAT_NULL_POINTER,	"invalid null pointer",			},
 
     // cryptographic status codes
     { _EP_STAT_INTERNAL(OK, EP_STAT_MOD_CRYPTO, 0), "crypto"		},
