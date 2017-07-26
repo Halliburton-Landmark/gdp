@@ -195,8 +195,8 @@ extern bool	ep_thr_mutex_assert_i_own(
 # define	ep_thr_mutex_assert_islocked(m, i, f, l)	true
 # define	ep_thr_mutex_assert_isunlocked(m, i, f, l)	true
 # define	ep_thr_mutex_assert_i_own(m, i, f, l)		true
-# define	EP_THR_MUTEX_ASSERT_ISLOCKED(m, r)
-# define	EP_THR_MUTEX_ASSERT_ISUNLOCKED(m, r)
+# define	EP_THR_MUTEX_ASSERT_ISLOCKED(m)
+# define	EP_THR_MUTEX_ASSERT_ISUNLOCKED(m)
 #endif
 
 typedef pthread_cond_t		EP_THR_COND;
