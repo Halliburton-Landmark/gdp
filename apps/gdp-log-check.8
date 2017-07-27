@@ -11,6 +11,7 @@
 .Op Fl q
 .Op Fl r
 .Op Fl s
+.Op Fl t
 .Op Fl v
 .Ar log-name ...
 .Sh DESCRIPTION
@@ -55,6 +56,9 @@ Rebuild (rather than check) log indices.
 .It Fl s
 Just print summaries of log status when checking
 (i.e., skip record-by-record errors).
+.
+.It Fl t
+Only repair the timestamp index (leaving the record index alone).
 .
 .It Fl v
 Run verbosely.

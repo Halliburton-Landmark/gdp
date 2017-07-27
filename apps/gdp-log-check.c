@@ -85,6 +85,7 @@ struct
 	bool	silent:1;
 	bool	force:1;
 	bool	summaryonly:1;
+	bool	tidx_only:1;
 } Flags;
 
 struct ctx
@@ -1158,8 +1159,12 @@ rebuild_record(
 			segment_t *seg,
 			struct ctx *ctx)
 {
-	// output info to ridx
-	EP_STAT estat1 = ridx_put(gcl, segrec->recno, seg->segno, offset);
+	EP_STAT estat1 = EP_STAT_OK;
+	if (!Flags.tidx_only)
+	{
+		// output info to ridx
+		estat1 = ridx_put(gcl, segrec->recno, seg->segno, offset);
+	}
 
 	// output info to tidx
 	EP_STAT estat2 = tidx_put(gcl,
@@ -1194,8 +1199,11 @@ remove_temp_files(gdp_gcl_t *gcl)
 {
 	// remove the temporary indexes
 	char temp_path[GCL_PATH_MAX];
-	get_gcl_path(gcl, -1, ".tmpridx", temp_path, sizeof temp_path);
-	unlink(temp_path);
+	if (!Flags.tidx_only)
+	{
+		get_gcl_path(gcl, -1, ".tmpridx", temp_path, sizeof temp_path);
+		unlink(temp_path);
+	}
 
 	get_gcl_path(gcl, -1, ".tmptidx", temp_path, sizeof temp_path);
 	unlink(temp_path);
@@ -1214,10 +1222,13 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 	estat = check_tidx_db(gcl, ctx, &phase);
 	EP_STAT_CHECK(estat, install_new_files = true);
 
-	// create temporary recno index
-	phase = "create ridx temp";
-	estat = ridx_create(gcl, ".tmpridx", (gdp_recno_t) 1, FLAG_TMPFILE);
-	EP_STAT_CHECK(estat, goto fail0);
+	if (!Flags.tidx_only)
+	{
+		// create temporary recno index
+		phase = "create ridx temp";
+		estat = ridx_create(gcl, ".tmpridx", (gdp_recno_t) 1, FLAG_TMPFILE);
+		EP_STAT_CHECK(estat, goto fail0);
+	}
 
 	// create temporary timestamp index
 	phase = "create tidx temp";
@@ -1229,8 +1240,11 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 	estat = scan_recs(gcl, rebuild_segment, rebuild_record, ctx);
 
 	// close the temporary indices
-	fclose(phys->ridx.fp);
-	phys->ridx.fp = NULL;
+	if (!Flags.tidx_only)
+	{
+		fclose(phys->ridx.fp);
+		phys->ridx.fp = NULL;
+	}
 	bdb_close(phys->tidx.db);
 	phys->tidx.db = NULL;
 
@@ -1297,11 +1311,14 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 
 		ep_app_info("installing new files for %s", ctx->logxname);
 
-		get_gcl_path(gcl, -1, GCL_RIDX_SUFFIX, real_path, sizeof real_path);
-		get_gcl_path(gcl, -1, ".oldridx", save_path, sizeof save_path);
-		get_gcl_path(gcl, -1, ".tmpridx", temp_path, sizeof temp_path);
-		rename(real_path, save_path);
-		rename(temp_path, real_path);
+		if (!Flags.tidx_only)
+		{
+			get_gcl_path(gcl, -1, GCL_RIDX_SUFFIX, real_path, sizeof real_path);
+			get_gcl_path(gcl, -1, ".oldridx", save_path, sizeof save_path);
+			get_gcl_path(gcl, -1, ".tmpridx", temp_path, sizeof temp_path);
+			rename(real_path, save_path);
+			rename(temp_path, real_path);
+		}
 
 		get_gcl_path(gcl, -1, GCL_TIDX_SUFFIX, real_path, sizeof real_path);
 		get_gcl_path(gcl, -1, ".oldtidx", save_path, sizeof save_path);
@@ -1317,8 +1334,11 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 	if (false)
 	{
 fail1:
-		fclose(phys->ridx.fp);
-		phys->ridx.fp = NULL;
+		if (phys->ridx.fp != NULL)
+		{
+			fclose(phys->ridx.fp);
+			phys->ridx.fp = NULL;
+		}
 
 fail0:
 		ep_app_message(estat, "do_rebuild: failure during %s",
@@ -1450,11 +1470,13 @@ void
 usage(void)
 {
 	fprintf(stderr,
-			"Usage: %s [-D dbg_spec] [-f] [-q] [-r] [-v] log-name ...\n"
+			"Usage: %s [-D dbg_spec] [-f] [-q] [-r] [-s] [-t] [-v] log-name ...\n"
 			"    -D  set debugging flags\n"
 			"    -f  force rebuilt index installation (with -r)\n"
 			"    -q  run quietly\n"
 			"    -r  rebuild the log (rather than just check consistency)\n"
+			"    -s  print summary only\n"
+			"    -t  update timestamp index only\n"
 			"    -v  run verbosely\n",
 			ep_app_getprogname());
 	exit(EX_USAGE);
@@ -1471,7 +1493,7 @@ main(int argc, char **argv)
 
 	initialize();
 
-	while ((opt = getopt(argc, argv, "D:fqrsv")) > 0)
+	while ((opt = getopt(argc, argv, "D:fqrstv")) > 0)
 	{
 		switch (opt)
 		{
@@ -1494,6 +1516,9 @@ main(int argc, char **argv)
 		 case 's':
 			 Flags.summaryonly = true;
 			 break;
+
+		 case 't':
+			 Flags.tidx_only = true;
 
 		 case 'v':
 			 Flags.verbose = true;
