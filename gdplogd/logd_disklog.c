@@ -211,13 +211,14 @@ bdb_open(const char *filename,
 		if ((dbstat = db_env_create(&DbEnv, 0)) != 0)
 			goto fail0;
 		phase = "dbenv->open";
-		uint32_t dbenv_flags = DB_CREATE | DB_INIT_MPOOL | DB_PRIVATE;
+		uint32_t dbenv_flags = DB_CREATE | DB_INIT_MPOOL | DB_PRIVATE |
+						DB_THREAD;
 		if ((dbstat = DbEnv->open(DbEnv, NULL, dbenv_flags, 0)) != 0)
 			goto fail0;
 	}
 
 	phase = "db_create";
-	if ((dbstat = db_create(&db, NULL, 0)) != 0)
+	if ((dbstat = db_create(&db, DbEnv, 0)) != 0)
 		goto fail0;
 
 	phase = "initfunc";
