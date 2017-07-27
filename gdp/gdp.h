@@ -77,10 +77,6 @@ typedef uint8_t				gdp_name_t[32];
 #define GDP_GCL_PNAME_LEN	43			// length of an encoded pname
 typedef char				gdp_pname_t[GDP_GCL_PNAME_LEN + 1];
 
-// a GDP request id (used for correlating commands and responses)
-typedef uint32_t			gdp_rid_t;
-#define PRIgdp_rid			PRIu32
-
 // a GCL record number
 typedef int64_t				gdp_recno_t;
 #define PRIgdp_recno		PRId64
@@ -270,6 +266,13 @@ extern EP_STAT	gdp_gcl_subscribe_ts(
 					gdp_event_cbfunc_t cbfunc,
 											// callback function for next datum
 					void *cbarg);			// argument passed to callback
+
+// unsubscribe from a GCL
+extern EP_STAT	gdp_gcl_unsubscribe(
+					gdp_gcl_t *gcl,			// GCL handle
+					gdp_event_cbfunc_t cbfunc,
+											// callback func (to make unique)
+					void *cbarg);			// callback arg (to make unique)
 
 // read multiple records (no subscriptions)
 extern EP_STAT	gdp_gcl_multiread(

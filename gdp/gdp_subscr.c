@@ -285,3 +285,57 @@ _gdp_gcl_subscribe(gdp_req_t *req,
 
 	return estat;
 }
+
+
+EP_STAT
+_gdp_gcl_unsubscribe(gdp_gcl_t *gcl,
+		gdp_event_cbfunc_t cbfunc,
+		void *cbarg,
+		uint32_t reqflags)
+{
+	EP_STAT estat;
+	gdp_req_t *req;
+	gdp_req_t *sub, *next_sub;
+
+	if (!EP_ASSERT(GDP_GCL_ISGOOD(gcl)))
+		return EP_STAT_ASSERT_ABORT;
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
+
+	ep_dbg_cprintf(Dbg, 1, "_gdp_gcl_unsubscribe(%s) cbfunc=%p cbarg=%p\n",
+			gcl->pname, cbfunc, cbarg);
+
+	estat = _gdp_req_new(GDP_CMD_UNSUBSCRIBE, gcl, _GdpChannel, NULL,
+						reqflags, &req);
+	EP_STAT_CHECK(estat, goto fail0);
+
+	for (sub = LIST_FIRST(&gcl->reqs); sub != NULL; sub = next_sub)
+	{
+		_gdp_req_lock(sub);
+		ep_dbg_cprintf(Dbg, 1, "... comparing to cbfunc=%p cbarg=%p\n",
+				sub->sub_cbfunc, sub->sub_cbarg);
+
+		next_sub = LIST_NEXT(req, gcllist);
+		if ((cbfunc != NULL && cbfunc != sub->sub_cbfunc) ||
+				(cbarg != NULL && cbarg != sub->sub_cbarg))
+		{
+			// this is not the subscription you are looking for
+			ep_dbg_cprintf(Dbg, 1, "... no match\n");
+			_gdp_req_unlock(sub);
+			continue;
+		}
+
+		ep_dbg_cprintf(Dbg, 1, "... deleting rid %" PRIgdp_rid "\n",
+					sub->cpdu->rid);
+		req->cpdu->rid = sub->cpdu->rid;
+
+		estat = _gdp_invoke(req);
+		EP_STAT_CHECK(estat, continue);
+
+		_gdp_req_free(&sub);
+	}
+
+	_gdp_req_free(&req);
+
+fail0:
+	return estat;
+}

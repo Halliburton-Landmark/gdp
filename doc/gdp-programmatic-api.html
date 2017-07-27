@@ -585,8 +585,7 @@ style="font-family: monospace;"><span style="font-family: serif;">Notes</span></
     <br>
     <hr size="2" width="100%">
     <h4> Name</h4>
-    gdp_gcl_unsubscribe &mdash; Unsubscribe from a GCL&nbsp; <span class="warning">[NOT
-      IMPLEMENTED; this interface is probably wrong] </span>
+    gdp_gcl_unsubscribe &mdash; Unsubscribe from a GCL<span class="warning"></span>
     <h4> Synopsis</h4>
     <pre>EP_STAT gdp_gcl_unsubscribe(gdp_gcl_t *gcl,
 		gdp_event_cbfunc_t *cbfunc,
@@ -594,8 +593,8 @@ style="font-family: monospace;"><span style="font-family: serif;">Notes</span></
 </pre>
     <h4> Notes</h4>
     <ul>
-      <li> Unsubscribes to the given {gcl, cbfunc, udata} tuple.</li>
-      <li><em>(Should subscribe/multiread return a handle to be passed to this
+      <li> Deletes all subscriptions matching the given {gcl, cbfunc, udata} tuple.</li><li>If <code>cbfunc</code> and or <code>udata</code> is <code>NULL</code> they are treated as wildcards.&nbsp; For example, "<code>gdp_gcl_unsubscribe(gcl, NULL, NULL)</code>" deletes all subscriptions for the given GCL.</li>
+      <li>If there are multiple subscriptions matching this tuple, they will all be terminated.&nbsp; For example, this might happen in a multi-threaded application.</li><li><em>(Should subscribe/multiread return a handle to be passed to this
           function rather than this interface?)</em></li>
     </ul>
     <br>

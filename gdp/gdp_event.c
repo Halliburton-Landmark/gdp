@@ -339,8 +339,8 @@ _gdp_event_setcb(
 			gdp_event_cbfunc_t cbfunc,
 			void *cbarg)
 {
-	req->sub_cb = cbfunc;
-	req->udata = cbarg;
+	req->sub_cbfunc = cbfunc;
+	req->sub_cbarg = cbarg;
 
 	// if using callbacks, make sure we have a callback thread running
 	if (cbfunc != NULL && !CallbackThreadStarted)
@@ -428,8 +428,8 @@ _gdp_event_add_from_req(gdp_req_t *req)
 	gev->type = evtype;
 	gev->gcl = req->gcl;
 	gev->stat = req->stat;
-	gev->udata = req->udata;
-	gev->cb = req->sub_cb;
+	gev->udata = req->sub_cbarg;
+	gev->cb = req->sub_cbfunc;
 	gev->datum = gdp_datum_dup(req->rpdu->datum);
 
 	// schedule the event for delivery
@@ -461,7 +461,7 @@ gdp_event_print(const gdp_event_t *gev, FILE *fp, int detail)
 	char ebuf[100];
 
 	if (detail > GDP_PR_BASIC + 1)
-		fprintf(fp, "Event type %d, udata %p, stat %s\n",
+		fprintf(fp, "Event type %d, cbarg %p, stat %s\n",
 				gev->type, gev->udata,
 				ep_stat_tostr(gev->stat, ebuf, sizeof ebuf));
 

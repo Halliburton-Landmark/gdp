@@ -188,9 +188,9 @@ sub_end_subscription(gdp_req_t *req)
 	// send an "end of subscription" event
 	req->rpdu->cmd = GDP_ACK_DELETED;
 
-	if (ep_dbg_test(Dbg, 61))
+	if (ep_dbg_test(Dbg, 39))
 	{
-		ep_dbg_printf("sub_end_subscription req:\n  ");
+		ep_dbg_printf("sub_end_subscription removing:\n  ");
 		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
@@ -200,12 +200,14 @@ sub_end_subscription(gdp_req_t *req)
 
 /*
 **  Unsubscribe all requests for a given gcl and destination.
+**  Can also optionally select a particular request id.
 */
 
 EP_STAT
 sub_end_all_subscriptions(
 		gdp_gcl_t *gcl,
-		gdp_name_t dest)
+		gdp_name_t dest,
+		gdp_rid_t rid)
 {
 	EP_STAT estat;
 	gdp_req_t *req;
@@ -231,6 +233,7 @@ sub_end_all_subscriptions(
 			EP_STAT_CHECK(estat, break);
 			nextreq = LIST_NEXT(req, gcllist);
 			if (!GDP_NAME_SAME(req->rpdu->dst, dest) ||
+					(rid != GDP_PDU_NO_RID && rid != req->cpdu->rid) ||
 					!EP_ASSERT(req->gcl == gcl))
 			{
 				_gdp_req_unlock(req);
@@ -238,6 +241,11 @@ sub_end_all_subscriptions(
 			}
 
 			// remove subscription for this destination (but keep GCL locked)
+			if (ep_dbg_test(Dbg, 39))
+			{
+				ep_dbg_printf("sub_end_all_subscriptions removing ");
+				_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+			}
 			LIST_REMOVE(req, gcllist);
 			req->flags &= ~GDP_REQ_ON_GCL_LIST;
 			_gdp_gcl_decref(&req->gcl);

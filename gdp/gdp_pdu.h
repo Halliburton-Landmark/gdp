@@ -104,8 +104,11 @@
 */
 
 typedef uint64_t		gdp_seqno_t;	// protocol sequence number
-
 #define	PRIgdp_seqno	PRId64
+
+typedef uint32_t		gdp_rid_t;		// request id (uniquifies request)
+#define PRIgdp_rid		PRIu32
+
 
 typedef struct gdp_pdu
 {
@@ -194,6 +197,7 @@ typedef struct gdp_pdu
 #define GDP_CMD_OPEN_RA			75			// open a GCL for read or append
 #define GDP_CMD_NEWSEGMENT		76			// create a new segment for a log
 #define GDP_CMD_FWD_APPEND		77			// forward (replicate) APPEND
+#define GDP_CMD_UNSUBSCRIBE		78			// delete all subscriptions
 //		128-191			Positive acks (HTTP 200-263)
 #define GDP_ACK_MIN			128			// minimum ack code
 #define GDP_ACK_SUCCESS			_GDP_ACK_FROM_CODE(SUCCESS)				// 128

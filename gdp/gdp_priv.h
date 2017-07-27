@@ -383,6 +383,12 @@ EP_STAT			_gdp_gcl_subscribe(			// subscribe to data
 						gdp_event_cbfunc_t cbfunc,
 						void *cbarg);
 
+EP_STAT			_gdp_gcl_unsubscribe(		// delete subscriptions
+						gdp_gcl_t *gcl,
+						gdp_event_cbfunc_t cbfunc,
+						void *cbarg,
+						uint32_t reqflags);
+
 EP_STAT			_gdp_gcl_getmetadata(		// retrieve metadata
 						gdp_gcl_t *gcl,
 						gdp_gclmd_t **gmdp,
@@ -527,8 +533,8 @@ struct gdp_req
 	EP_TIME_SPEC		act_ts;		// timestamp of last successful activity
 	void				(*postproc)(struct gdp_req *);
 									// do post processing after ack sent
-	gdp_event_cbfunc_t	sub_cb;		// callback function (subscribe & async I/O)
-	void				*udata;		// user-supplied opaque data to cb
+	gdp_event_cbfunc_t	sub_cbfunc;	// callback function (subscribe & async I/O)
+	void				*sub_cbarg;	// user-supplied opaque data to cb
 	EP_CRYPTO_MD		*md;		// message digest context
 	struct gev_list		events;		// pending events (see above)
 };

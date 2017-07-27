@@ -303,7 +303,7 @@ _gdp_req_free(gdp_req_t **reqp)
 	req->state = GDP_REQ_FREE;
 	req->flags = 0;
 	req->md = NULL;
-	req->udata = NULL;
+	req->sub_cbarg = NULL;
 
 	// add the empty request to the free list
 	ep_thr_mutex_lock(&ReqFreeListMutex);
@@ -608,10 +608,10 @@ _gdp_req_dump(const gdp_req_t *req, FILE *fp, int detail, int indent)
 	flockfile(fp);
 	fprintf(fp, "req@%p:\n", req);
 	fprintf(fp, "    nextrec=%" PRIgdp_recno ", numrecs=%" PRIu32 ", chan=%p\n"
-			"    postproc=%p, sub_cb=%p, udata=%p\n"
+			"    postproc=%p, sub_cbfunc=%p, sub_cbarg=%p\n"
 			"    state=%s, stat=%s\n",
 			req->nextrec, req->numrecs, req->chan,
-			req->postproc, req->sub_cb, req->udata,
+			req->postproc, req->sub_cbfunc, req->sub_cbarg,
 			statestr(req), ep_stat_tostr(req->stat, ebuf, sizeof ebuf));
 	fprintf(fp, "    act_ts=");
 	ep_time_print(&req->act_ts, fp, EP_TIME_FMT_HUMAN);

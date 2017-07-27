@@ -723,6 +723,31 @@ fail0:
 
 
 /*
+**  GDP_GCL_UNSUBSCRIBE --- delete subscriptions to a named GCL
+*/
+
+EP_STAT
+gdp_gcl_unsubscribe(gdp_gcl_t *gcl,
+		gdp_event_cbfunc_t cbfunc,
+		void *cbarg)
+{
+	EP_STAT estat;
+
+	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_unsubscribe\n");
+	if (!GDP_GCL_ISGOOD(gcl))
+		return bad_gcl(gcl, "gdp_gcl_unsubscribe");
+
+	_gdp_gcl_lock(gcl);
+	estat = _gdp_gcl_unsubscribe(gcl, cbfunc, cbarg, 0);
+	_gdp_gcl_unlock(gcl);
+
+	prstat(estat, gcl, "gdp_gcl_unsubscribe");
+	return estat;
+}
+
+
+
+/*
 **	GDP_GCL_MULTIREAD --- read multiple records from a GCL using recno start
 **
 **		Like gdp_gcl_subscribe, the data is returned through the event

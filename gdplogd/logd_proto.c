@@ -439,7 +439,7 @@ cmd_close(gdp_req_t *req)
 	}
 
 	// remove any subscriptions
-	sub_end_all_subscriptions(req->gcl, req->cpdu->src);
+	sub_end_all_subscriptions(req->gcl, req->cpdu->src, GDP_PDU_NO_RID);
 
 	//return number of records
 	req->rpdu->datum->recno = req->gcl->nrecs;
@@ -1089,9 +1089,37 @@ fail0:
 
 /*
 **  CMD_UNSUBSCRIBE --- terminate a subscription
-**
-**		XXX not implemented yet
 */
+
+EP_STAT
+cmd_unsubscribe(gdp_req_t *req)
+{
+	EP_STAT estat = EP_STAT_OK;
+
+	req->rpdu->cmd = GDP_ACK_SUCCESS;
+
+	// should have no input data; ignore anything there
+	flush_input_data(req, "cmd_unsubscribe");
+
+	estat = get_open_handle(req, GDP_MODE_ANY);
+	if (!EP_STAT_ISOK(estat))
+	{
+		return gdpd_gcl_error(req->cpdu->dst, "cmd_unsubscribe: GCL not open",
+							estat, GDP_STAT_NAK_BADREQ);
+	}
+
+	// remove any subscriptions
+	sub_end_all_subscriptions(req->gcl, req->cpdu->src, req->cpdu->rid);
+
+	if (ep_dbg_test(Dbg, 10))
+	{
+		char ebuf[100];
+		ep_dbg_printf("<<< cmd_unsubscribe(%s): %s\n", req->gcl->pname,
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
+
+	return estat;
+}
 
 
 /*
@@ -1249,6 +1277,7 @@ static struct cmdfuncs	CmdFuncs[] =
 	{ GDP_CMD_OPEN_RA,		cmd_open				},
 	{ GDP_CMD_NEWSEGMENT,	cmd_newsegment			},
 	{ GDP_CMD_FWD_APPEND,	cmd_fwd_append			},
+	{ GDP_CMD_UNSUBSCRIBE,	cmd_unsubscribe			},
 	{ 0,					NULL					}
 };
 

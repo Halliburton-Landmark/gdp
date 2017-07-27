@@ -109,6 +109,9 @@ MKDIR=		mkdir -p
 all:	${ALL}
 	@echo "To actually run the tests, run make allTests"
 
+gdp-stresser:	gdp-stresser.o t_common_support.o
+	${CC} -o $@ gdp-stresser.o ${LDFLAGS}
+
 t_fwd_append:	t_fwd_append.o t_common_support.o
 	${CC} -o $@ t_fwd_append.o ${LDFLAGS}
 
@@ -118,8 +121,8 @@ t_multimultiread:	t_multimultiread.o t_common_support.o
 t_sub_and_append:	t_sub_and_append.o t_common_support.o
 	${CC} -o $@ t_sub_and_append.o ${LDFLAGS}
 
-gdp-stresser:	gdp-stresser.o t_common_support.o
-	${CC} -o $@ gdp-stresser.o ${LDFLAGS}
+t_unsubscribe:	t_unsubscribe.o t_common_support.o
+	${CC} -o $@ t_unsubscribe.o ${LDFLAGS}
 
 ${CLEANALL}:	${LIBROOT}/gdp/libgdp.a ${LIBROOT}/ep/libep.a
 

@@ -832,6 +832,33 @@
           <td valign="top">Return GCL metadata.<br>
           </td>
         </tr>
+        <tr>
+          <td style="vertical-align: top; background-color: white;">CMD_OPEN_RA</td>
+          <td style="vertical-align: top; background-color: white;">75</td>
+          <td style="vertical-align: top; background-color: white;">Open GCL for
+            read and/or append.</td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; background-color: white;">CMD_NEWSEGMENT</td>
+          <td style="vertical-align: top; background-color: white;">76</td>
+          <td style="vertical-align: top; background-color: white;">Create a new
+            segment for a GCL.&nbsp; This creates a new data file for a
+            log.&nbsp; This is a physical operation only: there are no semantic
+            differences between records in different segments.</td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; background-color: white;">CMD_FWD_APPEND</td>
+          <td style="vertical-align: top; background-color: white;">77</td>
+          <td style="vertical-align: top; background-color: white;">Forward an
+            APPEND command to another server.&nbsp; Internal use only.</td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; background-color: white;">CMD_UNSUBSCRIBE</td>
+          <td style="vertical-align: top; background-color: white;">78</td>
+          <td style="vertical-align: top; background-color: white;">Delete all
+            subscriptions for a given {log, client} pair.&nbsp; This is implied
+            on close.</td>
+        </tr>
       </tbody>
     </table>
     <h3>Acknowledgements<br>
@@ -1053,8 +1080,8 @@
           <td style="vertical-align: top; background-color: white;">223</td>
           <td style="vertical-align: top; background-color: white;"><br>
           </td>
-          <td style="vertical-align: top; background-color: white;">There are multiple
-            versions of the same record number.</td>
+          <td style="vertical-align: top; background-color: white;">There are
+            multiple versions of the same record number.</td>
         </tr>
         <tr>
           <td style="vertical-align: top; background-color: white;" valign="top">NAK_S_INTERNAL<br>

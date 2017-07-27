@@ -39,8 +39,11 @@ void			sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd);
 // terminate a subscription
 void			sub_end_subscription(gdp_req_t *req);
 
-// terminate all subscriptions for a given {gcl, client} pair
-EP_STAT			sub_end_all_subscriptions(gdp_gcl_t *gcl, gdp_name_t dest);
+// terminate all subscriptions for a given {gcl, client, rid} tuple
+EP_STAT			sub_end_all_subscriptions(
+						gdp_gcl_t *gcl,
+						gdp_name_t dest,
+						gdp_rid_t rid);
 
 // reclaim subscription resources
 void			sub_reclaim_resources(gdp_chan_t *chan);
