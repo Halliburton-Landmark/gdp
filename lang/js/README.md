@@ -119,7 +119,7 @@ Testing using Ptolemy II
 If necessary, update $PTII/lib:
 
         cp libs/libgdpjs.1.0.dylib $PTII/lib
-        svn commit -m "Updated to gdp0.7.0." $PTII/lib/libgdpjs.1.0.dylib
+        svn commit -m "Updated to gdp0.8.0." $PTII/lib/libgdpjs.1.0.dylib
 
 Then run the model using Node:
 
@@ -137,13 +137,25 @@ If the GDP version number in ../../gdp/gdp_version.h changes, the make the follo
 1. gdpjs/Makefile: Update:
         # Version of the GDP Library, should match ../../../gdp/Makefile
 	GDPLIBMAJVER=	0
-	GDPLIBMINVER=	7
+	GDPLIBMINVER=	8
 
 2. gdpjs/gdpjs.js: Update
-        var libgdp = ffi.Library(GDP_DIR + '/libs/libgdp.0.6', {
+
+   // libcrypto and libssl are different under RHEL vs. Ubuntu, so
+   // we have different shared libraries for RHEL.
+   var libgdpPath = '/libs/libgdp.0.8';
+   var libgdpjsPath = '/../libs/libgdpjs.1.0';
+   try {
+       var fs = require('fs');
+       fs.accessSync('/etc/redhat-release', fs.F_OK);
+       libgdpPath = '/libs/libgdp.0.8-rhel';
+       libgdpjsPath = '/../libs/libgdpjs.1.0-rhel';
+   } catch (exception) {
+       // Not under RHEL
+   }
 
 3. Update package.json:
-        "version": "0.6.1",
+        "version": "0.8.0",
 
 4. Run make all_noavahi
 

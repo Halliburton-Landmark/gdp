@@ -287,12 +287,12 @@ var EP_TIME_SPEC_struct_PtrPtr = ref.refType(EP_TIME_SPEC_struct_Ptr);
 
 // libcrypto and libssl are different under RHEL vs. Ubuntu, so
 // we have different shared libraries for RHEL.
-var libgdpPath = '/libs/libgdp.0.7';
+var libgdpPath = '/libs/libgdp.0.8';
 var libgdpjsPath = '/../libs/libgdpjs.1.0';
 try {
     var fs = require('fs');
     fs.accessSync('/etc/redhat-release', fs.F_OK);
-    libgdpPath = '/libs/libgdp.0.7-rhel';
+    libgdpPath = '/libs/libgdp.0.8-rhel';
     libgdpjsPath = '/../libs/libgdpjs.1.0-rhel';
 } catch (exception) {
     // Not under RHEL

@@ -66,7 +66,7 @@ class GDP_GCLMD {
      * C gdp_gclmd_t structure.
      */
     public GDP_GCLMD() {
-        this.gdp_gclmd_ptr = Gdp07Library.INSTANCE.gdp_gclmd_new(0);
+        this.gdp_gclmd_ptr = Gdp08Library.INSTANCE.gdp_gclmd_new(0);
         this.did_i_create_it = true;
     }
     
@@ -75,7 +75,7 @@ class GDP_GCLMD {
      */
     public void finalize() {        
         if (this.did_i_create_it) {
-            Gdp07Library.INSTANCE.gdp_gclmd_free(this.gdp_gclmd_ptr);
+            Gdp08Library.INSTANCE.gdp_gclmd_free(this.gdp_gclmd_ptr);
         }
     }
     
@@ -101,7 +101,7 @@ class GDP_GCLMD {
             pointer.setByte(i,data[i]);
         }
                 
-        Gdp07Library.INSTANCE.gdp_gclmd_add(this.gdp_gclmd_ptr, gclmd_id,
+        Gdp08Library.INSTANCE.gdp_gclmd_add(this.gdp_gclmd_ptr, gclmd_id,
                 len, pointer);
     }
 
@@ -125,7 +125,7 @@ class GDP_GCLMD {
         // Pointer to the buffer to hold the value
         PointerByReference p = new PointerByReference();
         
-        Gdp07Library.INSTANCE.gdp_gclmd_get(this.gdp_gclmd_ptr, 
+        Gdp08Library.INSTANCE.gdp_gclmd_get(this.gdp_gclmd_ptr, 
                 index, gclmd_id_ptr, new NativeSizeByReference(len), p);
         
         // get the gclmd_id
@@ -153,7 +153,7 @@ class GDP_GCLMD {
         // Pointer to the buffer to hold the value
         PointerByReference p = new PointerByReference();
         
-        Gdp07Library.INSTANCE.gdp_gclmd_find(this.gdp_gclmd_ptr, 
+        Gdp08Library.INSTANCE.gdp_gclmd_find(this.gdp_gclmd_ptr, 
                 gclmd_id, new NativeSizeByReference(len), p);
         
         Pointer pointer = p.getValue();

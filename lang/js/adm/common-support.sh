@@ -20,14 +20,19 @@ Whi='[0;37m';     BWhi='[1;37m';    UWhi='[4;37m';    IWhi='[0;97m';    BIWh
 
 #################### FUNCTIONS ####################
 
+: ${quiet:=false}
 
 # Error/Information messages
 info() {
+    if ! $quiet; then
 	echo "${Gre}${On_Bla}[INFO] $1${Reset}"
+    fi
 }
 
 warn() {
+    if ! $quiet; then
 	echo "${Yel}${On_Bla}[WARN] $1${Reset}"
+    fi
 }
 
 fatal() {
@@ -38,73 +43,64 @@ fatal() {
 # Create a directory as the user gdp
 mkdir_gdp() {
 	test -d $1 && return
+	if [ -e $1 ]; then
+		warn "$1 exists but is not a directory"
+		return
+	fi
 	info "Creating $1 as ${GDP_USER}:${GDP_GROUP}"
 	sudo mkdir -p $1
-	sudo chmod ${2:-0755} $1
+	sudo chmod ${2:-0775} $1
+	sudo chown ${GDP_USER}:${GDP_GROUP} $1
+}
+
+# Create a file as the user gdp
+mkfile_gdp() {
+	test -f $1 && return
+	if [ -e $1 ]; then
+		warn "$1 exists but is not a file"
+		return
+	fi
+	info "Creating $1 as ${GDP_USER}:${GDP_GROUP}"
+	sudo cp /dev/null $1
+	sudo chmod ${2:-0664} $1
 	sudo chown ${GDP_USER}:${GDP_GROUP} $1
 }
 
 package() {
     info "Checking package $1..."
-    case "$OS" in
-	"ubuntu" | "debian")
+    case "${PKGMGR:-unknown}" in
+	"debian")
 	    if dpkg --get-selections | grep --quiet $1; then
 		info "$1 is already installed. skipping."
 	    else
 		sudo apt-get install -y $@
 	    fi
 	    ;;
-	"centos" | "redhat")
+
+	"yum")
 	    if rpm -qa | grep --quiet $1; then
 		info "$1 is already installed. skipping."
 	    else
 		sudo yum install -y $@
 	    fi
 	    ;;
-	"darwin")
-	    if [ -z "$pkgmgr" ]; then
-		if type brew > /dev/null 2>&1 && [ ! -z "`brew config`" ]; then
-		    pkgmgr=brew
-		    brew=`which brew`
-		    if [ -f $brew ]; then
-			brewUser=`ls -l $brew | awk '{print $3}'`
-			# Only use sudo to update brew if the brew binary is owned by root.
-			# This avoids "Cowardly refusing to 'sudo brew update'"
-			if [ "$brewUser" = "root" ]; then
-			    sudo brew update
-			else
-			    brew update
-			fi
-		    fi
-		fi
-		if type port > /dev/null 2>&1 && port installed | grep -q .; then
-		    if [ "$pkgmgr" = "brew" ]; then
-			warn "You seem to have both macports and homebrew installed."
-			fatal "You will have to deactivate one (or modify this script)"
-		    else
-			pkgmgr=port
-			sudo port selfupdate
-		    fi
-		fi
-		if [ -z "$pkgmgr" ]; then
-		    warn "You must install macports or homebrew."
-		    fatal "See README-compiling.md (Operating System Quirks) for details."
-		fi
-	    fi
-	    if [ "$pkgmgr" = "brew" ]; then
-		if brew list | grep --quiet $1; then
-		    info "$1 is already installed. skipping."
-		else
-		    brew install --build-bottle $@ || brew upgrade $@
-		fi
+
+	"brew")
+	    if brew list | grep --quiet $1; then
+		info "$1 is already installed. skipping."
 	    else
-		if port -q installed $1 | grep -q "."; then
-		    info "$1 is already installed. skipping."
-		else
-		    sudo port install $1
-		fi
+		brew install --build-bottle $@ || brew upgrade $@
 	    fi
 	    ;;
+
+	"macports")
+	    if port -q installed $1 | grep -q "."; then
+		info "$1 is already installed. skipping."
+	    else
+		sudo port install $1
+	    fi
+	    ;;
+
 	"freebsd")
 	    export PATH="/sbin:/usr/sbin:$PATH"
 	    if sudo pkg info -q $1; then
@@ -113,6 +109,7 @@ package() {
 		sudo pkg install $@
 	    fi
 	    ;;
+
 	"gentoo")
 	    if equery list $1 >& /dev/null; then
 		info "$1 is already installed. skipping."
@@ -120,38 +117,36 @@ package() {
 		sudo emerge $1
 	    fi
 	    ;;
+
 	*)
-	    fatal "unrecognized OS $OS"
+	    fatal "unrecognized PKGMGR $PKGMGR"
 	    ;;
     esac
 }
 
-#################### END OF FUNCTIONS ####################
-
 # configure defaults
-: ${GDP_ROOT:=/usr}
-if [ "$GDP_ROOT" = "/usr" ]
-then
-	: ${GDP_ETC:=/etc/gdp}
-	: ${EP_PARAMS:=/etc/ep_adm_params}
-elif [ "$GDP_ROOT" = "/usr/local" -o "$GDP_ROOT" = "/opt/local" ]
-then
-	: ${GDP_ETC:=$GDP_ROOT/etc/gdp}
-	: ${EP_PARAMS:=/usr/local/etc/ep_adm_params}
-else
-	: ${GDP_ETC:=$GDP_ROOT/etc}
-	: ${EP_PARAMS:=/usr/local/etc/ep_adm_params}
-fi
-: ${GDP_USER:=gdp}
-: ${GDP_GROUP:=$GDP_USER}
-: ${GDP_LOG_DIR:=/var/log/gdp}
-: ${GDP_VAR:=/var/swarm/gdp}
-: ${GDP_KEYS_DIR:=$GDP_ETC/keys}
-: ${GDPLOGD_DATADIR:=$GDP_VAR/gcls}
+configure_defaults() {
+    : ${GDP_ROOT:=/usr}
+    if [ "$GDP_ROOT" = "/usr" ]
+    then
+	    : ${GDP_ETC:=/etc/gdp}
+	    : ${EP_PARAMS:=/etc/ep_adm_params}
+    elif [ "$GDP_ROOT" = "/usr/local" -o "$GDP_ROOT" = "/opt/local" ]
+    then
+	    : ${GDP_ETC:=$GDP_ROOT/etc/gdp}
+	    : ${EP_PARAMS:=/usr/local/etc/ep_adm_params}
+    else
+	    : ${GDP_ETC:=$GDP_ROOT/etc}
+	    : ${EP_PARAMS:=/usr/local/etc/ep_adm_params}
+    fi
+    : ${GDP_USER:=gdp}
+    : ${GDP_GROUP:=$GDP_USER}
+    : ${GDP_LOG_DIR:=/var/log/gdp}
+    : ${GDP_VAR:=/var/swarm/gdp}
+    : ${GDP_KEYS_DIR:=$GDP_ETC/keys}
+    : ${GDPLOGD_DATADIR:=$GDP_VAR/gcls}
+}
 
-OS=""
-OSVER=""
-INITguess=""
 
 dot_to_int() {
 	full=$1
@@ -168,95 +163,179 @@ dot_to_int() {
 ###
 ###  figure out operating system and version number
 ###
-if [ -f "/etc/os-release" ]; then
-    . /etc/os-release
-    OS="${ID-}"
-    OSVER="${VERSION_ID-}"
-fi
-if [ -z "$OS" -a -f "/etc/lsb-release" ]; then
-    . /etc/lsb-release
-    OS="${DISTRIB_ID-}"
-    OSVER="${DISTRIB_VERSION-}"
-fi
-if [ "$OS" ]; then
-    # it is set --- do nothing
-    true
-elif [ -f "/etc/centos-release" ]; then
-    OS="centos"
-    #OSVER=???
-elif [ -f "/etc/redhat-release" ]; then
-    OS="redhat"
-    OSVER=`sed -e 's/.* release //' -e 's/ .*//' /etc/redhat-release`
-else
-    OS=`uname -s`
-fi
-OS=`echo $OS | tr '[A-Z]' '[a-z]'`
-if [ "$OS" = "linux" ]; then
-    OS=`head -1 /etc/issue | sed 's/ .*//' | tr '[A-Z]' '[a-z]'`
-elif [ "$OS" = "darwin" ]; then
-	OSVER=`sw_vers |
-		sed -e '/ProductVersion:/!d' -e 's/^.*[ 	][ 	]*//'`
-elif [ "$OS" = "freebsd" ]; then
-	_major=`uname -r | sed -e 's/\..*//'`
-	_minor=`uname -r | sed -e 's/[0-9]*\.//' -e 's/-.*//'`
-	OSVER=`printf "%02d%02d00" "$_major" "$_minor"`
-fi
+OS=""
+OSVER=""
 
-if [ -z "$OSVER" ]; then
-    OSVER="0"
-else
-    # clean up OSVER to make it a single integer
-    OSVER=`dot_to_int $OSVER`
-fi
+fatal_osver() {
+	fatal "Must be running $1 or later (have $VERSION_ID)"
+}
 
-# check to make sure we understand this OS release
-case $OS in
-  "debian")
-	if expr $OSVER \< 80000 > /dev/null
-	then
-		fatal "Must be running Debian 8 (Jessie) or later (have $VERSION_ID)"
-	fi
-	;;
+warn_unsupported() {
+	msg=${1:-"try anyway"}
+	warn "$OS is not a supported platform, but I'll $msg"
+}
 
-  "ubuntu")
-	if expr $OSVER \< 140400 > /dev/null
-	then
-		fatal "Must be running Ubuntu 14.04 or later (have $VERSION_ID)"
-	fi
-	if expr $OSVER \>= 160400 > /dev/null
-	then
-		INITguess=systemd
-	else
-		INITguess=upstart
-	fi
-	;;
+set_os() {
+    if [ -f "/etc/os-release" ]; then
+	. /etc/os-release
+	OS="${ID-}"
+	OSVER="${VERSION_ID-}"
+    fi
+    if [ -z "$OS" -a -f "/etc/lsb-release" ]; then
+	. /etc/lsb-release
+	OS="${DISTRIB_ID-}"
+	OSVER="${DISTRIB_VERSION-}"
+    fi
+    if [ "$OS" ]; then
+	# it is set --- do nothing
+	true
+    elif [ -f "/etc/centos-release" ]; then
+	OS="centos"
+	#OSVER=???
+    elif [ -f "/etc/redhat-release" ]; then
+	OS="redhat"
+	OSVER=`sed -e 's/.* release //' -e 's/ .*//' /etc/redhat-release`
+    else
+	OS=`uname -s`
+    fi
+    OS=`echo $OS | tr '[A-Z]' '[a-z]'`
+    if [ "$OS" = "linux" ]; then
+	OS=`head -1 /etc/issue | sed 's/ .*//' | tr '[A-Z]' '[a-z]'`
+    elif [ "$OS" = "darwin" ]; then
+	    OSVER=`sw_vers |
+		    sed -e '/ProductVersion:/!d' -e 's/^.*[ 	][ 	]*//'`
+    elif [ "$OS" = "freebsd" ]; then
+	    _major=`uname -r | sed -e 's/\..*//'`
+	    _minor=`uname -r | sed -e 's/[0-9]*\.//' -e 's/-.*//'`
+	    OSVER="$_major.$_minor"
+    fi
 
-  "redhat")
-	if expr $OSVER \< 070000 > /dev/null
-	then
-		INITguess=systemd
-	else
-		INITguess=upstart
-	fi
-esac
+    if [ -z "$OSVER" ]; then
+	OSVER="0"
+    else
+	# clean up OSVER to make it a single integer
+	OSVER=`dot_to_int $OSVER`
+    fi
+}
 
-# determine what init system we are using (heuristic!)
-if [ -z "$INITguess" ]
-then
-	case $OS in
-	  "debian" | "ubuntu" | "centos" | "redhat" | "gentoo")
-		# some linux variant; see if we can figure out systemd
-		proc1exe=`sudo stat /proc/1/exe | grep 'File: '`
-		if echo "$proc1exe" | grep -q "systemd"
-		then
-			INITguess="systemd"
+check_os() {
+    case "$OS" in
+	"debian")
+	    if expr $OSVER \< 80000 > /dev/null
+	    then
+		    fatal_osver "Debian 8 (Jessie)"
+	    fi
+	    ;;
+
+	"ubuntu")
+	    if expr $OSVER \< 140400 > /dev/null
+	    then
+		    fatal_osver "Ubuntu 14.04"
+	    fi
+	    ;;
+
+	"raspbian")
+	    warn_unsupported "assume it is debian-based"
+	    ;;
+
+	"centos" | "freebsd" | "darwin" | "redhat" | "gentoo")
+	    warn_unsupported
+	    ;;
+
+	*)
+	    fatal "Oops, we don't support $OS"
+    esac
+}
+
+
+# check to make sure we understand this OS and OSVER; choose PKGMGR & INITsys
+set_pkgmgr() {
+    : ${PKGMGR:=$OS}
+    INITguess=""
+    case $PKGMGR in
+      "debian"|"ubuntu")
+	    PKGMGR=debian
+	    if expr $OSVER \>= 160400 > /dev/null
+	    then
+		    INITguess=systemd
+	    else
+		    INITguess=upstart
+	    fi
+	    ;;
+
+      "raspbian")
+	    PKGMGR=debian
+	    ;;
+
+      "redhat")
+	    PKGMGR=yum
+	    if expr $OSVER \< 070000 > /dev/null
+	    then
+		    INITguess=systemd
+	    else
+		    INITguess=upstart
+	    fi
+	    ;;
+
+      "darwin")
+	    if type port > /dev/null 2>&1 && port installed | grep -q .; then
+		    PKGMGR=macports
+	    fi
+	    if type brew > /dev/null 2>&1 && [ ! -z "`brew config`" ]
+	    then
+		if [ "$PKGMGR" = "macports" ]; then
+		    PKGMGR=brewports
+		    warn "You seem to have both macports and homebrew installed."
+		    warn "They conflict with each other, and you may break all your"
+		    warn "packages if you try to use them at the same time."
+		    warn "Please choose one or the other.  Macports seems to work better."
+		    fatal "Set envar PKGMGR to 'brew' or 'macports' to choose."
+		else
+		    PKGMGR=brew
 		fi
-		;;
-	esac
+	    fi
+	    if [ "$PKGMGR" = "darwin" ]; then
+		warn "You must install macports or homebrew."
+		fatal "See README-compiling.md (Operating System Quirks) for details."
+	    fi
+	    ;;
+
+      "centos")
+	    PKGMGR=yum
+	    ;;
+    esac
+
+    # determine what init system we are using (heuristic!)
+    if [ -z "$INITguess" ]
+    then
+	    case $OS in
+	      "debian" | "ubuntu" | "centos" | "redhat" | "gentoo")
+		    # some linux variant; see if we can figure out systemd
+		    proc1exe=`sudo stat /proc/1/exe | grep 'File: '`
+		    if echo "$proc1exe" | grep -q "systemd"
+		    then
+			    INITguess="systemd"
+		    fi
+		    ;;
+	    esac
+    fi
+}
+
+
+#################### END OF FUNCTIONS ####################
+
+configure_defaults
+set_os
+check_os
+if [ -z "$PKGMGR" ]
+then
+    set_pkgmgr
 fi
-test -z "$INITguess" && INITguess="unknown"
 
 # see if we should use our guess
-test -z "$INITSYS" && INITSYS=$INITguess
+test -z "$INITSYS" && INITSYS=${INITguess:-unknown}
 
-info "System Info: OS=$OS, OSVER=$OSVER, INITSYS=$INITSYS"
+if ! $quiet
+then
+    info "System Info: OS=$OS, OSVER=$OSVER, PKGMGR=$PKGMGR, INITSYS=$INITSYS"
+fi

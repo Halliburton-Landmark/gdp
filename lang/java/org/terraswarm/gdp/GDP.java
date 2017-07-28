@@ -47,7 +47,7 @@ import org.terraswarm.gdp.NativeSize; // Fixed by cxh in makefile.
  * Utility functions for the GDP. For the lack of a better name and to
  * keep things concise, we just call it GDP.  Most (if not all)
  * members of this class should be static. The auto-generated
- * constants in Gdp07Library.java that should be made available to the
+ * constants in Gdp08Library.java that should be made available to the
  * users should also ideally be copied here.
  *  
  * @author Nitesh Mor, Christopher Brooks
@@ -60,7 +60,7 @@ public class GDP {
      */
     public static void gdp_init() {
         EP_STAT estat;
-        estat = Gdp07Library.INSTANCE.gdp_init((Pointer)null);        
+        estat = Gdp08Library.INSTANCE.gdp_init((Pointer)null);        
         check_EP_STAT(estat);        
        
     }
@@ -72,7 +72,7 @@ public class GDP {
      */
     public static void gdp_init(String gdpRouter) {
         EP_STAT estat;
-        estat = Gdp07Library.INSTANCE.gdp_init(gdpRouter);
+        estat = Gdp08Library.INSTANCE.gdp_init(gdpRouter);
         check_EP_STAT(estat);
         
     }
@@ -83,7 +83,7 @@ public class GDP {
      */
     public static void dbg_set(String debug_level) {
 
-        Gdp07Library.INSTANCE.ep_dbg_set(debug_level);
+        Gdp08Library.INSTANCE.ep_dbg_set(debug_level);
     }
 
     /** 
@@ -95,12 +95,12 @@ public class GDP {
 
         int code = estat.code;
 
-        int EP_STAT_SEVERITY = (code >>> Gdp07Library._EP_STAT_SEVSHIFT)
-                & ((1 << Gdp07Library._EP_STAT_SEVBITS) - 1);
+        int EP_STAT_SEVERITY = (code >>> Gdp08Library._EP_STAT_SEVSHIFT)
+                & ((1 << Gdp08Library._EP_STAT_SEVBITS) - 1);
 
 	//System.out.println("check_EP_STAT(" + estat.code + ") " + ep_stat_toStr(estat));
 
-        return (EP_STAT_SEVERITY < Gdp07Library.EP_STAT_SEV_WARN);
+        return (EP_STAT_SEVERITY < Gdp08Library.EP_STAT_SEV_WARN);
     }
 
     /** 
@@ -124,7 +124,7 @@ public class GDP {
     public static String ep_stat_toStr(EP_STAT estat) {
 	int length = 200;
 	ByteBuffer buffer = ByteBuffer.allocate(length);
-	Pointer statusMessage = Gdp07Library.INSTANCE.ep_stat_tostr((EP_STAT.ByValue)estat, buffer, new NativeSize(length));
+	Pointer statusMessage = Gdp08Library.INSTANCE.ep_stat_tostr((EP_STAT.ByValue)estat, buffer, new NativeSize(length));
 	return new String(buffer.array()).trim();
     }
 

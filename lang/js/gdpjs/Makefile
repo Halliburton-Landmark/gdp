@@ -2,7 +2,7 @@
 #  Makefile for libgdpjs  (based on gdp/libep/Makefile)
 
 #	Copyright (c) 2008-2015, Eric P. Allman.  All rights reserved.
-#	Copyright (c) 2014-2016, Regents of the University of California.
+#	Copyright (c) 2014-2017, Regents of the University of California.
 #	All rights reserved.
 #
 #	Permission is hereby granted, without written agreement and without
@@ -101,7 +101,7 @@ GDPJSLIBVER=	${GDPJSLIBMAJVER}.${GDPJSLIBMINVER}
 
 # Version of the GDP Library, should match ../../../gdp/Makefile
 GDPLIBMAJVER=	0
-GDPLIBMINVER=	7
+GDPLIBMINVER=	8
 
 GDPLIBVER= 	${GDPLIBMAJVER}.${GDPLIBMINVER}
 # The name of the library in ../../../gdp
