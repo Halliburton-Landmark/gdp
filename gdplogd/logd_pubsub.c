@@ -233,7 +233,7 @@ sub_end_all_subscriptions(
 			EP_STAT_CHECK(estat, break);
 			nextreq = LIST_NEXT(req, gcllist);
 			if (!GDP_NAME_SAME(req->rpdu->dst, dest) ||
-					(rid != GDP_PDU_NO_RID && rid != req->cpdu->rid) ||
+					(rid != GDP_PDU_NO_RID && rid != req->rpdu->rid) ||
 					!EP_ASSERT(req->gcl == gcl))
 			{
 				_gdp_req_unlock(req);

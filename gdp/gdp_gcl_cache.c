@@ -141,7 +141,7 @@ _gdp_gcl_cache_add(gdp_gcl_t *gcl, gdp_iomode_t mode)
 	g2 = ep_hash_insert(OpenGCLCache, sizeof (gdp_name_t), gcl->name, gcl);
 	if (g2 != NULL)
 	{
-		EP_ASSERT_PRINT("duplicate GCL cache entry");
+		EP_ASSERT_PRINT("duplicate GCL cache entry, gcl=%p", gcl);
 		fprintf(stderr, "New ");
 		_gdp_gcl_dump(gcl, stderr, GDP_PR_DETAILED, 0);
 		fprintf(stderr, "Existing ");
