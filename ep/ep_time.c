@@ -222,12 +222,37 @@ ep_time_format(const EP_TIME_SPEC *tv, char *tbuf, size_t tbsiz, uint32_t flags)
 {
 	bool human = EP_UT_BITSET(EP_TIME_FMT_HUMAN, flags);
 	bool showfuzz = !EP_UT_BITSET(EP_TIME_FMT_NOFUZZ, flags);
+	int sigfigs;
+	uint32_t scale;
 
 	if (!EP_TIME_IS_VALID(tv))
 	{
 		snprintf(tbuf, tbsiz, "%s", human ? "(none)" : "-");
 		return tbuf;
 	}
+
+	switch (flags & EP_TIME_FMT_SIGFIGMASK)
+	{
+	  case EP_TIME_FMT_SIGFIG0:
+		sigfigs = 0;
+		break;
+
+	  case EP_TIME_FMT_SIGFIG3:
+		sigfigs = 3;
+		scale = 1000000;
+		break;
+
+	  case EP_TIME_FMT_SIGFIG6:
+		sigfigs = 6;
+		scale = 1000;
+		break;
+
+	  case EP_TIME_FMT_SIGFIG9:
+		sigfigs = 9;
+		scale = 1;
+		break;
+	}
+
 
 	struct tm tm;
 	time_t tvsec;
@@ -255,7 +280,11 @@ ep_time_format(const EP_TIME_SPEC *tv, char *tbuf, size_t tbsiz, uint32_t flags)
 	{
 		ybuf[0] = '\0';
 	}
-	snprintf(tbuf, tbsiz, "%s.%09" PRIu32 "Z%s", xbuf, tv->tv_nsec, ybuf);
+	if (sigfigs == 0)
+		snprintf(tbuf, tbsiz, "%sZ%s", xbuf, ybuf);
+	else
+		snprintf(tbuf, tbsiz, "%s.%0*" PRIu32 "Z%s",
+				xbuf, sigfigs, tv->tv_nsec / scale, ybuf);
 	return tbuf;
 }
 
