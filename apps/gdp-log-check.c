@@ -931,6 +931,21 @@ check_record(
 	EP_STAT return_stat = EP_STAT_OK;
 	gcl_physinfo_t *phys = GETPHYS(gcl);
 
+	// do some sanity checking on the record header; if it isn't good
+	// we'll just report the record and skip it for rebuilding
+	if (rec->recno < GETPHYS(gcl)->ridx.min_recno)
+	{
+		if (!Flags.silent && !Flags.summaryonly)
+		{
+			ep_app_message(GDP_STAT_CORRUPT_GCL, "%s\n"
+					"    Corrupt GCL: recno = %" PRIgdp_recno
+					", min = %" PRIgdp_recno " (ignoring)",
+					gcl->pname,
+					rec->recno, GETPHYS(gcl)->ridx.min_recno);
+		}
+		return EP_STAT_OK;
+	}
+
 	// check record number to offset index
 	{
 		ridx_entry_t xentbuf;
@@ -1158,22 +1173,38 @@ rebuild_segment(
 EP_STAT
 rebuild_record(
 			gdp_gcl_t *gcl,
-			segment_record_t *segrec,
+			segment_record_t *rec,
 			off_t offset,
 			segment_t *seg,
 			struct ctx *ctx)
 {
 	EP_STAT estat1 = EP_STAT_OK;
+
+	// do some sanity checking on the record header; if it isn't good
+	// we'll just report the record and skip it for rebuilding
+	if (rec->recno < GETPHYS(gcl)->ridx.min_recno)
+	{
+		if (!Flags.silent && !Flags.summaryonly)
+		{
+			ep_app_message(GDP_STAT_CORRUPT_GCL, "%s\n"
+					"    Corrupt GCL: recno = %" PRIgdp_recno
+					", min = %" PRIgdp_recno " (ignoring)",
+					gcl->pname,
+					rec->recno, GETPHYS(gcl)->ridx.min_recno);
+		}
+		return EP_STAT_OK;
+	}
+
 	if (!Flags.tidx_only)
 	{
 		// output info to ridx
-		estat1 = ridx_put(gcl, segrec->recno, seg->segno, offset);
+		estat1 = ridx_put(gcl, rec->recno, seg->segno, offset);
 	}
 
 	// output info to tidx
 	EP_STAT estat2 = tidx_put(gcl,
-					segrec->timestamp.tv_sec, segrec->timestamp.tv_nsec,
-					segrec->recno);
+					rec->timestamp.tv_sec, rec->timestamp.tv_nsec,
+					rec->recno);
 
 	EP_STAT_CHECK(estat1, return estat1);
 	EP_STAT_CHECK(estat2, return estat2);
