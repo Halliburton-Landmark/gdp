@@ -42,6 +42,7 @@
 #include "gdp_priv.h"
 
 #include <event2/event.h>
+#include <openssl/md4.h>
 
 #include <errno.h>
 #include <string.h>
@@ -484,7 +485,53 @@ _gdp_gcl_cache_shutdown(void (*shutdownfunc)(gdp_req_t *))
 
 
 /*
+**  Rebuild GCL LRU list
+**		Should "never happen", but if it does all hell breaks loose.
+**		Yes, I know, this is O(n^2).  But it should never happen.
+**		So sue me.
+*/
+
+static void
+sorted_insert(size_t klen, const void *key, void *gcl_, va_list av)
+{
+	gdp_gcl_t *gcl = gcl_;
+	gdp_gcl_t *g2 = LIST_FIRST(&GclsByUse);
+	if (g2 == NULL || gcl->utime > g2->utime)
+	{
+		// new entry is younger than first entry
+		LIST_INSERT_HEAD(&GclsByUse, gcl, ulist);
+		return;
+	}
+	LIST_FOREACH(g2, &GclsByUse, ulist)
+	{
+		gdp_gcl_t *g3 = LIST_NEXT(g2, ulist);
+		if (g3 == NULL || gcl->utime > g3->utime)
+		{
+			LIST_INSERT_AFTER(g2, gcl, ulist);
+			return;
+		}
+	}
+
+	// shouldn't happen
+	EP_ASSERT_PRINT("sorted_insert: ran off end of GclsByUse, gcl = %p", gcl);
+}
+
+static void
+rebuild_lru_list(void)
+{
+	ep_dbg_cprintf(Dbg, 2, "rebuild_lru_list: rebuilding\n");
+	ep_thr_mutex_lock(&GclCacheMutex);
+	LIST_INIT(&GclsByUse);
+	ep_hash_forall(OpenGCLCache, sorted_insert);
+	ep_thr_mutex_unlock(&GclCacheMutex);
+}
+
+
+/*
 **  Show contents of LRU cache (for debugging)
+**
+**		Unfortunately, this is O(n^2).  The bloom filter is less
+**		useful here.
 */
 
 static void
@@ -507,19 +554,50 @@ check_cache(size_t klen, const void *key, void *val, va_list av)
 	fprintf(fp, "    ===> WARNING: %s not in usage list\n", gcl->pname);
 }
 
+#define LOG2_BLOOM_SIZE		10			// log base 2 of bloom filter size
+
 void
 _gdp_gcl_cache_dump(int plev, FILE *fp)
 {
 	gdp_gcl_t *gcl;
-	gdp_gcl_t *prev_gcl = NULL;
+	uint32_t bloom[1 << (LOG2_BLOOM_SIZE - 1)];		// bloom filter
+	union
+	{
+		uint8_t		md4out[MD4_DIGEST_LENGTH];		// output md4
+		uint32_t	md4eq[MD4_DIGEST_LENGTH / 4];
+	} md4buf;
+	bool check_for_loops = true;
+
+	memset(&md4buf, 0, sizeof md4buf);
 
 	fprintf(fp, "\n<<< Showing cached GCLs by usage >>>\n");
 	LIST_FOREACH(gcl, &GclsByUse, ulist)
 	{
-		// do minor sanity check on list
-		// won't help if the loop is more than one item
-		EP_ASSERT_ELSE(gcl != prev_gcl, break);
-		prev_gcl = gcl;
+		if (check_for_loops)
+		{
+			// check for loops, starting with quick bloom filter on address
+			uint32_t bmask;
+			int bindex;
+
+			MD4((unsigned char *) &gcl, sizeof gcl, md4buf.md4out);
+			bindex = md4buf.md4eq[0];			// just use first 32-bit word
+			bmask = 1 << (bindex & 0x1f);		// mask on single word
+			bindex = (bindex >> 4) & ((1 << (LOG2_BLOOM_SIZE - 1)) - 1);
+			if (EP_UT_BITSET(bmask, bloom[bindex]))
+			{
+				// may have a conflict --- do explicit check
+				gdp_gcl_t *g2 = LIST_NEXT(gcl, ulist);
+				while (g2 != NULL && g2 != gcl)
+					g2 = LIST_NEXT(g2, ulist);
+				if (g2 != NULL)
+				{
+					EP_ASSERT_PRINT("Loop in GclsByUse on %p", gcl);
+					rebuild_lru_list();
+					break;
+				}
+			}
+			bloom[bindex] |= bmask;
+		}
 
 		if (plev > GDP_PR_PRETTY)
 		{
@@ -541,6 +619,6 @@ _gdp_gcl_cache_dump(int plev, FILE *fp)
 					gcl->pname);
 	}
 
-	ep_hash_forall(OpenGCLCache, check_cache);
+	ep_hash_forall(OpenGCLCache, check_cache, fp);
 	fprintf(fp, "\n<<< End of cached GCL list >>>\n");
 }
