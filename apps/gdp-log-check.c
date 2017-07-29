@@ -940,8 +940,11 @@ check_record(
 		if (!EP_STAT_ISOK(estat))
 		{
 			char ebuf[80];
-			testfail("ridx entry read fail: %" PRIgdp_recno ": %s\n",
-					rec->recno, ep_stat_tostr(estat, ebuf, sizeof ebuf));
+			testfail("ridx entry read fail: off=%jd recno=%" PRIgdp_recno
+					": %s\n",
+					(intmax_t) offset,
+					rec->recno,
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		}
 		EP_STAT_CHECK(estat, goto fail0);
 
@@ -1095,6 +1098,7 @@ do_check(gdp_gcl_t *gcl, struct ctx *ctx)
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// check timestamp database
+	phase = "tidx_check";
 	estat = check_tidx_db(gcl, ctx, &phase);
 	EP_STAT_CHECK(estat, goto fail0);
 
@@ -1216,7 +1220,7 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 	EP_STAT estat;
 	const char *phase;
 	gcl_physinfo_t *phys = GETPHYS(gcl);
-	bool install_new_files = false;
+	bool install_new_files = Flags.force;
 
 	// check the tidx database (this is just to see if we need to reinstall)
 	estat = check_tidx_db(gcl, ctx, &phase);
@@ -1285,7 +1289,7 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 	if (install_new_files || EP_STAT_ISWARN(estat))
 	{
 		ep_app_message(estat, "changes made to log %s", ctx->logxname);
-		if (Flags.force || install_new_files ||
+		if (install_new_files ||
 			askuser("Do you want to install the new indices [Yn]?", true))
 		{
 			install_new_files = true;
@@ -1302,7 +1306,7 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 							: "(use -f to force new index installation)");
 	}
 
-	if (Flags.force || install_new_files)
+	if (install_new_files)
 	{
 		// move the new indexes into place
 		char real_path[GCL_PATH_MAX];
