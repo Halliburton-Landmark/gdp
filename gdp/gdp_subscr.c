@@ -82,9 +82,13 @@ subscr_resub(gdp_req_t *req)
 	}
 
 	req->state = GDP_REQ_IDLE;
-	if (req->rpdu->datum != NULL)
-		gdp_datum_free(req->rpdu->datum);
-	req->rpdu->datum = NULL;
+	// req->rpdu might be NULL if _gdp_invoke failed
+	if (req->rpdu != NULL)
+	{
+		if (req->rpdu->datum != NULL)
+			gdp_datum_free(req->rpdu->datum);
+		req->rpdu->datum = NULL;
+	}
 
 	return estat;
 }
