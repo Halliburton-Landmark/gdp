@@ -787,6 +787,7 @@ _gdp_pdu_new(void)
 		EP_ASSERT_ELSE(!pdu->inuse, pdu = NULL);
 	} while (pdu == NULL);
 	ep_thr_mutex_unlock(&PduFreeListMutex);
+	VALGRIND_HG_CLEAN_MEMORY(pdu, sizeof *pdu);
 
 	// initialize the PDU
 	memset(pdu, 0, sizeof *pdu);

@@ -101,6 +101,7 @@ _gdp_gcl_newhandle(gdp_name_t gcl_name, gdp_gcl_t **pgcl)
 			goto fail1;
 		ep_thr_mutex_setorder(&gcl->mutex, GDP_MUTEX_LORDER_GCL);
 	}
+	VALGRIND_HG_CLEAN_MEMORY(gcl, sizeof *gcl);
 
 	LIST_INIT(&gcl->reqs);
 	gcl->refcnt = 1;
@@ -210,6 +211,7 @@ _gdp_gcl_dump(
 {
 	if (detail >= GDP_PR_BASIC)
 		fprintf(fp, "GCL@%p: ", gcl);
+	VALGRIND_HG_DISABLE_CHECKING(gcl, sizeof gcl);
 	if (gcl == NULL)
 	{
 		fprintf(fp, "NULL\n");
@@ -247,6 +249,7 @@ _gdp_gcl_dump(
 			}
 		}
 	}
+	VALGRIND_HG_ENABLE_CHECKING(gcl, sizeof gcl);
 }
 
 

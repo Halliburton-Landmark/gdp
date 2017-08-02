@@ -101,6 +101,14 @@
 # undef EP_OPT_EXTENDED_MUTEX_CHECK
 #endif
 
+#if EP_OSCF_USE_VALGRIND
+# include <valgrind/helgrind.h>
+#else
+# define VALGRIND_HG_CLEAN_MEMORY(a, b)
+# define VALGRIND_HG_DISABLE_CHECKING(p, s)
+# define VALGRIND_HG_ENABLE_CHECKING(p, s)
+#endif
+
 
 typedef pthread_t		EP_THR;
 

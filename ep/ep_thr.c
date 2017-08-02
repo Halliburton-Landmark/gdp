@@ -86,6 +86,12 @@ extern int	ffsl(long);
 #  define CHECKMTX(m, e) \
     do	\
     {								\
+	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__lock,		\
+			sizeof pmtx->__data.__lock);		\
+	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__owner,		\
+			sizeof pmtx->__data.__owner);		\
+	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__nusers,	\
+			sizeof pmtx->__data.__nusers);		\
 	if (ep_dbg_test(Dbg, 98) &&				\
 	    ((m)->__data.__lock > 1 ||				\
 	     (m)->__data.__nusers > 1))				\
@@ -145,6 +151,8 @@ mtx_printtrace(EP_THR_MUTEX *m, const char *where,
 	int my_tid = gettid();
 
 	GETMTX(m);
+	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__lock, sizeof pmtx->__data.__lock);
+	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__owner, sizeof pmtx->__data.__owner);
 	ep_dbg_printf("ep_thr_%-13s %s:%d %p (%s) [%d] __lock=%x __owner=%d%s\n",
 			where, file, line, m, name, my_tid,
 			pmtx->__data.__lock, pmtx->__data.__owner,
@@ -296,6 +304,7 @@ _ep_thr_mutex_destroy(EP_THR_MUTEX *mtx,
 	GETMTX(mtx);
 	CHECKMTX(mtx, "destroy >>>");
 #if EP_OPT_EXTENDED_MUTEX_CHECK & 0x01
+	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__lock, sizeof pmtx->__data.__lock);
 	if (pmtx->__data.__lock != 0)
 	{
 		if (pmtx->__data.__lock == gettid())
@@ -367,6 +376,9 @@ _ep_thr_mutex_lock(EP_THR_MUTEX *mtx,
 	GETMTX(mtx);
 	CHECKMTX(mtx, "lock >>>");
 #if EP_OPT_EXTENDED_MUTEX_CHECK & 0x01
+	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__lock, sizeof pmtx->__data.__lock);
+	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__owner, sizeof pmtx->__data.__owner);
+	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__kind, sizeof pmtx->__data.__kind);
 	if (pmtx->__data.__lock != 0 &&
 	    pmtx->__data.__owner == gettid() &&
 	    pmtx->__data.__kind != PTHREAD_MUTEX_RECURSIVE_NP)
@@ -422,6 +434,9 @@ _ep_thr_mutex_trylock(EP_THR_MUTEX *mtx,
 	GETMTX(mtx);
 	CHECKMTX(pmtx, "trylock >>>");
 #if EP_OPT_EXTENDED_MUTEX_CHECK & 0x01
+	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__lock, sizeof pmtx->__data.__lock);
+	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__owner, sizeof pmtx->__data.__owner);
+	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__kind, sizeof pmtx->__data.__kind);
 	if (pmtx->__data.__lock != 0 &&
 	    pmtx->__data.__owner == gettid() &&
 	    pmtx->__data.__kind != PTHREAD_MUTEX_RECURSIVE_NP)
@@ -457,6 +472,7 @@ _ep_thr_mutex_unlock(EP_THR_MUTEX *mtx,
 	GETMTX(mtx);
 	CHECKMTX(pmtx, "unlock >>>");
 #if EP_OPT_EXTENDED_MUTEX_CHECK & 0x01
+	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__owner, sizeof pmtx->__data.__owner);
 	if (pmtx->__data.__owner != gettid())
 		ep_assert_print(file, line,
 				"_ep_thr_mutex_unlock: mtx owner = %d, I am %d",
@@ -489,6 +505,7 @@ _ep_thr_mutex_tryunlock(EP_THR_MUTEX *mtx,
 	GETMTX(mtx);
 	CHECKMTX(pmtx, "tryunlock >>>");
 #if EP_OPT_EXTENDED_MUTEX_CHECK & 0x01
+	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__owner, sizeof pmtx->__data.__owner);
 	if (pmtx->__data.__owner != gettid())
 		ep_assert_print(file, line,
 				"_ep_thr_mutex_unlock: mtx owner = %d, I am %d",
@@ -523,6 +540,8 @@ ep_thr_mutex_assert_islocked(
 {
 #if EP_OPT_EXTENDED_MUTEX_CHECK & 0x01
 	GETMTX(m);
+	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__lock, sizeof pmtx->__data.__lock);
+	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__owner, sizeof pmtx->__data.__owner);
 	if (pmtx->__data.__lock != 0 && pmtx->__data.__owner == gettid())
 	{
 		// OK, this is locked (by me)
@@ -554,8 +573,11 @@ ep_thr_mutex_assert_isunlocked(
 {
 #if EP_OPT_EXTENDED_MUTEX_CHECK & 0x01
 	GETMTX(m);
+	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__lock, sizeof pmtx->__data.__lock);
 	if (pmtx->__data.__lock == 0)
+	{
 		return true;
+	}
 	ep_assert_print(file, line,
 			"mutex %s (%p) is locked by %d (should be unlocked)",
 			mstr, m, pmtx->__data.__owner);
@@ -577,8 +599,11 @@ ep_thr_mutex_assert_i_own(
 {
 #if EP_OPT_EXTENDED_MUTEX_CHECK & 0x01
 	GETMTX(m);
+	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__owner, sizeof pmtx->__data.__owner);
 	if (pmtx->__data.__owner == gettid())
+	{
 		return true;
+	}
 	ep_assert_print(file, line,
 			"mutex %s (%p) is locked by %d (should be %d)",
 			mstr, m, pmtx->__data.__owner, gettid());

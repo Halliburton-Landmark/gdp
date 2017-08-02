@@ -40,6 +40,7 @@
 #include <ep/ep_dbg.h>
 #include <ep/ep_log.h>
 #include <ep/ep_prflags.h>
+#include <ep/ep_thr.h>
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.req", "GDP request processing");
 
@@ -605,6 +606,7 @@ _gdp_req_dump(const gdp_req_t *req, FILE *fp, int detail, int indent)
 		fprintf(fp, "req@%p: null\n", req);
 		return;
 	}
+	VALGRIND_HG_DISABLE_CHECKING(req, sizeof req);
 	flockfile(fp);
 	fprintf(fp, "req@%p:\n", req);
 	fprintf(fp, "    nextrec=%" PRIgdp_recno ", numrecs=%" PRIu32 ", chan=%p\n"
@@ -630,6 +632,7 @@ _gdp_req_dump(const gdp_req_t *req, FILE *fp, int detail, int indent)
 		_gdp_pdu_dump(req->rpdu, fp);
 	}
 	funlockfile(fp);
+	VALGRIND_HG_ENABLE_CHECKING(req, sizeof req);
 }
 
 
@@ -640,7 +643,9 @@ _gdp_req_dump(const gdp_req_t *req, FILE *fp, int detail, int indent)
 void
 _gdp_req_pr_stats(FILE *fp)
 {
+	VALGRIND_HG_DISABLE_CHECKING(&NReqsAllocated, sizeof NReqsAllocated);
 	fprintf(fp, "Reqs Allocated: %d\n", NReqsAllocated);
+	VALGRIND_HG_ENABLE_CHECKING(&NReqsAllocated, sizeof NReqsAllocated);
 }
 
 

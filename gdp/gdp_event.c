@@ -85,6 +85,7 @@ _gdp_event_new(gdp_event_t **gevp)
 	{
 		gev = ep_mem_zalloc(sizeof *gev);
 	}
+	VALGRIND_HG_CLEAN_MEMORY(gev, sizeof *gev);
 	*gevp = gev;
 	ep_dbg_cprintf(Dbg, 48, "_gdp_event_new => %p\n", gev);
 	return EP_STAT_OK;

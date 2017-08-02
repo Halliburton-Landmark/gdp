@@ -32,6 +32,7 @@
 #include <ep_app.h>
 #include <ep_dbg.h>
 #include <ep_string.h>
+#include <ep_thr.h>
 #include <ep_time.h>
 #include <errno.h>
 #include <inttypes.h>
@@ -46,13 +47,15 @@ static EP_DBG	Dbg = EP_DBG_INIT("libep.time", "Time operations");
 **	just take it as an administrative parameter.
 */
 
-static float	ClockAccuracy = -1;		// in seconds
+static float		ClockAccuracy = -1;	// in seconds
+static EP_THR_MUTEX	ClockAccuracyMutex	EP_THR_MUTEX_INITIALIZER;
 
 #define ONESECOND	INT64_C(1000000000)	// one second in nanoseconds
 
 float
 ep_time_accuracy(void)
 {
+	ep_thr_mutex_lock(&ClockAccuracyMutex);
 	if (ClockAccuracy < 0)
 	{
 		const char *p = ep_adm_getstrparam("libep.time.accuracy", NULL);
@@ -62,6 +65,7 @@ ep_time_accuracy(void)
 		else
 			ClockAccuracy = strtof(p, NULL);
 	}
+	ep_thr_mutex_unlock(&ClockAccuracyMutex);
 	return ClockAccuracy;
 }
 
