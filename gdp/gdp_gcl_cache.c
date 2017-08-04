@@ -123,9 +123,8 @@ void
 _gdp_gcl_cache_add(gdp_gcl_t *gcl, gdp_iomode_t mode)
 {
 	// sanity checks
-	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
-	EP_ASSERT_ELSE(gdp_name_is_valid(gcl->name), return);
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
+	if (!GDP_GCL_ASSERT_ISLOCKED(gcl))
+		return;
 
 	ep_dbg_cprintf(Dbg, 49, "_gdp_gcl_cache_add(%p): adding\n", gcl);
 	if (EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
@@ -213,7 +212,8 @@ _gdp_gcl_cache_changename(gdp_gcl_t *gcl, gdp_name_t newname)
 **		i.e., the caller is responsible for calling
 **		_gdp_gcl_decref(&gcl) when it is finished with it.
 **
-**		gcl is returned locked.
+**		gcl is returned locked and with its reference count
+**		incremented.
 */
 
 gdp_gcl_t *
@@ -283,7 +283,7 @@ _gdp_gcl_cache_drop(gdp_gcl_t *gcl)
 		EP_ASSERT_ELSE(gdp_name_is_valid(gcl->name), return);
 	}
 
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
+	GDP_GCL_ASSERT_ISLOCKED(gcl);
 
 	if (!EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
 	{
@@ -324,29 +324,29 @@ _gdp_gcl_touch(gdp_gcl_t *gcl)
 	struct timeval tv;
 
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
-	if (!EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex))
-		return;
-
-	if (!EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
-	{
-		ep_dbg_cprintf(Dbg, 8, "_gcl_gcl_touch(%p): uncached!\n", gcl);
-		return;
-	}
 
 	ep_dbg_cprintf(Dbg, 46, "_gdp_gcl_touch(%p)\n", gcl);
 
 	gettimeofday(&tv, NULL);
 	gcl->utime = tv.tv_sec;
 
-	if (!EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
-		ep_thr_mutex_lock(&GclCacheMutex);
-	LIST_REMOVE(gcl, ulist);
-	IF_LIST_CHECK_OK(&GclsByUse, gcl, ulist, gdp_gcl_t)
+	ep_thr_mutex_lock(&GclCacheMutex);
+	if (!GDP_GCL_ASSERT_ISLOCKED(gcl))
 	{
-		LIST_INSERT_HEAD(&GclsByUse, gcl, ulist);
+		// GCL isn't locked: do nothing
 	}
-	if (!EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
-		ep_thr_mutex_unlock(&GclCacheMutex);
+	else if (!EP_ASSERT(EP_UT_BITSET(GCLF_INCACHE, gcl->flags)))
+	{
+		// GCL isn't in cache: do nothing
+	}
+	else
+	{
+		// both locked and in cache
+		LIST_REMOVE(gcl, ulist);
+		IF_LIST_CHECK_OK(&GclsByUse, gcl, ulist, gdp_gcl_t)
+			LIST_INSERT_HEAD(&GclsByUse, gcl, ulist);
+	}
+	ep_thr_mutex_unlock(&GclCacheMutex);
 }
 
 
@@ -433,8 +433,7 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 				ep_dbg_printf("_gdp_gcl_cache_reclaim: reclaiming:\n   ");
 				_gdp_gcl_dump(g1, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
 			}
-			LIST_REMOVE(g1, ulist);
-			_gdp_gcl_freehandle(g1);
+			_gdp_gcl_freehandle(g1);	// also removes from cache & usage list
 		}
 		ep_thr_mutex_unlock(&GclCacheMutex);
 
@@ -478,9 +477,8 @@ _gdp_gcl_cache_shutdown(void (*shutdownfunc)(gdp_req_t *))
 	{
 		ep_thr_mutex_trylock(&g1->mutex);
 		g2 = LIST_NEXT(g1, ulist);
-		LIST_REMOVE(g1, ulist);
 		_gdp_req_freeall(&g1->reqs, shutdownfunc);
-		_gdp_gcl_freehandle(g1);
+		_gdp_gcl_freehandle(g1);	// also removes from cache and usage list
 	}
 }
 

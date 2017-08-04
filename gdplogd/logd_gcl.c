@@ -140,7 +140,8 @@ gcl_close(gdp_gcl_t *gcl)
 **		The GCL will have it's reference count bumped, so the
 **		caller must call _gdp_gcl_decref when done with it.
 **
-**		GCL is returned locked.
+**		GCL is returned locked and with its reference count
+**		incremented.
 */
 
 EP_STAT

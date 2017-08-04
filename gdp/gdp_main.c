@@ -145,13 +145,14 @@ gdp_pdu_proc_cmd(void *cpdu_)
 
 	gcl = _gdp_gcl_cache_get(cpdu->dst, 0);
 	if (gcl != NULL)
-		EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
+		GDP_GCL_ASSERT_ISLOCKED(gcl);
 
 	ep_dbg_cprintf(Dbg, 43,
 			"gdp_pdu_proc_cmd: allocating new req for GCL %p\n", gcl);
 	estat = _gdp_req_new(cmd, gcl, cpdu->chan, cpdu, GDP_REQ_CORE, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex);
+	EP_ASSERT(gcl == req->gcl);
 
 	ep_dbg_cprintf(Dbg, 40, "gdp_pdu_proc_cmd >>> req=%p\n", req);
 
@@ -173,6 +174,21 @@ gdp_pdu_proc_cmd(void *cpdu_)
 		ep_dbg_printf("gdp_pdu_proc_cmd: after dispatch, ");
 		_gdp_req_dump(req, ep_dbg_getfile(), 0, 0);
 	}
+
+	// make sure request or GCL haven't gotten fubared
+	if (!EP_ASSERT((gcl == NULL || gcl == req->gcl)) && ep_dbg_test(Dbg, 1))
+	{
+		ep_dbg_printf("gdp_pdu_proc_cmd, after dispatch:\n  gcl = ");
+		_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+		ep_dbg_printf("  req->gcl = ");
+		_gdp_gcl_dump(req->gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+	}
+
+	// cmd_open can return a new GCL in the req
+	gcl = req->gcl;
+
+	if (gcl != NULL)
+		GDP_GCL_ASSERT_ISLOCKED(gcl);
 
 	// figure out potential response code
 	// we compute even if unused so we can log server errors
@@ -201,6 +217,8 @@ gdp_pdu_proc_cmd(void *cpdu_)
 			datum->siglen = siglen;
 		}
 	}
+	if (gcl != NULL)
+		GDP_GCL_ASSERT_ISLOCKED(gcl);
 
 	// send response PDU if appropriate
 	if (req->rpdu != NULL)
@@ -213,28 +231,37 @@ gdp_pdu_proc_cmd(void *cpdu_)
 		//XXX anything to do with estat here?
 	}
 
+	EP_ASSERT(gcl == req->gcl);
+	if (gcl != NULL)
+		GDP_GCL_ASSERT_ISLOCKED(gcl);
+
 	// do command post processing
 	if (req->postproc)
 	{
 		ep_dbg_cprintf(Dbg, 44, "gdp_pdu_proc_cmd: doing post processing\n");
 		(req->postproc)(req);
 		req->postproc = NULL;
+
+		// postproc shouldn't change GCL lock status
+		EP_ASSERT(gcl == req->gcl);
 	}
 
 	// free up resources
 	if (req->rpdu->datum != NULL)
 		ep_thr_mutex_unlock(&req->rpdu->datum->mutex);
+	if (gcl != NULL)
+	{
+		if (!GDP_GCL_ASSERT_ISLOCKED(gcl))
+			_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+		_gdp_gcl_decref(&gcl);
+	}
 	if (EP_UT_BITSET(GDP_REQ_CORE, req->flags) &&
 			!EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
 	{
-		if (req->gcl != NULL)
-			_gdp_gcl_unlock(req->gcl);
 		_gdp_req_free(&req);
 	}
 	else
 	{
-		if (req->gcl != NULL && EP_UT_BITSET(GCLF_ISLOCKED, req->gcl->flags))
-			_gdp_gcl_unlock(req->gcl);
 		_gdp_req_unlock(req);
 	}
 
@@ -360,6 +387,8 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 	}
 	else
 	{
+		GDP_GCL_ASSERT_ISLOCKED(gcl);
+
 		// find the corresponding request
 		ep_dbg_cprintf(DbgProcResp, 23,
 				"gdp_pdu_proc_resp: searching gcl %p for rid %" PRIgdp_rid "\n",
@@ -407,7 +436,7 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 	}
 
 	if (gcl != NULL)
-		_gdp_gcl_decref(&gcl);
+		GDP_GCL_ASSERT_ISLOCKED(gcl);
 
 	if (req->cpdu == NULL)
 	{
@@ -444,11 +473,21 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 
 	// request is locked
 
+	if (gcl != NULL)
+		GDP_GCL_ASSERT_ISLOCKED(gcl);
+
 	// mark this request as active (for subscriptions)
 	ep_time_now(&req->act_ts);
 
 	// do ack/nak specific processing
 	estat = _gdp_req_dispatch(req, cmd);
+
+	// we should now be done with the GCL
+	if (gcl != NULL)
+	{
+		GDP_GCL_ASSERT_ISLOCKED(gcl);
+		_gdp_gcl_decref(&gcl);
+	}
 
 	// figure out potential response code
 	// we compute even if unused so we can log server errors

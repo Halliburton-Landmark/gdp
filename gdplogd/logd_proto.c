@@ -224,7 +224,6 @@ cmd_ping(gdp_req_t *req)
 	estat =  GDP_STAT_NAK_NOTFOUND;
 
 done:
-	_gdp_gcl_decref(&gcl);
 	return estat;
 }
 
@@ -324,7 +323,7 @@ cmd_create(gdp_req_t *req)
 
 	// leave this in the cache
 	gcl->flags |= GCLF_DEFER_FREE;
-	_gdp_gcl_decref(&req->gcl);
+	//DEBUG: _gdp_gcl_decref(&req->gcl);
 
 fail0:
 	ep_thr_mutex_unlock(&req->cpdu->datum->mutex);
@@ -404,7 +403,6 @@ cmd_open(gdp_req_t *req)
 	}
 
 	ep_thr_mutex_unlock(&req->rpdu->datum->mutex);
-	_gdp_gcl_decref(&req->gcl);
 	return estat;
 }
 
@@ -451,9 +449,6 @@ cmd_close(gdp_req_t *req)
 					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 
-	// drop reference
-	_gdp_gcl_decref(&req->gcl);
-
 	return estat;
 }
 
@@ -499,7 +494,6 @@ cmd_read(gdp_req_t *req)
 		estat = GDP_STAT_NAK_NOTFOUND;
 
 fail0:
-	_gdp_gcl_decref(&req->gcl);
 	return estat;
 }
 
@@ -753,7 +747,6 @@ fail0:
 
 	// we're no longer using this handle
 	ep_thr_mutex_unlock(&req->cpdu->datum->mutex);
-	_gdp_gcl_decref(&req->gcl);
 
 	return estat;
 }
@@ -892,9 +885,11 @@ cmd_subscribe(gdp_req_t *req)
 {
 	EP_STAT estat;
 	EP_TIME_SPEC timeout;
+	gdp_gcl_t *gcl;
+	bool new_subscription = true;
 
 	if (req->gcl != NULL)
-		EP_THR_MUTEX_ASSERT_ISLOCKED(&req->gcl->mutex);
+		GDP_GCL_ASSERT_ISLOCKED(req->gcl);
 
 	req->rpdu->cmd = GDP_ACK_SUCCESS;
 
@@ -906,6 +901,14 @@ cmd_subscribe(gdp_req_t *req)
 							estat, GDP_STAT_NAK_BADREQ);
 	}
 
+	gcl = req->gcl;
+	if (!EP_ASSERT(GDP_GCL_ISGOOD(gcl)))
+	{
+		ep_dbg_printf("cmd_subscribe: bad gcl %p in req, flags = %x\n",
+				gcl, gcl == NULL ? 0 : gcl->flags);
+		return EP_STAT_ASSERT_ABORT;
+	}
+
 	// get the additional parameters: number of records and timeout
 	ep_thr_mutex_lock(&req->cpdu->datum->mutex);
 	req->numrecs = (int) gdp_buf_get_uint32(req->cpdu->datum->dbuf);
@@ -915,7 +918,7 @@ cmd_subscribe(gdp_req_t *req)
 	{
 		ep_dbg_printf("cmd_subscribe: first = %" PRIgdp_recno ", numrecs = %d\n  ",
 				req->cpdu->datum->recno, req->numrecs);
-		_gdp_gcl_dump(req->gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+		_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
 	// should have no more input data; ignore anything there
@@ -939,9 +942,11 @@ cmd_subscribe(gdp_req_t *req)
 	{
 		gdp_req_t *r1;
 
-		for (r1 = LIST_FIRST(&req->gcl->reqs); r1 != NULL;
+		for (r1 = LIST_FIRST(&gcl->reqs); r1 != NULL;
 				r1 = LIST_NEXT(r1, gcllist))
 		{
+			EP_ASSERT(GDP_GCL_ISGOOD(r1->gcl));
+			EP_ASSERT(r1->gcl == gcl);
 			if (ep_dbg_test(Dbg, 50))
 			{
 				ep_dbg_printf("cmd_subscribe: comparing to ");
@@ -964,11 +969,14 @@ cmd_subscribe(gdp_req_t *req)
 			ep_dbg_cprintf(Dbg, 20, "cmd_subscribe: removing old request\n");
 			LIST_REMOVE(r1, gcllist);
 			r1->flags &= ~GDP_REQ_ON_GCL_LIST;
-			_gdp_gcl_decref(&r1->gcl);
 			_gdp_req_lock(r1);
 			_gdp_req_free(&r1);
+			new_subscription = false;
 		}
 	}
+
+	// the _gdp_gcl_decref better not have invalidated the GCL
+	EP_ASSERT(GDP_GCL_ISGOOD(gcl));
 
 	// mark this as persistent and upgradable
 	req->flags |= GDP_REQ_PERSIST | GDP_REQ_SUBUPGRADE;
@@ -977,7 +985,7 @@ cmd_subscribe(gdp_req_t *req)
 	ep_time_now(&req->act_ts);
 
 	// if some of the records already exist, arrange to return them
-	if (req->nextrec <= req->gcl->nrecs)
+	if (req->nextrec <= gcl->nrecs)
 	{
 		ep_dbg_cprintf(Dbg, 24, "cmd_subscribe: doing post processing\n");
 		req->flags &= ~GDP_REQ_SRV_SUBSCR;
@@ -992,9 +1000,11 @@ cmd_subscribe(gdp_req_t *req)
 		// link this request into the GCL so the subscription can be found
 		if (!EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
 		{
-			IF_LIST_CHECK_OK(&req->gcl->reqs, req, gcllist, gdp_req_t)
+			IF_LIST_CHECK_OK(&gcl->reqs, req, gcllist, gdp_req_t)
 			{
-				LIST_INSERT_HEAD(&req->gcl->reqs, req, gcllist);
+				LIST_INSERT_HEAD(&gcl->reqs, req, gcllist);
+				if (new_subscription)
+					_gdp_gcl_incref(gcl);
 				req->flags |= GDP_REQ_ON_GCL_LIST;
 			}
 			else
@@ -1155,7 +1165,6 @@ cmd_getmetadata(gdp_req_t *req)
 	ep_thr_mutex_unlock(&req->rpdu->datum->mutex);
 
 fail1:
-	_gdp_gcl_decref(&req->gcl);
 fail0:
 	return estat;
 }

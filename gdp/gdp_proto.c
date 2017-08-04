@@ -82,10 +82,7 @@ _gdp_invoke(gdp_req_t *req)
 
 	EP_ASSERT_POINTER_VALID(req);
 	if (req->gcl != NULL)
-	{
-		EP_ASSERT(GDP_GCL_ISGOOD(req->gcl));
-		EP_THR_MUTEX_ASSERT_ISLOCKED(&req->gcl->mutex);
-	}
+		GDP_GCL_ASSERT_ISLOCKED(req->gcl);
 	cmdname = _gdp_proto_cmd_name(req->cpdu->cmd);
 	if (ep_dbg_test(Dbg, 10))
 	{
@@ -145,6 +142,7 @@ _gdp_invoke(gdp_req_t *req)
 			// cond_wait will unlock the mutex
 			int e = ep_thr_cond_wait(&req->cond, &req->mutex, &abs_to);
 
+			// re-acquire GCL lock
 			if (req->gcl != NULL)
 			{
 				// have to unlock the req so lock ordering is right
@@ -834,9 +832,14 @@ _gdp_req_dispatch(gdp_req_t *req, int cmd)
 	gdp_pname_t pname;
 
 	if (req->gcl != NULL)
+	{
 		memcpy(pname, req->gcl->pname, sizeof pname);
+		GDP_GCL_ASSERT_ISLOCKED(req->gcl);
+	}
 	else
+	{
 		pname[0] = '\0';
+	}
 	if (ep_dbg_test(Dbg, 28) || ep_dbg_test(DbgCmdTrace, 28))
 	{
 		flockfile(ep_dbg_getfile());
@@ -860,6 +863,10 @@ _gdp_req_dispatch(gdp_req_t *req, int cmd)
 		estat = cmd_not_implemented(req);
 	else
 		estat = (*d->func)(req);
+
+	// command function should not change lock state of GCL
+	if (req->gcl != NULL)
+		GDP_GCL_ASSERT_ISLOCKED(req->gcl);
 
 	if (ep_dbg_test(Dbg, 18) || ep_dbg_test(DbgCmdTrace, 18))
 	{

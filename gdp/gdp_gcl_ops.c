@@ -160,14 +160,16 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
 					return EP_STAT_ASSERT_ABORT);
+	GDP_GCL_ASSERT_ISLOCKED(gcl);
 
 	// send the request across to the log daemon
 	errno = 0;				// avoid spurious messages
 	reqflags |= GDP_REQ_ROUTEFAIL;			// don't retry on router errors
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
 	estat = _gdp_req_new(cmd, gcl, chan, NULL, reqflags, &req);
+	GDP_GCL_ASSERT_ISLOCKED(gcl);					//DEBUG
 	EP_STAT_CHECK(estat, goto fail0);
 	estat = _gdp_invoke(req);
+	GDP_GCL_ASSERT_ISLOCKED(gcl);					//DEBUG
 	EP_STAT_CHECK(estat, goto fail0);
 	// success
 

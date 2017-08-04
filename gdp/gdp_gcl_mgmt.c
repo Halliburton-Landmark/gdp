@@ -147,7 +147,7 @@ _gdp_gcl_freehandle(gdp_gcl_t *gcl)
 	// this is a forced free, so ignore existing refcnts, etc.
 	gcl->refcnt = 0;
 
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
+	GDP_GCL_ASSERT_ISLOCKED(gcl);
 	gcl->flags |= GCLF_DROPPING | GCLF_ISLOCKED;
 
 	// drop it from the name -> handle cache
@@ -266,6 +266,7 @@ _gdp_gcl_lock_trace(
 {
 	//XXX cheat: _ep_thr_mutex_lock is a libep-private interface
 	_ep_thr_mutex_lock(&gcl->mutex, file, line, id);
+	EP_ASSERT(!EP_UT_BITSET(GCLF_ISLOCKED, gcl->flags));
 	gcl->flags |= GCLF_ISLOCKED;
 }
 
@@ -281,8 +282,10 @@ _gdp_gcl_unlock_trace(
 		int line,
 		const char *id)
 {
-	//XXX cheat: _ep_thr_mutex_unlock is a libep-private interface
+	EP_ASSERT(EP_UT_BITSET(GCLF_ISLOCKED, gcl->flags));
 	gcl->flags &= ~GCLF_ISLOCKED;
+
+	//XXX cheat: _ep_thr_mutex_unlock is a libep-private interface
 	_ep_thr_mutex_unlock(&gcl->mutex, file, line, id);
 }
 
@@ -374,7 +377,7 @@ void
 _gdp_gcl_incref(gdp_gcl_t *gcl)
 {
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
+	GDP_GCL_ASSERT_ISLOCKED(gcl);
 
 	gcl->refcnt++;
 	_gdp_gcl_touch(gcl);
@@ -410,10 +413,9 @@ _gdp_gcl_decref_trace(
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
 	(void) ep_thr_mutex_assert_islocked(&gcl->mutex, id, file, line);
 
+	EP_ASSERT(gcl->refcnt > 0);
 	if (gcl->refcnt > 0)
 		gcl->refcnt--;
-	else
-		ep_log(GDP_STAT_BAD_REFCNT, "_gdp_gcl_decref: %p: zero refcnt", gcl);
 	*gclp = NULL;
 
 	ep_dbg_cprintf(Dbg, 51, "_gdp_gcl_decref(%p): %d\n",

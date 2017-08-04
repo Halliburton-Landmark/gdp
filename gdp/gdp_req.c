@@ -126,12 +126,8 @@ _gdp_req_new(int cmd,
 		flags |= GDP_REQ_PERSIST | GDP_REQ_ALLOC_RID;
 
 	// if assertion fails, may be working with an unallocated GCL
-	if (gcl != NULL)
-	{
-		if (!EP_ASSERT(GDP_GCL_ISGOOD(gcl)) ||
-				!EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex))
+	if (gcl != NULL && !GDP_GCL_ASSERT_ISLOCKED(gcl))
 			return EP_STAT_ASSERT_ABORT;
-	}
 
 	// simplify the simple case
 	if (chan == NULL)
@@ -213,7 +209,7 @@ _gdp_req_new(int cmd,
 		pdu->cmd = cmd;
 		if (gcl != NULL)
 		{
-			EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
+			GDP_GCL_ASSERT_ISLOCKED(gcl);
 			memcpy(pdu->dst, gcl->name, sizeof pdu->dst);
 		}
 		if ((gcl == NULL || !EP_UT_BITSET(GDP_REQ_PERSIST, flags)) &&
@@ -281,7 +277,7 @@ _gdp_req_free(gdp_req_t **reqp)
 	if (EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
 	{
 		EP_ASSERT_ELSE(req->gcl != NULL, return);
-		EP_THR_MUTEX_ASSERT_ISLOCKED(&req->gcl->mutex);
+		GDP_GCL_ASSERT_ISLOCKED(req->gcl);
 		LIST_REMOVE(req, gcllist);
 		req->flags &= ~GDP_REQ_ON_GCL_LIST;
 	}
@@ -437,7 +433,7 @@ _gdp_req_send(gdp_req_t *req)
 	{
 		// link the request to the GCL
 		ep_dbg_cprintf(Dbg, 49, "_gdp_req_send(%p) gcl=%p\n", req, gcl);
-		EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
+		GDP_GCL_ASSERT_ISLOCKED(gcl);
 		LIST_INSERT_HEAD(&gcl->reqs, req, gcllist);
 		req->flags |= GDP_REQ_ON_GCL_LIST;
 
@@ -484,7 +480,7 @@ _gdp_req_unsend(gdp_req_t *req)
 		ep_dbg_cprintf(Dbg, 4, "_gdp_req_unsend: req %p not on GCL list\n",
 				req);
 	}
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
+	GDP_GCL_ASSERT_ISLOCKED(gcl);
 	LIST_REMOVE(req, gcllist);
 	req->flags &= ~GDP_REQ_ON_GCL_LIST;
 
@@ -517,9 +513,9 @@ _gdp_req_find(gdp_gcl_t *gcl, gdp_rid_t rid)
 
 	ep_dbg_cprintf(Dbg, 50, "_gdp_req_find(gcl=%p, rid=%" PRIgdp_rid")\n",
 			gcl, rid);
-	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
-					return NULL);
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
+	if (!EP_ASSERT(GDP_GCL_ISGOOD(gcl)))
+		return NULL;
+	GDP_GCL_ASSERT_ISLOCKED(gcl);
 
 	for (;;)
 	{

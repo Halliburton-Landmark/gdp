@@ -87,6 +87,8 @@
 **		hence only runs on Linux systems using NPTL.
 **	0x02	Add primitive lock ordering checks.  This changes the
 **		ABI!!!  As a result, it should not be used in production.
+**	0x10	Do deeper lock checks (every time one is used).
+**		Probably inefficient.
 */
 
 #ifndef EP_OPT_EXTENDED_MUTEX_CHECK				//XXX DEBUG TEMP

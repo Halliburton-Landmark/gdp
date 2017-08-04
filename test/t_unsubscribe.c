@@ -21,13 +21,18 @@ main(int argc, char **argv)
 	int opt;
 	char *gclxname = "x00";
 	bool test_wildcard = false;
+	int pausesec = 1;
 
-	while ((opt = getopt(argc, argv, "D:w")) > 0)
+	while ((opt = getopt(argc, argv, "D:p:w")) > 0)
 	{
 		switch (opt)
 		{
 		  case 'D':
 			ep_dbg_set(optarg);
+			break;
+
+		  case 'p':
+			pausesec = atoi(optarg);
 			break;
 
 		  case 'w':
@@ -62,7 +67,8 @@ main(int argc, char **argv)
 	test_message(estat, "gdp_gcl_append1");
 	gdp_buf_reset(gdp_datum_getbuf(d));
 	ep_app_info("sleeping1");
-	ep_time_nanosleep(1 SECONDS);
+	ep_time_nanosleep(pausesec SECONDS);
+
 
 	// use different cbarg: subscription should persist
 	estat = gdp_gcl_unsubscribe(gcl, NULL, (void *) 2);
@@ -72,7 +78,7 @@ main(int argc, char **argv)
 	estat = gdp_gcl_append(gcl, d);
 	test_message(estat, "gdp_gcl_append2");
 	ep_app_info("sleeping2");
-	ep_time_nanosleep(1 SECONDS);
+	ep_time_nanosleep(pausesec SECONDS);
 
 	if (test_wildcard)
 	{
@@ -93,7 +99,7 @@ main(int argc, char **argv)
 	estat = gdp_gcl_append(gcl, d);
 	test_message(estat, "gdp_gcl_append3");
 	ep_app_info("sleeping3");
-	ep_time_nanosleep(1 SECONDS);
+	ep_time_nanosleep(pausesec SECONDS);
 
 	ep_app_info("closing");
 	estat = gdp_gcl_close(gcl);

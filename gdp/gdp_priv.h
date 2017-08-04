@@ -222,6 +222,12 @@ struct gdp_gcl
 #define GDP_GCL_ISGOOD(gcl)												\
 				((gcl) != NULL &&										\
 				 EP_UT_BITSET(GCLF_INUSE, (gcl)->flags))
+#define GDP_GCL_ASSERT_ISLOCKED(gcl)									\
+			(															\
+				EP_ASSERT(GDP_GCL_ISGOOD(gcl)) &&						\
+				EP_ASSERT(EP_UT_BITSET(GCLF_ISLOCKED, (gcl)->flags)) &&	\
+				EP_THR_MUTEX_ASSERT_ISLOCKED(&(gcl)->mutex)				\
+			)
 #define GDP_GCL_CHECK_RETURN_STAT(gcl)									\
 			do															\
 			{															\
@@ -238,6 +244,7 @@ struct gdp_gcl
 				if (!EP_ASSERT(EP_UT_BITSET(GCLF_INUSE, (gcl)->flags)))	\
 						return NULL;									\
 			} while (false)
+
 
 
 /*

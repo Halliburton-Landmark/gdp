@@ -90,7 +90,7 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 	gdp_req_t *nextreq;
 	EP_TIME_SPEC sub_timeout;
 
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&pubreq->gcl->mutex);
+	GDP_GCL_ASSERT_ISLOCKED(pubreq->gcl);
 
 	if (ep_dbg_test(Dbg, 32))
 	{
@@ -173,8 +173,10 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 void
 sub_end_subscription(gdp_req_t *req)
 {
+	gdp_gcl_t *gcl = req->gcl;
+
 	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex);
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->gcl->mutex);
+	GDP_GCL_ASSERT_ISLOCKED(req->gcl);
 
 	// make it not persistent and not a subscription
 	req->flags &= ~(GDP_REQ_PERSIST | GDP_REQ_SRV_SUBSCR);
@@ -183,7 +185,9 @@ sub_end_subscription(gdp_req_t *req)
 	if (EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
 		LIST_REMOVE(req, gcllist);
 	req->flags &= ~GDP_REQ_ON_GCL_LIST;
-	_gdp_gcl_decref(&req->gcl);
+//DEBUG:	req->gcl->flags |= GCLF_KEEPLOCKED;
+//DEBUG:	_gdp_gcl_decref(&gcl);
+//DEBUG:	req->gcl->flags &= ~GCLF_KEEPLOCKED;
 
 	// send an "end of subscription" event
 	req->rpdu->cmd = GDP_ACK_DELETED;
@@ -219,7 +223,7 @@ sub_end_all_subscriptions(
 		_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
+	GDP_GCL_ASSERT_ISLOCKED(gcl);
 	if (EP_UT_BITSET(GCLF_KEEPLOCKED, gcl->flags) && ep_dbg_test(Dbg, 1))
 		ep_dbg_printf("sub_end_all_subscriptions: GCLF_KEEPLOCKED on entry\n");
 	gcl->flags |= GCLF_KEEPLOCKED;

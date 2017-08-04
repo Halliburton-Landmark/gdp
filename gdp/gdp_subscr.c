@@ -282,9 +282,8 @@ _gdp_gcl_unsubscribe(gdp_gcl_t *gcl,
 	gdp_req_t *req;
 	gdp_req_t *sub, *next_sub;
 
-	if (!EP_ASSERT(GDP_GCL_ISGOOD(gcl)))
+	if (!GDP_GCL_ASSERT_ISLOCKED(gcl))
 		return EP_STAT_ASSERT_ABORT;
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
 
 	ep_dbg_cprintf(Dbg, 1, "_gdp_gcl_unsubscribe(%s) cbfunc=%p cbarg=%p\n",
 			gcl->pname, cbfunc, cbarg);
