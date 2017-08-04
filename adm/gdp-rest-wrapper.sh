@@ -18,6 +18,7 @@
 # manifest constants (see <sysexits.h>)
 EX_USAGE=64
 EX_UNAVAILABLE=69
+EX_TEMPFAIL=75
 EX_NOPERM=77
 EX_CONFIG=78
 
@@ -63,8 +64,18 @@ then
 	exit $EX_USAGE
 fi
 
-echo "[INFO] Running $GDP_REST_BIN $GDP_REST_ARGS"
-$GDP_REST_BIN $GDP_REST_ARGS
-rc=$?
+rc=$EX_TEMPFAIL
+while [ $rc -eq $EX_TEMPFAIL ];
+do
+	echo "[INFO] Running $GDP_REST_BIN $GDP_REST_ARGS"
+	$GDP_REST_BIN $GDP_REST_ARGS
+	rc=$?
+	if [ $rc -eq $EX_TEMPFAIL ];
+	then
+		echo "[WARN] $0: $GDP_REST_BIN DNS lookup failure, will retry"
+		sleep 30
+	fi
+done
+
 echo "[FATAL] $0: $GDP_REST_BIN exited with status $rc"
 exit $rc
