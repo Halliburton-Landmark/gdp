@@ -290,7 +290,8 @@ Can be overridden on a per-program basis.
 .It swarm.gdp.subscr.refresh
 How often open subscriptions should be renewed (in seconds).
 Subscriptions that are not renewed will eventually expire.
-Defaults to 60 (one minute).
+Defaults to one third of
+.Va swarm.gdp.subscr.timeout .
 Note that the
 .Xr gdplogd 8
 hosting the log decides how long a subscription lease will last,

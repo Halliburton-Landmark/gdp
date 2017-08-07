@@ -1161,6 +1161,14 @@ ridx_fseek_to_recno(
 {
 	off_t xoff;
 
+	if (recno < phys->ridx.min_recno)
+	{
+		// error: recno is out of range
+		ep_dbg_cprintf(Dbg, 1, "ridx_fseek_to_recno: recno = %" PRIgdp_recno
+					", min_recno = %" PRIgdp_recno "\n",
+					recno, phys->ridx.min_recno);
+		return GDP_STAT_CORRUPT_GCL;
+	}
 	xoff = (recno - phys->ridx.min_recno) * SIZEOF_RIDX_RECORD +
 			phys->ridx.header_size;
 	ep_dbg_cprintf(Dbg, 44,

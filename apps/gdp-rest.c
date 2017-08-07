@@ -1387,6 +1387,18 @@ main(int argc, char **argv, char **env)
 
 		if (!EP_STAT_ISOK(estat))
 		{
+			// DNS lookup failure is usually an external network
+			// issue, so exit with an errorcode and let the system
+			// control restart attempts
+			if (EP_STAT_IS_SAME(estat, EP_STAT_DNS_FAILURE))
+			{
+				char nbuf[40];
+
+				strerror_r(errno, nbuf, sizeof nbuf);
+				ep_app_error("Cannot initialize gdp library: %s", nbuf);
+				return EX_TEMPFAIL;
+			}
+
 			ep_app_abort("Cannot initialize gdp library: %s",
 					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		}

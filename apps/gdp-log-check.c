@@ -931,6 +931,21 @@ check_record(
 	EP_STAT return_stat = EP_STAT_OK;
 	gcl_physinfo_t *phys = GETPHYS(gcl);
 
+	// do some sanity checking on the record header; if it isn't good
+	// we'll just report the record and skip it for rebuilding
+	if (rec->recno < GETPHYS(gcl)->ridx.min_recno)
+	{
+		if (!Flags.silent && !Flags.summaryonly)
+		{
+			ep_app_message(GDP_STAT_CORRUPT_GCL, "%s\n"
+					"    Corrupt GCL: recno = %" PRIgdp_recno
+					", min = %" PRIgdp_recno " (ignoring)",
+					gcl->pname,
+					rec->recno, GETPHYS(gcl)->ridx.min_recno);
+		}
+		return EP_STAT_OK;
+	}
+
 	// check record number to offset index
 	{
 		ridx_entry_t xentbuf;
@@ -940,8 +955,11 @@ check_record(
 		if (!EP_STAT_ISOK(estat))
 		{
 			char ebuf[80];
-			testfail("ridx entry read fail: %" PRIgdp_recno ": %s\n",
-					rec->recno, ep_stat_tostr(estat, ebuf, sizeof ebuf));
+			testfail("ridx entry read fail: off=%jd recno=%" PRIgdp_recno
+					": %s\n",
+					(intmax_t) offset,
+					rec->recno,
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		}
 		EP_STAT_CHECK(estat, goto fail0);
 
@@ -1095,6 +1113,7 @@ do_check(gdp_gcl_t *gcl, struct ctx *ctx)
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// check timestamp database
+	phase = "tidx_check";
 	estat = check_tidx_db(gcl, ctx, &phase);
 	EP_STAT_CHECK(estat, goto fail0);
 
@@ -1154,22 +1173,38 @@ rebuild_segment(
 EP_STAT
 rebuild_record(
 			gdp_gcl_t *gcl,
-			segment_record_t *segrec,
+			segment_record_t *rec,
 			off_t offset,
 			segment_t *seg,
 			struct ctx *ctx)
 {
 	EP_STAT estat1 = EP_STAT_OK;
+
+	// do some sanity checking on the record header; if it isn't good
+	// we'll just report the record and skip it for rebuilding
+	if (rec->recno < GETPHYS(gcl)->ridx.min_recno)
+	{
+		if (!Flags.silent && !Flags.summaryonly)
+		{
+			ep_app_message(GDP_STAT_CORRUPT_GCL, "%s\n"
+					"    Corrupt GCL: recno = %" PRIgdp_recno
+					", min = %" PRIgdp_recno " (ignoring)",
+					gcl->pname,
+					rec->recno, GETPHYS(gcl)->ridx.min_recno);
+		}
+		return EP_STAT_OK;
+	}
+
 	if (!Flags.tidx_only)
 	{
 		// output info to ridx
-		estat1 = ridx_put(gcl, segrec->recno, seg->segno, offset);
+		estat1 = ridx_put(gcl, rec->recno, seg->segno, offset);
 	}
 
 	// output info to tidx
 	EP_STAT estat2 = tidx_put(gcl,
-					segrec->timestamp.tv_sec, segrec->timestamp.tv_nsec,
-					segrec->recno);
+					rec->timestamp.tv_sec, rec->timestamp.tv_nsec,
+					rec->recno);
 
 	EP_STAT_CHECK(estat1, return estat1);
 	EP_STAT_CHECK(estat2, return estat2);
@@ -1216,7 +1251,7 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 	EP_STAT estat;
 	const char *phase;
 	gcl_physinfo_t *phys = GETPHYS(gcl);
-	bool install_new_files = false;
+	bool install_new_files = Flags.force;
 
 	// check the tidx database (this is just to see if we need to reinstall)
 	estat = check_tidx_db(gcl, ctx, &phase);
@@ -1285,7 +1320,7 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 	if (install_new_files || EP_STAT_ISWARN(estat))
 	{
 		ep_app_message(estat, "changes made to log %s", ctx->logxname);
-		if (Flags.force || install_new_files ||
+		if (install_new_files ||
 			askuser("Do you want to install the new indices [Yn]?", true))
 		{
 			install_new_files = true;
@@ -1302,7 +1337,7 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 							: "(use -f to force new index installation)");
 	}
 
-	if (Flags.force || install_new_files)
+	if (install_new_files)
 	{
 		// move the new indexes into place
 		char real_path[GCL_PATH_MAX];

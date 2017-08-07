@@ -44,22 +44,6 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.subscr", "GDP subscriptions");
 
 
 /*
-**  Subscription disappeared; remove it from list
-*/
-
-static void
-subscr_lost(gdp_req_t *req)
-{
-	//TODO IMPLEMENT ME!
-	if (ep_dbg_test(Dbg, 1))
-	{
-		ep_dbg_printf("subscr_lost: ");
-		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
-	}
-}
-
-
-/*
 **  Re-subscribe to a GCL
 */
 
@@ -98,9 +82,13 @@ subscr_resub(gdp_req_t *req)
 	}
 
 	req->state = GDP_REQ_IDLE;
-	if (req->rpdu->datum != NULL)
-		gdp_datum_free(req->rpdu->datum);
-	req->rpdu->datum = NULL;
+	// req->rpdu might be NULL if _gdp_invoke failed
+	if (req->rpdu != NULL)
+	{
+		if (req->rpdu->datum != NULL)
+			gdp_datum_free(req->rpdu->datum);
+		req->rpdu->datum = NULL;
+	}
 
 	return estat;
 }
@@ -115,12 +103,18 @@ static void *
 subscr_poker_thread(void *chan_)
 {
 	gdp_chan_t *chan = chan_;
-	long delta_poke = ep_adm_getlongparam("swarm.gdp.subscr.pokeintvl",
-							GDP_SUBSCR_REFRESH_DEF);
-	long delta_dead = ep_adm_getlongparam("swarm.gdp.subscr.deadintvl",
+	long timeout = ep_adm_getlongparam("swarm.gdp.subscr.timeout",
 							GDP_SUBSCR_TIMEOUT_DEF);
+	long delta_poke = ep_adm_getlongparam("swarm.gdp.subscr.refresh",
+							timeout / 3);
 
-	ep_dbg_cprintf(Dbg, 10, "Starting subscription poker thread\n");
+	if (timeout < delta_poke)
+		ep_app_warn("swarm.gdp.subscr.timeout < swarm.gdp.subscr.refresh"
+					" (%ld < %ld)",
+					timeout, delta_poke);
+	ep_dbg_cprintf(Dbg, 10,
+			"Starting subscription poker thread, delta_poke = %ld\n",
+			delta_poke);
 	chan->flags |= GDP_CHAN_HAS_SUB_THR;
 
 	// loop forever poking subscriptions
@@ -131,7 +125,6 @@ subscr_poker_thread(void *chan_)
 		gdp_req_t *nextreq;
 		EP_TIME_SPEC now;
 		EP_TIME_SPEC t_poke;	// poke if older than this
-		EP_TIME_SPEC t_dead;	// abort if older than this
 
 		// wait for a while to avoid hogging CPU
 		ep_time_nanosleep(delta_poke / 2 SECONDS);
@@ -140,8 +133,6 @@ subscr_poker_thread(void *chan_)
 		ep_time_now(&now);
 		ep_time_from_nsec(-delta_poke SECONDS, &t_poke);
 		ep_time_add_delta(&now, &t_poke);
-		ep_time_from_nsec(-delta_dead SECONDS, &t_dead);
-		ep_time_add_delta(&now, &t_dead);
 
 		// do loop is in case _gdp_req_lock fails
 		do
@@ -182,15 +173,9 @@ subscr_poker_thread(void *chan_)
 				{
 					// we've seen activity recently, no need to poke
 				}
-				else if (ep_time_before(&req->act_ts, &t_dead))
-				{
-					// this subscription is dead
-					//XXX should be impossible: subscription refreshed each time
-					subscr_lost(req);
-				}
 				else
 				{
-					// t_dead < act_ts <= t_poke: refresh this subscription
+					// act_ts <= t_poke: refresh this subscription
 					(void) subscr_resub(req);
 				}
 
