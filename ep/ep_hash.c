@@ -275,9 +275,11 @@ ep_hash_forall(
 	ep_thr_mutex_lock(&hp->mutex);
 	for (i = 0; i < hp->tabsize; i++)
 	{
-		for (n = hp->tab[i]; n != NULL; n = n->next)
+		struct node *next;
+		for (n = hp->tab[i]; n != NULL; n = next)
 		{
 			va_list lav;
+			next = n->next;
 
 			va_copy(lav, av);
 			(*func)(n->keylen, n->key, n->val, lav);
