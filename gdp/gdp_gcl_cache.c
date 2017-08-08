@@ -65,10 +65,10 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.gcl.cache", "GCL cache");
 **
 ***********************************************************************/
 
-static EP_HASH			*OpenGCLCache;		// associative cache
+EP_HASH				*_OpenGCLCache;		// associative cache
 LIST_HEAD(gcl_use_head, gdp_gcl)			// LRU cache
-						GclsByUse		= LIST_HEAD_INITIALIZER(GclByUse);
-static EP_THR_MUTEX		GclCacheMutex;
+					GclsByUse		= LIST_HEAD_INITIALIZER(GclByUse);
+EP_THR_MUTEX		_GclCacheMutex;
 
 
 /*
@@ -82,19 +82,19 @@ _gdp_gcl_cache_init(void)
 	int istat;
 	const char *err;
 
-	if (OpenGCLCache == NULL)
+	if (_OpenGCLCache == NULL)
 	{
-		istat = ep_thr_mutex_init(&GclCacheMutex, EP_THR_MUTEX_RECURSIVE);
+		istat = ep_thr_mutex_init(&_GclCacheMutex, EP_THR_MUTEX_RECURSIVE);
 		if (istat != 0)
 		{
 			estat = ep_stat_from_errno(istat);
-			err = "could not initialize GclCacheMutex";
+			err = "could not initialize _GclCacheMutex";
 			goto fail0;
 		}
-		ep_thr_mutex_setorder(&GclCacheMutex, GDP_MUTEX_LORDER_GCLCACHE);
+		ep_thr_mutex_setorder(&_GclCacheMutex, GDP_MUTEX_LORDER_GCLCACHE);
 
-		OpenGCLCache = ep_hash_new("OpenGCLCache", NULL, 0);
-		if (OpenGCLCache == NULL)
+		_OpenGCLCache = ep_hash_new("_OpenGCLCache", NULL, 0);
+		if (_OpenGCLCache == NULL)
 		{
 			estat = ep_stat_from_errno(errno);
 			err = "could not create OpenGCLCache";
@@ -136,9 +136,9 @@ _gdp_gcl_cache_add(gdp_gcl_t *gcl, gdp_iomode_t mode)
 
 	// save it in the associative cache
 	gdp_gcl_t *g2;
-	ep_dbg_cprintf(Dbg, 49, "_gdp_gcl_cache_add(%p): insert into OpenGCLCache\n",
+	ep_dbg_cprintf(Dbg, 49, "_gdp_gcl_cache_add(%p): insert into _OpenGCLCache\n",
 			gcl);
-	g2 = ep_hash_insert(OpenGCLCache, sizeof (gdp_name_t), gcl->name, gcl);
+	g2 = ep_hash_insert(_OpenGCLCache, sizeof (gdp_name_t), gcl->name, gcl);
 	if (g2 != NULL)
 	{
 		EP_ASSERT_PRINT("duplicate GCL cache entry, gcl=%p (%s)",
@@ -159,12 +159,12 @@ _gdp_gcl_cache_add(gdp_gcl_t *gcl, gdp_iomode_t mode)
 
 		ep_dbg_cprintf(Dbg, 49, "_gdp_gcl_cache_add(%p): insert into LRU list\n",
 				gcl);
-		ep_thr_mutex_lock(&GclCacheMutex);
+		ep_thr_mutex_lock(&_GclCacheMutex);
 		IF_LIST_CHECK_OK(&GclsByUse, gcl, ulist, gdp_gcl_t)
 		{
 			LIST_INSERT_HEAD(&GclsByUse, gcl, ulist);
 		}
-		ep_thr_mutex_unlock(&GclCacheMutex);
+		ep_thr_mutex_unlock(&_GclCacheMutex);
 	}
 
 	gcl->flags |= GCLF_INCACHE;
@@ -190,11 +190,11 @@ _gdp_gcl_cache_changename(gdp_gcl_t *gcl, gdp_name_t newname)
 	EP_ASSERT_ELSE(gdp_name_is_valid(newname), return);
 	EP_ASSERT_ELSE(EP_UT_BITSET(GCLF_INCACHE, gcl->flags), return);
 
-	ep_thr_mutex_lock(&GclCacheMutex);
-	(void) ep_hash_delete(OpenGCLCache, sizeof (gdp_name_t), gcl->name);
+	ep_thr_mutex_lock(&_GclCacheMutex);
+	(void) ep_hash_delete(_OpenGCLCache, sizeof (gdp_name_t), gcl->name);
 	(void) memcpy(gcl->name, newname, sizeof (gdp_name_t));
-	(void) ep_hash_insert(OpenGCLCache, sizeof (gdp_name_t), newname, gcl);
-	ep_thr_mutex_unlock(&GclCacheMutex);
+	(void) ep_hash_insert(_OpenGCLCache, sizeof (gdp_name_t), newname, gcl);
+	ep_thr_mutex_unlock(&_GclCacheMutex);
 
 	ep_dbg_cprintf(Dbg, 40, "_gdp_gcl_cache_changename: %s => %p\n",
 					gcl->pname, gcl);
@@ -205,7 +205,7 @@ _gdp_gcl_cache_changename(gdp_gcl_t *gcl, gdp_name_t newname)
 **  _GDP_GCL_CACHE_GET --- get a GCL from the cache, if it exists
 **
 **		To avoid deadlock due to improper lock ordering, you can't
-**		hold GclCacheMutex while locking or unlocking a GCL, which 
+**		hold _GclCacheMutex while locking or unlocking a GCL, which 
 **		can cause problems.
 **
 **		If found, the refcnt is bumped for the returned GCL,
@@ -222,8 +222,8 @@ _gdp_gcl_cache_get(gdp_name_t gcl_name, gdp_iomode_t mode)
 	gdp_gcl_t *gcl;
 
 	// see if we have a pointer to this GCL in the cache
-	// don't need to lock GclCacheMutex since OpenGCLCache is protected
-	gcl = ep_hash_search(OpenGCLCache, sizeof (gdp_name_t), (void *) gcl_name);
+	// don't need to lock _GclCacheMutex since _OpenGCLCache is protected
+	gcl = ep_hash_search(_OpenGCLCache, sizeof (gdp_name_t), (void *) gcl_name);
 	if (gcl == NULL)
 		goto done;
 	_gdp_gcl_lock(gcl);
@@ -268,7 +268,7 @@ done:
 /*
 ** Drop a GCL from both the associative and the LRU caches
 **
-**		GclCacheMutex should already be acquired, since this is
+**		_GclCacheMutex should already be acquired, since this is
 **		only called when freeing resources.
 */
 
@@ -301,7 +301,7 @@ _gdp_gcl_cache_drop(gdp_gcl_t *gcl)
 	}
 
 	// remove it from the associative cache
-	(void) ep_hash_delete(OpenGCLCache, sizeof (gdp_name_t), gcl->name);
+	(void) ep_hash_delete(_OpenGCLCache, sizeof (gdp_name_t), gcl->name);
 
 	// ... and the LRU list
 	LIST_REMOVE(gcl, ulist);
@@ -330,7 +330,7 @@ _gdp_gcl_touch(gdp_gcl_t *gcl)
 	gettimeofday(&tv, NULL);
 	gcl->utime = tv.tv_sec;
 
-	ep_thr_mutex_lock(&GclCacheMutex);
+	ep_thr_mutex_lock(&_GclCacheMutex);
 	if (!GDP_GCL_ASSERT_ISLOCKED(gcl))
 	{
 		// GCL isn't locked: do nothing
@@ -346,7 +346,7 @@ _gdp_gcl_touch(gdp_gcl_t *gcl)
 		IF_LIST_CHECK_OK(&GclsByUse, gcl, ulist, gdp_gcl_t)
 			LIST_INSERT_HEAD(&GclsByUse, gcl, ulist);
 	}
-	ep_thr_mutex_unlock(&GclCacheMutex);
+	ep_thr_mutex_unlock(&_GclCacheMutex);
 }
 
 
@@ -400,7 +400,7 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 		gettimeofday(&tv, NULL);
 		mintime = tv.tv_sec - maxage;
 
-		ep_thr_mutex_lock(&GclCacheMutex);
+		ep_thr_mutex_lock(&_GclCacheMutex);
 		for (g1 = LIST_FIRST(&GclsByUse); g1 != NULL; g1 = g2)
 		{
 			if (loopcount++ > maxgcls)
@@ -435,7 +435,7 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 			}
 			_gdp_gcl_freehandle(g1);	// also removes from cache & usage list
 		}
-		ep_thr_mutex_unlock(&GclCacheMutex);
+		ep_thr_mutex_unlock(&_GclCacheMutex);
 
 		// check to see if we have enough headroom
 		int maxfds;
@@ -519,10 +519,10 @@ static void
 rebuild_lru_list(void)
 {
 	ep_dbg_cprintf(Dbg, 2, "rebuild_lru_list: rebuilding\n");
-	ep_thr_mutex_lock(&GclCacheMutex);
+	ep_thr_mutex_lock(&_GclCacheMutex);
 	LIST_INIT(&GclsByUse);
-	ep_hash_forall(OpenGCLCache, sorted_insert);
-	ep_thr_mutex_unlock(&GclCacheMutex);
+	ep_hash_forall(_OpenGCLCache, sorted_insert);
+	ep_thr_mutex_unlock(&_GclCacheMutex);
 }
 
 
@@ -613,11 +613,11 @@ _gdp_gcl_cache_dump(int plev, FILE *fp)
 				snprintf(tbuf, sizeof tbuf, "%"PRIu64, (int64_t) gcl->utime);
 			fprintf(fp, "%s %p %s %d\n", tbuf, gcl, gcl->pname, gcl->refcnt);
 		}
-		if (ep_hash_search(OpenGCLCache, sizeof gcl->name, (void *) gcl->name) == NULL)
+		if (ep_hash_search(_OpenGCLCache, sizeof gcl->name, (void *) gcl->name) == NULL)
 			fprintf(fp, "    ===> WARNING: %s not in primary cache\n",
 					gcl->pname);
 	}
 
-	ep_hash_forall(OpenGCLCache, check_cache, fp);
+	ep_hash_forall(_OpenGCLCache, check_cache, fp);
 	fprintf(fp, "\n<<< End of cached GCL list >>>\n");
 }
