@@ -190,18 +190,15 @@ sub_end_subscription(gdp_req_t *req)
 	if (EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
 		LIST_REMOVE(req, gcllist);
 	req->flags &= ~GDP_REQ_ON_GCL_LIST;
-#if 0 //DEBUG
 	{
 		gdp_gcl_t *gcl = req->gcl;
 		if (EP_UT_BITSET(GCLF_KEEPLOCKED, gcl->flags))
 		{
 			ep_dbg_cprintf(Dbg, 1, "   *** WARNING: KEEPLOCKED set in sub_end_subscription ***\n");
 		}
-		gcl->flags |= GCLF_KEEPLOCKED;
-		_gdp_gcl_decref(&gcl);
-		gcl->flags &= ~GCLF_KEEPLOCKED;
+		EP_ASSERT(gcl->refcnt > 1);
+		_gdp_gcl_decref(&gcl, true);
 	}
-#endif //DEBUG
 
 	// send an "end of subscription" event
 	req->rpdu->cmd = GDP_ACK_DELETED;
@@ -266,7 +263,7 @@ sub_end_all_subscriptions(
 			}
 			LIST_REMOVE(req, gcllist);
 			req->flags &= ~GDP_REQ_ON_GCL_LIST;
-			_gdp_gcl_decref(&req->gcl);
+			_gdp_gcl_decref(&req->gcl, false);
 			_gdp_req_free(&req);
 		}
 	} while (!EP_STAT_ISOK(estat));
@@ -310,20 +307,24 @@ gcl_reclaim_subscriptions(size_t klen,
 
 		ep_time_from_nsec(-timeout SECONDS, &sub_delta);
 		ep_time_deltanow(&sub_delta, &sub_timeout);
-		ep_dbg_cprintf(Dbg, 29,
-				"sub_reclaim_resources: timeout = %ld\n", timeout);
+		ep_dbg_cprintf(Dbg, 39,
+				"gcl_reclaim_subscriptions: GCL = %p, refcnt = %d, timeout = %ld\n",
+				gcl, gcl->refcnt, timeout);
 	}
 
 	// don't even try locked GCLs
 	// first check is to avoid extraneous errors
 	if (EP_UT_BITSET(GCLF_ISLOCKED, gcl->flags))
+	{
+		ep_dbg_cprintf(Dbg, 39, " ... skipping locked GCL\n");
 		return;
+	}
 	istat = ep_thr_mutex_trylock(&gcl->mutex);
 	if (istat != 0)
 	{
 		if (ep_dbg_test(Dbg, 21))
 		{
-			ep_dbg_printf("sub_reclaim_resources: gcl already locked:\n    ");
+			ep_dbg_printf("gcl_reclaim_subscriptions: gcl already locked:\n    ");
 			_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 		}
 		return;
@@ -333,14 +334,20 @@ gcl_reclaim_subscriptions(size_t klen,
 	nextreq = LIST_FIRST(&gcl->reqs);
 	while ((req = nextreq) != NULL)
 	{
+		if (ep_dbg_test(Dbg, 59))
+		{
+			ep_dbg_printf("gcl_reclaim_subscriptions: checking ");
+			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+		}
+
 		// now that GCL is locked, we lock the request
 		istat = ep_thr_mutex_trylock(&req->mutex);
 		if (istat != 0)		// checking on status of req lock attempt
 		{
 			// already locked
-			if (ep_dbg_test(Dbg, 21))
+			if (ep_dbg_test(Dbg, 41))
 			{
-				ep_dbg_printf("sub_reclaim_resources: req already locked:\n    ");
+				ep_dbg_printf("gcl_reclaim_subscriptions: req already locked:\n    ");
 				_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 			}
 			_gdp_gcl_unlock(req->gcl);
@@ -355,11 +362,6 @@ gcl_reclaim_subscriptions(size_t klen,
 			break;
 		}
 
-		if (ep_dbg_test(Dbg, 59))
-		{
-			ep_dbg_printf("sub_reclaim_resources: checking ");
-			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
-		}
 
 		if (!EP_UT_BITSET(GDP_REQ_SRV_SUBSCR, req->flags))
 		{
@@ -387,17 +389,19 @@ gcl_reclaim_subscriptions(size_t klen,
 			}
 			req->flags &= ~(GDP_REQ_ON_GCL_LIST | GDP_REQ_ON_CHAN_LIST);
 			_gdp_req_free(&req);
-			_gdp_gcl_decref(&gcl);
+			_gdp_gcl_decref(&gcl, false);
 		}
 		else if (ep_dbg_test(Dbg, 59))
 		{
 			ep_dbg_printf("    ... not yet time\n");
 		}
+
 		if (req != NULL)
 			_gdp_req_unlock(req);
-		if (gcl != NULL)
-			_gdp_gcl_unlock(gcl);
 	}
+
+	if (gcl != NULL)
+		_gdp_gcl_unlock(gcl);
 }
 
 void

@@ -397,14 +397,15 @@ _gdp_gcl_incref(gdp_gcl_t *gcl)
 #undef _gdp_gcl_decref
 
 void
-_gdp_gcl_decref(gdp_gcl_t **gclp)
+_gdp_gcl_decref(gdp_gcl_t **gclp, bool keeplocked)
 {
-	_gdp_gcl_decref_trace(gclp, __FILE__, __LINE__, "gclp");
+	_gdp_gcl_decref_trace(gclp, keeplocked, __FILE__, __LINE__, "gclp");
 }
 
 void
 _gdp_gcl_decref_trace(
 		gdp_gcl_t **gclp,
+		bool keeplocked,
 		const char *file,
 		int line,
 		const char *id)
@@ -423,7 +424,7 @@ _gdp_gcl_decref_trace(
 			gcl, gcl->refcnt);
 	if (gcl->refcnt == 0 && !EP_UT_BITSET(GCLF_DEFER_FREE, gcl->flags))
 		_gdp_gcl_freehandle(gcl);
-	else if (!EP_UT_BITSET(GCLF_KEEPLOCKED, gcl->flags))
+	else if (!keeplocked && !EP_UT_BITSET(GCLF_KEEPLOCKED, gcl->flags))
 		_gdp_gcl_unlock_trace(gcl, file, line, id);
 }
 

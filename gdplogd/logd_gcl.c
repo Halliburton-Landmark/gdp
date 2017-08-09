@@ -100,7 +100,7 @@ gcl_open(gdp_name_t gcl_name, gdp_iomode_t iomode, gdp_gcl_t **pgcl)
 	return estat;
 
 fail1:
-	_gdp_gcl_decref(&gcl);
+	_gdp_gcl_decref(&gcl, false);
 fail0:
 	// if this isn't a "not found" error, mark it as an internal error
 	if (!EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOTFOUND))

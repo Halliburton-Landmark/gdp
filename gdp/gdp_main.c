@@ -253,7 +253,7 @@ gdp_pdu_proc_cmd(void *cpdu_)
 	{
 		if (!GDP_GCL_ASSERT_ISLOCKED(gcl))
 			_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
-		_gdp_gcl_decref(&gcl);
+		_gdp_gcl_decref(&gcl, false);
 	}
 	if (EP_UT_BITSET(GDP_REQ_CORE, req->flags) &&
 			!EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
@@ -448,11 +448,6 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 		}
 	}
 
-	if (gcl != NULL)
-	{
-		if (!EP_ASSERT(gcl == req->gcl))					//DEBUG
-			ep_dbg_printf("XXX gcl = %p, req->gcl = %p\n", gcl, req->gcl);	//DEBUG
-	}
 	GDP_GCL_ASSERT_ISLOCKED(req->gcl);
 
 	if (req->cpdu == NULL)
@@ -570,7 +565,7 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 		// use a shadow variables so req does not lose gcl
 		gdp_gcl_t *gcl = req->gcl;
 		GDP_GCL_ASSERT_ISLOCKED(gcl);
-		_gdp_gcl_decref(&gcl);
+		_gdp_gcl_decref(&gcl, false);
 	}
 
 	if (EP_UT_BITSET(GDP_REQ_CORE, req->flags) &&

@@ -441,9 +441,10 @@ _ep_thr_mutex_trylock(EP_THR_MUTEX *mtx,
 	    pmtx->__data.__owner == gettid() &&
 	    pmtx->__data.__kind != PTHREAD_MUTEX_RECURSIVE_NP)
 	{
-		ep_assert_print(file, line,
-			"_ep_thr_mutex_lock: mutex %p (%s) already self-locked",
-			mtx, name);
+		// this is not necessarily an error
+		ep_dbg_cprintf(Dbg, 1,
+			"_ep_thr_mutex_lock: mutex %p (%s) already self-locked (%s:%d)\n",
+			mtx, name, file, line);
 	}
 #endif
 	// EBUSY => mutex was already locked

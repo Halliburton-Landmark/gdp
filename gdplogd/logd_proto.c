@@ -323,7 +323,6 @@ cmd_create(gdp_req_t *req)
 
 	// leave this in the cache
 	gcl->flags |= GCLF_DEFER_FREE;
-	//DEBUG: _gdp_gcl_decref(&req->gcl);
 
 fail0:
 	ep_thr_mutex_unlock(&req->cpdu->datum->mutex);

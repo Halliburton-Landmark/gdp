@@ -123,7 +123,7 @@ _gdp_gcl_create(gdp_name_t gclname,
 
 fail0:
 	if (gcl != NULL)
-		_gdp_gcl_decref(&gcl);
+		_gdp_gcl_decref(&gcl, false);
 fail1:
 	if (req != NULL)
 		_gdp_req_free(&req);
@@ -366,7 +366,7 @@ _gdp_gcl_close(gdp_gcl_t *gcl,
 	_gdp_event_free_all(gcl);
 finis:
 fail0:
-	_gdp_gcl_decref(&gcl);
+	_gdp_gcl_decref(&gcl, false);
 	return estat;
 }
 

@@ -304,11 +304,12 @@ void			_gdp_gcl_incref(			// increase reference count
 
 void			_gdp_gcl_decref_trace(		// decrease reference count (trace)
 						gdp_gcl_t **gclp,
+						bool keeplocked,
 						const char *file,
 						int line,
 						const char *id);
 
-#define _gdp_gcl_decref(g)	_gdp_gcl_decref_trace(g, __FILE__, __LINE__, #g)
+#define _gdp_gcl_decref(g, k)	_gdp_gcl_decref_trace(g, k, __FILE__, __LINE__, #g)
 
 void			_gdp_gcl_pr_stats(			// print (debug) statistics
 						FILE *fp);
