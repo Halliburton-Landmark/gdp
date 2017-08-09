@@ -145,8 +145,6 @@ _gdp_gcl_freehandle(gdp_gcl_t *gcl)
 
 	// this is a forced free, so ignore existing refcnts, etc.
 	gcl->refcnt = 0;
-
-	GDP_GCL_ASSERT_ISLOCKED(gcl);
 	gcl->flags |= GCLF_DROPPING | GCLF_ISLOCKED;
 
 	// drop it from the name -> handle cache

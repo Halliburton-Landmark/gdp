@@ -188,10 +188,10 @@ sub_end_subscription(gdp_req_t *req)
 
 	// remove the request from the work list
 	if (EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
-		LIST_REMOVE(req, gcllist);
-	req->flags &= ~GDP_REQ_ON_GCL_LIST;
 	{
 		gdp_gcl_t *gcl = req->gcl;
+		LIST_REMOVE(req, gcllist);
+		req->flags &= ~GDP_REQ_ON_GCL_LIST;
 		if (EP_UT_BITSET(GCLF_KEEPLOCKED, gcl->flags))
 		{
 			ep_dbg_cprintf(Dbg, 1, "   *** WARNING: KEEPLOCKED set in sub_end_subscription ***\n");
