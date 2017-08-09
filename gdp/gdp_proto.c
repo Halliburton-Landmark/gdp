@@ -142,6 +142,8 @@ _gdp_invoke(gdp_req_t *req)
 			// cond_wait will unlock the mutex
 			int e = ep_thr_cond_wait(&req->cond, &req->mutex, &abs_to);
 
+EP_ASSERT(req->gcl != NULL);
+
 			// re-acquire GCL lock
 			if (req->gcl != NULL)
 			{
@@ -150,6 +152,7 @@ _gdp_invoke(gdp_req_t *req)
 				_gdp_req_unlock(req);
 				_gdp_gcl_lock(req->gcl);
 				_gdp_req_lock(req);
+GDP_GCL_ASSERT_ISLOCKED(req->gcl);	//DEBUG
 			}
 
 			char ebuf[100];
@@ -167,6 +170,7 @@ _gdp_invoke(gdp_req_t *req)
 			}
 		}
 		req->state = GDP_REQ_ACTIVE;
+GDP_GCL_ASSERT_ISLOCKED(req->gcl);	//DEBUG
 		if (EP_STAT_ISOK(estat))
 		{
 			estat = req->stat;
@@ -198,10 +202,13 @@ _gdp_invoke(gdp_req_t *req)
 				ep_time_nanosleep(retry_delay MILLISECONDS);
 			}
 		}
+GDP_GCL_ASSERT_ISLOCKED(req->gcl);	//DEBUG
 	} while (--retries > 0);
+GDP_GCL_ASSERT_ISLOCKED(req->gcl);	//DEBUG
 
 	// if we had any pending asynchronous events, deliver them
 	_gdp_event_trigger_pending(&req->events);
+GDP_GCL_ASSERT_ISLOCKED(req->gcl);	//DEBUG
 
 	if (ep_dbg_test(Dbg, 10))
 	{
@@ -219,6 +226,7 @@ _gdp_invoke(gdp_req_t *req)
 		}
 		funlockfile(ep_dbg_getfile());
 	}
+GDP_GCL_ASSERT_ISLOCKED(req->gcl);	//DEBUG
 	return estat;
 }
 

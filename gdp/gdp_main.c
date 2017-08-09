@@ -317,6 +317,10 @@ find_req_in_channel_list(
 	if (req != NULL)
 	{
 		char ebuf[100];
+
+		// since GCL has to be locked before req, do it now
+		if (req->gcl != NULL)
+			_gdp_gcl_lock(req->gcl);
 		estat = _gdp_req_lock(req);
 		ep_dbg_cprintf(DbgProcResp, 44,
 				"find_req_in_channel_list: _gdp_req_lock => %s\n",
@@ -352,7 +356,12 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 			rpdu, _gdp_proto_cmd_name(cmd), gcl);
 	if (gcl == NULL)
 	{
+		char ebuf[200];
+
 		estat = find_req_in_channel_list(rpdu, chan, &req);
+		ep_dbg_cprintf(DbgProcResp, 20,
+				"    rpdu = %p req = %p stat = %s\n", rpdu, req,
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 
 		if (!EP_STAT_ISOK(estat) || req == NULL)
 		{
@@ -373,6 +382,10 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 		}
 
 		EP_ASSERT_ELSE(req->state != GDP_REQ_FREE, return);
+		if (req->gcl != NULL)
+		{
+			GDP_GCL_ASSERT_ISLOCKED(req->gcl);
+		}
 
 		// remove the request from the GCL list it is already on
 		// req is already locked by find_req_in_channel_list
@@ -383,7 +396,6 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 
 			// code below expects request to remain locked
 		}
-
 	}
 	else
 	{
@@ -399,6 +411,7 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 			ep_dbg_printf("... found ");
 			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 		}
+		EP_ASSERT(gcl == req->gcl);
 
 		// req is already locked by _gdp_req_find
 		if (req == NULL)
@@ -436,7 +449,11 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 	}
 
 	if (gcl != NULL)
-		GDP_GCL_ASSERT_ISLOCKED(gcl);
+	{
+		if (!EP_ASSERT(gcl == req->gcl))					//DEBUG
+			ep_dbg_printf("XXX gcl = %p, req->gcl = %p\n", gcl, req->gcl);	//DEBUG
+	}
+	GDP_GCL_ASSERT_ISLOCKED(req->gcl);
 
 	if (req->cpdu == NULL)
 	{
@@ -471,10 +488,9 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
-	// request is locked
-
-	if (gcl != NULL)
-		GDP_GCL_ASSERT_ISLOCKED(gcl);
+	// request is locked, GCL should be too
+	if (req->gcl != NULL)
+		GDP_GCL_ASSERT_ISLOCKED(req->gcl);
 
 	// mark this request as active (for subscriptions)
 	ep_time_now(&req->act_ts);
@@ -482,12 +498,9 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 	// do ack/nak specific processing
 	estat = _gdp_req_dispatch(req, cmd);
 
-	// we should now be done with the GCL
-	if (gcl != NULL)
-	{
-		GDP_GCL_ASSERT_ISLOCKED(gcl);
-		_gdp_gcl_decref(&gcl);
-	}
+	// dispatch should leave it locked
+	if (req->gcl != NULL)
+		GDP_GCL_ASSERT_ISLOCKED(req->gcl);
 
 	// figure out potential response code
 	// we compute even if unused so we can log server errors
@@ -552,6 +565,14 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 	}
 
 	// free up resources
+	if (req->gcl != NULL)
+	{
+		// use a shadow variables so req does not lose gcl
+		gdp_gcl_t *gcl = req->gcl;
+		GDP_GCL_ASSERT_ISLOCKED(gcl);
+		_gdp_gcl_decref(&gcl);
+	}
+
 	if (EP_UT_BITSET(GDP_REQ_CORE, req->flags) &&
 		!EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
 	{

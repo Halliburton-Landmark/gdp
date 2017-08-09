@@ -56,8 +56,7 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.gcl.mgmt", "GCL resource management");
 **
 ***********************************************************************/
 
-static EP_THR_MUTEX		GclFreeListMutex
-								EP_THR_MUTEX_INITIALIZER2(GDP_MUTEX_LORDER_LEAF);
+extern EP_THR_MUTEX		_GclCacheMutex;
 static LIST_HEAD(gcl_free_head, gdp_gcl)
 						GclFreeList = LIST_HEAD_INITIALIZER(GclFreeList);
 
@@ -82,13 +81,13 @@ _gdp_gcl_newhandle(gdp_name_t gcl_name, gdp_gcl_t **pgcl)
 	EP_STAT estat = EP_STAT_OK;
 	gdp_gcl_t *gcl = NULL;
 
-	ep_thr_mutex_lock(&GclFreeListMutex);
+	ep_thr_mutex_lock(&_GclCacheMutex);
 	if (!LIST_EMPTY(&GclFreeList))
 	{
 		gcl = LIST_FIRST(&GclFreeList);
 		LIST_REMOVE(gcl, ulist);
 	}
-	ep_thr_mutex_unlock(&GclFreeListMutex);
+	ep_thr_mutex_unlock(&_GclCacheMutex);
 
 	if (gcl == NULL)
 	{
@@ -180,9 +179,9 @@ _gdp_gcl_freehandle(gdp_gcl_t *gcl)
 
 	// drop this (now empty) GCL handle on the free list
 	gcl->flags = 0;
-	ep_thr_mutex_lock(&GclFreeListMutex);
+	ep_thr_mutex_lock(&_GclCacheMutex);
 	LIST_INSERT_HEAD(&GclFreeList, gcl, ulist);
-	ep_thr_mutex_unlock(&GclFreeListMutex);
+	ep_thr_mutex_unlock(&_GclCacheMutex);
 	NGclsAllocated--;
 }
 
@@ -265,9 +264,11 @@ _gdp_gcl_lock_trace(
 		const char *id)
 {
 	//XXX cheat: _ep_thr_mutex_lock is a libep-private interface
-	_ep_thr_mutex_lock(&gcl->mutex, file, line, id);
-	EP_ASSERT(!EP_UT_BITSET(GCLF_ISLOCKED, gcl->flags));
-	gcl->flags |= GCLF_ISLOCKED;
+	if (_ep_thr_mutex_lock(&gcl->mutex, file, line, id) == 0)
+	{
+		EP_ASSERT(!EP_UT_BITSET(GCLF_ISLOCKED, gcl->flags));
+		gcl->flags |= GCLF_ISLOCKED;
+	}
 }
 
 

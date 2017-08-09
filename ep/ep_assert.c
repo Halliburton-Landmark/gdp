@@ -102,7 +102,13 @@ ep_assert_printv(
 
 	// give the application a chance to print state
 	if (EpAssertInfo != NULL)
-		(*EpAssertInfo)();
+	{
+		// avoid assert loops when printing info
+		void (*saveinfo)(void) = EpAssertInfo;
+		EpAssertInfo = NULL;
+		(*saveinfo)();
+		EpAssertInfo = saveinfo;
+	}
 
 	funlockfile(stderr);
 

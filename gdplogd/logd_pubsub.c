@@ -34,10 +34,16 @@
 #include "logd_pubsub.h"
 
 #include <gdp/gdp_priv.h>
+#include <ep/ep.h>
 #include <ep/ep_dbg.h>
+#include <ep/ep_hash.h>
+
+#include <sys/queue.h>
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.pubsub",
 								"GDP Log Daemon pub/sub handling");
+
+extern EP_HASH	*_OpenGCLCache;		// associative cache
 
 
 /*
@@ -173,7 +179,6 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 void
 sub_end_subscription(gdp_req_t *req)
 {
-	gdp_gcl_t *gcl = req->gcl;
 
 	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex);
 	GDP_GCL_ASSERT_ISLOCKED(req->gcl);
@@ -185,9 +190,18 @@ sub_end_subscription(gdp_req_t *req)
 	if (EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
 		LIST_REMOVE(req, gcllist);
 	req->flags &= ~GDP_REQ_ON_GCL_LIST;
-//DEBUG:	req->gcl->flags |= GCLF_KEEPLOCKED;
-//DEBUG:	_gdp_gcl_decref(&gcl);
-//DEBUG:	req->gcl->flags &= ~GCLF_KEEPLOCKED;
+#if 0 //DEBUG
+	{
+		gdp_gcl_t *gcl = req->gcl;
+		if (EP_UT_BITSET(GCLF_KEEPLOCKED, gcl->flags))
+		{
+			ep_dbg_cprintf(Dbg, 1, "   *** WARNING: KEEPLOCKED set in sub_end_subscription ***\n");
+		}
+		gcl->flags |= GCLF_KEEPLOCKED;
+		_gdp_gcl_decref(&gcl);
+		gcl->flags &= ~GCLF_KEEPLOCKED;
+	}
+#endif //DEBUG
 
 	// send an "end of subscription" event
 	req->rpdu->cmd = GDP_ACK_DELETED;
@@ -263,14 +277,31 @@ sub_end_all_subscriptions(
 
 /*
 **  SUB_RECLAIM_RESOURCES --- remove any expired subscriptions
+**
+**		This is a bit tricky to get lock ordering correct.  The
+**		obvious implementation is to loop through the channel
+**		list, but when you try to lock a GCL or a request you
+**		have a lock ordering problem (the channel is quite low
+**		in the locking hierarchy).  Instead you run through
+**		the GCL hash table.
 */
 
-void
-sub_reclaim_resources(gdp_chan_t *chan)
+// helper (does most of the work)
+static void
+gcl_reclaim_subscriptions(size_t klen,
+		const void *key,
+		void *gcl_,
+		va_list av)
 {
+	int istat;
+	gdp_gcl_t *gcl = gcl_;
 	gdp_req_t *req;
 	gdp_req_t *nextreq;
 	EP_TIME_SPEC sub_timeout;
+
+	// just in case
+	if (gcl == NULL)
+		return;
 
 	{
 		EP_TIME_SPEC sub_delta;
@@ -283,16 +314,28 @@ sub_reclaim_resources(gdp_chan_t *chan)
 				"sub_reclaim_resources: timeout = %ld\n", timeout);
 	}
 
-	ep_thr_mutex_lock(&chan->mutex);
-	for (req = LIST_FIRST(&chan->reqs); req != NULL; req = nextreq)
+	// don't even try locked GCLs
+	// first check is to avoid extraneous errors
+	if (EP_UT_BITSET(GCLF_ISLOCKED, gcl->flags))
+		return;
+	istat = ep_thr_mutex_trylock(&gcl->mutex);
+	if (istat != 0)
 	{
-		int istat;
+		if (ep_dbg_test(Dbg, 21))
+		{
+			ep_dbg_printf("sub_reclaim_resources: gcl already locked:\n    ");
+			_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+		}
+		return;
+	}
+	gcl->flags |= GCLF_ISLOCKED;
 
-		// if this req is already locked it must be current
+	nextreq = LIST_FIRST(&gcl->reqs);
+	while ((req = nextreq) != NULL)
+	{
+		// now that GCL is locked, we lock the request
 		istat = ep_thr_mutex_trylock(&req->mutex);
-		nextreq = LIST_NEXT(req, chanlist);			//XXX race if istat != 0?
-		EP_ASSERT_ELSE(req != nextreq, break);
-		if (istat != 0)
+		if (istat != 0)		// checking on status of req lock attempt
 		{
 			// already locked
 			if (ep_dbg_test(Dbg, 21))
@@ -300,7 +343,16 @@ sub_reclaim_resources(gdp_chan_t *chan)
 				ep_dbg_printf("sub_reclaim_resources: req already locked:\n    ");
 				_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 			}
+			_gdp_gcl_unlock(req->gcl);
 			continue;
+		}
+
+		// get next request while locked and do sanity checks
+		nextreq = LIST_NEXT(req, gcllist);
+		if (!EP_ASSERT(req != nextreq) || !EP_ASSERT(req->gcl == gcl))
+		{
+			_gdp_gcl_unlock(req->gcl);
+			break;
 		}
 
 		if (ep_dbg_test(Dbg, 59))
@@ -324,12 +376,10 @@ sub_reclaim_resources(gdp_chan_t *chan)
 			}
 
 			// have to manually remove req from lists to avoid lock inversion
-			EP_ASSERT(req->gcl != NULL);
 			if (EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
 			{
-				_gdp_gcl_lock(req->gcl);
+				// gcl is already locked
 				LIST_REMOVE(req, gcllist);
-				_gdp_gcl_decref(&req->gcl);			// also unlocks GCL
 			}
 			if (EP_UT_BITSET(GDP_REQ_ON_CHAN_LIST, req->flags))
 			{
@@ -337,6 +387,7 @@ sub_reclaim_resources(gdp_chan_t *chan)
 			}
 			req->flags &= ~(GDP_REQ_ON_GCL_LIST | GDP_REQ_ON_CHAN_LIST);
 			_gdp_req_free(&req);
+			_gdp_gcl_decref(&gcl);
 		}
 		else if (ep_dbg_test(Dbg, 59))
 		{
@@ -344,6 +395,13 @@ sub_reclaim_resources(gdp_chan_t *chan)
 		}
 		if (req != NULL)
 			_gdp_req_unlock(req);
+		if (gcl != NULL)
+			_gdp_gcl_unlock(gcl);
 	}
-	ep_thr_mutex_unlock(&chan->mutex);
+}
+
+void
+sub_reclaim_resources(gdp_chan_t *chan)
+{
+	ep_hash_forall(_OpenGCLCache, gcl_reclaim_subscriptions);
 }

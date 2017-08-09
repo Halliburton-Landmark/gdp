@@ -80,7 +80,7 @@ prstat(EP_STAT estat, const gdp_gcl_t *gcl, const char *where)
 		dbglev = 39;
 	else if (EP_STAT_ISWARN(estat))
 		dbglev = 11;
-	if (gcl != NULL)
+	if (gcl == NULL)
 	{
 		ep_dbg_cprintf(Dbg, dbglev, "<<< %s: %s\n",
 				where, ep_stat_tostr(estat, ebuf, sizeof ebuf));

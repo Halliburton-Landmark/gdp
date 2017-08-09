@@ -365,8 +365,13 @@ cmd_open(gdp_req_t *req)
 	// should have no input data; ignore anything there
 	flush_input_data(req, "cmd_open");
 
+	// it should be safe to unlock the req here, since we should hold the
+	// only reference, and we need to get the lock ordering right
+	_gdp_req_unlock(req);
+
 	// see if we already know about this GCL
 	estat = get_open_handle(req, GDP_MODE_ANY);
+	_gdp_req_lock(req);
 	if (!EP_STAT_ISOK(estat))
 	{
 		estat = gdpd_gcl_error(req->cpdu->dst, "cmd_open: could not open GCL",
@@ -606,7 +611,7 @@ cmd_append(gdp_req_t *req)
 			req->gcl->pname, req->cpdu->datum->recno);
 
 	// validate sequence number and signature
-	ep_thr_mutex_lock(&req->cpdu->datum->mutex);
+	// only path to datum is via this req, so we don't have to lock it
 	if (req->cpdu->datum->recno != req->gcl->nrecs + 1)
 	{
 		bool random_order_ok = GdplogdForgive.allow_log_gaps &&
@@ -744,9 +749,6 @@ fail0:
 	if (req->cpdu->datum->sig != NULL)
 		gdp_buf_reset(req->cpdu->datum->sig);
 	req->cpdu->datum->siglen = 0;
-
-	// we're no longer using this handle
-	ep_thr_mutex_unlock(&req->cpdu->datum->mutex);
 
 	return estat;
 }

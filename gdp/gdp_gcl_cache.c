@@ -410,8 +410,14 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 							maxgcls);
 				break;
 			}
-			_gdp_gcl_lock(g1);
-			g2 = LIST_NEXT(g1, ulist);
+			g2 = LIST_NEXT(g1, ulist);		// do as early as possible
+			if (ep_thr_mutex_trylock(&g1->mutex) != 0)
+			{
+				// couldn't get the lock: previous g2 setting may be wrong
+				continue;
+			}
+			g1->flags |= GCLF_ISLOCKED;
+			g2 = LIST_NEXT(g1, ulist);		// get g2 again with the lock
 			if (g1->utime > mintime)
 			{
 				_gdp_gcl_unlock(g1);
