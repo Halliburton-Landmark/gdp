@@ -192,10 +192,6 @@ sub_end_subscription(gdp_req_t *req)
 		gdp_gcl_t *gcl = req->gcl;
 		LIST_REMOVE(req, gcllist);
 		req->flags &= ~GDP_REQ_ON_GCL_LIST;
-		if (EP_UT_BITSET(GCLF_KEEPLOCKED, gcl->flags))
-		{
-			ep_dbg_cprintf(Dbg, 1, "   *** WARNING: KEEPLOCKED set in sub_end_subscription ***\n");
-		}
 		EP_ASSERT(gcl->refcnt > 1);
 		_gdp_gcl_decref(&gcl, true);
 	}
@@ -388,8 +384,8 @@ gcl_reclaim_subscriptions(size_t klen,
 				LIST_REMOVE(req, chanlist);			// chan already locked
 			}
 			req->flags &= ~(GDP_REQ_ON_GCL_LIST | GDP_REQ_ON_CHAN_LIST);
+			_gdp_gcl_decref(&req->gcl, true);
 			_gdp_req_free(&req);
-			_gdp_gcl_decref(&gcl, false);
 		}
 		else if (ep_dbg_test(Dbg, 59))
 		{

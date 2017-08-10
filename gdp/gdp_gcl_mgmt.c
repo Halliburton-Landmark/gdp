@@ -422,7 +422,12 @@ _gdp_gcl_decref_trace(
 			gcl, gcl->refcnt);
 	if (gcl->refcnt == 0 && !EP_UT_BITSET(GCLF_DEFER_FREE, gcl->flags))
 		_gdp_gcl_freehandle(gcl);
-	else if (!keeplocked && !EP_UT_BITSET(GCLF_KEEPLOCKED, gcl->flags))
+	else if (!EP_UT_BITSET(GCLF_ISLOCKED, gcl->flags))
+	{
+		ep_dbg_cprintf(Dbg, 1,
+				"_gdp_gcl_decref(%p, %s) not locked at %s:%d\n",
+				gcl, id, file, line);
+	} else if (!keeplocked && !EP_UT_BITSET(GCLF_KEEPLOCKED, gcl->flags))
 		_gdp_gcl_unlock_trace(gcl, file, line, id);
 }
 
