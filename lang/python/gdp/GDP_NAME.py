@@ -91,7 +91,7 @@ class GDP_NAME:
         def __is_binary_string(s):
             textchars = bytearray({7,8,9,10,12,13,27} | \
                             set(range(0x20, 0x100)) - {0x7f})
-            return bool(s.translate(None, textchars))
+            return bool(str(s).translate(None, textchars))
 
 
         if len(name) == 32 and __is_binary_string(name)==True:
