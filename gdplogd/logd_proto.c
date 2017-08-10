@@ -853,7 +853,7 @@ post_subscribe(gdp_req_t *req)
 		{
 			IF_LIST_CHECK_OK(&req->gcl->reqs, req, gcllist, gdp_req_t)
 			{
-				_gdp_gcl_incref(req->gcl);		//DEBUG: is this appropriate?
+				_gdp_gcl_incref(req->gcl);
 				LIST_INSERT_HEAD(&req->gcl->reqs, req, gcllist);
 				req->flags |= GDP_REQ_ON_GCL_LIST;
 			}
