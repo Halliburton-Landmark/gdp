@@ -60,6 +60,8 @@
 #include "../gdplogd/logd_disklog.c"
 #undef Dbg
 
+#include <ep/ep_app.h>
+
 #include <signal.h>
 #include <sysexits.h>
 
@@ -239,6 +241,13 @@ recseq_init(struct ctx *ctx)
 			ep_app_message(estat, "Cannot open sequence sequence db cursor");
 	}
 	return estat;
+}
+
+void
+recseq_cleanup(struct ctx *ctx)
+{
+	bdb_close(ctx->recseqdb);
+	ctx->recseqdb = NULL;
 }
 
 
@@ -680,6 +689,7 @@ find_segs(gdp_gcl_t *gcl)
 		if (phys->nsegments <= segno)
 			phys->nsegments = segno + 1;
 	}
+	closedir(dir);
 
 	EP_STAT_CHECK(estat, return estat);
 
@@ -879,6 +889,9 @@ fail1:
 
 	if (EP_STAT_SEVERITY(estat) > EP_STAT_SEVERITY(return_stat))
 		return_stat = estat;
+
+	if (ep_dbg_test(Dbg, 9))
+		ep_app_dumpfds(stdout);
 	return return_stat;
 }
 
@@ -1130,6 +1143,7 @@ do_check(gdp_gcl_t *gcl, struct ctx *ctx)
 	recseq_process(ctx);
 
 fail0:
+	recseq_cleanup(ctx);
 	if (!Flags.silent)
 	{
 		const char *fgcolor;
