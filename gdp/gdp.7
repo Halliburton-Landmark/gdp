@@ -63,11 +63,11 @@ the process will abort,
 even if the assertion has a recovery action.
 If zero, non-fatal assertions will never abort.
 If one, all assertions are fatal.
-Defaults to 0.
+Defaults to 100.
 .
 .It libep.assert.resetinterval
-The assertion count is set to zero after this time interval (in seconds).
-Defaults to 60 (one minute).
+The assertion count is set to zero after this time interval (in milliseconds).
+Defaults to 2000 (two seconds).
 .
 .It libep.crypto.dev
 If set, try to use the hardware crypto acceleration provided by

@@ -1723,11 +1723,11 @@ EP_STAT                 ep_crypto_cipher_final(
     parameters: <parameter>libep.assert.maxfailures</parameter> specifies the
     number of assertion failures that will be tolerated before the process
     aborts; however, every <parameter>libep.assert.resetinterval</parameter>
-    seconds the failure count is reset. For example, if
+    milliseconds the failure count is reset. For example, if
     <parameter>libep.assert.maxfailures</parameter> is one, all assertion
-    failures are fatal. It defaults to zero (no assertions are fatal);
-    <parameter>libep.assert.resetinterval</parameter> defines to 60 (one
-    minute).</para>
+    failures are fatal; if zero, none are. It defaults to 100.
+    <parameter>libep.assert.resetinterval</parameter> defaults to 2000 (two
+    seconds).</para>
 
     <programlisting>    #include &lt;ep/ep_assert.h&gt;
 

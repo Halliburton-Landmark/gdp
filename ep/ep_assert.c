@@ -81,6 +81,8 @@ ep_assert_breakpoint(void)
 **  EP_ASSERT_PRINT[V] -- print assertion failure message (but do not abort)
 */
 
+#define MILLISECONDS	* INT64_C(1000000)
+
 void
 ep_assert_printv(
 	const char *file,
@@ -130,8 +132,8 @@ ep_assert_printv(
 		// reset assertion count every so often
 		EP_TIME_SPEC delta, target;
 		ep_time_from_nsec(
-			-ep_adm_getlongparam("libep.assert.resetinterval", 60)
-					SECONDS,
+			-ep_adm_getlongparam("libep.assert.resetinterval",
+						2000) MILLISECONDS,
 			&delta);
 		ep_time_deltanow(&delta, &target);
 		if (ep_time_before(&base_time, &target))
@@ -142,7 +144,7 @@ ep_assert_printv(
 	}
 
 	// if too many recent failures, force an abort
-	int max_fails = ep_adm_getintparam("libep.assert.maxfailures", 0);
+	int max_fails = ep_adm_getintparam("libep.assert.maxfailures", 100);
 	if (max_fails > 0 && ++n_assertions >= max_fails)
 	{
 		// make things abort now
