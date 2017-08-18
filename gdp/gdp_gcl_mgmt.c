@@ -413,9 +413,10 @@ _gdp_gcl_decref_trace(
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
 	(void) ep_thr_mutex_assert_islocked(&gcl->mutex, id, file, line);
 
-	EP_ASSERT(gcl->refcnt > 0);
 	if (gcl->refcnt > 0)
 		gcl->refcnt--;
+	else
+		ep_assert_print(file, line, "gcl->refcnt = %d (%s)", gcl->refcnt, id);
 	*gclp = NULL;
 
 	ep_dbg_cprintf(Dbg, 51, "_gdp_gcl_decref(%p): %d\n",
