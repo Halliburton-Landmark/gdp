@@ -57,6 +57,8 @@ struct event_base	*GdpIoEventBase;	// the base for GDP I/O events
 gdp_name_t			_GdpMyRoutingName;	// source name for PDUs
 bool				_GdpLibInitialized;	// are we initialized?
 gdp_chan_t			*_GdpChannel;		// our primary app-level protocol port
+static bool			_GdpRunCmdInThread = true;		// run commands in threads
+static bool			_GdpRunRespInThread = false;	// run responses in threads
 
 
 /*
@@ -338,11 +340,15 @@ find_req_in_channel_list(
 **		PDU off the wire and req->cpdu should be the original command
 **		PDU that prompted this response.  We save the passed rpdu
 **		into req->rpdu for processing in _gdp_req_dispatch.
+**
+**		XXX This is not tested for running in a thread.
 */
 
 static void
-gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
+gdp_pdu_proc_resp(void *rpdu_)
 {
+	gdp_pdu_t *rpdu = rpdu_;
+	gdp_chan_t *chan = _GdpChannel;
 	int cmd = rpdu->cmd;
 	EP_STAT estat = EP_STAT_OK;
 	gdp_gcl_t *gcl;
@@ -596,9 +602,19 @@ _gdp_pdu_process(gdp_pdu_t *pdu, gdp_chan_t *chan)
 {
 	// cmd: dispatch in thread; ack: dispatch directly
 	if (GDP_CMD_IS_COMMAND(pdu->cmd))
-		ep_thr_pool_run(&gdp_pdu_proc_cmd, pdu);
+	{
+		if (_GdpRunCmdInThread)
+			ep_thr_pool_run(&gdp_pdu_proc_cmd, pdu);
+		else
+			gdp_pdu_proc_cmd(pdu);
+	}
 	else
-		gdp_pdu_proc_resp(pdu, chan);
+	{
+		if (_GdpRunRespInThread)
+			ep_thr_pool_run(&gdp_pdu_proc_resp, pdu);
+		else
+			gdp_pdu_proc_resp(pdu);
+	}
 }
 
 
@@ -923,6 +939,12 @@ gdp_lib_init(const char *myname)
 	// [DEPRECATED: use libep.assert.allabort]
 	EpAssertAllAbort = ep_adm_getboolparam("swarm.gdp.debug.assert.allabort",
 									EpAssertAllAbort);
+
+	// check to see if commands/responses should be run in threads
+	_GdpRunCmdInThread = ep_adm_getboolparam("swarm.gdp.command.runinthread",
+									true);
+	_GdpRunRespInThread = ep_adm_getboolparam("swarm.gdp.response.runinthread",
+									false);
 
 	// register status strings
 	_gdp_stat_init();
