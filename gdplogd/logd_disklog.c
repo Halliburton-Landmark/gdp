@@ -179,6 +179,40 @@ ep_stat_from_dbstat(int dbstat)
 
 
 static EP_STAT
+bdb_init(void)
+{
+	EP_STAT estat = EP_STAT_OK;
+
+#if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
+	int dbstat;
+	const char *phase;
+
+	if (DbEnv == NULL)
+	{
+		phase = "db_env_create";
+		if ((dbstat = db_env_create(&DbEnv, 0)) != 0)
+			goto fail0;
+		phase = "dbenv->open";
+		uint32_t dbenv_flags = DB_CREATE | DB_INIT_MPOOL | DB_PRIVATE |
+						DB_THREAD | DB_RECOVER;
+		if ((dbstat = DbEnv->open(DbEnv, NULL, dbenv_flags, 0)) != 0)
+			goto fail0;
+	}
+
+	if (false)
+	{
+fail0:
+		estat = ep_stat_from_dbstat(dbstat);
+		ep_dbg_cprintf(Dbg, 1, "bdb_init: error during %s: %s\n",
+					phase, db_strerror(dbstat));
+	}
+#endif
+	return estat;
+}
+
+
+
+static EP_STAT
 bdb_open(const char *filename,
 		int dbflags,
 		int filemode,
@@ -205,17 +239,8 @@ bdb_open(const char *filename,
 	int dbstat;
 	const char *phase;
 
-	if (DbEnv == NULL)
-	{
-		phase = "db_env_create";
-		if ((dbstat = db_env_create(&DbEnv, 0)) != 0)
-			goto fail0;
-		phase = "dbenv->open";
-		uint32_t dbenv_flags = DB_CREATE | DB_INIT_MPOOL | DB_PRIVATE |
-						DB_THREAD;
-		if ((dbstat = DbEnv->open(DbEnv, NULL, dbenv_flags, 0)) != 0)
-			goto fail0;
-	}
+	if (!EP_ASSERT(DbEnv != NULL))
+		return EP_STAT_NOT_INITIALIZED;
 
 	phase = "db_create";
 	if ((dbstat = db_create(&db, DbEnv, 0)) != 0)
@@ -424,6 +449,8 @@ bdb_put(DB *db,
 
 /*
 **  Initialize the physical I/O module
+**
+**		Note this is always called before threads have been spawned.
 */
 
 static EP_STAT
@@ -446,6 +473,9 @@ disk_init()
 
 	if (ep_adm_getboolparam("swarm.gdplogd.disklog.log-posix-errors", false))
 		DefaultLogFlags |= LOG_POSIX_ERRORS;
+
+	// initialize berkeley DB (must be done while single threaded)
+	bdb_init();
 
 	ep_dbg_cprintf(Dbg, 8, "disk_init: log dir = %s, mode = 0%o\n",
 			GCLDir, GCLfilemode);
