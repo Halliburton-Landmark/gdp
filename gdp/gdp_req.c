@@ -90,10 +90,11 @@ statestr(const gdp_req_t *req)
 **
 **	Parameters:
 **		cmd --- the command to be issued
-**		gcl --- the associated GCL handle, if any.  Should be unlocked
+**		gcl --- the associated GCL handle, if any.  Must be locked
 **				on entry.
 **		chan --- the channel associated with the request
-**		pdu --- the existing PDU; if none, one will be allocated
+**		pdu --- the existing PDU; if none, one will be allocated.
+**				This is only used by gdp_pdu_proc_cmd.
 **		flags --- modifier flags
 **		reqp --- a pointer to the output area
 **
@@ -115,11 +116,6 @@ _gdp_req_new(int cmd,
 {
 	EP_STAT estat = EP_STAT_OK;
 	gdp_req_t *req;
-	bool newpdu = pdu == NULL;
-
-#if ALWAYS_ALLOC_NEW_RID			//DEBUG
-	flags |= GDP_REQ_ALLOC_RID;		//DEBUG
-#endif								//DEBUG
 
 	// if the caller wants asynchronous results, tweak flags accordingly
 	if (EP_UT_BITSET(GDP_REQ_ASYNCIO, flags))
@@ -129,7 +125,7 @@ _gdp_req_new(int cmd,
 	if (gcl != NULL && !GDP_GCL_ASSERT_ISLOCKED(gcl))
 			return EP_STAT_ASSERT_ABORT;
 
-	// simplify the simple case
+	// rationalize parameters
 	if (chan == NULL)
 		chan = _GdpChannel;
 
@@ -149,9 +145,12 @@ _gdp_req_new(int cmd,
 			!EP_ASSERT(!EP_UT_BITSET(GDP_REQ_ON_CHAN_LIST, req->flags)))
 		{
 			// just abandon the bogus request on free list
+			// (we'll create a new one below)
 			req = NULL;
 		}
 	}
+
+	// if no free reqs available, create and initialize a new one
 	if (req == NULL)
 	{
 		// nothing on free list; allocate another
@@ -162,50 +161,25 @@ _gdp_req_new(int cmd,
 		STAILQ_INIT(&req->events);
 	}
 
-	// make it active so that _gdp_req_lock doesn't object
-	req->state = GDP_REQ_ACTIVE;
+	// initialize request
+	req->state = GDP_REQ_ACTIVE;		// must be before _gdp_req_lock
 	VALGRIND_HG_CLEAN_MEMORY(req, sizeof *req);
 	(void) _gdp_req_lock(req);
-
-	// initialize request
-	if (pdu == NULL)
-	{
-		pdu = _gdp_pdu_new();
-		ep_dbg_cprintf(Dbg, 11, "_gdp_req_new: allocated new pdu @ %p\n",
-					pdu);
-	}
-	if (GDP_CMD_IS_COMMAND(cmd))
-	{
-		req->cpdu = pdu;
-	}
-	else
-	{
-		req->rpdu = pdu;
-	}
-	req->gcl = gcl;
 	req->stat = EP_STAT_OK;
 	req->flags = flags;
 	req->chan = chan;
+	req->gcl = gcl;
+	if (gcl != NULL)
+		_gdp_gcl_incref(gcl);		// request has a new reference
 
-	// keep track of all outstanding requests on a channel
-	if (chan != NULL)
+	// if we're not passing in a PDU, create and initialize the new one
+	if (pdu == NULL)
 	{
-		ep_thr_mutex_lock(&chan->mutex);
-		IF_LIST_CHECK_OK(&chan->reqs, req, chanlist, gdp_req_t)
-		{
-			LIST_INSERT_HEAD(&chan->reqs, req, chanlist);
-			req->flags |= GDP_REQ_ON_CHAN_LIST;
-		}
-		else
-		{
-			estat = EP_STAT_ASSERT_ABORT;
-		}
-		ep_thr_mutex_unlock(&chan->mutex);
-	}
-
-	// if we're not passing in a PDU, initialize the new one
-	if (newpdu)
-	{
+		// This is the common case
+		// gdp_pdu_proc_cmd is the only case where PDU already exists
+		pdu = _gdp_pdu_new();
+		ep_dbg_cprintf(Dbg, 11, "_gdp_req_new: allocated new pdu @ %p\n",
+					pdu);
 		pdu->cmd = cmd;
 		if (gcl != NULL)
 		{
@@ -223,6 +197,27 @@ _gdp_req_new(int cmd,
 			// allocate a new unique request id
 			pdu->rid = _gdp_rid_new(gcl, chan);
 		}
+	}
+	if (GDP_CMD_IS_COMMAND(cmd))
+		req->cpdu = pdu;
+	else
+		req->rpdu = pdu;
+
+	// keep track of all outstanding requests on a channel
+	//DEBUG: shouldn't this be in _gdp_req_send???
+	if (chan != NULL)
+	{
+		ep_thr_mutex_lock(&chan->mutex);
+		IF_LIST_CHECK_OK(&chan->reqs, req, chanlist, gdp_req_t)
+		{
+			LIST_INSERT_HEAD(&chan->reqs, req, chanlist);
+			req->flags |= GDP_REQ_ON_CHAN_LIST;
+		}
+		else
+		{
+			estat = EP_STAT_ASSERT_ABORT;
+		}
+		ep_thr_mutex_unlock(&chan->mutex);
 	}
 
 	// success
@@ -263,6 +258,8 @@ _gdp_req_free(gdp_req_t **reqp)
 		// req was freed after a reference was taken
 		return;
 	}
+	if (req->gcl != NULL)
+		EP_ASSERT(req->gcl->refcnt > 0);
 
 	// remove the request from the channel subscription list
 	if (EP_UT_BITSET(GDP_REQ_ON_CHAN_LIST, req->flags))
@@ -296,7 +293,8 @@ _gdp_req_free(gdp_req_t **reqp)
 		_gdp_pdu_free(req->cpdu);
 	req->rpdu = req->cpdu = NULL;
 
-	req->gcl = NULL;
+	if (req->gcl != NULL)
+		_gdp_gcl_decref(&req->gcl, true);
 	req->state = GDP_REQ_FREE;
 	req->flags = 0;
 	req->md = NULL;
@@ -439,8 +437,8 @@ _gdp_req_send(gdp_req_t *req)
 
 		// register this handle so we can process the results
 		//		(it's likely that it's already in the cache)
-		ep_dbg_cprintf(Dbg, 49, "_gdp_req_send(%p) adding to cache\n", gcl);
-		_gdp_gcl_cache_add(gcl, 0);
+//DEBUG:		ep_dbg_cprintf(Dbg, 49, "_gdp_req_send(%p) adding to cache\n", gcl);
+//DEBUG:		_gdp_gcl_cache_add(gcl, 0);
 	}
 
 	// write the message out

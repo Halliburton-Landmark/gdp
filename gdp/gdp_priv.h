@@ -218,6 +218,7 @@ struct gdp_gcl
 #define GCLF_INUSE			0x0008		// handle is allocated
 #define GCLF_DEFER_FREE		0x0010		// defer actual free until reclaim
 #define GCLF_KEEPLOCKED		0x0020		// don't unlock in _gdp_gcl_decref
+#define GCLF_PENDING		0x0040		// not yet fully open
 
 #define GDP_GCL_ISGOOD(gcl)												\
 				((gcl) != NULL &&										\
@@ -259,20 +260,30 @@ void			_gdp_gcl_cache_dump(		// print cache (for debugging)
 						int plev,
 						FILE *fp);
 
-gdp_gcl_t		*_gdp_gcl_cache_get(		// get entry from cache
+typedef EP_STAT	gcl_open_func(
+						gdp_gcl_t *gcl,
+						void *open_info);
+
+EP_STAT			_gdp_gcl_cache_get(		// get entry from cache
 						gdp_name_t gcl_name,
-						gdp_iomode_t mode);
+						gdp_iomode_t mode,
+						uint32_t flags,
+						gdp_gcl_t **pgcl);
+
+#define GGCF_NOCREATE		0			// dummy
+#define GGCF_CREATE			0x00000001	// create cache entry if non existent
+#define GGCF_GET_PENDING	0x00000002	// return "pending" entries
 
 void			_gdp_gcl_cache_add(			// add entry to cache
-						gdp_gcl_t *gcl,
-						gdp_iomode_t mode);
+						gdp_gcl_t *gcl);
 
 void			_gdp_gcl_cache_changename(	// update the name of a GCL
 						gdp_gcl_t *gcl,
 						gdp_name_t newname);
 
 void			_gdp_gcl_cache_drop(		// drop entry from cache
-						gdp_gcl_t *gcl);
+						gdp_gcl_t *gcl,			// GCL to drop
+						bool cleanup);			// set if doing cache cleanup
 
 void			_gdp_gcl_cache_reclaim(		// flush old entries
 						time_t maxage);
@@ -326,7 +337,7 @@ EP_STAT			_gdp_gcl_newhandle(			// create new in-mem handle
 						gdp_gcl_t **gclhp);
 
 void			_gdp_gcl_freehandle(		// free in-memory handle
-						gdp_gcl_t *gcl);
+						gdp_gcl_t *gcl);		// GCL to free
 
 EP_STAT			_gdp_gcl_newname(			// create new name based on metadata
 						gdp_gcl_t *gcl);
@@ -348,7 +359,7 @@ EP_STAT			_gdp_gcl_create(			// create a new GCL
 EP_STAT			_gdp_gcl_open(				// open a GCL
 						gdp_gcl_t *gcl,
 						int cmd,
-						gdp_gcl_open_info_t *info,
+						gdp_gcl_open_info_t *open_info,
 						gdp_chan_t *chan,
 						uint32_t reqflags);
 
@@ -722,10 +733,10 @@ EP_STAT			_gdp_evloop_init(void);		// start event loop
 **		Lower numbered locks should be acquired before higher numbered locks.
 */
 
-#define GDP_MUTEX_LORDER_GCL		4
+#define GDP_MUTEX_LORDER_GCLCACHE	4
+#define GDP_MUTEX_LORDER_GCL		6
 #define GDP_MUTEX_LORDER_REQ		8
 #define GDP_MUTEX_LORDER_CHAN		12
-#define GDP_MUTEX_LORDER_GCLCACHE	15
 #define GDP_MUTEX_LORDER_DATUM		18
 #define GDP_MUTEX_LORDER_LEAF		31	// freelists, etc.
 

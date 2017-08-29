@@ -195,7 +195,7 @@ EP_STAT
 cmd_ping(gdp_req_t *req)
 {
 	gdp_gcl_t *gcl;
-	EP_STAT estat = EP_STAT_OK;
+	EP_STAT estat;
 
 	req->rpdu->cmd = GDP_ACK_SUCCESS;
 	flush_input_data(req, "cmd_ping");
@@ -203,8 +203,9 @@ cmd_ping(gdp_req_t *req)
 	if (GDP_NAME_SAME(req->cpdu->dst, _GdpMyRoutingName))
 		return EP_STAT_OK;
 
-	gcl = _gdp_gcl_cache_get(req->rpdu->dst, GDP_MODE_RO);
-	if (gcl != NULL)
+	estat = _gdp_gcl_cache_get(req->rpdu->dst, GDP_MODE_RO,
+						GGCF_NOCREATE, &gcl);
+	if (EP_STAT_ISOK(estat))
 	{
 		// We know about the GCL.  How about the subscription?
 		gdp_req_t *sub;
@@ -290,6 +291,7 @@ cmd_create(gdp_req_t *req)
 	// get the memory space for the GCL itself
 	estat = gcl_alloc(gclname, GDP_MODE_AO, &gcl);
 	EP_STAT_CHECK(estat, goto fail0);
+
 	_gdp_gcl_lock(gcl);
 	req->gcl = gcl;			// for debugging
 
@@ -311,18 +313,16 @@ cmd_create(gdp_req_t *req)
 		goto fail0;
 	}
 
+	// cache the open GCL Handle for possible future use
+	EP_ASSERT(gdp_name_is_valid(gcl->name));
+	gcl->flags |= GCLF_DEFER_FREE;
+	_gdp_gcl_cache_add(gcl);
+
 	// advertise this new GCL
 	logd_advertise_one(gcl->name, GDP_CMD_ADVERTISE);
 
-	// cache the open GCL Handle for possible future use
-	EP_ASSERT(gdp_name_is_valid(gcl->name));
-	_gdp_gcl_cache_add(gcl, gcl->iomode);
-
 	// pass any creation info back to the caller
 	// (none at this point)
-
-	// leave this in the cache
-	gcl->flags |= GCLF_DEFER_FREE;
 
 fail0:
 	ep_thr_mutex_unlock(&req->cpdu->datum->mutex);
@@ -887,7 +887,6 @@ cmd_subscribe(gdp_req_t *req)
 	EP_STAT estat;
 	EP_TIME_SPEC timeout;
 	gdp_gcl_t *gcl;
-	bool new_subscription = true;
 
 	if (req->gcl != NULL)
 		GDP_GCL_ASSERT_ISLOCKED(req->gcl);
@@ -972,7 +971,6 @@ cmd_subscribe(gdp_req_t *req)
 			r1->flags &= ~GDP_REQ_ON_GCL_LIST;
 			_gdp_req_lock(r1);
 			_gdp_req_free(&r1);
-			new_subscription = false;
 		}
 	}
 
@@ -1004,8 +1002,6 @@ cmd_subscribe(gdp_req_t *req)
 			IF_LIST_CHECK_OK(&gcl->reqs, req, gcllist, gdp_req_t)
 			{
 				LIST_INSERT_HEAD(&gcl->reqs, req, gcllist);
-				if (new_subscription)
-					_gdp_gcl_incref(gcl);
 				req->flags |= GDP_REQ_ON_GCL_LIST;
 			}
 			else

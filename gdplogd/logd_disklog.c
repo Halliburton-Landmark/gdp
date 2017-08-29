@@ -194,7 +194,7 @@ bdb_init(void)
 			goto fail0;
 		phase = "dbenv->open";
 		uint32_t dbenv_flags = DB_CREATE | DB_INIT_MPOOL | DB_PRIVATE |
-						DB_THREAD | DB_RECOVER;
+						DB_THREAD;
 		if ((dbstat = DbEnv->open(DbEnv, NULL, dbenv_flags, 0)) != 0)
 			goto fail0;
 	}
@@ -475,7 +475,7 @@ disk_init()
 		DefaultLogFlags |= LOG_POSIX_ERRORS;
 
 	// initialize berkeley DB (must be done while single threaded)
-	bdb_init();
+	estat = bdb_init();
 
 	ep_dbg_cprintf(Dbg, 8, "disk_init: log dir = %s, mode = 0%o\n",
 			GCLDir, GCLfilemode);

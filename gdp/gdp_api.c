@@ -402,8 +402,8 @@ fail0:
 
 EP_STAT
 gdp_gcl_open(gdp_name_t name,
-			gdp_iomode_t mode,
-			gdp_gcl_open_info_t *info,
+			gdp_iomode_t iomode,
+			gdp_gcl_open_info_t *open_info,
 			gdp_gcl_t **pgcl)
 {
 	EP_STAT estat;
@@ -419,16 +419,16 @@ gdp_gcl_open(gdp_name_t name,
 	estat = GDP_CHECK_INITIALIZED;		// make sure gdp_init is done
 	EP_STAT_CHECK(estat, return estat);
 
-	if (mode == GDP_MODE_RO)
+	if (iomode == GDP_MODE_RO)
 		cmd = GDP_CMD_OPEN_RO;
-	else if (mode == GDP_MODE_AO)
+	else if (iomode == GDP_MODE_AO)
 		cmd = GDP_CMD_OPEN_AO;
-	else if (mode == GDP_MODE_RA)
+	else if (iomode == GDP_MODE_RA)
 		cmd = GDP_CMD_OPEN_RA;
 	else
 	{
 		// illegal I/O mode
-		ep_app_error("gdp_gcl_open: illegal mode %d", mode);
+		ep_app_error("gdp_gcl_open: illegal mode %d", iomode);
 		return GDP_STAT_BAD_IOMODE;
 	}
 
@@ -443,43 +443,30 @@ gdp_gcl_open(gdp_name_t name,
 	ep_thr_mutex_lock(&OpenMutex);
 
 	// see if we already have this open
-	gcl = _gdp_gcl_cache_get(name, mode);
-	if (gcl != NULL)
-	{
-		// reference count has been bumped in _gdp_gcl_cache_get
-		ep_dbg_cprintf(Dbg, 10, "gdp_gcl_open(%s): using existing GCL @ %p\n",
-				gcl->pname, gcl);
-		gcl->iomode |= mode;
-		estat = EP_STAT_OK;
-	}
-	else
-	{
-		// it's not there yet, so create a new one
-		estat = _gdp_gcl_newhandle(name, &gcl);
-		EP_STAT_CHECK(estat, goto fail0);
+	estat = _gdp_gcl_cache_get(name, iomode, GGCF_CREATE, &gcl);
+	EP_STAT_CHECK(estat, goto fail0);
+	EP_ASSERT(gcl != NULL);
+	GDP_GCL_ASSERT_ISLOCKED(gcl);
 
-		_gdp_gcl_lock(gcl);
-		gcl->iomode = mode;
-		estat = _gdp_gcl_open(gcl, cmd, info, _GdpChannel, GDP_REQ_ALLOC_RID);
-		GDP_GCL_ASSERT_ISLOCKED(gcl);
-	}
-	if (EP_STAT_ISOK(estat))
+	// if open is partially complete, finish the job
+	if (EP_UT_BITSET(GCLF_PENDING, gcl->flags))
 	{
-		if (info != NULL && info->keep_in_cache)
-		{
-			gcl->flags |= GCLF_DEFER_FREE;
-			_gdp_reclaim_resources_init(NULL);
-		}
-		*pgcl = gcl;
+		estat = _gdp_gcl_open(gcl, cmd, open_info, _GdpChannel, 0);
+		EP_STAT_CHECK(estat, goto fail0);
 	}
+
+	if (open_info != NULL && open_info->keep_in_cache)
+	{
+		gcl->flags |= GCLF_DEFER_FREE;
+		_gdp_reclaim_resources_init(NULL);
+	}
+	gcl->flags &= ~GCLF_PENDING;
+	_gdp_gcl_unlock(gcl);
+	*pgcl = gcl;
 
 fail0:
 	prstat(estat, gcl, "gdp_gcl_open");
-	if (gcl == NULL)
-		;				// do nothing
-	else if (EP_STAT_ISOK(estat))
-		_gdp_gcl_unlock(gcl);
-	else
+	if (gcl != NULL && !EP_STAT_ISOK(estat))
 		_gdp_gcl_freehandle(gcl);
 	ep_thr_mutex_unlock(&OpenMutex);
 	return estat;

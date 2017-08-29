@@ -110,10 +110,11 @@ _gdp_gcl_create(gdp_name_t gclname,
 	// add the metadata to the output stream
 	_gdp_gclmd_serialize(gmd, req->cpdu->datum->dbuf);
 
+	// send command and wait for results
 	estat = _gdp_invoke(req);
 	EP_STAT_CHECK(estat, goto fail1);
 
-	// success --- change the GCL name to the true name
+	// change the GCL name to the true name so it will match up with response
 	_gdp_gcl_cache_changename(gcl, gclname);
 
 	// free resources and return results
@@ -145,7 +146,7 @@ fail1:
 EP_STAT
 _gdp_gcl_open(gdp_gcl_t *gcl,
 			int cmd,
-			gdp_gcl_open_info_t *info,
+			gdp_gcl_open_info_t *open_info,
 			gdp_chan_t *chan,
 			uint32_t reqflags)
 {
@@ -164,6 +165,7 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 
 	// send the request across to the log daemon
 	errno = 0;				// avoid spurious messages
+	reqflags |= GDP_REQ_ALLOC_RID;			// always use a new request id
 	reqflags |= GDP_REQ_ROUTEFAIL;			// don't retry on router errors
 	estat = _gdp_req_new(cmd, gcl, chan, NULL, reqflags, &req);
 	GDP_GCL_ASSERT_ISLOCKED(gcl);					//DEBUG
@@ -196,13 +198,13 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 //	pktype = pkbuf[1];
 
 	// get the secret key if needed
-	if (info != NULL)
+	if (open_info != NULL)
 	{
-		secretkey = info->signkey;
-		if (secretkey == NULL && info->signkey_cb != NULL)
+		secretkey = open_info->signkey;
+		if (secretkey == NULL && open_info->signkey_cb != NULL)
 		{
-			estat = (*info->signkey_cb)(gcl->name,
-							info->signkey_udata, &secretkey);
+			estat = (*open_info->signkey_cb)(gcl->name,
+							open_info->signkey_udata, &secretkey);
 			EP_STAT_CHECK(estat, return estat);
 			my_secretkey = true;				// we must deallocate
 		}

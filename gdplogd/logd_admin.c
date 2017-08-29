@@ -39,6 +39,7 @@
 #include <gdp/gdp.h>
 #include <gdp/gdp_priv.h>
 
+#include <ep/ep_dbg.h>
 #include <ep/ep_xlate.h>
 
 #include <stdarg.h>
@@ -47,6 +48,8 @@
 
 #include <sys/errno.h>
 #include <sys/stat.h>
+
+static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.admin", "GDP administrative logging");
 
 /*
 **	ADMIN_POST --- post statistics for system visualization
@@ -61,6 +64,7 @@ static FILE			*AdminStatsFp;
 static uint32_t		AdminRunMask = 0xffffffff;
 static char			*AdminPrefix = "";
 static bool			AdminInitialized = false;
+static EP_THR_MUTEX	AdminProbeMutex		EP_THR_MUTEX_INITIALIZER;
 
 // a prefix to indicate that this is an admin message (stdout & stderr only)
 #define INDICATOR		">#<"
@@ -295,10 +299,19 @@ post_one_log(gdp_name_t gdpname, void *ctx)
 {
 	gdp_gcl_t *gcl;
 	gdp_pname_t gdppname;
+	EP_STAT estat;
 
 	gdp_printable_name(gdpname, gdppname);
 
-	gcl = _gdp_gcl_cache_get(gdpname, _GDP_MODE_PEEK);
+	estat = _gdp_gcl_cache_get(gdpname, _GDP_MODE_PEEK, GGCF_NOCREATE, &gcl);
+	if (!EP_STAT_ISOK(estat))
+	{
+		char ebuf[100];
+
+		ep_dbg_cprintf(Dbg, 1, "post_one_log: _gdp_gcl_cache_get: %s\n",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		return;
+	}
 	if (gcl != NULL)
 	{
 		if (gcl->x->physimpl->getstats != NULL)
@@ -340,7 +353,13 @@ post_one_log(gdp_name_t gdpname, void *ctx)
 static void
 admin_probe_thread(void *ctx)
 {
+	if (ep_thr_mutex_trylock(&AdminProbeMutex) != 0)
+	{
+		ep_dbg_cprintf(Dbg, 7, "admin_probe_thread: locked\n");
+		return;
+	}
 	GdpDiskImpl.foreach(post_one_log, ctx);
+	ep_thr_mutex_unlock(&AdminProbeMutex);
 }
 
 void

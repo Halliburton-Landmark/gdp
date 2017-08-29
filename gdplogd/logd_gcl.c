@@ -76,40 +76,6 @@ fail0:
 
 
 /*
-**  GCL_OPEN --- open an existing GCL
-**
-**		Returns the GCL locked.
-*/
-
-EP_STAT
-gcl_open(gdp_name_t gcl_name, gdp_iomode_t iomode, gdp_gcl_t **pgcl)
-{
-	EP_STAT estat;
-	gdp_gcl_t *gcl;
-
-	estat = gcl_alloc(gcl_name, iomode, &gcl);
-	EP_STAT_CHECK(estat, goto fail0);
-
-	// so far, so good...  do the physical open
-	_gdp_gcl_lock(gcl);
-	estat = gcl->x->physimpl->open(gcl);
-	EP_STAT_CHECK(estat, goto fail1);
-
-	// success!
-	*pgcl = gcl;
-	return estat;
-
-fail1:
-	_gdp_gcl_decref(&gcl, false);
-fail0:
-	// if this isn't a "not found" error, mark it as an internal error
-	if (!EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOTFOUND))
-		estat = GDP_STAT_NAK_INTERNAL;
-	return estat;
-}
-
-
-/*
 **  GCL_CLOSE --- close a GDP version of a GCL handle
 **
 **		Called from _gdp_gcl_freehandle, generally when the reference
@@ -144,16 +110,54 @@ gcl_close(gdp_gcl_t *gcl)
 **		incremented.
 */
 
+static EP_STAT
+do_physical_open(gdp_gcl_t *gcl, void *open_info_)
+{
+	EP_STAT estat;
+
+	if (ep_dbg_test(Dbg, 11))
+		ep_dbg_printf("do_physical_open: %s\n", gcl->pname);
+
+	gcl->x = ep_mem_zalloc(sizeof *gcl->x);
+	gcl->x->gcl = gcl;
+
+	//XXX for now, assume all GCLs are on disk
+	gcl->x->physimpl = &GdpDiskImpl;
+
+	// make sure that if this is freed it gets removed from GclsByUse
+	gcl->freefunc = gcl_close;
+
+	// open the physical disk files
+	estat = gcl->x->physimpl->open(gcl);
+	EP_STAT_CHECK(estat, goto fail1);
+
+	gcl->flags |= GCLF_DEFER_FREE;
+	gcl->flags &= ~GCLF_PENDING;
+
+	if (false)
+	{
+fail1:
+		_gdp_gcl_decref(&gcl, false);
+
+		// if this isn't a "not found" error, mark it as an internal error
+		if (!EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOTFOUND))
+			estat = GDP_STAT_NAK_INTERNAL;
+	}
+
+	return estat;
+}
+
+
 EP_STAT
 get_open_handle(gdp_req_t *req, gdp_iomode_t iomode)
 {
 	EP_STAT estat;
 
-	// if we already got this (e.g., in _gdp_pdu_process or in cache)
+	// if we already got this (e.g., in _gdp_pdu_process or in cache),
 	//		just let it be
-	if (req->gcl != NULL ||
-		(req->gcl = _gdp_gcl_cache_get(req->cpdu->dst, iomode)) != NULL)
+	if (req->gcl != NULL)
 	{
+		estat = EP_STAT_OK;
 		if (ep_dbg_test(Dbg, 40))
 		{
 			gdp_pname_t pname;
@@ -162,35 +166,31 @@ get_open_handle(gdp_req_t *req, gdp_iomode_t iomode)
 			ep_dbg_printf("get_open_handle: using existing GCL:\n\t%s => %p\n",
 					pname, req->gcl);
 		}
-		return EP_STAT_OK;
 	}
-
-	// not in cache?  create a new one.
-	if (ep_dbg_test(Dbg, 11))
+	else
 	{
-		gdp_pname_t pname;
+		if (ep_dbg_test(Dbg, 40))
+		{
+			gdp_pname_t pname;
 
-		gdp_printable_name(req->cpdu->dst, pname);
-		ep_dbg_printf("get_open_handle: opening %s\n", pname);
-	}
+			gdp_printable_name(req->cpdu->dst, pname);
+			ep_dbg_printf("get_open_handle: finding %s in cache\n", pname);
+		}
+		estat = _gdp_gcl_cache_get(req->cpdu->dst, iomode,
+							GGCF_CREATE, &req->gcl);
+		if (EP_STAT_ISOK(estat) && EP_UT_BITSET(GCLF_PENDING, req->gcl->flags))
+			estat = do_physical_open(req->gcl, NULL);
+		if (ep_dbg_test(Dbg, 40))
+		{
+			char ebuf[60];
 
-	estat = gcl_open(req->cpdu->dst, iomode, &req->gcl);
-	if (EP_STAT_ISOK(estat))
-		_gdp_gcl_cache_add(req->gcl, iomode);
-	if (req->gcl != NULL)
-		req->gcl->flags |= GCLF_DEFER_FREE;
-
-	if (ep_dbg_test(Dbg, 40))
-	{
-		gdp_pname_t pname;
-		char ebuf[60];
-
-		gdp_printable_name(req->cpdu->dst, pname);
-		ep_stat_tostr(estat, ebuf, sizeof ebuf);
-		ep_dbg_printf("get_open_handle: %s => %p: %s\n",
-				pname, req->gcl, ebuf);
+			ep_stat_tostr(estat, ebuf, sizeof ebuf);
+			ep_dbg_printf("get_open_handle: %s => %p: %s\n",
+					req->gcl->pname, req->gcl, ebuf);
+		}
 	}
 	return estat;
 }
+
 
 # endif // LOG_CHECK

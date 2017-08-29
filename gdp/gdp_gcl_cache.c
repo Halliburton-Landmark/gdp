@@ -120,7 +120,7 @@ fail0:
 */
 
 void
-_gdp_gcl_cache_add(gdp_gcl_t *gcl, gdp_iomode_t mode)
+add_cache_unlocked(gdp_gcl_t *gcl)
 {
 	// sanity checks
 	if (!GDP_GCL_ASSERT_ISLOCKED(gcl))
@@ -129,14 +129,16 @@ _gdp_gcl_cache_add(gdp_gcl_t *gcl, gdp_iomode_t mode)
 	ep_dbg_cprintf(Dbg, 49, "_gdp_gcl_cache_add(%p): adding\n", gcl);
 	if (EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
 	{
-		ep_dbg_cprintf(Dbg, 41, "_gdp_gcl_cache_add(%p): already cached\n",
+		ep_dbg_cprintf(Dbg, 41,
+				"_gdp_gcl_cache_add(%p): already cached\n",
 				gcl);
 		return;
 	}
 
 	// save it in the associative cache
 	gdp_gcl_t *g2;
-	ep_dbg_cprintf(Dbg, 49, "_gdp_gcl_cache_add(%p): insert into _OpenGCLCache\n",
+	ep_dbg_cprintf(Dbg, 49,
+			"_gdp_gcl_cache_add(%p): insert into _OpenGCLCache\n",
 			gcl);
 	g2 = ep_hash_insert(_OpenGCLCache, sizeof (gdp_name_t), gcl->name, gcl);
 	if (g2 != NULL)
@@ -159,17 +161,24 @@ _gdp_gcl_cache_add(gdp_gcl_t *gcl, gdp_iomode_t mode)
 
 		ep_dbg_cprintf(Dbg, 49, "_gdp_gcl_cache_add(%p): insert into LRU list\n",
 				gcl);
-		ep_thr_mutex_lock(&_GclCacheMutex);
 		IF_LIST_CHECK_OK(&GclsByUse, gcl, ulist, gdp_gcl_t)
 		{
 			LIST_INSERT_HEAD(&GclsByUse, gcl, ulist);
 		}
-		ep_thr_mutex_unlock(&_GclCacheMutex);
 	}
 
 	gcl->flags |= GCLF_INCACHE;
 	ep_dbg_cprintf(Dbg, 40, "_gdp_gcl_cache_add: %s => %p\n",
 			gcl->pname, gcl);
+}
+
+void
+_gdp_gcl_cache_add(gdp_gcl_t *gcl)
+{
+	EP_THR_MUTEX_ASSERT_ISUNLOCKED(&gcl->mutex);
+	ep_thr_mutex_lock(&_GclCacheMutex);
+	add_cache_unlocked(gcl);
+	ep_thr_mutex_unlock(&_GclCacheMutex);
 }
 
 
@@ -204,76 +213,93 @@ _gdp_gcl_cache_changename(gdp_gcl_t *gcl, gdp_name_t newname)
 /*
 **  _GDP_GCL_CACHE_GET --- get a GCL from the cache, if it exists
 **
-**		To avoid deadlock due to improper lock ordering, you can't
-**		hold _GclCacheMutex while locking or unlocking a GCL, which 
-**		can cause problems.
+**		Searches for a specific GCL.  If found it is returned; if not,
+**		it returns null unless the GGCF_CREATE flag is set, in which
+**		case it is created and returned.  This allows the Cache Mutex
+**		to be locked before the GCL is locked.  Newly created GCLs
+**		are marked GCLF_PENDING unless the open routine clears that bit.
+**		In particular, gdp_gcl_open needs to do additional opening
+**		_after_ _gdp_gcl_cache_get returns so that the cache is
+**		unlocked while sending protocol to the server.
 **
-**		If found, the refcnt is bumped for the returned GCL,
-**		i.e., the caller is responsible for calling
-**		_gdp_gcl_decref(&gcl) when it is finished with it.
-**
-**		gcl is returned locked and with its reference count
-**		incremented.
+**		The GCL is returned locked and with its reference count
+**		incremented.  It is up to the caller to call _gdp_gcl_decref
+**		on the GCL when it is done with it.
 */
 
-gdp_gcl_t *
-_gdp_gcl_cache_get(gdp_name_t gcl_name, gdp_iomode_t mode)
+EP_STAT
+_gdp_gcl_cache_get(
+			gdp_name_t gcl_name,
+			gdp_iomode_t iomode,
+			uint32_t flags,
+			gdp_gcl_t **pgcl)
 {
 	gdp_gcl_t *gcl;
+	EP_STAT estat = EP_STAT_OK;
+
+	ep_thr_mutex_lock(&_GclCacheMutex);
 
 	// see if we have a pointer to this GCL in the cache
-	// don't need to lock _GclCacheMutex since _OpenGCLCache is protected
 	gcl = ep_hash_search(_OpenGCLCache, sizeof (gdp_name_t), (void *) gcl_name);
-	if (gcl == NULL)
-		goto done;
-	_gdp_gcl_lock(gcl);
+	if (gcl != NULL)
+	{
+		_gdp_gcl_lock(gcl);
 
-	// sanity checking --- someone may have snuck in before we acquired the lock
-	if (!EP_UT_BITSET(GCLF_INUSE, gcl->flags) ||
-			!EP_UT_BITSET(GCLF_INCACHE, gcl->flags) ||
-			EP_UT_BITSET(GCLF_DROPPING, gcl->flags))
-	{
-		// someone deallocated this in the brief window above
-		_gdp_gcl_unlock(gcl);
-		gcl = NULL;
-	}
-	else
-	{
-		// we're good to go
-		if (mode != _GDP_MODE_PEEK)
+		// sanity checking:
+		// someone may have snuck in before we acquired the lock
+		if (!EP_UT_BITSET(GCLF_INUSE, gcl->flags) ||
+				!EP_UT_BITSET(GCLF_INCACHE, gcl->flags) ||
+				EP_UT_BITSET(GCLF_DROPPING, gcl->flags) ||
+				(EP_UT_BITSET(GCLF_PENDING, gcl->flags) &&
+				 !EP_UT_BITSET(GGCF_GET_PENDING, flags)))
+		{
+			// someone deallocated this in the brief window above
+			_gdp_gcl_unlock(gcl);
+			gcl = NULL;
+		}
+		else if (iomode != _GDP_MODE_PEEK)
 			_gdp_gcl_incref(gcl);
+	}
+	if (gcl == NULL)
+	{
+		if (!EP_UT_BITSET(GGCF_CREATE, flags))
+			goto done;
+
+		// create a new one
+		estat = _gdp_gcl_newhandle(gcl_name, &gcl);
+		EP_STAT_CHECK(estat, goto fail0);
+		_gdp_gcl_lock(gcl);
+		gcl->iomode = iomode;
+		add_cache_unlocked(gcl);
 	}
 
 done:
-	if (gcl == NULL)
+	if (ep_dbg_test(Dbg, 42))
 	{
-		if (ep_dbg_test(Dbg, 42))
-		{
-			gdp_pname_t pname;
+		gdp_pname_t pname;
 
-			gdp_printable_name(gcl_name, pname);
+		gdp_printable_name(gcl_name, pname);
+		if (gcl == NULL)
 			ep_dbg_printf("gdp_gcl_cache_get: %s => NULL\n", pname);
-		}
+		else
+			ep_dbg_printf("gdp_gcl_cache_get: %s =>\n\t%p refcnt %d\n",
+						pname, gcl, gcl->refcnt);
 	}
-	else
-	{
-		ep_dbg_cprintf(Dbg, 42, "gdp_gcl_cache_get: %s =>\n"
-					"\t%p refcnt %d\n",
-					gcl->pname, gcl, gcl->refcnt);
-	}
-	return gcl;
+fail0:
+	if (EP_STAT_ISOK(estat))
+		*pgcl = gcl;
+	ep_thr_mutex_unlock(&_GclCacheMutex);
+	return estat;
 }
 
 
 /*
 ** Drop a GCL from both the associative and the LRU caches
 **
-**		_GclCacheMutex should already be acquired, since this is
-**		only called when freeing resources.
 */
 
 void
-_gdp_gcl_cache_drop(gdp_gcl_t *gcl)
+_gdp_gcl_cache_drop(gdp_gcl_t *gcl, bool cleanup)
 {
 	EP_ASSERT_ELSE(gcl != NULL, return);
 	if (!EP_ASSERT(GDP_GCL_ISGOOD(gcl)))
@@ -284,6 +310,9 @@ _gdp_gcl_cache_drop(gdp_gcl_t *gcl)
 	}
 
 	GDP_GCL_ASSERT_ISLOCKED(gcl);
+	EP_ASSERT(EP_UT_BITSET(GCLF_INCACHE, gcl->flags));
+	if (!cleanup)
+		EP_THR_MUTEX_ASSERT_ISUNLOCKED(&_GclCacheMutex);
 
 	if (!EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
 	{
@@ -300,12 +329,35 @@ _gdp_gcl_cache_drop(gdp_gcl_t *gcl)
 			_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
+	// mark it as being dropped to detect race condition
+	gcl->flags |= GCLF_DROPPING;
+
+	// if we're not cleanup up (_GclCacheMutex unlocked) we have to
+	// get the lock ordering right
+	if (!cleanup)
+	{
+		// now lock the cache and then re-lock the GCL
+		_gdp_gcl_unlock(gcl);
+		ep_thr_mutex_lock(&_GclCacheMutex);
+		_gdp_gcl_lock(gcl);
+
+		// sanity checks (XXX should these be assertions? XXX)
+		//XXX need to check that nothing bad happened while GCL was unlocked
+		EP_ASSERT(EP_UT_BITSET(GCLF_INCACHE, gcl->flags));
+	}
+
 	// remove it from the associative cache
 	(void) ep_hash_delete(_OpenGCLCache, sizeof (gdp_name_t), gcl->name);
 
 	// ... and the LRU list
 	LIST_REMOVE(gcl, ulist);
 	gcl->flags &= ~GCLF_INCACHE;
+
+	if (!cleanup)
+	{
+		// now we can unlock the cache, but leave the GCL locked
+		ep_thr_mutex_unlock(&_GclCacheMutex);
+	}
 
 	ep_dbg_cprintf(Dbg, 40, "_gdp_gcl_cache_drop: %s => %p\n",
 			gcl->pname, gcl);
@@ -434,12 +486,18 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 				continue;
 			}
 
+			// OK, we really want to drop this GCL
 			if (ep_dbg_test(Dbg, 32))
 			{
 				ep_dbg_printf("_gdp_gcl_cache_reclaim: reclaiming:\n   ");
 				_gdp_gcl_dump(g1, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
 			}
-			_gdp_gcl_freehandle(g1);	// also removes from cache & usage list
+
+			// remove from the LRU list and the name->handle cache
+			_gdp_gcl_cache_drop(g1, true);
+
+			// release memory (this will also unlock the corpse)
+			_gdp_gcl_freehandle(g1);
 		}
 		ep_thr_mutex_unlock(&_GclCacheMutex);
 
