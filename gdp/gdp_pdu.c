@@ -70,6 +70,8 @@ static EP_PRFLAGS_DESC	PduFlags[] =
 void
 _gdp_pdu_dump(const gdp_pdu_t *pdu, FILE *fp)
 {
+	if (fp == NULL)
+		fp = ep_dbg_getfile();
 	flockfile(fp);
 	fprintf(fp, "PDU@%p: ", pdu);
 	if (pdu == NULL)

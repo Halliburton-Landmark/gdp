@@ -157,7 +157,7 @@ _gdp_gcl_freehandle(gdp_gcl_t *gcl)
 	}
 
 	// release any remaining requests
-	_gdp_req_freeall(&gcl->reqs, NULL);
+	_gdp_req_freeall(gcl, NULL);
 
 	// should be inacessible now
 	_gdp_gcl_unlock(gcl);

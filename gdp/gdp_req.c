@@ -320,15 +320,15 @@ _gdp_req_free(gdp_req_t **reqp)
 */
 
 void
-_gdp_req_freeall(struct req_head *reqlist, void (*shutdownfunc)(gdp_req_t *))
+_gdp_req_freeall(gdp_gcl_t *gcl, void (*shutdownfunc)(gdp_req_t *))
 {
 	EP_STAT rstat = EP_STAT_OK;
 	gdp_req_t *req;
 	gdp_req_t *nextreq;
 
-	ep_dbg_cprintf(Dbg, 49, ">>> _gdp_req_freeall(%p)\n", reqlist);
+	ep_dbg_cprintf(Dbg, 49, ">>> _gdp_req_freeall(%p)\n", gcl);
 
-	for (req = LIST_FIRST(reqlist); req != NULL; req = nextreq)
+	for (req = LIST_FIRST(&gcl->reqs); req != NULL; req = nextreq)
 	{
 		EP_STAT estat = _gdp_req_lock(req);
 		nextreq = LIST_NEXT(req, gcllist);
@@ -352,13 +352,13 @@ _gdp_req_freeall(struct req_head *reqlist, void (*shutdownfunc)(gdp_req_t *))
 
 	// if there were errors, it's possible that there are still some
 	// items on reqlist.  Abandon those to avoid cascading errors.
-	LIST_INIT(reqlist);
+	LIST_INIT(&gcl->reqs);
 
 	if (ep_dbg_test(Dbg, EP_STAT_ISOK(rstat) ? 49 : 1))
 	{
 		char ebuf[100];
 		ep_dbg_printf("<<< _gdp_req_freeall(%p): %s\n",
-					reqlist, ep_stat_tostr(rstat, ebuf, sizeof ebuf));
+					gcl, ep_stat_tostr(rstat, ebuf, sizeof ebuf));
 	}
 }
 
@@ -595,6 +595,8 @@ _gdp_req_dump(const gdp_req_t *req, FILE *fp, int detail, int indent)
 {
 	char ebuf[200];
 
+	if (fp == NULL)
+		fp = ep_dbg_getfile();
 	if (req == NULL)
 	{
 		fprintf(fp, "req@%p: null\n", req);

@@ -613,8 +613,8 @@ EP_STAT			_gdp_req_dispatch(			// do local req processing
 EP_STAT			_gdp_invoke(				// send request to daemon (sync)
 						gdp_req_t *req);
 
-void			_gdp_req_freeall(			// free all requests in list
-						struct req_head *reqlist,
+void			_gdp_req_freeall(			// free all requests in GCL list
+						gdp_gcl_t *gcl,
 						void (*shutdownfunc)(gdp_req_t *));
 
 void			_gdp_req_dump(				// print (debug) request

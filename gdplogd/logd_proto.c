@@ -845,7 +845,11 @@ post_subscribe(gdp_req_t *req)
 	}
 	else
 	{
-		ep_dbg_cprintf(Dbg, 24, "post_subscribe: converting to subscription\n");
+		if (ep_dbg_test(Dbg, 24))
+		{
+			ep_dbg_printf("post_subscribe: converting to subscription\n    ");
+			_gdp_req_dump(req, NULL, GDP_PR_BASIC, 0);
+		}
 		req->flags |= GDP_REQ_SRV_SUBSCR;
 
 		// link this request into the GCL so the subscription can be found
@@ -853,7 +857,7 @@ post_subscribe(gdp_req_t *req)
 		{
 			IF_LIST_CHECK_OK(&req->gcl->reqs, req, gcllist, gdp_req_t)
 			{
-				_gdp_gcl_incref(req->gcl);
+				// req->gcl->refcnt already allows for this reference
 				LIST_INSERT_HEAD(&req->gcl->reqs, req, gcllist);
 				req->flags |= GDP_REQ_ON_GCL_LIST;
 			}

@@ -540,8 +540,9 @@ _gdp_gcl_cache_shutdown(void (*shutdownfunc)(gdp_req_t *))
 	for (g1 = LIST_FIRST(&GclsByUse); g1 != NULL; g1 = g2)
 	{
 		ep_thr_mutex_trylock(&g1->mutex);
+		g1->flags |= GCLF_ISLOCKED;
 		g2 = LIST_NEXT(g1, ulist);
-		_gdp_req_freeall(&g1->reqs, shutdownfunc);
+		_gdp_req_freeall(g1, shutdownfunc);
 		_gdp_gcl_freehandle(g1);	// also removes from cache and usage list
 	}
 }
@@ -631,6 +632,8 @@ _gdp_gcl_cache_dump(int plev, FILE *fp)
 	} md4buf;
 	bool check_for_loops = true;
 
+	if (fp == NULL)
+		fp = ep_dbg_getfile();
 	memset(&md4buf, 0, sizeof md4buf);
 
 	fprintf(fp, "\n<<< Showing cached GCLs by usage >>>\n");

@@ -325,5 +325,7 @@ void
 _gdp_datum_dump(const gdp_datum_t *datum,
 			FILE *fp)
 {
+	if (fp == NULL)
+		fp = ep_dbg_getfile();
 	gdp_datum_print(datum, fp, GDP_DATUM_PRDEBUG);
 }
