@@ -221,11 +221,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     ## done argument parsing, instantiate the service
-    logging.basicConfig(level=logging.DEBUG)
+    if args.debug:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.WARN)
+
     service = logCreationService(GDP_SERVICE_ADDR.internal_name(),
                                     "%s:%d" % (args.host, args.port),
-                                    args.logservers, args.dbname,
-                                    debug=args.debug)
+                                    args.logservers, args.dbname)
 
     ## all done, start the service (and sleep indefinitely)
     logging.info("Starting logcreationservice")

@@ -40,12 +40,12 @@ def pprint(d):
         if len(data)>0: hex_repr = '\\x' + hex_repr
         return hex_repr
 
-    s = "{"
+    s = "{" + "\n"
     for k in d.keys():
         tmp = d[k]
         if type(tmp) == type(0): p = str(tmp)
         else: p = "'" + to_hex(tmp) + "'"
-        s += " '" + k + "': " + p + ","
+        s += " '" + k + "': " + p + "," + "\n"
     s += "}"
     return s
 
@@ -239,11 +239,9 @@ class GDPProtocol(Protocol):
         keys = set(msg_dict.keys()) & set(['cmd', 'dst', 'src', 'flags',
                                                 'rid', 'data', 'options'])
         data = {k: msg_dict[k] for k in keys}
-        if self.args.get("debug", False):
-            logging.debug("Passing to request handler\n%s", pprint(data))
+        logging.debug("Incoming:\n%s", pprint(data))
         resp = self.request_handler(data)
-        if self.args.get("debug", False):
-            logging.debug("Received from request handler\n%s", pprint(resp))
+        logging.debug("Outgoing:\n%s", pprint(resp))
 
         if resp is not None:
             # if a destination is specified in the response, it will take
@@ -367,9 +365,8 @@ class GDPService(object):
 
         ## Establish connection to the router (the reactor isn't running
         ## yet, so this will only get established when 'start()' is called.
-        if kwargs.get("debug", False):
-            print "Connecting to host:%s, port:%d" % \
-                    (self.router_host, self.router_port)
+        logging.debug("Connecting to host:%s, port:%d", 
+                            self.router_host, self.router_port)
         reactor.connectTCP(self.router_host, self.router_port, ProtocolFactory)
 
 
