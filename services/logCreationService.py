@@ -13,18 +13,14 @@ is handled cleanly, before we can come up with a better solution).
 from GDPService import GDPService
 import gdp
 import random
-import cPickle
 import argparse
-import sys
 import time
 import sqlite3
 import logging
 import os
+import sys
 
-GDP_SERVICE_ADDR = gdp.GDP_NAME("logcreationservice")
-GDP_LOG_NAME = "logcreationservicelog"
-GDP_LOG_ADDR = gdp.GDP_NAME(GDP_LOG_NAME)
-
+SERVICE_NAMES = ['logcreationservice']
 DEFAULT_ROUTER_PORT = 8007
 DEFAULT_ROUTER_HOST = "172.30.0.1"
 
@@ -47,19 +43,20 @@ GDP_NAK_C_BADREQ = 192
 
 class logCreationService(GDPService):
 
-    def __init__(self, GDPaddress, router, logservers, dbname, **kwargs):
+    def __init__(self, dbname, router, GDPaddrs, logservers):
         """
-        GDPaddress: the address of this particular service
         router: a 'host:port' string representing the GDP router
+        GDPaddrs: a list of 256-bit addresses of this particular service
         logservers: a list of log-servers on the backend that we use
         dbname: sqlite database location
         """
 
         ## First call the __init__ of GDPService
-        super(logCreationService, self).__init__(GDPaddress, router, **kwargs)
+        super(logCreationService, self).__init__(router, GDPaddrs)
 
         ## Setup instance specific constants
-        self.logservers = [gdp.GDP_NAME(x).internal_name() for x in logservers]
+        self.GDPaddrs = GDPaddrs
+        self.logservers = logservers
         self.dbname = dbname
 
         ## Setup a connection to the backend database
@@ -75,7 +72,7 @@ class logCreationService(GDPService):
             ## Make table for bookkeeping
             self.cur.execute("""CREATE TABLE logs(
                                     logname TEXT UNIQUE, srvname TEXT,
-                                    ack_seen INTEGER DEFAULT 0, 
+                                    ack_seen INTEGER DEFAULT 0,
                                     ts DATETIME DEFAULT CURRENT_TIMESTAMP,
                                     creator TEXT, rid INTEGER)""")
             self.cur.execute("""CREATE UNIQUE INDEX logname_ndx
@@ -101,7 +98,7 @@ class logCreationService(GDPService):
 
         # check if it's a request from a client or a response from a logd.
 
-        if req['cmd']<128:      ## it's a command
+        if req['cmd'] < 128:      ## it's a command
 
             ## First check for any error conditions. If any of the
             ## following occur, we ought to send back a NAK
@@ -141,8 +138,8 @@ class logCreationService(GDPService):
                 return self.gen_bad_request_resp(req)
 
             ## Send a spoofed request to the logserver
-            spoofed_req = req
-            spoofed_req['src'] = self.GDPaddress
+            spoofed_req = req.copy()
+            spoofed_req['src'] = req['dst']
             spoofed_req['dst'] = srvname
             spoofed_req['rid'] = self.cur.lastrowid
 
@@ -156,7 +153,7 @@ class logCreationService(GDPService):
             ## Sanity checking
             if req['src'] not in self.logservers:
                 logging.info("error: received a non-response from logserver")
-                return self.gen_bad_request_resp(req) 
+                return self.gen_bad_request_resp(req)
 
             logging.info("Received response from a log-server")
 
@@ -165,7 +162,7 @@ class logCreationService(GDPService):
                                             WHERE rowid=?""", (req['rid'],))
             dbrows = self.cur.fetchall()
 
-            good_resp = len(dbrows)==1
+            good_resp = len(dbrows) == 1
             if good_resp:
                 (__creator, orig_rid, ack_seen) = dbrows[0]
                 creator = gdp.GDP_NAME(__creator).internal_name()
@@ -182,8 +179,8 @@ class logCreationService(GDPService):
                 self.conn.commit()
 
             # create a spoofed reply and send it to the client
-            spoofed_reply = req
-            spoofed_reply['src'] = self.GDPaddress
+            spoofed_reply = req.copy()
+            spoofed_reply['src'] = req['dst']
             spoofed_reply['dst'] = creator
             spoofed_reply['rid'] = orig_rid
 
@@ -194,7 +191,7 @@ class logCreationService(GDPService):
     def gen_bad_request_resp(self, req):
         resp = dict()
         resp['cmd'] = GDP_NAK_C_BADREQ
-        resp['src'] = self.GDPaddress
+        resp['src'] = req['dst']
         resp['dst'] = req['src']
         return resp
 
@@ -204,31 +201,43 @@ if __name__ == "__main__":
     ## argument parsing
     parser = argparse.ArgumentParser(description="Log creation service")
 
-    parser.add_argument("-D", "--debug", action='store_true',
-                                help="Turn on debugging")
+    parser.add_argument("-v", "--verbose", action='store_true',
+                                help="Be quite verbose in execution.")
     parser.add_argument("-i", "--host", type=str, default=DEFAULT_ROUTER_HOST,
                                 help="host of gdp_router instance. "
                                      "default = %s" % DEFAULT_ROUTER_HOST)
     parser.add_argument("-p", "--port", type=int, default=DEFAULT_ROUTER_PORT,
                                 help="port for gdp_router instance. "
                                      "default = %d" % DEFAULT_ROUTER_PORT)
-    parser.add_argument("dbname", type=str, 
+    parser.add_argument("-d", "--dbname", type=str, required=True,
                                 help="filename for sqlite database")
-    parser.add_argument("logservers", type=str, nargs="+",
-                                help="log daemons that this instance of "
-                                     "log creation service should use")
+    parser.add_argument("-a", "--addr", type=str, nargs='+', required=True,
+                                help="Address(es) for this service, typically "
+                                     "human readable names.")
+    parser.add_argument("-s", "--server", type=str, nargs='+', required=True,
+                                help="Log server(s) to be used for actual log "
+                                     "creation, typically human readable names")
 
     args = parser.parse_args()
 
     ## done argument parsing, instantiate the service
-    if args.debug:
+    if args.verbose:
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.WARN)
 
-    service = logCreationService(GDP_SERVICE_ADDR.internal_name(),
-                                    "%s:%d" % (args.host, args.port),
-                                    args.logservers, args.dbname)
+    ## parse arguments
+    router = "%s:%d" % (args.host, args.port)
+    addrs = [gdp.GDP_NAME(x).internal_name() for x in args.addr]
+    servers = [gdp.GDP_NAME(x).internal_name() for x in args.server]
+
+    logging.info("Starting a log-creation service...")
+    logging.info(">> Connecting to %s", router)
+    logging.info(">> Servicing names %r", args.addr)
+    logging.info(">> Using log servers %r", args.server)
+
+    ## instantiate the service
+    service = logCreationService(args.dbname, router, addrs, servers)
 
     ## all done, start the service (and sleep indefinitely)
     logging.info("Starting logcreationservice")
