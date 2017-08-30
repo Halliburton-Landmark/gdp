@@ -18,6 +18,7 @@ import time
 import sqlite3
 import logging
 import os
+import sys
 
 SERVICE_NAMES = ['logcreationservice']
 DEFAULT_ROUTER_PORT = 8007
@@ -42,7 +43,7 @@ GDP_NAK_C_BADREQ = 192
 
 class logCreationService(GDPService):
 
-    def __init__(self, router, GDPaddrs, logservers, dbname):
+    def __init__(self, dbname, router, GDPaddrs, logservers):
         """
         router: a 'host:port' string representing the GDP router
         GDPaddrs: a list of 256-bit addresses of this particular service
@@ -55,7 +56,7 @@ class logCreationService(GDPService):
 
         ## Setup instance specific constants
         self.GDPaddrs = GDPaddrs
-        self.logservers = [gdp.GDP_NAME(x).internal_name() for x in logservers]
+        self.logservers = logservers
         self.dbname = dbname
 
         ## Setup a connection to the backend database
@@ -200,31 +201,43 @@ if __name__ == "__main__":
     ## argument parsing
     parser = argparse.ArgumentParser(description="Log creation service")
 
-    parser.add_argument("-D", "--debug", action='store_true',
-                                help="Turn on debugging")
+    parser.add_argument("-v", "--verbose", action='store_true',
+                                help="Be quite verbose in execution.")
     parser.add_argument("-i", "--host", type=str, default=DEFAULT_ROUTER_HOST,
                                 help="host of gdp_router instance. "
                                      "default = %s" % DEFAULT_ROUTER_HOST)
     parser.add_argument("-p", "--port", type=int, default=DEFAULT_ROUTER_PORT,
                                 help="port for gdp_router instance. "
                                      "default = %d" % DEFAULT_ROUTER_PORT)
-    parser.add_argument("dbname", type=str,
+    parser.add_argument("-d", "--dbname", type=str, required=True,
                                 help="filename for sqlite database")
-    parser.add_argument("logservers", type=str, nargs="+",
-                                help="log daemons that this instance of "
-                                     "log creation service should use")
+    parser.add_argument("-a", "--addr", type=str, nargs='+', required=True,
+                                help="Address(es) for this service, typically "
+                                     "human readable names.")
+    parser.add_argument("-s", "--server", type=str, nargs='+', required=True,
+                                help="Log server(s) to be used for actual log "
+                                     "creation, typically human readable names")
 
     args = parser.parse_args()
 
     ## done argument parsing, instantiate the service
-    if args.debug:
+    if args.verbose:
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.WARN)
 
+    ## parse arguments
     router = "%s:%d" % (args.host, args.port)
-    addrs = [gdp.GDP_NAME(x).internal_name() for x in SERVICE_NAMES]
-    service = logCreationService(router, addrs, args.logservers, args.dbname)
+    addrs = [gdp.GDP_NAME(x).internal_name() for x in args.addr]
+    servers = [gdp.GDP_NAME(x).internal_name() for x in args.server]
+
+    logging.info("Starting a log-creation service...")
+    logging.info(">> Connecting to %s", router)
+    logging.info(">> Servicing names %r", args.addr)
+    logging.info(">> Using log servers %r", args.server)
+
+    ## instantiate the service
+    service = logCreationService(args.dbname, router, addrs, servers)
 
     ## all done, start the service (and sleep indefinitely)
     logging.info("Starting logcreationservice")
