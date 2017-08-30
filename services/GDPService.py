@@ -27,6 +27,7 @@ import struct
 import random
 import argparse
 import threading
+import logging
 
 
 def pprint(d):
@@ -39,13 +40,14 @@ def pprint(d):
         if len(data)>0: hex_repr = '\\x' + hex_repr
         return hex_repr
 
-    print "{"
+    s = "{"
     for k in d.keys():
         tmp = d[k]
         if type(tmp) == type(0): p = str(tmp)
         else: p = "'" + to_hex(tmp) + "'"
-        print " '" + k + "': " + p + ","
-    print "}"
+        s += " '" + k + "': " + p + ","
+    s += "}"
+    return s
 
 
 class GDPProtocol(Protocol):
@@ -238,12 +240,10 @@ class GDPProtocol(Protocol):
                                                 'rid', 'data', 'options'])
         data = {k: msg_dict[k] for k in keys}
         if self.args.get("debug", False):
-            print "GDPService: Passing to request handler..."
-            pprint(data)
+            logging.debug("Passing to request handler\n%s", pprint(data))
         resp = self.request_handler(data)
         if self.args.get("debug", False):
-            print "GDPService: Received from request handler..."
-            pprint(resp)
+            logging.debug("Received from request handler\n%s", pprint(resp))
 
         if resp is not None:
             # if a destination is specified in the response, it will take

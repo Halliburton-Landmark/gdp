@@ -1,5 +1,15 @@
 #!/usr/bin/env python
 
+"""
+A log creation service that receives Log Creation commands from an
+unmodified client and passes them to a log-server. The purpose of
+such a log-creation service is to provide a layer of indirection
+between the clients and log-servers (and ensure log-duplication
+is handled cleanly, before we can come up with a better solution).
+
+
+"""
+
 from GDPService import GDPService
 import gdp
 import random
@@ -64,10 +74,10 @@ class logCreationService(GDPService):
 
             ## Make table for bookkeeping
             self.cur.execute("""CREATE TABLE logs(
-                                    logname BLOB UNIQUE, srvname BLOB,
+                                    logname TEXT UNIQUE, srvname TEXT,
                                     ack_seen INTEGER DEFAULT 0, 
                                     ts DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                    creator BLOB, rid INTEGER)""")
+                                    creator TEXT, rid INTEGER)""")
             self.cur.execute("""CREATE UNIQUE INDEX logname_ndx
                                                 ON logs(logname)""")
             self.cur.execute("CREATE INDEX srvname_ndx ON logs(srvname)")
@@ -114,14 +124,15 @@ class logCreationService(GDPService):
             rid = req['rid']
 
             ## log this to our backend database
+            __logname = gdp.GDP_NAME(logname).printable_name()
+            __srvname = gdp.GDP_NAME(srvname).printable_name()
+            __creator = gdp.GDP_NAME(creator).printable_name()
             try:
                 logging.debug("inserting to database %r, %r, %r, %d",
-                                logname, srvname, creator, rid)
+                                __logname, __srvname, __creator, rid)
                 self.cur.execute("""INSERT INTO logs (logname, srvname,
                                     creator, rid) VALUES(?,?,?,?);""",
-                                    (sqlite3.Binary(logname),
-                                     sqlite3.Binary(srvname),
-                                     sqlite3.Binary(creator), rid))
+                                    (__logname, __srvname, __creator, rid))
                 self.conn.commit()
 
             except sqlite3.IntegrityError:
@@ -156,7 +167,8 @@ class logCreationService(GDPService):
 
             good_resp = len(dbrows)==1
             if good_resp:
-                (creator, orig_rid, ack_seen) = dbrows[0]
+                (__creator, orig_rid, ack_seen) = dbrows[0]
+                creator = gdp.GDP_NAME(__creator).internal_name()
                 if ack_seen != 0:
                     good_resp = False
 
