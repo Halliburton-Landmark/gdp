@@ -19,10 +19,7 @@ import sqlite3
 import logging
 import os
 
-GDP_SERVICE_ADDR = gdp.GDP_NAME("logcreationservice")
-GDP_LOG_NAME = "logcreationservicelog"
-GDP_LOG_ADDR = gdp.GDP_NAME(GDP_LOG_NAME)
-
+SERVICE_NAMES = ['logcreationservice']
 DEFAULT_ROUTER_PORT = 8007
 DEFAULT_ROUTER_HOST = "172.30.0.1"
 
@@ -45,18 +42,19 @@ GDP_NAK_C_BADREQ = 192
 
 class logCreationService(GDPService):
 
-    def __init__(self, GDPaddress, router, logservers, dbname):
+    def __init__(self, router, GDPaddrs, logservers, dbname):
         """
-        GDPaddress: the address of this particular service
         router: a 'host:port' string representing the GDP router
+        GDPaddrs: a list of 256-bit addresses of this particular service
         logservers: a list of log-servers on the backend that we use
         dbname: sqlite database location
         """
 
         ## First call the __init__ of GDPService
-        super(logCreationService, self).__init__(GDPaddress, router)
+        super(logCreationService, self).__init__(router, GDPaddrs)
 
         ## Setup instance specific constants
+        self.GDPaddrs = GDPaddrs
         self.logservers = [gdp.GDP_NAME(x).internal_name() for x in logservers]
         self.dbname = dbname
 
@@ -139,8 +137,8 @@ class logCreationService(GDPService):
                 return self.gen_bad_request_resp(req)
 
             ## Send a spoofed request to the logserver
-            spoofed_req = req
-            spoofed_req['src'] = self.GDPaddress
+            spoofed_req = req.copy()
+            spoofed_req['src'] = req['dst']
             spoofed_req['dst'] = srvname
             spoofed_req['rid'] = self.cur.lastrowid
 
@@ -180,8 +178,8 @@ class logCreationService(GDPService):
                 self.conn.commit()
 
             # create a spoofed reply and send it to the client
-            spoofed_reply = req
-            spoofed_reply['src'] = self.GDPaddress
+            spoofed_reply = req.copy()
+            spoofed_reply['src'] = req['dst']
             spoofed_reply['dst'] = creator
             spoofed_reply['rid'] = orig_rid
 
@@ -192,7 +190,7 @@ class logCreationService(GDPService):
     def gen_bad_request_resp(self, req):
         resp = dict()
         resp['cmd'] = GDP_NAK_C_BADREQ
-        resp['src'] = self.GDPaddress
+        resp['src'] = req['dst']
         resp['dst'] = req['src']
         return resp
 
@@ -224,9 +222,9 @@ if __name__ == "__main__":
     else:
         logging.basicConfig(level=logging.WARN)
 
-    service = logCreationService(GDP_SERVICE_ADDR.internal_name(),
-                                    "%s:%d" % (args.host, args.port),
-                                    args.logservers, args.dbname)
+    router = "%s:%d" % (args.host, args.port)
+    addrs = [gdp.GDP_NAME(x).internal_name() for x in SERVICE_NAMES]
+    service = logCreationService(router, addrs, args.logservers, args.dbname)
 
     ## all done, start the service (and sleep indefinitely)
     logging.info("Starting logcreationservice")

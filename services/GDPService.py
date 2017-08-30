@@ -56,22 +56,21 @@ class GDPProtocol(Protocol):
     # this is the conventional GDP address of a router
     GDPROUTER_ADDRESS = (chr(255) + chr(0)) * 16
 
-    def __init__(self, req_handler, GDPaddress):
+    def __init__(self, req_handler, GDPaddrs):
         """ The GDP address for the service end point """
 
-        self.GDPaddress = GDPaddress
+        self.GDPaddrs = GDPaddrs
         self.request_handler = req_handler
         self.buffer = ""
 
     def connectionMade(self):
 
-        # Send the advertisement message
-        advertisement = ('\x03' + '\x00' * 2 + '\x01' +
-                            self.GDPROUTER_ADDRESS + self.GDPaddress +
+        # Send the advertisement messages, do network I/O in reactor thread
+        for addr in self.GDPaddrs:
+            advertisement = ('\x03' + '\x00' * 2 + '\x01' +
+                            self.GDPROUTER_ADDRESS + addr +
                             '\x00' * 4 + '\x00' * 4 + '\x00'*4 )
-
-        ## do network I/O in the reactor thread
-        reactor.callFromThread(self.transport.write, advertisement)
+            reactor.callFromThread(self.transport.write, advertisement)
 
 
     def terminateConnection(self, reason):
@@ -244,9 +243,9 @@ class GDPProtocol(Protocol):
         logging.debug("Outgoing:\n%s", pprint(resp))
 
         if resp is not None:
-            # if a destination is specified in the response, it will take
-            #   precedence
-            self.send_PDU(resp, dst=msg_dict['src'])
+            # if a specific source or a destination is specified
+            # in the response, it will take precedence.
+            self.send_PDU(resp, src=msg_dict['dst'], dst=msg_dict['src'])
 
 
     def send_PDU(self, data, **kwargs):
@@ -267,10 +266,11 @@ class GDPProtocol(Protocol):
         msg['res'] = '\x00'
         msg['cmd'] = chr(data['cmd'])           # mandatory
 
-        # make sure we do have a destination
+        # make sure we do have a source and a destination
+        assert 'src' in data.keys() + kwargs.keys()
         assert 'dst' in data.keys() + kwargs.keys()
-        msg['dst'] = str(data.get('dst', kwargs.get('dst', None)))
-        msg['src'] = str(data.get('src', self.GDPaddress))
+        msg['dst'] = str(data.get('dst', kwargs['dst']))
+        msg['src'] = str(data.get('src', kwargs['src']))
 
         # XXX: The following are from protocol ver 0x02
         # These are replaced by siginfo
@@ -312,12 +312,13 @@ class GDPProtocol(Protocol):
 
 class GDPProtocolFactory(ClientFactory):
 
-    def __init__(self, req_handler, GDPaddress):
-        self.GDPaddress = GDPaddress
+    def __init__(self, req_handler, GDPaddrs):
+        "Initialize with the request handler and list of GDP addresses"
+        self.GDPaddrs = GDPaddrs
         self.request_handler = req_handler
 
     def buildProtocol(self, remoteaddr):
-        protocol = GDPProtocol(self.request_handler, self.GDPaddress)
+        protocol = GDPProtocol(self.request_handler, self.GDPaddrs)
         return protocol
 
 
@@ -335,19 +336,22 @@ class GDPService(object):
     """
 
 
-    def __init__(self, GDPaddress, router):
+    def __init__(self, router, GDPaddrs):
         """
-        address: 256 bit GDP address
-        router: ip:port for a GDP router
+        router: ip:port for a GDP router/switch that we connect to
+        GDPaddrs: list of 256 bit GDP addresses that we listen to
         """
+
+        assert isinstance(router, str)
+        assert isinstance(GDPaddrs, list)
 
         ## parse the GDP router host:port
         t = router.split(":")
         self.router_host = t[0]
         self.router_port = int(t[1])
-        self.GDPaddress = GDPaddress
+        self.GDPaddrs = GDPaddrs
 
-        ProtocolFactory = GDPProtocolFactory(self.request_handler, GDPaddress)
+        ProtocolFactory = GDPProtocolFactory(self.request_handler, GDPaddrs)
 
         ## Call service specific setup code
         self.setup()
