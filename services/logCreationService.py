@@ -13,9 +13,7 @@ is handled cleanly, before we can come up with a better solution).
 from GDPService import GDPService
 import gdp
 import random
-import cPickle
 import argparse
-import sys
 import time
 import sqlite3
 import logging
@@ -47,7 +45,7 @@ GDP_NAK_C_BADREQ = 192
 
 class logCreationService(GDPService):
 
-    def __init__(self, GDPaddress, router, logservers, dbname, **kwargs):
+    def __init__(self, GDPaddress, router, logservers, dbname):
         """
         GDPaddress: the address of this particular service
         router: a 'host:port' string representing the GDP router
@@ -56,7 +54,7 @@ class logCreationService(GDPService):
         """
 
         ## First call the __init__ of GDPService
-        super(logCreationService, self).__init__(GDPaddress, router, **kwargs)
+        super(logCreationService, self).__init__(GDPaddress, router)
 
         ## Setup instance specific constants
         self.logservers = [gdp.GDP_NAME(x).internal_name() for x in logservers]
@@ -75,7 +73,7 @@ class logCreationService(GDPService):
             ## Make table for bookkeeping
             self.cur.execute("""CREATE TABLE logs(
                                     logname TEXT UNIQUE, srvname TEXT,
-                                    ack_seen INTEGER DEFAULT 0, 
+                                    ack_seen INTEGER DEFAULT 0,
                                     ts DATETIME DEFAULT CURRENT_TIMESTAMP,
                                     creator TEXT, rid INTEGER)""")
             self.cur.execute("""CREATE UNIQUE INDEX logname_ndx
@@ -101,7 +99,7 @@ class logCreationService(GDPService):
 
         # check if it's a request from a client or a response from a logd.
 
-        if req['cmd']<128:      ## it's a command
+        if req['cmd'] < 128:      ## it's a command
 
             ## First check for any error conditions. If any of the
             ## following occur, we ought to send back a NAK
@@ -156,7 +154,7 @@ class logCreationService(GDPService):
             ## Sanity checking
             if req['src'] not in self.logservers:
                 logging.info("error: received a non-response from logserver")
-                return self.gen_bad_request_resp(req) 
+                return self.gen_bad_request_resp(req)
 
             logging.info("Received response from a log-server")
 
@@ -165,7 +163,7 @@ class logCreationService(GDPService):
                                             WHERE rowid=?""", (req['rid'],))
             dbrows = self.cur.fetchall()
 
-            good_resp = len(dbrows)==1
+            good_resp = len(dbrows) == 1
             if good_resp:
                 (__creator, orig_rid, ack_seen) = dbrows[0]
                 creator = gdp.GDP_NAME(__creator).internal_name()
@@ -212,7 +210,7 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--port", type=int, default=DEFAULT_ROUTER_PORT,
                                 help="port for gdp_router instance. "
                                      "default = %d" % DEFAULT_ROUTER_PORT)
-    parser.add_argument("dbname", type=str, 
+    parser.add_argument("dbname", type=str,
                                 help="filename for sqlite database")
     parser.add_argument("logservers", type=str, nargs="+",
                                 help="log daemons that this instance of "

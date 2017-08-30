@@ -1,16 +1,16 @@
 #!/usr/bin/env python
 
-"""                                                                             
+"""
 
 A library to perform network related operations (setting up TCP connections,
 parsing incoming PDUs, sending out replies, etc) for a GDP service.
-                                                                               
+
 To use GDPService for your own service, at the very minimum, you need to
 subclass GDPService and override the method 'request_handler'. Then, you need
 to create an instance of this service with the 256-bit GDP address that this
 service should listen on and the address of a GDP router (as a
-"IP-address:port" string). 
-                                                                                
+"IP-address:port" string).
+
 Any GDP PDU destined to the GDP address specified for at the instantiation time
 is parsed and passed as a dictionary to the 'request_handler'. This request
 handler should act on the received data and return a python dictionary
@@ -24,9 +24,6 @@ from twisted.internet.protocol import ClientFactory, Protocol
 from twisted.internet import reactor
 import threading
 import struct
-import random
-import argparse
-import threading
 import logging
 
 
@@ -37,13 +34,15 @@ def pprint(d):
 
     def to_hex(data):
         hex_repr = "".join([hex(ord(t))[2:] for t in data])
-        if len(data)>0: hex_repr = '\\x' + hex_repr
+        if len(data) > 0:
+            hex_repr = '\\x' + hex_repr
         return hex_repr
 
     s = "{" + "\n"
     for k in d.keys():
         tmp = d[k]
-        if type(tmp) == type(0): p = str(tmp)
+        if isinstance(tmp, int):
+            p = str(tmp)
         else: p = "'" + to_hex(tmp) + "'"
         s += " '" + k + "': " + p + "," + "\n"
     s += "}"
@@ -57,22 +56,22 @@ class GDPProtocol(Protocol):
     # this is the conventional GDP address of a router
     GDPROUTER_ADDRESS = (chr(255) + chr(0)) * 16
 
-    def __init__(self, GDPaddress, args):
+    def __init__(self, req_handler, GDPaddress):
         """ The GDP address for the service end point """
 
         self.GDPaddress = GDPaddress
-        self.args = args
+        self.request_handler = req_handler
         self.buffer = ""
 
     def connectionMade(self):
 
         # Send the advertisement message
-        self.advertisement = ('\x03' + '\x00' * 2 + '\x01' +
+        advertisement = ('\x03' + '\x00' * 2 + '\x01' +
                             self.GDPROUTER_ADDRESS + self.GDPaddress +
                             '\x00' * 4 + '\x00' * 4 + '\x00'*4 )
 
         ## do network I/O in the reactor thread
-        reactor.callFromThread(self.transport.write, self.advertisement)
+        reactor.callFromThread(self.transport.write, advertisement)
 
 
     def terminateConnection(self, reason):
@@ -82,6 +81,7 @@ class GDPProtocol(Protocol):
         """
 
         # This just terminates the connection
+        logging.info("Terminating connection, %r", reason)
         self.transport.abortConnection()
 
 
@@ -249,10 +249,6 @@ class GDPProtocol(Protocol):
             self.send_PDU(resp, dst=msg_dict['src'])
 
 
-    def request_handler(self, req):
-        pass
-
-
     def send_PDU(self, data, **kwargs):
         """
         Create a GDP message and write it to the network connection
@@ -316,17 +312,13 @@ class GDPProtocol(Protocol):
 
 class GDPProtocolFactory(ClientFactory):
 
-    def __init__(self, GDPaddress, args):
+    def __init__(self, req_handler, GDPaddress):
         self.GDPaddress = GDPaddress
-        self.args = args
+        self.request_handler = req_handler
 
     def buildProtocol(self, remoteaddr):
-        protocol = GDPProtocol(self.GDPaddress, self.args)
-        protocol.request_handler = self.request_handler
+        protocol = GDPProtocol(self.request_handler, self.GDPaddress)
         return protocol
-
-    def request_handler(self,req):
-        pass
 
 
 class GDPService(object):
@@ -343,7 +335,7 @@ class GDPService(object):
     """
 
 
-    def __init__(self, GDPaddress, router, **kwargs):
+    def __init__(self, GDPaddress, router):
         """
         address: 256 bit GDP address
         router: ip:port for a GDP router
@@ -355,17 +347,14 @@ class GDPService(object):
         self.router_port = int(t[1])
         self.GDPaddress = GDPaddress
 
-        self.kwargs = kwargs
-
-        ProtocolFactory = GDPProtocolFactory(GDPaddress, self.kwargs)
-        ProtocolFactory.request_handler = self.request_handler
+        ProtocolFactory = GDPProtocolFactory(self.request_handler, GDPaddress)
 
         ## Call service specific setup code
         self.setup()
 
         ## Establish connection to the router (the reactor isn't running
         ## yet, so this will only get established when 'start()' is called.
-        logging.debug("Connecting to host:%s, port:%d", 
+        logging.debug("Connecting to host:%s, port:%d",
                             self.router_host, self.router_port)
         reactor.connectTCP(self.router_host, self.router_port, ProtocolFactory)
 
@@ -394,10 +383,10 @@ class GDPService(object):
         should put appropriate logic after calling 'start' to keep main thread
         alive as long as possible.
         """
-        self.reactor_thr = threading.Thread(name="ReactorThr",
+        reactor_thr = threading.Thread(name="ReactorThr",
                                  target=reactor.run,
                                  kwargs={'installSignalHandlers':False})
-        self.reactor_thr.start()
+        reactor_thr.start()
 
 
     def stop(self):
