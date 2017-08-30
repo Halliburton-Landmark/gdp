@@ -758,6 +758,7 @@ int scgi_add_header( scgi_desc *d, char *name, char *val )
     if ( !strcmp(val,"GET") ) d->req->request_method = SCGI_METHOD_GET;
     else if ( !strcmp(val,"POST") ) d->req->request_method = SCGI_METHOD_POST;
     else if ( !strcmp(val,"PUT") ) d->req->request_method = SCGI_METHOD_PUT;
+    else if ( !strcmp(val,"OPTIONS") ) d->req->request_method = SCGI_METHOD_OPTIONS;
     else if ( !strcmp(val,"DELETE") ) d->req->request_method = SCGI_METHOD_DELETE;
     else if ( !strcmp(val,"HEAD") ) d->req->request_method = SCGI_METHOD_HEAD;
     else d->req->request_method = SCGI_METHOD_UNKNOWN;

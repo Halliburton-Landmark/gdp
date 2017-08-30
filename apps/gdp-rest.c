@@ -131,6 +131,8 @@ scgi_method_name(types_of_methods_for_http_protocol meth)
 			return "DELETE";
 		case SCGI_METHOD_HEAD:
 			return "HEAD";
+		case SCGI_METHOD_OPTIONS:
+			return "OPTIONS";
 	}
 	return "impossible";
 }
@@ -356,6 +358,21 @@ find_query_kv(const char *key, struct qkvpair *qkvs)
 	return NULL;
 }
 
+/*
+**  CORS200 --- issue an OPTIONS response supportive of javascript CORS needs
+*/
+EP_STAT
+cors200(scgi_request *req)
+{
+	char buf[SCGI_MAX_OUTBUF_SIZE];
+	snprintf(buf, sizeof buf,
+			 "HTTP/1.1 200 OK\r\n"
+			 "Content-Type: text/plain\r\n"
+			 "\r\n"
+ 			 "\r\n");
+	write_scgi(req, buf);
+	return EP_STAT_OK;
+}
 
 /*
 **  ERROR400 --- issue a 400 "Bad Request" error
@@ -1022,6 +1039,10 @@ pfx_gcl(scgi_request *req, char *uri)
 			estat = error404(req, "listing GCLs not implemented (yet)");
 			break;
 
+		case SCGI_METHOD_OPTIONS:
+			estat = cors200(req);
+			break;
+
 		default:
 			// unknown URI/method
 			estat = error405(req,
@@ -1053,6 +1074,10 @@ pfx_gcl(scgi_request *req, char *uri)
 				estat = a_append(req, gcliname, datum);
 				gdp_datum_free(datum);
 			}
+			break;
+
+		case SCGI_METHOD_OPTIONS:
+			estat = cors200(req);
 			break;
 
 		default:
