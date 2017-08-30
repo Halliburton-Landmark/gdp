@@ -217,7 +217,7 @@ _gdp_gcl_dump(
 		fp = ep_dbg_getfile();
 	if (detail >= GDP_PR_BASIC)
 		fprintf(fp, "GCL@%p: ", gcl);
-	VALGRIND_HG_DISABLE_CHECKING(gcl, sizeof gcl);
+	VALGRIND_HG_DISABLE_CHECKING(gcl, sizeof *gcl);
 	if (gcl == NULL)
 	{
 		fprintf(fp, "NULL\n");
@@ -255,7 +255,7 @@ _gdp_gcl_dump(
 			}
 		}
 	}
-	VALGRIND_HG_ENABLE_CHECKING(gcl, sizeof gcl);
+	VALGRIND_HG_ENABLE_CHECKING(gcl, sizeof *gcl);
 }
 
 

@@ -54,21 +54,19 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.gcl.cache", "GCL cache");
 /***********************************************************************
 **
 **	GCL Caching
-**		Let's us find the internal representation of the GCL from
+**		Return the internal representation of the GCL from
 **		the name.  These are not really intended for public use,
 **		but they are shared with gdplogd.
 **
-**		FIXME This is a very stupid implementation at the moment.
-**
-**		FIXME Makes no distinction between io modes (we cludge this
-**			  by just opening everything for r/w for now)
+**		Getting lock ordering right here is a pain.
 **
 ***********************************************************************/
 
-EP_HASH				*_OpenGCLCache;		// associative cache
+EP_HASH					*_OpenGCLCache;		// associative cache
+static EP_THR_MUTEX		GclCacheMutex;		// locks _OpenGCLCache
 LIST_HEAD(gcl_use_head, gdp_gcl)			// LRU cache
-					GclsByUse		= LIST_HEAD_INITIALIZER(GclByUse);
-EP_THR_MUTEX		_GclCacheMutex;
+						GclsByUse		= LIST_HEAD_INITIALIZER(GclByUse);
+static EP_THR_MUTEX		GclsByUseMutex	EP_THR_MUTEX_INITIALIZER;
 
 
 /*
@@ -84,14 +82,14 @@ _gdp_gcl_cache_init(void)
 
 	if (_OpenGCLCache == NULL)
 	{
-		istat = ep_thr_mutex_init(&_GclCacheMutex, EP_THR_MUTEX_RECURSIVE);
+		istat = ep_thr_mutex_init(&GclCacheMutex, EP_THR_MUTEX_DEFAULT);
 		if (istat != 0)
 		{
 			estat = ep_stat_from_errno(istat);
-			err = "could not initialize _GclCacheMutex";
+			err = "could not initialize GclCacheMutex";
 			goto fail0;
 		}
-		ep_thr_mutex_setorder(&_GclCacheMutex, GDP_MUTEX_LORDER_GCLCACHE);
+		ep_thr_mutex_setorder(&GclCacheMutex, GDP_MUTEX_LORDER_GCLCACHE);
 
 		_OpenGCLCache = ep_hash_new("_OpenGCLCache", NULL, 0);
 		if (_OpenGCLCache == NULL)
@@ -161,10 +159,12 @@ add_cache_unlocked(gdp_gcl_t *gcl)
 
 		ep_dbg_cprintf(Dbg, 49, "_gdp_gcl_cache_add(%p): insert into LRU list\n",
 				gcl);
+		ep_thr_mutex_lock(&GclsByUseMutex);
 		IF_LIST_CHECK_OK(&GclsByUse, gcl, ulist, gdp_gcl_t)
 		{
 			LIST_INSERT_HEAD(&GclsByUse, gcl, ulist);
 		}
+		ep_thr_mutex_unlock(&GclsByUseMutex);
 	}
 
 	gcl->flags |= GCLF_INCACHE;
@@ -176,9 +176,9 @@ void
 _gdp_gcl_cache_add(gdp_gcl_t *gcl)
 {
 	EP_THR_MUTEX_ASSERT_ISUNLOCKED(&gcl->mutex);
-	ep_thr_mutex_lock(&_GclCacheMutex);
+	ep_thr_mutex_lock(&GclCacheMutex);
 	add_cache_unlocked(gcl);
-	ep_thr_mutex_unlock(&_GclCacheMutex);
+	ep_thr_mutex_unlock(&GclCacheMutex);
 }
 
 
@@ -199,11 +199,11 @@ _gdp_gcl_cache_changename(gdp_gcl_t *gcl, gdp_name_t newname)
 	EP_ASSERT_ELSE(gdp_name_is_valid(newname), return);
 	EP_ASSERT_ELSE(EP_UT_BITSET(GCLF_INCACHE, gcl->flags), return);
 
-	ep_thr_mutex_lock(&_GclCacheMutex);
+	ep_thr_mutex_lock(&GclCacheMutex);
 	(void) ep_hash_delete(_OpenGCLCache, sizeof (gdp_name_t), gcl->name);
 	(void) memcpy(gcl->name, newname, sizeof (gdp_name_t));
 	(void) ep_hash_insert(_OpenGCLCache, sizeof (gdp_name_t), newname, gcl);
-	ep_thr_mutex_unlock(&_GclCacheMutex);
+	ep_thr_mutex_unlock(&GclCacheMutex);
 
 	ep_dbg_cprintf(Dbg, 40, "_gdp_gcl_cache_changename: %s => %p\n",
 					gcl->pname, gcl);
@@ -237,7 +237,7 @@ _gdp_gcl_cache_get(
 	gdp_gcl_t *gcl;
 	EP_STAT estat = EP_STAT_OK;
 
-	ep_thr_mutex_lock(&_GclCacheMutex);
+	ep_thr_mutex_lock(&GclCacheMutex);
 
 	// see if we have a pointer to this GCL in the cache
 	gcl = ep_hash_search(_OpenGCLCache, sizeof (gdp_name_t), (void *) gcl_name);
@@ -288,7 +288,7 @@ done:
 fail0:
 	if (EP_STAT_ISOK(estat))
 		*pgcl = gcl;
-	ep_thr_mutex_unlock(&_GclCacheMutex);
+	ep_thr_mutex_unlock(&GclCacheMutex);
 	return estat;
 }
 
@@ -312,7 +312,7 @@ _gdp_gcl_cache_drop(gdp_gcl_t *gcl, bool cleanup)
 	GDP_GCL_ASSERT_ISLOCKED(gcl);
 	EP_ASSERT(EP_UT_BITSET(GCLF_INCACHE, gcl->flags));
 	if (!cleanup)
-		EP_THR_MUTEX_ASSERT_ISUNLOCKED(&_GclCacheMutex);
+		EP_THR_MUTEX_ASSERT_ISUNLOCKED(&GclCacheMutex);
 
 	if (!EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
 	{
@@ -332,13 +332,13 @@ _gdp_gcl_cache_drop(gdp_gcl_t *gcl, bool cleanup)
 	// mark it as being dropped to detect race condition
 	gcl->flags |= GCLF_DROPPING;
 
-	// if we're not cleanup up (_GclCacheMutex unlocked) we have to
+	// if we're not cleanup up (GclCacheMutex unlocked) we have to
 	// get the lock ordering right
 	if (!cleanup)
 	{
 		// now lock the cache and then re-lock the GCL
 		_gdp_gcl_unlock(gcl);
-		ep_thr_mutex_lock(&_GclCacheMutex);
+		ep_thr_mutex_lock(&GclCacheMutex);
 		_gdp_gcl_lock(gcl);
 
 		// sanity checks (XXX should these be assertions? XXX)
@@ -356,7 +356,7 @@ _gdp_gcl_cache_drop(gdp_gcl_t *gcl, bool cleanup)
 	if (!cleanup)
 	{
 		// now we can unlock the cache, but leave the GCL locked
-		ep_thr_mutex_unlock(&_GclCacheMutex);
+		ep_thr_mutex_unlock(&GclCacheMutex);
 	}
 
 	ep_dbg_cprintf(Dbg, 40, "_gdp_gcl_cache_drop: %s => %p\n",
@@ -382,7 +382,7 @@ _gdp_gcl_touch(gdp_gcl_t *gcl)
 	gettimeofday(&tv, NULL);
 	gcl->utime = tv.tv_sec;
 
-	ep_thr_mutex_lock(&_GclCacheMutex);
+	ep_thr_mutex_lock(&GclsByUseMutex);
 	if (!GDP_GCL_ASSERT_ISLOCKED(gcl))
 	{
 		// GCL isn't locked: do nothing
@@ -398,7 +398,7 @@ _gdp_gcl_touch(gdp_gcl_t *gcl)
 		IF_LIST_CHECK_OK(&GclsByUse, gcl, ulist, gdp_gcl_t)
 			LIST_INSERT_HEAD(&GclsByUse, gcl, ulist);
 	}
-	ep_thr_mutex_unlock(&_GclCacheMutex);
+	ep_thr_mutex_unlock(&GclsByUseMutex);
 }
 
 
@@ -452,7 +452,7 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 		gettimeofday(&tv, NULL);
 		mintime = tv.tv_sec - maxage;
 
-		ep_thr_mutex_lock(&_GclCacheMutex);
+		ep_thr_mutex_lock(&GclsByUseMutex);
 		for (g1 = LIST_FIRST(&GclsByUse); g1 != NULL; g1 = g2)
 		{
 			if (loopcount++ > maxgcls)
@@ -499,7 +499,7 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 			// release memory (this will also unlock the corpse)
 			_gdp_gcl_freehandle(g1);
 		}
-		ep_thr_mutex_unlock(&_GclCacheMutex);
+		ep_thr_mutex_unlock(&GclsByUseMutex);
 
 		// check to see if we have enough headroom
 		int maxfds;
@@ -584,10 +584,12 @@ static void
 rebuild_lru_list(void)
 {
 	ep_dbg_cprintf(Dbg, 2, "rebuild_lru_list: rebuilding\n");
-	ep_thr_mutex_lock(&_GclCacheMutex);
+	ep_thr_mutex_unlock(&GclCacheMutex);
+	ep_thr_mutex_lock(&GclsByUseMutex);
 	LIST_INIT(&GclsByUse);
 	ep_hash_forall(_OpenGCLCache, sorted_insert);
-	ep_thr_mutex_unlock(&_GclCacheMutex);
+	ep_thr_mutex_unlock(&GclsByUseMutex);
+	ep_thr_mutex_unlock(&GclCacheMutex);
 }
 
 

@@ -615,8 +615,8 @@ gdp_pdu_proc_resp(void *rpdu_)
 		gdp_gcl_t *gcl = req->gcl;
 		GDP_GCL_ASSERT_ISLOCKED(gcl);
 		_gdp_gcl_decref(&gcl, false);
-		if (req->gcl->refcnt <= 0)		//DEBUG
-			req->gcl = NULL;			//DEBUG
+//DEBUG:		if (req->gcl->refcnt <= 0)		//DEBUG
+//DEBUG:			req->gcl = NULL;			//DEBUG
 	}
 
 	if (EP_UT_BITSET(GDP_REQ_CORE, req->flags) &&

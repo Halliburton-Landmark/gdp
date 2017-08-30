@@ -602,7 +602,7 @@ _gdp_req_dump(const gdp_req_t *req, FILE *fp, int detail, int indent)
 		fprintf(fp, "req@%p: null\n", req);
 		return;
 	}
-	VALGRIND_HG_DISABLE_CHECKING(req, sizeof req);
+	VALGRIND_HG_DISABLE_CHECKING(req, sizeof *req);
 	flockfile(fp);
 	fprintf(fp, "req@%p:\n", req);
 	fprintf(fp, "    nextrec=%" PRIgdp_recno ", numrecs=%" PRIu32 ", chan=%p\n"
@@ -628,7 +628,7 @@ _gdp_req_dump(const gdp_req_t *req, FILE *fp, int detail, int indent)
 		_gdp_pdu_dump(req->rpdu, fp);
 	}
 	funlockfile(fp);
-	VALGRIND_HG_ENABLE_CHECKING(req, sizeof req);
+	VALGRIND_HG_ENABLE_CHECKING(req, sizeof *req);
 }
 
 
