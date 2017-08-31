@@ -118,7 +118,6 @@ class logCreationService(GDPService):
                 return self.gen_nak(req, GDP_NAK_S_NOTIMPL)
 
             ## By now, we know the request is a CREATE request from a client
-            logging.info("Received Create request from a client")
 
             ## figure out the data we need to insert in the database
             logname = req['data'][:32]
@@ -131,6 +130,9 @@ class logCreationService(GDPService):
             __logname = gdp.GDP_NAME(logname).printable_name()
             __srvname = gdp.GDP_NAME(srvname).printable_name()
             __creator = gdp.GDP_NAME(creator).printable_name()
+
+            logging.info("Received Create request for logname %r"
+                                "picking server %r", __logname, __srvname)
 
             try:
                 logging.debug("inserting to database %r, %r, %r, %d",
@@ -162,7 +164,8 @@ class logCreationService(GDPService):
                 logging.info("error: received a non-response from logserver")
                 return self.gen_nak(req, GDP_NAK_C_BADREQ)
 
-            logging.info("Received response from a log-server")
+            logging.info("Received response from log-server, row %d",
+                                                                req['rid'])
 
             ## Fetch the original creator and rid from our database
             self.cur.execute("""SELECT creator, rid, ack_seen FROM logs
@@ -180,7 +183,7 @@ class logCreationService(GDPService):
                 logging.info("error: bogus response")
                 return self.gen_nak(req, GDP_NAK_C_BADREQ)
             else:
-                logging.info("Setting ack_seen to 1 for row %d", req['rid'])
+                logging.debug("Setting ack_seen to 1 for row %d", req['rid'])
                 self.cur.execute("""UPDATE logs SET ack_seen=1
                                             WHERE rowid=?""", (req['rid'],))
                 self.conn.commit()
