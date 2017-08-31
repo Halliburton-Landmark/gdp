@@ -1,0 +1,27 @@
+[Unit]
+Description=GDP log-creation service
+After=network-online.target
+
+[Service]
+Type=simple
+; Following should be tweaked for individual environments
+User=gdp
+WorkingDirectory=/opt/gdp/services/
+ExecStart=/usr/bin/python logCreationService.py \
+        -i gdp-01.eecs.berkeley.edu -p 8007 -d logs.db \
+         -a "edu.berkeley.eecs.gdp-01.gdplogd" \
+            "edu.berkeley.eecs.gdp-02.gdplogd" \
+            "edu.berkeley.eecs.gdp-03.gdplogd" \
+            "edu.berkeley.eecs.gdp-04.gdplogd" \
+         -s "edu.berkeley.eecs.gdp-01.gdplogd.physical" \
+            "edu.berkeley.eecs.gdp-02.gdplogd.physical" \
+            "edu.berkeley.eecs.gdp-03.gdplogd.physical" \
+            "edu.berkeley.eecs.gdp-04.gdplogd.physical" 
+
+Restart=always
+StandardOutput=syslog
+StandardError=inherit
+SyslogIdentifier=logCreationService
+
+[Install]
+WantedBy=multi-user.target
