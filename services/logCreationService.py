@@ -126,12 +126,13 @@ class logCreationService(GDPService):
             creator = req['src']
             rid = req['rid']
 
-            ## log this to our backend database
-            __logname = gdp.GDP_NAME(logname).printable_name()
-            __srvname = gdp.GDP_NAME(srvname).printable_name()
-            __creator = gdp.GDP_NAME(creator).printable_name()
+            ## log this to our backend database. Generate printable
+            ## names (except the null character, which causes problems)
+            __logname = gdp.GDP_NAME(logname).printable_name()[:-1]
+            __srvname = gdp.GDP_NAME(srvname).printable_name()[:-1]
+            __creator = gdp.GDP_NAME(creator).printable_name()[:-1]
 
-            logging.info("Received Create request for logname %r"
+            logging.info("Received Create request for logname %r, "
                                 "picking server %r", __logname, __srvname)
 
             try:
