@@ -448,14 +448,16 @@ _gdp_gcl_append(gdp_gcl_t *gcl,
 
 	// send the request to the log server
 	estat = _gdp_invoke(req);
-	if (EP_STAT_ISOK(estat))
-		gcl->nrecs = datum->recno;
+	EP_STAT_CHECK(estat, goto fail1);
 
+	// collect results
+	gcl->nrecs = datum->recno;
 	gdp_buf_reset(datum->dbuf);
 	if (datum->sig != NULL)
 		gdp_buf_reset(datum->sig);
 	gdp_datum_copy(datum, req->rpdu->datum);
 
+fail1:
 	_gdp_req_free(&req);
 fail0:
 	if (ep_dbg_test(Dbg, 42))
