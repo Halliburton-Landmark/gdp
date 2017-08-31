@@ -24,6 +24,7 @@ SERVICE_NAMES = ['logcreationservice']
 DEFAULT_ROUTER_PORT = 8007
 DEFAULT_ROUTER_HOST = "172.30.0.1"
 
+GDPROUTER_ADDRESS = (chr(255) + chr(0)) * 16
 ### these come from gdp/gdp_pdu.h from the GDP C library
 
 # Acks/Naks
@@ -35,6 +36,8 @@ GDP_NAK_C_MIN = 223
 GDP_NAC_C_MAX = 239
 GDP_NAK_R_MIN = 240
 GDP_NAK_R_MAX = 254
+GDP_NAK_C_CONFLICT = 201
+GDP_NAK_S_NOTIMPL = 225
 
 # specific commands
 GDP_CMD_CREATE = 66
@@ -96,21 +99,25 @@ class logCreationService(GDPService):
         a log-server.
         """
 
-        # check if it's a request from a client or a response from a logd.
+        # early exit if a router told us something (usually not a good
+        # sign)
+        if req['src'] == GDPROUTER_ADDRESS:
+            return
 
+        # check if it's a request from a client or a response from a logd.
         if req['cmd'] < 128:      ## it's a command
 
             ## First check for any error conditions. If any of the
             ## following occur, we ought to send back a NAK
-
             if req['src'] in self.logservers:
                 logging.info("error: received cmd %d from server", req['cmd'])
-                return self.gen_bad_request_resp(req)
+                return self.gen_nak(req, GDP_NAK_C_BADREQ)
 
             if req['cmd'] != GDP_CMD_CREATE:
                 logging.info("error: recieved unknown request")
-                return self.gen_bad_request_resp(req)
+                return self.gen_nak(req, GDP_NAK_S_NOTIMPL)
 
+            ## By now, we know the request is a CREATE request from a client
             logging.info("Received Create request from a client")
 
             ## figure out the data we need to insert in the database
@@ -124,6 +131,7 @@ class logCreationService(GDPService):
             __logname = gdp.GDP_NAME(logname).printable_name()
             __srvname = gdp.GDP_NAME(srvname).printable_name()
             __creator = gdp.GDP_NAME(creator).printable_name()
+
             try:
                 logging.debug("inserting to database %r, %r, %r, %d",
                                 __logname, __srvname, __creator, rid)
@@ -133,9 +141,8 @@ class logCreationService(GDPService):
                 self.conn.commit()
 
             except sqlite3.IntegrityError:
-
                 logging.info("Log already exists")
-                return self.gen_bad_request_resp(req)
+                return self.gen_nak(req, GDP_NAK_C_CONFLICT)
 
             ## Send a spoofed request to the logserver
             spoofed_req = req.copy()
@@ -153,7 +160,7 @@ class logCreationService(GDPService):
             ## Sanity checking
             if req['src'] not in self.logservers:
                 logging.info("error: received a non-response from logserver")
-                return self.gen_bad_request_resp(req)
+                return self.gen_nak(req, GDP_NAK_C_BADREQ)
 
             logging.info("Received response from a log-server")
 
@@ -171,7 +178,7 @@ class logCreationService(GDPService):
 
             if not good_resp:
                 logging.info("error: bogus response")
-                return self.gen_bad_request_resp(req)
+                return self.gen_nak(req, GDP_NAK_C_BADREQ)
             else:
                 logging.info("Setting ack_seen to 1 for row %d", req['rid'])
                 self.cur.execute("""UPDATE logs SET ack_seen=1
@@ -188,9 +195,9 @@ class logCreationService(GDPService):
             return spoofed_reply
 
 
-    def gen_bad_request_resp(self, req):
+    def gen_nak(self, req, nak=GDP_NAK_C_BADREQ):
         resp = dict()
-        resp['cmd'] = GDP_NAK_C_BADREQ
+        resp['cmd'] = nak
         resp['src'] = req['dst']
         resp['dst'] = req['src']
         return resp
@@ -224,7 +231,7 @@ if __name__ == "__main__":
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG)
     else:
-        logging.basicConfig(level=logging.WARN)
+        logging.basicConfig(level=logging.INFO)
 
     ## parse arguments
     router = "%s:%d" % (args.host, args.port)
