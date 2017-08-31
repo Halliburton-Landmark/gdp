@@ -382,7 +382,6 @@ gdp_gcl_create(gdp_name_t gclname,
 	if (EP_STAT_ISOK(estat))
 	{
 		(*pgcl)->iomode = GDP_MODE_ANY;
-		_gdp_gcl_unlock(*pgcl);
 	}
 	else
 	{

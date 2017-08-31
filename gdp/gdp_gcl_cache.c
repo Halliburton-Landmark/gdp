@@ -115,19 +115,23 @@ fail0:
 
 /*
 **  Add a GCL to both the associative and the LRU caches.
+**  The "unlocked" refers to GclCacheMutex, which should already
+**  be locked on entry.  The GCL is also expected to be locked.
 */
 
-void
+static void
 add_cache_unlocked(gdp_gcl_t *gcl)
 {
+	ep_dbg_cprintf(Dbg, 49, "_gdp_gcl_cache_add(%p): adding\n", gcl);
+
 	// sanity checks
 	if (!GDP_GCL_ASSERT_ISLOCKED(gcl))
 		return;
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&GclCacheMutex);
 
-	ep_dbg_cprintf(Dbg, 49, "_gdp_gcl_cache_add(%p): adding\n", gcl);
 	if (EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
 	{
-		ep_dbg_cprintf(Dbg, 41,
+		ep_dbg_cprintf(Dbg, 9,
 				"_gdp_gcl_cache_add(%p): already cached\n",
 				gcl);
 		return;
@@ -172,11 +176,22 @@ add_cache_unlocked(gdp_gcl_t *gcl)
 			gcl->pname, gcl);
 }
 
+
+/*
+**	Wrapper for add_cache_unlocked that takes care of locking
+**	GclCacheMutex.  Since that *must* be locked before the GCL,
+**	we have to unlock the GCL before we lock GclCache.
+**	This should be OK since presumably the GCL is not in the
+**	cache and hence not accessible to other threads.
+*/
+
 void
 _gdp_gcl_cache_add(gdp_gcl_t *gcl)
 {
-	EP_THR_MUTEX_ASSERT_ISUNLOCKED(&gcl->mutex);
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
+	_gdp_gcl_unlock(gcl);
 	ep_thr_mutex_lock(&GclCacheMutex);
+	_gdp_gcl_lock(gcl);
 	add_cache_unlocked(gcl);
 	ep_thr_mutex_unlock(&GclCacheMutex);
 }
@@ -387,7 +402,7 @@ _gdp_gcl_touch(gdp_gcl_t *gcl)
 	{
 		// GCL isn't locked: do nothing
 	}
-	else if (!EP_ASSERT(EP_UT_BITSET(GCLF_INCACHE, gcl->flags)))
+	else if (!EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
 	{
 		// GCL isn't in cache: do nothing
 	}
@@ -689,4 +704,24 @@ _gdp_gcl_cache_dump(int plev, FILE *fp)
 
 	ep_hash_forall(_OpenGCLCache, check_cache, fp);
 	fprintf(fp, "\n<<< End of cached GCL list >>>\n");
+}
+
+
+/*
+**  Do a pass over all known GCLs.  Used for reclaimation.
+*/
+
+void
+_gdp_gcl_cache_foreach(void (*f)(gdp_gcl_t *))
+{
+	gdp_gcl_t *g1;
+	gdp_gcl_t *g2;
+
+	ep_thr_mutex_lock(&GclsByUseMutex);
+	for (g1 = LIST_FIRST(&GclsByUse); g1 != NULL; g1 = g2)
+	{
+		g2 = LIST_NEXT(g1, ulist);
+		(*f)(g1);
+	}
+	ep_thr_mutex_unlock(&GclsByUseMutex);
 }

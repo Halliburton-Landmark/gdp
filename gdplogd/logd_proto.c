@@ -292,14 +292,19 @@ cmd_create(gdp_req_t *req)
 	estat = gcl_alloc(gclname, GDP_MODE_AO, &gcl);
 	EP_STAT_CHECK(estat, goto fail0);
 
-	_gdp_gcl_lock(gcl);
+	// collect metadata, if any
+	gmd = _gdp_gclmd_deserialize(req->cpdu->datum->dbuf);
+
+	ep_thr_mutex_unlock(&req->cpdu->datum->mutex);
+
+	// have to get lock ordering right here.
+	// safe because no one else can have a handle on this req.
 	req->gcl = gcl;			// for debugging
+	_gdp_req_unlock(req);
+	_gdp_gcl_lock(gcl);
 
 	// assume both read and write modes
 	gcl->iomode = GDP_MODE_RA;
-
-	// collect metadata, if any
-	gmd = _gdp_gclmd_deserialize(req->cpdu->datum->dbuf);
 
 	// no further input, so we can reset the buffer just to be safe
 	flush_input_data(req, "cmd_create");
@@ -310,13 +315,16 @@ cmd_create(gdp_req_t *req)
 	if (!EP_STAT_ISOK(estat))
 	{
 		req->rpdu->cmd = GDP_NAK_S_INTERNAL;
-		goto fail0;
+		goto fail1;
 	}
 
 	// cache the open GCL Handle for possible future use
+	// notice the dance around lock ordering
 	EP_ASSERT(gdp_name_is_valid(gcl->name));
 	gcl->flags |= GCLF_DEFER_FREE;
+	gcl->flags &= ~GCLF_PENDING;
 	_gdp_gcl_cache_add(gcl);
+	_gdp_req_lock(req);
 
 	// advertise this new GCL
 	logd_advertise_one(gcl->name, GDP_CMD_ADVERTISE);
@@ -324,8 +332,12 @@ cmd_create(gdp_req_t *req)
 	// pass any creation info back to the caller
 	// (none at this point)
 
+	if (false)
+	{
 fail0:
-	ep_thr_mutex_unlock(&req->cpdu->datum->mutex);
+		ep_thr_mutex_unlock(&req->cpdu->datum->mutex);
+	}
+fail1:
 	if (gcl != NULL)
 	{
 		char ebuf[60];

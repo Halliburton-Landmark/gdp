@@ -113,26 +113,29 @@ _gdp_gcl_create(gdp_name_t gclname,
 	// send command and wait for results
 	estat = _gdp_invoke(req);
 	EP_STAT_CHECK(estat, goto fail1);
+	GDP_GCL_ASSERT_ISLOCKED(gcl);
 
-	// change the GCL name to the true name so it will match up with response
-	_gdp_gcl_cache_changename(gcl, gclname);
+	// change GCL name
+	(void) memcpy(gcl->name, gclname, sizeof (gdp_name_t));
+
+	// add new GCL to cache
+	EP_ASSERT(req->gcl == gcl);
+	_gdp_gcl_cache_add(gcl);
+	req->gcl = NULL;			// avoid decref in _gdp_req_free
 
 	// free resources and return results
-	_gdp_req_free(&req);
 	*pgcl = gcl;
-	return estat;
 
 fail0:
-	if (gcl != NULL)
-		_gdp_gcl_decref(&gcl, false);
 fail1:
 	if (req != NULL)
 		_gdp_req_free(&req);
+	_gdp_gcl_unlock(gcl);
 
 	{
 		char ebuf[100];
 
-		ep_dbg_cprintf(Dbg, 8, "Could not create GCL: %s\n",
+		ep_dbg_cprintf(Dbg, 8, "_gdp_gcl_create <<< %s\n",
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 	return estat;

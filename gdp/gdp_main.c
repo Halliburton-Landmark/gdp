@@ -205,7 +205,7 @@ gdp_pdu_proc_cmd(void *cpdu_)
 		}
 	}
 
-	// cmd_open can return a new GCL in the req
+	// cmd_open and cmd_create can return a new GCL in the req
 	if (gcl == NULL && req->gcl != NULL)
 	{
 		gcl = req->gcl;

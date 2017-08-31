@@ -281,13 +281,9 @@ sub_end_all_subscriptions(
 
 // helper (does most of the work)
 static void
-gcl_reclaim_subscriptions(size_t klen,
-		const void *key,
-		void *gcl_,
-		va_list av)
+gcl_reclaim_subscriptions(gdp_gcl_t *gcl)
 {
 	int istat;
-	gdp_gcl_t *gcl = gcl_;
 	gdp_req_t *req;
 	gdp_req_t *nextreq;
 	EP_TIME_SPEC sub_timeout;
@@ -403,5 +399,5 @@ gcl_reclaim_subscriptions(size_t klen,
 void
 sub_reclaim_resources(gdp_chan_t *chan)
 {
-	ep_hash_forall(_OpenGCLCache, gcl_reclaim_subscriptions);
+	_gdp_gcl_cache_foreach(gcl_reclaim_subscriptions);
 }

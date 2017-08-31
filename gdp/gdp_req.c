@@ -223,7 +223,7 @@ _gdp_req_new(int cmd,
 	// success
 	*reqp = req;
 	ep_dbg_cprintf(Dbg, 48, "_gdp_req_new(gcl=%p, cmd=%s) => %p (rid=%d)\n",
-			gcl, _gdp_proto_cmd_name(cmd), req, pdu->rid);
+			req->gcl, _gdp_proto_cmd_name(cmd), req, pdu->rid);
 	return estat;
 }
 
@@ -236,6 +236,7 @@ _gdp_req_new(int cmd,
 **
 **		The request must be locked on entry.
 **		A GCL in the request must be unlocked on entry.
+**		It will still be locked on return.   XXX why?
 */
 
 void
@@ -434,11 +435,6 @@ _gdp_req_send(gdp_req_t *req)
 		GDP_GCL_ASSERT_ISLOCKED(gcl);
 		LIST_INSERT_HEAD(&gcl->reqs, req, gcllist);
 		req->flags |= GDP_REQ_ON_GCL_LIST;
-
-		// register this handle so we can process the results
-		//		(it's likely that it's already in the cache)
-//DEBUG:		ep_dbg_cprintf(Dbg, 49, "_gdp_req_send(%p) adding to cache\n", gcl);
-//DEBUG:		_gdp_gcl_cache_add(gcl, 0);
 	}
 
 	// write the message out

@@ -294,6 +294,9 @@ void			_gdp_gcl_cache_shutdown(	// immediately shut down cache
 void			_gdp_gcl_touch(				// move to front of LRU list
 						gdp_gcl_t *gcl);
 
+void			_gdp_gcl_cache_foreach(		// run over all cached GCLs
+						void (*f)(gdp_gcl_t *));
+
 void			_gdp_gcl_lock_trace(		// lock the GCL mutex
 						gdp_gcl_t *gcl,
 						const char *file,
