@@ -14,14 +14,12 @@ crossorigin="anonymous"></script>
 
     <H4>
       <pre>
-      A sequence of restful calls are made to append the gcl_id and a
-      timestamp (JSON key "testcase") to a GDP test log HTTP methods,
-      where each append is followed by a read to verify the timestamp
-      through visual inspection. A completely successful sequence (all
-      200 responses) verifies that the server is supporting CORS
-      requirements with basic authentication. Web browsers will
-      normally produce a pre-flight HTTP OPTIONS method request as a
-      side effect of an explicit HTTP {GET|PUT|POST} method request.
+      A restful call is made to append a record, containing log name
+      and timestamp fields, to a GDP test log. That is followed by a
+      read of the log's last record, which should display the same
+      timestamp, appended to the "testcase" field. A completely
+      successful sequence (all 200 responses) verifies that the server
+      is supporting CORS requirements with basic authentication.
       </pre>
     </H4>
 
