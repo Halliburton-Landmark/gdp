@@ -231,7 +231,7 @@ if __name__ == "__main__":
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG)
     else:
-        logging.basicConfig(level=logging.WARN)
+        logging.basicConfig(level=logging.INFO)
 
     ## parse arguments
     router = "%s:%d" % (args.host, args.port)
