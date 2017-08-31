@@ -20,7 +20,8 @@ are overridden in the response dictionary.
 
 """
 
-from twisted.internet.protocol import ClientFactory, Protocol
+from twisted.internet.protocol import ReconnectingClientFactory, Protocol
+from twisted.internet.task import LoopingCall
 from twisted.internet import reactor
 import threading
 import struct
@@ -62,15 +63,27 @@ class GDPProtocol(Protocol):
         self.GDPaddrs = GDPaddrs
         self.request_handler = req_handler
         self.buffer = ""
+        self.advertising_call = None
 
-    def connectionMade(self):
 
+    def advertise(self):
         # Send the advertisement messages, do network I/O in reactor thread
+        logging.info("%r, Advertising %d names", self, len(self.GDPaddrs))
         for addr in self.GDPaddrs:
             advertisement = ('\x03' + '\x00' * 2 + '\x01' +
                             self.GDPROUTER_ADDRESS + addr +
                             '\x00' * 4 + '\x00' * 4 + '\x00'*4 )
             reactor.callFromThread(self.transport.write, advertisement)
+
+
+    def connectionMade(self):
+        """
+        This gets called when the connection gets established
+        """
+        logging.info("Connection made")
+        ## periodic readvertisements, also doubles as a keep-alive
+        self.advertising_call = LoopingCall(self.advertise)
+        self.advertising_call.start(30, now=True)
 
 
     def terminateConnection(self, reason):
@@ -310,17 +323,27 @@ class GDPProtocol(Protocol):
 
 
 
-class GDPProtocolFactory(ClientFactory):
+class GDPProtocolFactory(ReconnectingClientFactory):
 
     def __init__(self, req_handler, GDPaddrs):
         "Initialize with the request handler and list of GDP addresses"
         self.GDPaddrs = GDPaddrs
         self.request_handler = req_handler
+        self.protocol = None
 
     def buildProtocol(self, remoteaddr):
-        protocol = GDPProtocol(self.request_handler, self.GDPaddrs)
-        return protocol
+        self.protocol = GDPProtocol(self.request_handler, self.GDPaddrs)
+        return self.protocol
 
+    def clientConnectionLost(self, connector, reason):
+        logging.error("Conenction lost: %r", reason)
+        self.protocol.advertising_call.stop()
+        ReconnectingClientFactory.clientConnectionLost(self, connector, reason)
+
+    def clientConnectionFailed(self, connector, reason):
+        logging.error("Connection failed: %r", reason)
+        ReconnectingClientFactory.clientConnectionFailed(self,
+                                                            connector, reason)
 
 class GDPService(object):
     """
