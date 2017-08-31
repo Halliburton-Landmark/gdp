@@ -823,7 +823,7 @@ void scgi_deal_with_socket_out_of_ram( scgi_desc *d )
 int scgi_initialize(int port)
 {
   scgi_port *p;
-  int status, sock;
+  int status, sock, on = 1;
   struct addrinfo hints, *servinfo;
   char portstr[128];
 
@@ -845,6 +845,8 @@ int scgi_initialize(int port)
 
   if ( sock == -1 )
     return 0;
+
+  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (const void *)&on, sizeof(on));
 
   if ( bind(sock, servinfo->ai_addr, servinfo->ai_addrlen) == -1
   ||   listen(sock, SCGI_LISTEN_BACKLOG_PER_PORT) == -1 )
