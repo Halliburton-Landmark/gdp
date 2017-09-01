@@ -1,7 +1,6 @@
 [Unit]
 Description=GDP REST gateway
-Wants=gdplogd lighttpd
-After=gdplogd
+Wants=lighttpd.service
 
 [Service]
 Type=notify
