@@ -236,7 +236,11 @@ done:
 **		not the log; the log name is in the payload.  However, we
 **		respond using the name of the new log rather than the
 **		daemon.
+**
+**		Create has too many exceptions, so we single thread it.
 */
+
+static EP_THR_MUTEX		GclCreateMutex			EP_THR_MUTEX_INITIALIZER;
 
 EP_STAT
 cmd_create(gdp_req_t *req)
@@ -297,6 +301,9 @@ cmd_create(gdp_req_t *req)
 
 	ep_thr_mutex_unlock(&req->cpdu->datum->mutex);
 
+	// single thread the guts
+	ep_thr_mutex_lock(&GclCreateMutex);
+
 	// have to get lock ordering right here.
 	// safe because no one else can have a handle on this req.
 	req->gcl = gcl;			// for debugging
@@ -338,6 +345,7 @@ fail0:
 		ep_thr_mutex_unlock(&req->cpdu->datum->mutex);
 	}
 fail1:
+	ep_thr_mutex_unlock(&GclCreateMutex);
 	if (gcl != NULL)
 	{
 		char ebuf[60];

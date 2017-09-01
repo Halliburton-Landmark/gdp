@@ -62,11 +62,10 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.gcl.cache", "GCL cache");
 **
 ***********************************************************************/
 
+static EP_THR_MUTEX		GclCacheMutex;		// locks _OpenGCLCache and GclsByUse
 EP_HASH					*_OpenGCLCache;		// associative cache
-static EP_THR_MUTEX		GclCacheMutex;		// locks _OpenGCLCache
 LIST_HEAD(gcl_use_head, gdp_gcl)			// LRU cache
 						GclsByUse		= LIST_HEAD_INITIALIZER(GclByUse);
-static EP_THR_MUTEX		GclsByUseMutex	EP_THR_MUTEX_INITIALIZER;
 
 
 /*
@@ -163,12 +162,10 @@ add_cache_unlocked(gdp_gcl_t *gcl)
 
 		ep_dbg_cprintf(Dbg, 49, "_gdp_gcl_cache_add(%p): insert into LRU list\n",
 				gcl);
-		ep_thr_mutex_lock(&GclsByUseMutex);
 		IF_LIST_CHECK_OK(&GclsByUse, gcl, ulist, gdp_gcl_t)
 		{
 			LIST_INSERT_HEAD(&GclsByUse, gcl, ulist);
 		}
-		ep_thr_mutex_unlock(&GclsByUseMutex);
 	}
 
 	gcl->flags |= GCLF_INCACHE;
@@ -397,7 +394,7 @@ _gdp_gcl_touch(gdp_gcl_t *gcl)
 	gettimeofday(&tv, NULL);
 	gcl->utime = tv.tv_sec;
 
-	ep_thr_mutex_lock(&GclsByUseMutex);
+//DEBUG:	ep_thr_mutex_lock(&GclCacheMutex);
 	if (!GDP_GCL_ASSERT_ISLOCKED(gcl))
 	{
 		// GCL isn't locked: do nothing
@@ -413,7 +410,7 @@ _gdp_gcl_touch(gdp_gcl_t *gcl)
 		IF_LIST_CHECK_OK(&GclsByUse, gcl, ulist, gdp_gcl_t)
 			LIST_INSERT_HEAD(&GclsByUse, gcl, ulist);
 	}
-	ep_thr_mutex_unlock(&GclsByUseMutex);
+//DEBUG:	ep_thr_mutex_unlock(&GclCacheMutex);
 }
 
 
@@ -467,7 +464,7 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 		gettimeofday(&tv, NULL);
 		mintime = tv.tv_sec - maxage;
 
-		ep_thr_mutex_lock(&GclsByUseMutex);
+		ep_thr_mutex_lock(&GclCacheMutex);
 		for (g1 = LIST_FIRST(&GclsByUse); g1 != NULL; g1 = g2)
 		{
 			if (loopcount++ > maxgcls)
@@ -514,7 +511,7 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 			// release memory (this will also unlock the corpse)
 			_gdp_gcl_freehandle(g1);
 		}
-		ep_thr_mutex_unlock(&GclsByUseMutex);
+		ep_thr_mutex_unlock(&GclCacheMutex);
 
 		// check to see if we have enough headroom
 		int maxfds;
@@ -599,11 +596,9 @@ static void
 rebuild_lru_list(void)
 {
 	ep_dbg_cprintf(Dbg, 2, "rebuild_lru_list: rebuilding\n");
-	ep_thr_mutex_unlock(&GclCacheMutex);
-	ep_thr_mutex_lock(&GclsByUseMutex);
+	ep_thr_mutex_lock(&GclCacheMutex);
 	LIST_INIT(&GclsByUse);
 	ep_hash_forall(_OpenGCLCache, sorted_insert);
-	ep_thr_mutex_unlock(&GclsByUseMutex);
 	ep_thr_mutex_unlock(&GclCacheMutex);
 }
 
@@ -717,11 +712,11 @@ _gdp_gcl_cache_foreach(void (*f)(gdp_gcl_t *))
 	gdp_gcl_t *g1;
 	gdp_gcl_t *g2;
 
-	ep_thr_mutex_lock(&GclsByUseMutex);
+	ep_thr_mutex_lock(&GclCacheMutex);
 	for (g1 = LIST_FIRST(&GclsByUse); g1 != NULL; g1 = g2)
 	{
 		g2 = LIST_NEXT(g1, ulist);
 		(*f)(g1);
 	}
-	ep_thr_mutex_unlock(&GclsByUseMutex);
+	ep_thr_mutex_unlock(&GclCacheMutex);
 }

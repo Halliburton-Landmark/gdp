@@ -358,6 +358,8 @@ fail0:
 **	GDP_GCL_CREATE --- create a new GCL
 */
 
+static EP_THR_MUTEX		GlobalGclCreateMutex		EP_THR_MUTEX_INITIALIZER;
+
 EP_STAT
 gdp_gcl_create(gdp_name_t gclname,
 				gdp_name_t logdname,
@@ -370,6 +372,9 @@ gdp_gcl_create(gdp_name_t gclname,
 	ep_dbg_cprintf(Dbg, 19, "\n>>> gdp_gcl_create\n");
 	estat = GDP_CHECK_INITIALIZED;		// make sure gdp_init is done
 	EP_STAT_CHECK(estat, goto fail0);
+
+	// create is just too wierd --- single thread it
+	ep_thr_mutex_lock(&GlobalGclCreateMutex);
 
 	if (gclname == NULL)
 	{
@@ -388,6 +393,7 @@ gdp_gcl_create(gdp_name_t gclname,
 		*pgcl = NULL;
 	}
 fail0:
+	ep_thr_mutex_unlock(&GlobalGclCreateMutex);
 	prstat(estat, *pgcl, "gdp_gcl_create");
 	return estat;
 }
