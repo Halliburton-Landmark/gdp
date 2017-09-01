@@ -412,7 +412,6 @@ _gdp_gcl_touch(gdp_gcl_t *gcl)
 	gettimeofday(&tv, NULL);
 	gcl->utime = tv.tv_sec;
 
-//DEBUG:	ep_thr_mutex_lock(&GclCacheMutex);
 	if (!GDP_GCL_ASSERT_ISLOCKED(gcl))
 	{
 		// GCL isn't locked: do nothing
@@ -428,7 +427,6 @@ _gdp_gcl_touch(gdp_gcl_t *gcl)
 		IF_LIST_CHECK_OK(&GclsByUse, gcl, ulist, gdp_gcl_t)
 			LIST_INSERT_HEAD(&GclsByUse, gcl, ulist);
 	}
-//DEBUG:	ep_thr_mutex_unlock(&GclCacheMutex);
 }
 
 

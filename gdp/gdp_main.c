@@ -156,7 +156,6 @@ gdp_pdu_proc_cmd(void *cpdu_)
 	{
 		GDP_GCL_ASSERT_ISLOCKED(gcl);
 		EP_ASSERT(gcl->refcnt > 0);
-		ep_dbg_cprintf(Dbg, 23, "  +++ 0 : %d\n", gcl->refcnt);	//DEBUG:
 	}
 
 	ep_dbg_cprintf(Dbg, 43,
@@ -165,10 +164,6 @@ gdp_pdu_proc_cmd(void *cpdu_)
 	EP_STAT_CHECK(estat, goto fail0);
 	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex);
 	EP_ASSERT(gcl == req->gcl);
-	if (gcl != NULL)	//DEBUG:
-		ep_dbg_cprintf(Dbg, 23, "  +++ 1 : %d\n", gcl->refcnt);	//DEBUG:
-	if (req->gcl != NULL)	//DEBUG:
-		ep_dbg_cprintf(Dbg, 23, "  +++ 1': %d\n", req->gcl->refcnt);	//DEBUG:
 
 	ep_dbg_cprintf(Dbg, 40, "gdp_pdu_proc_cmd >>> req=%p\n", req);
 
@@ -186,10 +181,6 @@ gdp_pdu_proc_cmd(void *cpdu_)
 
 	// do the per-command processing
 	estat = _gdp_req_dispatch(req, cmd);
-	if (gcl != NULL)	//DEBUG:
-		ep_dbg_cprintf(Dbg, 23, "  +++ 2 : %d\n", gcl->refcnt);	//DEBUG:
-	if (req->gcl != NULL)	//DEBUG:
-		ep_dbg_cprintf(Dbg, 23, "  +++ 2': %d\n", req->gcl->refcnt);	//DEBUG:
 	if (ep_dbg_test(Dbg, 59))
 	{
 		ep_dbg_printf("gdp_pdu_proc_cmd: after dispatch, ");
@@ -217,8 +208,6 @@ gdp_pdu_proc_cmd(void *cpdu_)
 		gcl = req->gcl;
 		_gdp_gcl_incref(gcl);
 	}
-	if (gcl != NULL)	//DEBUG:
-		ep_dbg_cprintf(Dbg, 23, "  +++ 4 : %d\n", gcl->refcnt);	//DEBUG:
 
 	// figure out potential response code
 	// we compute even if unused so we can log server errors
@@ -229,8 +218,6 @@ gdp_pdu_proc_cmd(void *cpdu_)
 		ep_log(estat, "gdp_pdu_proc_cmd(%s): server error",
 				_gdp_proto_cmd_name(cmd));
 	}
-	if (gcl != NULL)	//DEBUG:
-		ep_dbg_cprintf(Dbg, 23, "  +++ 5 : %d\n", gcl->refcnt);	//DEBUG:
 
 	// do sanity checks on signature
 	if (req->rpdu->datum != NULL)
@@ -249,9 +236,6 @@ gdp_pdu_proc_cmd(void *cpdu_)
 			datum->siglen = siglen;
 		}
 	}
-	if (gcl != NULL)	//DEBUG:
-		ep_dbg_cprintf(Dbg, 23, "  +++ 6 : %d\n", gcl->refcnt);	//DEBUG:
-	EP_ASSERT(gcl == req->gcl);		//DEBUG:
 
 	// send response PDU if appropriate
 	if (req->rpdu != NULL)
@@ -263,14 +247,11 @@ gdp_pdu_proc_cmd(void *cpdu_)
 		req->stat = _gdp_pdu_out(req->rpdu, req->chan, NULL);
 		//XXX anything to do with estat here?
 	}
-	if (gcl != NULL)	//DEBUG:
-		ep_dbg_cprintf(Dbg, 23, "  +++ 7 : %d\n", gcl->refcnt);	//DEBUG:
 
 	EP_ASSERT(gcl == req->gcl);
 	if (gcl != NULL)
 	{
 		GDP_GCL_ASSERT_ISLOCKED(gcl);
-		ep_dbg_cprintf(Dbg, 23, "  +++ 8 : %d\n", gcl->refcnt);	//DEBUG:
 		EP_ASSERT(gcl->refcnt > 0);
 	}
 
@@ -284,8 +265,6 @@ gdp_pdu_proc_cmd(void *cpdu_)
 		// postproc shouldn't change GCL lock status
 		EP_ASSERT(gcl == req->gcl);
 	}
-	if (gcl != NULL)	//DEBUG:
-		ep_dbg_cprintf(Dbg, 23, "  +++ 9 : %d\n", gcl->refcnt);	//DEBUG:
 
 	// free up resources
 	if (req->rpdu->datum != NULL)
@@ -301,7 +280,6 @@ gdp_pdu_proc_cmd(void *cpdu_)
 	}
 	if (gcl != NULL)
 	{
-		ep_dbg_cprintf(Dbg, 23, "  +++ 10 : %d\n", gcl->refcnt);	//DEBUG:
 		if (!GDP_GCL_ASSERT_ISLOCKED(gcl) || !EP_ASSERT(gcl->refcnt > 0))
 			_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 		_gdp_gcl_decref(&gcl, false);	// ref from _gdp_gcl_cache_get
@@ -625,8 +603,6 @@ gdp_pdu_proc_resp(void *rpdu_)
 		gdp_gcl_t *gcl = req->gcl;
 		GDP_GCL_ASSERT_ISLOCKED(gcl);
 		_gdp_gcl_decref(&gcl, false);
-//DEBUG:		if (req->gcl->refcnt <= 0)		//DEBUG
-//DEBUG:			req->gcl = NULL;			//DEBUG
 	}
 
 	if (EP_UT_BITSET(GDP_REQ_CORE, req->flags) &&
