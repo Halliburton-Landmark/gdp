@@ -1,7 +1,7 @@
 [Unit]
 Description=GDP log daemon
-Wants=gdp-router-click
-After=gdp-router-click
+Wants=gdp-router-click.service
+After=gdp-router-click.service
 
 [Service]
 Type=notify
