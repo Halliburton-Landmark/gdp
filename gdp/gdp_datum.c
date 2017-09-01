@@ -120,10 +120,15 @@ gdp_datum_free(gdp_datum_t *datum)
 		ep_dbg_cprintf(Dbg, 1, "gdp_datum_free(%p): was locked\n", datum);
 	}
 	ep_thr_mutex_unlock(&datum->mutex);
+#if GDP_DEBUG_NO_FREE_LISTS		// avoid helgrind complaints
+	ep_thr_mutex_destroy(&datum->mutex);
+	ep_mem_free(datum);
+#else
 	ep_thr_mutex_lock(&DatumFreeListMutex);
 	datum->next = DatumFreeList;
 	DatumFreeList = datum;
 	ep_thr_mutex_unlock(&DatumFreeListMutex);
+#endif
 }
 
 
@@ -325,5 +330,7 @@ void
 _gdp_datum_dump(const gdp_datum_t *datum,
 			FILE *fp)
 {
+	if (fp == NULL)
+		fp = ep_dbg_getfile();
 	gdp_datum_print(datum, fp, GDP_DATUM_PRDEBUG);
 }

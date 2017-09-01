@@ -380,6 +380,10 @@ ack_success(gdp_req_t *req)
 		gdp_printable_name(gcl->name, gcl->pname);
 	}
 
+	// if this is an open response, the GCL is now fully open
+	if (gcl != NULL)
+		gcl->flags &= ~GCLF_PENDING;
+
 fail0:
 	return estat;
 }
@@ -865,8 +869,8 @@ _gdp_req_dispatch(gdp_req_t *req, int cmd)
 		estat = (*d->func)(req);
 
 	// command function should not change lock state of GCL
-	if (req->gcl != NULL)
-		GDP_GCL_ASSERT_ISLOCKED(req->gcl);
+	if (req->gcl != NULL && !GDP_GCL_ASSERT_ISLOCKED(req->gcl))
+		_gdp_gcl_dump(req->gcl, NULL, GDP_PR_BASIC, 0);
 
 	if (ep_dbg_test(Dbg, 18) || ep_dbg_test(DbgCmdTrace, 18))
 	{

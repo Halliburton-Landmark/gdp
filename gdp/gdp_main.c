@@ -57,6 +57,8 @@ struct event_base	*GdpIoEventBase;	// the base for GDP I/O events
 gdp_name_t			_GdpMyRoutingName;	// source name for PDUs
 bool				_GdpLibInitialized;	// are we initialized?
 gdp_chan_t			*_GdpChannel;		// our primary app-level protocol port
+static bool			_GdpRunCmdInThread = true;		// run commands in threads
+static bool			_GdpRunRespInThread = false;	// run responses in threads
 
 
 /*
@@ -129,23 +131,32 @@ acknak_from_estat(EP_STAT estat, int def)
 **		Usually done in a thread since it may be heavy weight.
 */
 
+static EP_THR_MUTEX		GclCreateMutex			EP_THR_MUTEX_INITIALIZER;
+
 static void
 gdp_pdu_proc_cmd(void *cpdu_)
 {
 	gdp_pdu_t *cpdu = cpdu_;
 	int cmd = cpdu->cmd;
 	EP_STAT estat;
-	gdp_gcl_t *gcl;
+	gdp_gcl_t *gcl = NULL;
 	gdp_req_t *req = NULL;
 	int resp;
+
+	// create has too many special cases, so we single thread it
+	if (cmd == GDP_CMD_CREATE)
+		ep_thr_mutex_lock(&GclCreateMutex);
 
 	ep_dbg_cprintf(Dbg, 40,
 			"gdp_pdu_proc_cmd(%s, thread %p)\n",
 			_gdp_proto_cmd_name(cmd), (void *) ep_thr_gettid());
 
-	gcl = _gdp_gcl_cache_get(cpdu->dst, 0);
+	estat = _gdp_gcl_cache_get(cpdu->dst, 0, GGCF_NOCREATE, &gcl);
 	if (gcl != NULL)
+	{
 		GDP_GCL_ASSERT_ISLOCKED(gcl);
+		EP_ASSERT(gcl->refcnt > 0);
+	}
 
 	ep_dbg_cprintf(Dbg, 43,
 			"gdp_pdu_proc_cmd: allocating new req for GCL %p\n", gcl);
@@ -168,6 +179,7 @@ gdp_pdu_proc_cmd(void *cpdu_)
 		req->rpdu->rid = req->cpdu->rid;
 	}
 
+	// do the per-command processing
 	estat = _gdp_req_dispatch(req, cmd);
 	if (ep_dbg_test(Dbg, 59))
 	{
@@ -176,19 +188,26 @@ gdp_pdu_proc_cmd(void *cpdu_)
 	}
 
 	// make sure request or GCL haven't gotten fubared
-	if (!EP_ASSERT((gcl == NULL || gcl == req->gcl)) && ep_dbg_test(Dbg, 1))
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex);
+	if (gcl != NULL)
 	{
-		ep_dbg_printf("gdp_pdu_proc_cmd, after dispatch:\n  gcl = ");
-		_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
-		ep_dbg_printf("  req->gcl = ");
-		_gdp_gcl_dump(req->gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+		GDP_GCL_ASSERT_ISLOCKED(gcl);
+		ep_dbg_cprintf(Dbg, 23, "  +++ 3 : %d\n", gcl->refcnt);
+		if (!EP_ASSERT(gcl == req->gcl) && ep_dbg_test(Dbg, 1))
+		{
+			ep_dbg_printf("gdp_pdu_proc_cmd, after dispatch:\n  gcl = ");
+			_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+			ep_dbg_printf("  req->gcl = ");
+			_gdp_gcl_dump(req->gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+		}
 	}
 
-	// cmd_open can return a new GCL in the req
-	gcl = req->gcl;
-
-	if (gcl != NULL)
-		GDP_GCL_ASSERT_ISLOCKED(gcl);
+	// cmd_open and cmd_create can return a new GCL in the req
+	if (gcl == NULL && req->gcl != NULL)
+	{
+		gcl = req->gcl;
+		_gdp_gcl_incref(gcl);
+	}
 
 	// figure out potential response code
 	// we compute even if unused so we can log server errors
@@ -217,8 +236,6 @@ gdp_pdu_proc_cmd(void *cpdu_)
 			datum->siglen = siglen;
 		}
 	}
-	if (gcl != NULL)
-		GDP_GCL_ASSERT_ISLOCKED(gcl);
 
 	// send response PDU if appropriate
 	if (req->rpdu != NULL)
@@ -233,7 +250,10 @@ gdp_pdu_proc_cmd(void *cpdu_)
 
 	EP_ASSERT(gcl == req->gcl);
 	if (gcl != NULL)
+	{
 		GDP_GCL_ASSERT_ISLOCKED(gcl);
+		EP_ASSERT(gcl->refcnt > 0);
+	}
 
 	// do command post processing
 	if (req->postproc)
@@ -249,30 +269,34 @@ gdp_pdu_proc_cmd(void *cpdu_)
 	// free up resources
 	if (req->rpdu->datum != NULL)
 		ep_thr_mutex_unlock(&req->rpdu->datum->mutex);
-	if (gcl != NULL)
-	{
-		if (!GDP_GCL_ASSERT_ISLOCKED(gcl))
-			_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
-		_gdp_gcl_decref(&gcl, false);
-	}
 	if (EP_UT_BITSET(GDP_REQ_CORE, req->flags) &&
 			!EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
 	{
-		_gdp_req_free(&req);
+		_gdp_req_free(&req);		// also decref's req->gcl (leaves locked)
 	}
 	else
 	{
 		_gdp_req_unlock(req);
 	}
+	if (gcl != NULL)
+	{
+		if (!GDP_GCL_ASSERT_ISLOCKED(gcl) || !EP_ASSERT(gcl->refcnt > 0))
+			_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+		_gdp_gcl_decref(&gcl, false);	// ref from _gdp_gcl_cache_get
+	}
+
+	if (false)
+	{
+fail0:
+		ep_log(estat, "gdp_pdu_proc_cmd: cannot allocate request; dropping PDU");
+		if (cpdu != NULL)
+			_gdp_pdu_free(cpdu);
+	}
+
+	if (cmd == GDP_CMD_CREATE)
+		ep_thr_mutex_unlock(&GclCreateMutex);
 
 	ep_dbg_cprintf(Dbg, 40, "gdp_pdu_proc_cmd <<< done\n");
-
-	return;
-
-fail0:
-	ep_log(estat, "gdp_pdu_proc_cmd: cannot allocate request; dropping PDU");
-	if (cpdu != NULL)
-		_gdp_pdu_free(cpdu);
 }
 
 
@@ -298,10 +322,10 @@ find_req_in_channel_list(
 	ep_thr_mutex_lock(&chan->mutex);
 	LIST_FOREACH(req, &chan->reqs, chanlist)
 	{
-		if (req->rpdu != NULL &&
-				req->rpdu->rid == rpdu->rid &&
-				GDP_NAME_SAME(req->rpdu->src, rpdu->dst) &&
-				GDP_NAME_SAME(req->rpdu->dst, rpdu->src))
+		if (req->cpdu != NULL &&
+				req->cpdu->rid == rpdu->rid &&
+				GDP_NAME_SAME(req->cpdu->src, rpdu->dst) &&
+				GDP_NAME_SAME(req->cpdu->dst, rpdu->src))
 			break;
 	}
 	if (ep_dbg_test(DbgProcResp, 40))
@@ -338,22 +362,35 @@ find_req_in_channel_list(
 **		PDU off the wire and req->cpdu should be the original command
 **		PDU that prompted this response.  We save the passed rpdu
 **		into req->rpdu for processing in _gdp_req_dispatch.
+**
+**		XXX This is not tested for running in a thread.
 */
 
 static void
-gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
+gdp_pdu_proc_resp(void *rpdu_)
 {
+	gdp_pdu_t *rpdu = rpdu_;
+	gdp_chan_t *chan = _GdpChannel;
 	int cmd = rpdu->cmd;
-	EP_STAT estat = EP_STAT_OK;
-	gdp_gcl_t *gcl;
+	EP_STAT estat;
+	gdp_gcl_t *gcl = NULL;
 	gdp_req_t *req = NULL;
 	int resp;
 	int ocmd;					// original command prompting this response
 
-	gcl = _gdp_gcl_cache_get(rpdu->src, 0);
-	ep_dbg_cprintf(DbgProcResp, 20,
-			"gdp_pdu_proc_resp(%p %s) gcl %p\n",
-			rpdu, _gdp_proto_cmd_name(cmd), gcl);
+	estat = _gdp_gcl_cache_get(rpdu->src, 0,
+						GGCF_NOCREATE | GGCF_GET_PENDING, &gcl);
+	if (ep_dbg_test(DbgProcResp, 20))
+	{
+		char ebuf[120];
+		gdp_pname_t rpdu_pname;
+
+		ep_dbg_printf("gdp_pdu_proc_resp: cmd %s rpdu %p ->src %s) gcl %p stat %s\n",
+			_gdp_proto_cmd_name(cmd),
+			rpdu, gdp_printable_name(rpdu->src, rpdu_pname), gcl,
+			ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
+	// check estat here?
 	if (gcl == NULL)
 	{
 		char ebuf[200];
@@ -596,9 +633,19 @@ _gdp_pdu_process(gdp_pdu_t *pdu, gdp_chan_t *chan)
 {
 	// cmd: dispatch in thread; ack: dispatch directly
 	if (GDP_CMD_IS_COMMAND(pdu->cmd))
-		ep_thr_pool_run(&gdp_pdu_proc_cmd, pdu);
+	{
+		if (_GdpRunCmdInThread)
+			ep_thr_pool_run(&gdp_pdu_proc_cmd, pdu);
+		else
+			gdp_pdu_proc_cmd(pdu);
+	}
 	else
-		gdp_pdu_proc_resp(pdu, chan);
+	{
+		if (_GdpRunRespInThread)
+			ep_thr_pool_run(&gdp_pdu_proc_resp, pdu);
+		else
+			gdp_pdu_proc_resp(pdu);
+	}
 }
 
 
@@ -923,6 +970,12 @@ gdp_lib_init(const char *myname)
 	// [DEPRECATED: use libep.assert.allabort]
 	EpAssertAllAbort = ep_adm_getboolparam("swarm.gdp.debug.assert.allabort",
 									EpAssertAllAbort);
+
+	// check to see if commands/responses should be run in threads
+	_GdpRunCmdInThread = ep_adm_getboolparam("swarm.gdp.command.runinthread",
+									true);
+	_GdpRunRespInThread = ep_adm_getboolparam("swarm.gdp.response.runinthread",
+									false);
 
 	// register status strings
 	_gdp_stat_init();

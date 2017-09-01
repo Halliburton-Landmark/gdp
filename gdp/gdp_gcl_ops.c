@@ -110,28 +110,34 @@ _gdp_gcl_create(gdp_name_t gclname,
 	// add the metadata to the output stream
 	_gdp_gclmd_serialize(gmd, req->cpdu->datum->dbuf);
 
+	// send command and wait for results
 	estat = _gdp_invoke(req);
 	EP_STAT_CHECK(estat, goto fail1);
+	GDP_GCL_ASSERT_ISLOCKED(gcl);
 
-	// success --- change the GCL name to the true name
-	_gdp_gcl_cache_changename(gcl, gclname);
+	// change GCL name
+	(void) memcpy(gcl->name, gclname, sizeof (gdp_name_t));
+
+	// add new GCL to cache
+	EP_ASSERT(req->gcl == gcl);
+	req->gcl = NULL;			// avoid decref in _gdp_req_free
+	_gdp_req_unlock(req);		// lock ordering
+	_gdp_gcl_cache_add(gcl);
+	_gdp_req_lock(req);			// must be locked for _gdp_req_free
 
 	// free resources and return results
-	_gdp_req_free(&req);
 	*pgcl = gcl;
-	return estat;
 
 fail0:
-	if (gcl != NULL)
-		_gdp_gcl_decref(&gcl, false);
 fail1:
 	if (req != NULL)
 		_gdp_req_free(&req);
+	_gdp_gcl_unlock(gcl);
 
 	{
 		char ebuf[100];
 
-		ep_dbg_cprintf(Dbg, 8, "Could not create GCL: %s\n",
+		ep_dbg_cprintf(Dbg, 8, "_gdp_gcl_create <<< %s\n",
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 	return estat;
@@ -145,7 +151,7 @@ fail1:
 EP_STAT
 _gdp_gcl_open(gdp_gcl_t *gcl,
 			int cmd,
-			gdp_gcl_open_info_t *info,
+			gdp_gcl_open_info_t *open_info,
 			gdp_chan_t *chan,
 			uint32_t reqflags)
 {
@@ -164,6 +170,7 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 
 	// send the request across to the log daemon
 	errno = 0;				// avoid spurious messages
+	reqflags |= GDP_REQ_ALLOC_RID;			// always use a new request id
 	reqflags |= GDP_REQ_ROUTEFAIL;			// don't retry on router errors
 	estat = _gdp_req_new(cmd, gcl, chan, NULL, reqflags, &req);
 	GDP_GCL_ASSERT_ISLOCKED(gcl);					//DEBUG
@@ -196,13 +203,13 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 //	pktype = pkbuf[1];
 
 	// get the secret key if needed
-	if (info != NULL)
+	if (open_info != NULL)
 	{
-		secretkey = info->signkey;
-		if (secretkey == NULL && info->signkey_cb != NULL)
+		secretkey = open_info->signkey;
+		if (secretkey == NULL && open_info->signkey_cb != NULL)
 		{
-			estat = (*info->signkey_cb)(gcl->name,
-							info->signkey_udata, &secretkey);
+			estat = (*open_info->signkey_cb)(gcl->name,
+							open_info->signkey_udata, &secretkey);
 			EP_STAT_CHECK(estat, return estat);
 			my_secretkey = true;				// we must deallocate
 		}
@@ -334,8 +341,6 @@ _gdp_gcl_close(gdp_gcl_t *gcl,
 		ep_dbg_printf("_gdp_gcl_close: ");
 		_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
 	}
-
-	_gdp_gcl_lock(gcl);
 
 	// need to count the number of references /excluding/ subscriptions
 	nrefs = gcl->refcnt;

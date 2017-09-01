@@ -56,7 +56,7 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.gcl.mgmt", "GCL resource management");
 **
 ***********************************************************************/
 
-extern EP_THR_MUTEX		_GclCacheMutex;
+static EP_THR_MUTEX		_GclFreeListMutex	EP_THR_MUTEX_INITIALIZER;
 static LIST_HEAD(gcl_free_head, gdp_gcl)
 						GclFreeList = LIST_HEAD_INITIALIZER(GclFreeList);
 
@@ -72,6 +72,8 @@ static int				NGclsAllocated = 0;
 **		gcl_name --- internal (256-bit) name of the GCL
 **		pgcl --- location to store the resulting GCL handle
 **
+**		This does not add the new GCL handle to the cache.
+**
 **		gcl is returned unlocked.
 */
 
@@ -81,13 +83,13 @@ _gdp_gcl_newhandle(gdp_name_t gcl_name, gdp_gcl_t **pgcl)
 	EP_STAT estat = EP_STAT_OK;
 	gdp_gcl_t *gcl = NULL;
 
-	ep_thr_mutex_lock(&_GclCacheMutex);
+	ep_thr_mutex_lock(&_GclFreeListMutex);
 	if (!LIST_EMPTY(&GclFreeList))
 	{
 		gcl = LIST_FIRST(&GclFreeList);
 		LIST_REMOVE(gcl, ulist);
 	}
-	ep_thr_mutex_unlock(&_GclCacheMutex);
+	ep_thr_mutex_unlock(&_GclFreeListMutex);
 
 	if (gcl == NULL)
 	{
@@ -115,7 +117,7 @@ _gdp_gcl_newhandle(gdp_name_t gcl_name, gdp_gcl_t **pgcl)
 	gdp_printable_name(gcl->name, gcl->pname);
 
 	// success
-	gcl->flags |= GCLF_INUSE;
+	gcl->flags = GCLF_INUSE | GCLF_PENDING;
 	*pgcl = gcl;
 	ep_dbg_cprintf(Dbg, 28, "_gdp_gcl_newhandle => %p (%s)\n",
 			gcl, gcl->pname);
@@ -142,19 +144,20 @@ _gdp_gcl_freehandle(gdp_gcl_t *gcl)
 	ep_dbg_cprintf(Dbg, 28, "_gdp_gcl_freehandle(%p)\n", gcl);
 	if (gcl == NULL)
 		return;
+	GDP_GCL_ASSERT_ISLOCKED(gcl);
 
 	// this is a forced free, so ignore existing refcnts, etc.
+	gcl->flags |= GCLF_DROPPING;
 	gcl->refcnt = 0;
-	gcl->flags |= GCLF_DROPPING | GCLF_ISLOCKED;
 
-	// drop it from the name -> handle cache
-	_gdp_gcl_cache_drop(gcl);
+	if (EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
+	{
+		// drop it from the name -> handle cache and the LRU list
+		_gdp_gcl_cache_drop(gcl, false);
+	}
 
 	// release any remaining requests
-	_gdp_req_freeall(&gcl->reqs, NULL);
-
-	// should be inacessible now
-	_gdp_gcl_unlock(gcl);
+	_gdp_req_freeall(gcl, NULL);
 
 	// free any additional per-GCL resources
 	if (gcl->freefunc != NULL)
@@ -175,11 +178,19 @@ _gdp_gcl_freehandle(gdp_gcl_t *gcl)
 		gcl->x = NULL;
 	}
 
-	// drop this (now empty) GCL handle on the free list
+	// gcl should be inaccessible now, so this should be safe
+	_gdp_gcl_unlock(gcl);
 	gcl->flags = 0;
-	ep_thr_mutex_lock(&_GclCacheMutex);
+
+	// drop this (now empty) GCL handle on the free list
+	ep_thr_mutex_lock(&_GclFreeListMutex);
+#if GDP_DEBUG_NO_FREE_LISTS		// avoid helgrind complaints
+	ep_thr_mutex_destroy(&gcl->mutex);
+	ep_mem_free(gcl);
+#else
 	LIST_INSERT_HEAD(&GclFreeList, gcl, ulist);
-	ep_thr_mutex_unlock(&_GclCacheMutex);
+#endif
+	ep_thr_mutex_unlock(&_GclFreeListMutex);
 	NGclsAllocated--;
 }
 
@@ -196,6 +207,7 @@ EP_PRFLAGS_DESC	GclFlags[] =
 	{ GCLF_INUSE,			GCLF_INUSE,				"INUSE"				},
 	{ GCLF_DEFER_FREE,		GCLF_DEFER_FREE,		"DEFER_FREE"		},
 	{ GCLF_KEEPLOCKED,		GCLF_KEEPLOCKED,		"KEEPLOCKED"		},
+	{ GCLF_PENDING,			GCLF_PENDING,			"PENDING"			},
 	{ 0, 0, NULL }
 };
 
@@ -206,9 +218,11 @@ _gdp_gcl_dump(
 		int detail,
 		int indent)
 {
+	if (fp == NULL)
+		fp = ep_dbg_getfile();
 	if (detail >= GDP_PR_BASIC)
 		fprintf(fp, "GCL@%p: ", gcl);
-	VALGRIND_HG_DISABLE_CHECKING(gcl, sizeof gcl);
+	VALGRIND_HG_DISABLE_CHECKING(gcl, sizeof *gcl);
 	if (gcl == NULL)
 	{
 		fprintf(fp, "NULL\n");
@@ -246,7 +260,7 @@ _gdp_gcl_dump(
 			}
 		}
 	}
-	VALGRIND_HG_ENABLE_CHECKING(gcl, sizeof gcl);
+	VALGRIND_HG_ENABLE_CHECKING(gcl, sizeof *gcl);
 }
 
 
@@ -410,12 +424,17 @@ _gdp_gcl_decref_trace(
 {
 	gdp_gcl_t *gcl = *gclp;
 
-	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
+	if (!EP_ASSERT(GDP_GCL_ISGOOD(gcl)))
+	{
+		_gdp_gcl_dump(gcl, NULL, GDP_PR_BASIC, 0);
+		return;
+	}
 	(void) ep_thr_mutex_assert_islocked(&gcl->mutex, id, file, line);
 
-	EP_ASSERT(gcl->refcnt > 0);
 	if (gcl->refcnt > 0)
 		gcl->refcnt--;
+	else
+		ep_assert_print(file, line, "gcl->refcnt = %d (%s)", gcl->refcnt, id);
 	*gclp = NULL;
 
 	ep_dbg_cprintf(Dbg, 51, "_gdp_gcl_decref(%p): %d\n",

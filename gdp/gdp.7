@@ -183,6 +183,13 @@ Defaults to
 .Li true .
 You might want to set this to false in some debugging contexts.
 .
+.It swarm.gdp.command.runinthread
+Run command processing (read, append, etc.) in a thread.
+Mostly relevant to
+gdplogd .
+Defaults to
+.Li true .
+.
 .It swarm.gdp.crypto.dsa.keylen
 When creating a new key of type DSA,
 the default number of bits to use.
@@ -243,10 +250,12 @@ If the internal event loop terminates,
 sleep this many microseconds before restarting the loop.
 This is to avoid allowing a software bug to chew up 100% of a CPU.
 Defaults to 1000 (one millisecond).
+.
 .It swarm.gdp.event.looptimeout
 How many seconds to allow an event loop to run before restarting it.
 This is only needed in some versions of the underlying event library.
 Defaults to 30.
+.
 .It swarm.gdp.invoke.retries
 When a GDP client is trying to invoke a service
 (for example, accessing a log)
@@ -255,6 +264,7 @@ it is trying to access.
 If a response is not received in a timely fashion,
 it will retry up to this many times.
 Defaults to 3.
+.
 .It swarm.gdp.invoke.timeout
 When a GDP client is trying to invoke a service
 (for example, accessing a log)
@@ -263,12 +273,20 @@ it is trying to access.
 If it does not get a response in this many milliseconds
 it will retry.
 Defaults to 10000 (ten seconds).
+.
 .It swarm.gdp.reconnect.delay
 If a GDP application (either client or server) loses contact with
 the routing layer, it will sleep this number of milliseconds
 before it tries to reconnect.
 This is to keep from flooding routers that are trying to reboot.
 Defaults to 1000 (one second).
+.
+.It swarm.gdp.response.runinthread
+Run response processing (2xx, 4xx, etc) in a thread.
+Defaults to
+.Li false .
+Caveat Emptor: This is untested.
+.
 .It swarm.gdp.routers
 This is semicolon-delimited list of IP names or addresses
 to search to find a GDP router.

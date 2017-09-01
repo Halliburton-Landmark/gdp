@@ -580,8 +580,8 @@ ep_thr_mutex_assert_isunlocked(
 		return true;
 	}
 	ep_assert_print(file, line,
-			"mutex %s (%p) is locked by %d (should be unlocked)",
-			mstr, m, pmtx->__data.__owner);
+			"mutex %s (%p) is locked by %d (should be unlocked; I am %d)",
+			mstr, m, pmtx->__data.__owner, gettid());
 	return false;
 #else
 	return true;
