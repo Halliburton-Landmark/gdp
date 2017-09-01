@@ -411,7 +411,6 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 			ep_dbg_printf("... found ");
 			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 		}
-		EP_ASSERT(gcl == req->gcl);
 
 		// req is already locked by _gdp_req_find
 		if (req == NULL)
@@ -446,6 +445,7 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 				_gdp_pdu_dump(rpdu, ep_dbg_getfile());
 			}
 		}
+		EP_ASSERT(gcl == req->gcl);
 	}
 
 	GDP_GCL_ASSERT_ISLOCKED(req->gcl);
