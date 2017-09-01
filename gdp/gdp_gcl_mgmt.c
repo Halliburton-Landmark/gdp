@@ -159,9 +159,6 @@ _gdp_gcl_freehandle(gdp_gcl_t *gcl)
 	// release any remaining requests
 	_gdp_req_freeall(gcl, NULL);
 
-	// should be inacessible now
-	_gdp_gcl_unlock(gcl);
-
 	// free any additional per-GCL resources
 	if (gcl->freefunc != NULL)
 		(*gcl->freefunc)(gcl);
@@ -181,10 +178,18 @@ _gdp_gcl_freehandle(gdp_gcl_t *gcl)
 		gcl->x = NULL;
 	}
 
-	// drop this (now empty) GCL handle on the free list
+	// gcl should be inaccessible now, so this should be safe
+	_gdp_gcl_unlock(gcl);
 	gcl->flags = 0;
+
+	// drop this (now empty) GCL handle on the free list
 	ep_thr_mutex_lock(&_GclFreeListMutex);
+#if GDP_DEBUG_NO_FREE_LISTS		// avoid helgrind complaints
+	ep_thr_mutex_destroy(&gcl->mutex);
+	ep_mem_free(gcl);
+#else
 	LIST_INSERT_HEAD(&GclFreeList, gcl, ulist);
+#endif
 	ep_thr_mutex_unlock(&_GclFreeListMutex);
 	NGclsAllocated--;
 }

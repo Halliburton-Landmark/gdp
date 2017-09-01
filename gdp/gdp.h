@@ -302,13 +302,13 @@ extern EP_STAT	gdp_gcl_newsegment(
 					gdp_gcl_t *gcl);		// GCL handle
 
 // set append filter
-extern void		gdp_gcl_set_append_filter(
+extern EP_STAT	gdp_gcl_set_append_filter(
 					gdp_gcl_t *gcl,			// GCL handle
 					EP_STAT (*readfilter)(gdp_datum_t *, void *),
 					void *filterdata);
 
 // set read filter
-extern void		gdp_gcl_set_read_filter(
+extern EP_STAT	gdp_gcl_set_read_filter(
 					gdp_gcl_t *gcl,			// GCL handle
 					EP_STAT (*readfilter)(gdp_datum_t *, void *),
 					void *filterdata);

@@ -120,8 +120,10 @@ _gdp_gcl_create(gdp_name_t gclname,
 
 	// add new GCL to cache
 	EP_ASSERT(req->gcl == gcl);
-	_gdp_gcl_cache_add(gcl);
 	req->gcl = NULL;			// avoid decref in _gdp_req_free
+	_gdp_req_unlock(req);		// lock ordering
+	_gdp_gcl_cache_add(gcl);
+	_gdp_req_lock(req);			// must be locked for _gdp_req_free
 
 	// free resources and return results
 	*pgcl = gcl;
@@ -339,8 +341,6 @@ _gdp_gcl_close(gdp_gcl_t *gcl,
 		ep_dbg_printf("_gdp_gcl_close: ");
 		_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
 	}
-
-	_gdp_gcl_lock(gcl);
 
 	// need to count the number of references /excluding/ subscriptions
 	nrefs = gcl->refcnt;

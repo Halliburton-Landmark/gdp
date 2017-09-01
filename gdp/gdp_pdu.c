@@ -813,7 +813,11 @@ _gdp_pdu_free(gdp_pdu_t *pdu)
 	// abandon this PDU if already free
 	EP_ASSERT_ELSE(pdu->inuse, return);
 	pdu->inuse = false;
+#if GDP_DEBUG_NO_FREE_LISTS		// avoid helgrind complaints
+	ep_mem_free(pdu);
+#else
 	ep_thr_mutex_lock(&PduFreeListMutex);
 	TAILQ_INSERT_HEAD(&PduFreeList, pdu, list);
 	ep_thr_mutex_unlock(&PduFreeListMutex);
+#endif
 }

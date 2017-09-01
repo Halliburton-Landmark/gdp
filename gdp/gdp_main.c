@@ -131,6 +131,8 @@ acknak_from_estat(EP_STAT estat, int def)
 **		Usually done in a thread since it may be heavy weight.
 */
 
+static EP_THR_MUTEX		GclCreateMutex			EP_THR_MUTEX_INITIALIZER;
+
 static void
 gdp_pdu_proc_cmd(void *cpdu_)
 {
@@ -140,6 +142,10 @@ gdp_pdu_proc_cmd(void *cpdu_)
 	gdp_gcl_t *gcl = NULL;
 	gdp_req_t *req = NULL;
 	int resp;
+
+	// create has too many special cases, so we single thread it
+	if (cmd == GDP_CMD_CREATE)
+		ep_thr_mutex_lock(&GclCreateMutex);
 
 	ep_dbg_cprintf(Dbg, 40,
 			"gdp_pdu_proc_cmd(%s, thread %p)\n",
@@ -301,14 +307,18 @@ gdp_pdu_proc_cmd(void *cpdu_)
 		_gdp_gcl_decref(&gcl, false);	// ref from _gdp_gcl_cache_get
 	}
 
-	ep_dbg_cprintf(Dbg, 40, "gdp_pdu_proc_cmd <<< done\n");
-
-	return;
-
+	if (false)
+	{
 fail0:
-	ep_log(estat, "gdp_pdu_proc_cmd: cannot allocate request; dropping PDU");
-	if (cpdu != NULL)
-		_gdp_pdu_free(cpdu);
+		ep_log(estat, "gdp_pdu_proc_cmd: cannot allocate request; dropping PDU");
+		if (cpdu != NULL)
+			_gdp_pdu_free(cpdu);
+	}
+
+	if (cmd == GDP_CMD_CREATE)
+		ep_thr_mutex_unlock(&GclCreateMutex);
+
+	ep_dbg_cprintf(Dbg, 40, "gdp_pdu_proc_cmd <<< done\n");
 }
 
 

@@ -99,11 +99,29 @@ _gdp_gcl_cache_init(void)
 		}
 	}
 
+#if EP_OSCF_USE_VALGRIND
+	{
+		gdp_gcl_t *gcl;
+
+		// establish lock ordering for valgrind
+		ep_thr_mutex_lock(&GclCacheMutex);
+		estat = _gdp_gcl_newhandle(NULL, &gcl);
+		if (EP_STAT_ISOK(estat))
+		{
+			_gdp_gcl_lock(gcl);
+			_gdp_gcl_freehandle(gcl);
+		}
+		ep_thr_mutex_unlock(&GclCacheMutex);
+	}
+#endif
+
 	// Nothing to do for LRU cache
 
 	if (false)
 	{
 fail0:
+		if (EP_STAT_ISOK(estat))
+			estat = EP_STAT_ERROR;
 		ep_log(estat, "gdp_gcl_cache_init: %s", err);
 		ep_app_fatal("gdp_gcl_cache_init: %s", err);
 	}

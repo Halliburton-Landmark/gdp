@@ -303,11 +303,16 @@ _gdp_req_free(gdp_req_t **reqp)
 
 	// add the empty request to the free list
 	ep_thr_mutex_lock(&ReqFreeListMutex);
+	_gdp_req_unlock(req);
+#if GDP_DEBUG_NO_FREE_LISTS		// avoid helgrind complaints
+	ep_thr_mutex_destroy(&req->mutex);
+	ep_thr_cond_destroy(&req->cond);
+	ep_mem_free(req);
+#else
 	LIST_INSERT_HEAD(&ReqFreeList, req, gcllist);
+#endif
 	NReqsAllocated--;
 	ep_thr_mutex_unlock(&ReqFreeListMutex);
-
-	_gdp_req_unlock(req);
 }
 
 
