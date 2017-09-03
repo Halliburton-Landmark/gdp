@@ -178,6 +178,10 @@ ep_stat_from_dbstat(int dbstat)
 }
 
 
+// desparation: make all Berkeley DB operations single threaded for now
+static EP_THR_MUTEX		BdbMutex		EP_THR_MUTEX_INITIALIZER;
+
+
 static EP_STAT
 bdb_init(void)
 {
@@ -187,6 +191,7 @@ bdb_init(void)
 	int dbstat;
 	const char *phase;
 
+	ep_thr_mutex_lock(&BdbMutex);
 	if (DbEnv == NULL)
 	{
 		phase = "db_env_create";
@@ -206,6 +211,7 @@ fail0:
 		ep_dbg_cprintf(Dbg, 1, "bdb_init: error during %s: %s\n",
 					phase, db_strerror(dbstat));
 	}
+	ep_thr_mutex_unlock(&BdbMutex);
 #endif
 	return estat;
 }
@@ -228,11 +234,16 @@ bdb_open(const char *filename,
 	EP_STAT estat = EP_STAT_OK;
 	struct stat st;
 
+	ep_thr_mutex_lock(&BdbMutex);
+
 	// check file existence to avoid db->open complaints
 	if (filename != NULL && stat(filename, &st) < 0)
 	{
 		if (errno != ENOENT || !EP_UT_BITSET(DB_CREATE, dbflags))
-			return ep_stat_from_errno(errno);
+		{
+			estat = ep_stat_from_errno(errno);
+			goto done;
+		}
 	}
 
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
@@ -240,7 +251,10 @@ bdb_open(const char *filename,
 	const char *phase;
 
 	if (!EP_ASSERT(DbEnv != NULL))
-		return EP_STAT_NOT_INITIALIZED;
+	{
+		estat = EP_STAT_NOT_INITIALIZED;
+		goto done;
+	}
 
 	phase = "db_create";
 	if ((dbstat = db_create(&db, DbEnv, 0)) != 0)
@@ -290,6 +304,8 @@ fail0:
 #endif
 
 	*pdb = db;
+done:
+	ep_thr_mutex_unlock(&BdbMutex);
 	return estat;
 }
 
@@ -299,12 +315,14 @@ bdb_close(DB *db)
 {
 	int dbstat;
 
+	ep_thr_mutex_lock(&BdbMutex);
 	(void) db->sync(db, 0);
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
 	dbstat = db->close(db, 0);
 #else
 	dbstat = db->close(db);
 #endif
+	ep_thr_mutex_unlock(&BdbMutex);
 	return ep_stat_from_dbstat(dbstat);
 }
 
@@ -323,6 +341,7 @@ bdb_get(DB *db,
 		ep_dbg_printf("bdb_get: len = %zd, key =\n", (size_t) key->size);
 		ep_hexdump(key->data, key->size, ep_dbg_getfile(), 0, 0);
 	}
+	ep_thr_mutex_lock(&BdbMutex);
 
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
 	dbstat = db->get(db, NULL, key, val, 0);
@@ -338,6 +357,7 @@ bdb_get(DB *db,
 		ep_dbg_printf("bdb_get: dbstat %d (%s)", dbstat,
 					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
+	ep_thr_mutex_unlock(&BdbMutex);
 	return estat;
 }
 #endif // LOG_CHECK
@@ -357,6 +377,7 @@ bdb_get_first_after_key(DB *db,
 				(size_t) key->size);
 		ep_hexdump(key->data, key->size, ep_dbg_getfile(), 0, 0);
 	}
+	ep_thr_mutex_lock(&BdbMutex);
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
 	DBC *dbc = NULL;
 
@@ -372,6 +393,7 @@ bdb_get_first_after_key(DB *db,
 	dbstat = db->seq(db, key, val, R_CURSOR);
 #endif
 
+	ep_thr_mutex_unlock(&BdbMutex);
 	estat = ep_stat_from_dbstat(dbstat);
 	if (!EP_STAT_ISOK(estat) && !EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOTFOUND))
 		ep_log(estat, "bdb_get_first_after_key");
@@ -384,16 +406,21 @@ bdb_get_first_after_key(DB *db,
 static EP_STAT
 bdb_cursor_open(DB *db, DBC **dbcp)
 {
+	EP_STAT estat;
+
+	ep_thr_mutex_lock(&BdbMutex);
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
 	int dbstat;
 
 	// need cursor to get approximate keys (next entry >= key)
 	dbstat = db->cursor(db, NULL, dbcp, 0);
-	return ep_stat_from_dbstat(dbstat);
+	estat = ep_stat_from_dbstat(dbstat);
 #else
 	*dbcp = db;
-	return EP_STAT_OK;
+	estat = EP_STAT_OK;
 #endif
+	ep_thr_mutex_unlock(&BdbMutex);
+	return estat;
 }
 
 
@@ -403,12 +430,14 @@ bdb_cursor_next(DBC *dbc, DBT *key, DBT *val)
 	EP_STAT estat;
 	int dbstat;
 
+	ep_thr_mutex_lock(&BdbMutex);
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
 	// need cursor to get approximate keys (next entry >= key)
 	dbstat = dbc->c_get(dbc, key, val, DB_NEXT);
 #else
 	dbstat = dbc->seq(dbc, key, val, R_NEXT);
 #endif
+	ep_thr_mutex_unlock(&BdbMutex);
 
 	estat = ep_stat_from_dbstat(dbstat);
 	return estat;
@@ -432,6 +461,7 @@ bdb_put(DB *db,
 		ep_hexdump(key->data, key->size, ep_dbg_getfile(), 0, 0);
 	}
 
+	ep_thr_mutex_lock(&BdbMutex);
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
 	dbstat = db->put(db, NULL, key, val, 0);
 	if (dbstat != 0 && ep_dbg_test(Dbg, 6))
@@ -441,6 +471,7 @@ bdb_put(DB *db,
 	if (dbstat != 0 && ep_dbg_test(Dbg, 6))
 		ep_dbg_printf("bdb_put: dbstat %d\n", dbstat);
 #endif
+	ep_thr_mutex_unlock(&BdbMutex);
 	estat = ep_stat_from_dbstat(dbstat);
 	return estat;
 }
