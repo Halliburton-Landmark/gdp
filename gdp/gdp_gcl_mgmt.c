@@ -91,6 +91,9 @@ _gdp_gcl_newhandle(gdp_name_t gcl_name, gdp_gcl_t **pgcl)
 	}
 	ep_thr_mutex_unlock(&_GclFreeListMutex);
 
+	if (gcl != NULL && !EP_ASSERT(!EP_UT_BITSET(GCLF_INUSE, gcl->flags)))
+		gcl = NULL;
+
 	if (gcl == NULL)
 	{
 		// allocate the memory to hold the gcl_handle
@@ -143,6 +146,8 @@ _gdp_gcl_freehandle(gdp_gcl_t *gcl)
 {
 	ep_dbg_cprintf(Dbg, 28, "_gdp_gcl_freehandle(%p)\n", gcl);
 	if (gcl == NULL)
+		return;
+	if (!EP_ASSERT(EP_UT_BITSET(GCLF_INUSE, gcl->flags)))
 		return;
 	GDP_GCL_ASSERT_ISLOCKED(gcl);
 

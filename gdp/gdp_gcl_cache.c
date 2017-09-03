@@ -129,6 +129,145 @@ fail0:
 	return estat;
 }
 
+#define LOG2_BLOOM_SIZE		10			// log base 2 of bloom filter size
+
+
+/*
+**  Helper routine checking that associative cache matches the LRU cache.
+**
+**		Unfortunately, this is O(n^2).  The bloom filter is less
+**		useful here.
+**		This is a helper routine called from ep_hash_forall.
+*/
+
+static void
+check_cache_helper(size_t klen, const void *key, void *val, va_list av)
+{
+	const gdp_gcl_t *gcl;
+	const gdp_gcl_t *g2;
+
+	if (val == NULL)
+		return;
+
+	gcl = val;
+	LIST_FOREACH(g2, &GclsByUse, ulist)
+	{
+		if (g2 == gcl)
+			return;
+	}
+
+	FILE *fp = va_arg(av, FILE *);
+	fprintf(fp, "    ===> WARNING: %s not in usage list\n", gcl->pname);
+}
+
+
+/*
+** Check cache consistency.
+**		Returns true if is OK, false if is not.
+*/
+
+static bool
+check_cache_consistency(void)
+{
+	bool rval = true;
+	gdp_gcl_t *gcl;
+	uint32_t bloom[1 << (LOG2_BLOOM_SIZE - 1)];		// bloom filter
+	union
+	{
+		uint8_t		md4out[MD4_DIGEST_LENGTH];		// output md4
+		uint32_t	md4eq[MD4_DIGEST_LENGTH / 4];
+	} md4buf;
+
+	memset(&md4buf, 0, sizeof md4buf);
+
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&GclCacheMutex);
+	LIST_FOREACH(gcl, &GclsByUse, ulist)
+	{
+		VALGRIND_HG_DISABLE_CHECKING(gcl, sizeof *gcl);
+		{
+			// check for loops, starting with quick bloom filter on address
+			uint32_t bmask;
+			int bindex;
+
+			MD4((unsigned char *) &gcl, sizeof gcl, md4buf.md4out);
+			bindex = md4buf.md4eq[0];			// just use first 32-bit word
+			bmask = 1 << (bindex & 0x1f);		// mask on single word
+			bindex = (bindex >> 4) & ((1 << (LOG2_BLOOM_SIZE - 1)) - 1);
+			if (EP_UT_BITSET(bmask, bloom[bindex]))
+			{
+				// may have a conflict --- do explicit check
+				gdp_gcl_t *g2 = LIST_NEXT(gcl, ulist);
+				while (g2 != NULL && g2 != gcl)
+					g2 = LIST_NEXT(g2, ulist);
+				if (g2 != NULL)
+				{
+					EP_ASSERT_PRINT("Loop in GclsByUse on %p", gcl);
+					rval = false;
+					break;
+				}
+			}
+			bloom[bindex] |= bmask;
+		}
+		VALGRIND_HG_ENABLE_CHECKING(gcl, sizeof *gcl);
+	}
+
+	ep_hash_forall(_OpenGCLCache, check_cache_helper, ep_dbg_getfile());
+	return rval;
+}
+
+
+/*
+**  Rebuild GCL LRU list from the associative hash table.
+**		Which one is the definitive version?
+**
+**		Should "never happen", but if it does all hell breaks loose.
+**		Yes, I know, this is O(n^2).  But it should never happen.
+**		So sue me.
+*/
+
+// helper routine
+static void
+sorted_insert(size_t klen, const void *key, void *gcl_, va_list av)
+{
+	gdp_gcl_t *gcl = gcl_;
+
+	// if this is being dropped, just skip this GCL
+	if (EP_UT_BITSET(GCLF_DROPPING, gcl->flags))
+		return;
+
+	gdp_gcl_t *g2 = LIST_FIRST(&GclsByUse);
+	if (g2 == NULL || gcl->utime > g2->utime)
+	{
+		// new entry is younger than first entry
+		LIST_INSERT_HEAD(&GclsByUse, gcl, ulist);
+		return;
+	}
+	LIST_FOREACH(g2, &GclsByUse, ulist)
+	{
+		gdp_gcl_t *g3 = LIST_NEXT(g2, ulist);
+		if (g3 == NULL || gcl->utime > g3->utime)
+		{
+			LIST_INSERT_AFTER(g2, gcl, ulist);
+			return;
+		}
+	}
+
+	// shouldn't happen
+	EP_ASSERT_PRINT("sorted_insert: ran off end of GclsByUse, gcl = %p", gcl);
+}
+
+static void
+rebuild_lru_list(void)
+{
+	ep_dbg_cprintf(Dbg, 2, "rebuild_lru_list: rebuilding\n");
+	ep_thr_mutex_lock(&GclCacheMutex);
+	LIST_INIT(&GclsByUse);
+	ep_hash_forall(_OpenGCLCache, sorted_insert);
+	ep_thr_mutex_unlock(&GclCacheMutex);
+}
+
+
+
 
 /*
 **  Add a GCL to both the associative and the LRU caches.
@@ -142,9 +281,12 @@ add_cache_unlocked(gdp_gcl_t *gcl)
 	ep_dbg_cprintf(Dbg, 49, "_gdp_gcl_cache_add(%p): adding\n", gcl);
 
 	// sanity checks
+	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
 	if (!GDP_GCL_ASSERT_ISLOCKED(gcl))
 		return;
 	EP_THR_MUTEX_ASSERT_ISLOCKED(&GclCacheMutex);
+
+	check_cache_consistency();
 
 	if (EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
 	{
@@ -230,6 +372,7 @@ _gdp_gcl_cache_changename(gdp_gcl_t *gcl, gdp_name_t newname)
 	EP_ASSERT_ELSE(EP_UT_BITSET(GCLF_INCACHE, gcl->flags), return);
 
 	ep_thr_mutex_lock(&GclCacheMutex);
+	check_cache_consistency();
 	(void) ep_hash_delete(_OpenGCLCache, sizeof (gdp_name_t), gcl->name);
 	(void) memcpy(gcl->name, newname, sizeof (gdp_name_t));
 	(void) ep_hash_insert(_OpenGCLCache, sizeof (gdp_name_t), newname, gcl);
@@ -268,6 +411,8 @@ _gdp_gcl_cache_get(
 	EP_STAT estat = EP_STAT_OK;
 
 	ep_thr_mutex_lock(&GclCacheMutex);
+	if (!check_cache_consistency())
+		rebuild_lru_list();
 
 	// see if we have a pointer to this GCL in the cache
 	gcl = ep_hash_search(_OpenGCLCache, sizeof (gdp_name_t), (void *) gcl_name);
@@ -343,14 +488,21 @@ _gdp_gcl_cache_drop(gdp_gcl_t *gcl, bool cleanup)
 	}
 
 	GDP_GCL_ASSERT_ISLOCKED(gcl);
-	EP_ASSERT(EP_UT_BITSET(GCLF_INCACHE, gcl->flags));
-	if (!cleanup)
-		EP_THR_MUTEX_ASSERT_ISUNLOCKED(&GclCacheMutex);
-
-	if (!EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
-	{
-		ep_dbg_cprintf(Dbg, 8, "_gdp_gcl_cache_drop(%p): uncached\n", gcl);
+	if (!EP_ASSERT(EP_UT_BITSET(GCLF_INCACHE, gcl->flags)))
 		return;
+	if (EP_UT_BITSET(GCLF_DROPPING, gcl->flags))
+	{
+		// already being dropped
+		return;
+	}
+	if (cleanup)
+	{
+		EP_THR_MUTEX_ASSERT_ISLOCKED(&GclCacheMutex);
+		check_cache_consistency();
+	}
+	else
+	{
+		EP_THR_MUTEX_ASSERT_ISUNLOCKED(&GclCacheMutex);
 	}
 
 	// error if we're dropping something that's referenced from the cache
@@ -372,6 +524,7 @@ _gdp_gcl_cache_drop(gdp_gcl_t *gcl, bool cleanup)
 		// now lock the cache and then re-lock the GCL
 		_gdp_gcl_unlock(gcl);
 		ep_thr_mutex_lock(&GclCacheMutex);
+		check_cache_consistency();
 		_gdp_gcl_lock(gcl);
 
 		// sanity checks (XXX should these be assertions? XXX)
@@ -427,6 +580,7 @@ _gdp_gcl_touch(gdp_gcl_t *gcl)
 	{
 		// both locked and in cache
 		EP_THR_MUTEX_ASSERT_ISLOCKED(&GclCacheMutex);
+		check_cache_consistency();
 		LIST_REMOVE(gcl, ulist);
 		IF_LIST_CHECK_OK(&GclsByUse, gcl, ulist, gdp_gcl_t)
 			LIST_INSERT_HEAD(&GclsByUse, gcl, ulist);
@@ -447,6 +601,7 @@ _gdp_gcl_touch(gdp_gcl_t *gcl)
 **		XXX	reclaimed, especially since they are a scarce resource.
 */
 
+#define CACHE_BLOOM_SIZE		(16 * 1024)
 void
 _gdp_gcl_cache_reclaim(time_t maxage)
 {
@@ -485,6 +640,8 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 		mintime = tv.tv_sec - maxage;
 
 		ep_thr_mutex_lock(&GclCacheMutex);
+		if (!check_cache_consistency())
+			rebuild_lru_list();
 		for (g1 = LIST_FIRST(&GclsByUse); g1 != NULL; g1 = g2)
 		{
 			if (loopcount++ > maxgcls)
@@ -495,6 +652,7 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 				break;
 			}
 			g2 = LIST_NEXT(g1, ulist);		// do as early as possible
+
 			if (ep_thr_mutex_trylock(&g1->mutex) != 0)
 			{
 				// couldn't get the lock: previous g2 setting may be wrong
@@ -580,123 +738,22 @@ _gdp_gcl_cache_shutdown(void (*shutdownfunc)(gdp_req_t *))
 }
 
 
-/*
-**  Rebuild GCL LRU list
-**		Should "never happen", but if it does all hell breaks loose.
-**		Yes, I know, this is O(n^2).  But it should never happen.
-**		So sue me.
-*/
-
-static void
-sorted_insert(size_t klen, const void *key, void *gcl_, va_list av)
-{
-	gdp_gcl_t *gcl = gcl_;
-	gdp_gcl_t *g2 = LIST_FIRST(&GclsByUse);
-	if (g2 == NULL || gcl->utime > g2->utime)
-	{
-		// new entry is younger than first entry
-		LIST_INSERT_HEAD(&GclsByUse, gcl, ulist);
-		return;
-	}
-	LIST_FOREACH(g2, &GclsByUse, ulist)
-	{
-		gdp_gcl_t *g3 = LIST_NEXT(g2, ulist);
-		if (g3 == NULL || gcl->utime > g3->utime)
-		{
-			LIST_INSERT_AFTER(g2, gcl, ulist);
-			return;
-		}
-	}
-
-	// shouldn't happen
-	EP_ASSERT_PRINT("sorted_insert: ran off end of GclsByUse, gcl = %p", gcl);
-}
-
-static void
-rebuild_lru_list(void)
-{
-	ep_dbg_cprintf(Dbg, 2, "rebuild_lru_list: rebuilding\n");
-	ep_thr_mutex_lock(&GclCacheMutex);
-	LIST_INIT(&GclsByUse);
-	ep_hash_forall(_OpenGCLCache, sorted_insert);
-	ep_thr_mutex_unlock(&GclCacheMutex);
-}
-
-
-/*
-**  Show contents of LRU cache (for debugging)
-**
-**		Unfortunately, this is O(n^2).  The bloom filter is less
-**		useful here.
-*/
-
-static void
-check_cache(size_t klen, const void *key, void *val, va_list av)
-{
-	const gdp_gcl_t *gcl;
-	const gdp_gcl_t *g2;
-
-	if (val == NULL)
-		return;
-
-	gcl = val;
-	LIST_FOREACH(g2, &GclsByUse, ulist)
-	{
-		if (g2 == gcl)
-			return;
-	}
-
-	FILE *fp = va_arg(av, FILE *);
-	fprintf(fp, "    ===> WARNING: %s not in usage list\n", gcl->pname);
-}
-
-#define LOG2_BLOOM_SIZE		10			// log base 2 of bloom filter size
-
 void
 _gdp_gcl_cache_dump(int plev, FILE *fp)
 {
 	gdp_gcl_t *gcl;
-	uint32_t bloom[1 << (LOG2_BLOOM_SIZE - 1)];		// bloom filter
-	union
-	{
-		uint8_t		md4out[MD4_DIGEST_LENGTH];		// output md4
-		uint32_t	md4eq[MD4_DIGEST_LENGTH / 4];
-	} md4buf;
-	bool check_for_loops = true;
+	int ngcls = 0;
+	int maxgcls = 40;		//XXX should be a parameter
 
 	if (fp == NULL)
 		fp = ep_dbg_getfile();
-	memset(&md4buf, 0, sizeof md4buf);
 
 	fprintf(fp, "\n<<< Showing cached GCLs by usage >>>\n");
 	LIST_FOREACH(gcl, &GclsByUse, ulist)
 	{
+		if (++ngcls > maxgcls)
+			break;
 		VALGRIND_HG_DISABLE_CHECKING(gcl, sizeof *gcl);
-		if (check_for_loops)
-		{
-			// check for loops, starting with quick bloom filter on address
-			uint32_t bmask;
-			int bindex;
-
-			MD4((unsigned char *) &gcl, sizeof gcl, md4buf.md4out);
-			bindex = md4buf.md4eq[0];			// just use first 32-bit word
-			bmask = 1 << (bindex & 0x1f);		// mask on single word
-			bindex = (bindex >> 4) & ((1 << (LOG2_BLOOM_SIZE - 1)) - 1);
-			if (EP_UT_BITSET(bmask, bloom[bindex]))
-			{
-				// may have a conflict --- do explicit check
-				gdp_gcl_t *g2 = LIST_NEXT(gcl, ulist);
-				while (g2 != NULL && g2 != gcl)
-					g2 = LIST_NEXT(g2, ulist);
-				if (g2 != NULL)
-				{
-					EP_ASSERT_PRINT("Loop in GclsByUse on %p", gcl);
-					rebuild_lru_list();
-					break;
-				}
-			}
-			bloom[bindex] |= bmask;
-		}
 
 		if (plev > GDP_PR_PRETTY)
 		{
@@ -718,9 +775,11 @@ _gdp_gcl_cache_dump(int plev, FILE *fp)
 					gcl->pname);
 		VALGRIND_HG_ENABLE_CHECKING(gcl, sizeof *gcl);
 	}
-
-	ep_hash_forall(_OpenGCLCache, check_cache, fp);
-	fprintf(fp, "\n<<< End of cached GCL list >>>\n");
+	if (gcl == NULL)
+		fprintf(fp, "\n<<< End of cached GCL list >>>\n");
+	else
+		fprintf(fp, "\n<<< End of cached GCL list (only %d of %d printed >>>\n",
+				ngcls, maxgcls);
 }
 
 
