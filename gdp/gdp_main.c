@@ -126,7 +126,7 @@ acknak_from_estat(EP_STAT estat, int def)
 
 
 /*
-**  GDP_PDU_PROC_CMD --- process command PDU
+**  PROCESS_CMD --- process command PDU
 **
 **		Usually done in a thread since it may be heavy weight.
 */
@@ -134,7 +134,7 @@ acknak_from_estat(EP_STAT estat, int def)
 static EP_THR_MUTEX		GclCreateMutex			EP_THR_MUTEX_INITIALIZER;
 
 static void
-gdp_pdu_proc_cmd(void *cpdu_)
+process_cmd(void *cpdu_)
 {
 	gdp_pdu_t *cpdu = cpdu_;
 	int cmd = cpdu->cmd;
@@ -148,7 +148,7 @@ gdp_pdu_proc_cmd(void *cpdu_)
 		ep_thr_mutex_lock(&GclCreateMutex);
 
 	ep_dbg_cprintf(Dbg, 40,
-			"gdp_pdu_proc_cmd(%s, thread %p)\n",
+			"process_cmd(%s, thread %p)\n",
 			_gdp_proto_cmd_name(cmd), (void *) ep_thr_gettid());
 
 	estat = _gdp_gcl_cache_get(cpdu->dst, 0, GGCF_NOCREATE, &gcl);
@@ -159,13 +159,13 @@ gdp_pdu_proc_cmd(void *cpdu_)
 	}
 
 	ep_dbg_cprintf(Dbg, 43,
-			"gdp_pdu_proc_cmd: allocating new req for GCL %p\n", gcl);
+			"process_cmd: allocating new req for GCL %p\n", gcl);
 	estat = _gdp_req_new(cmd, gcl, cpdu->chan, cpdu, GDP_REQ_CORE, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex);
 	EP_ASSERT(gcl == req->gcl);
 
-	ep_dbg_cprintf(Dbg, 40, "gdp_pdu_proc_cmd >>> req=%p\n", req);
+	ep_dbg_cprintf(Dbg, 40, "process_cmd >>> req=%p\n", req);
 
 	// if command will need an ack, allocate space for that PDU
 	if (GDP_CMD_NEEDS_ACK(cmd))
@@ -183,7 +183,7 @@ gdp_pdu_proc_cmd(void *cpdu_)
 	estat = _gdp_req_dispatch(req, cmd);
 	if (ep_dbg_test(Dbg, 59))
 	{
-		ep_dbg_printf("gdp_pdu_proc_cmd: after dispatch, ");
+		ep_dbg_printf("process_cmd: after dispatch, ");
 		_gdp_req_dump(req, ep_dbg_getfile(), 0, 0);
 	}
 
@@ -192,10 +192,9 @@ gdp_pdu_proc_cmd(void *cpdu_)
 	if (gcl != NULL)
 	{
 		GDP_GCL_ASSERT_ISLOCKED(gcl);
-		ep_dbg_cprintf(Dbg, 23, "  +++ 3 : %d\n", gcl->refcnt);
 		if (!EP_ASSERT(gcl == req->gcl) && ep_dbg_test(Dbg, 1))
 		{
-			ep_dbg_printf("gdp_pdu_proc_cmd, after dispatch:\n  gcl = ");
+			ep_dbg_printf("process_cmd, after dispatch:\n  gcl = ");
 			_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 			ep_dbg_printf("  req->gcl = ");
 			_gdp_gcl_dump(req->gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
@@ -215,7 +214,7 @@ gdp_pdu_proc_cmd(void *cpdu_)
 
 	if (resp >= GDP_NAK_S_MIN && resp <= GDP_NAK_S_MAX)
 	{
-		ep_log(estat, "gdp_pdu_proc_cmd(%s): server error",
+		ep_log(estat, "process_cmd(%s): server error",
 				_gdp_proto_cmd_name(cmd));
 	}
 
@@ -230,7 +229,7 @@ gdp_pdu_proc_cmd(void *cpdu_)
 			siglen = gdp_buf_getlength(datum->sig);
 		if (siglen != datum->siglen)
 		{
-			ep_dbg_cprintf(Dbg, 1, "gdp_pdu_proc_cmd(%s): datum->siglen = %d, actual = %d\n",
+			ep_dbg_cprintf(Dbg, 1, "process_cmd(%s): datum->siglen = %d, actual = %d\n",
 					_gdp_proto_cmd_name(cmd),
 					datum->siglen, siglen);
 			datum->siglen = siglen;
@@ -241,7 +240,7 @@ gdp_pdu_proc_cmd(void *cpdu_)
 	if (req->rpdu != NULL)
 	{
 		ep_dbg_cprintf(Dbg, 47,
-				"gdp_pdu_proc_cmd: sending %zd bytes\n",
+				"process_cmd: sending %zd bytes\n",
 				gdp_buf_getlength(req->rpdu->datum->dbuf));
 		req->rpdu->cmd = resp;
 		req->stat = _gdp_pdu_out(req->rpdu, req->chan, NULL);
@@ -258,7 +257,7 @@ gdp_pdu_proc_cmd(void *cpdu_)
 	// do command post processing
 	if (req->postproc)
 	{
-		ep_dbg_cprintf(Dbg, 44, "gdp_pdu_proc_cmd: doing post processing\n");
+		ep_dbg_cprintf(Dbg, 44, "process_cmd: doing post processing\n");
 		(req->postproc)(req);
 		req->postproc = NULL;
 
@@ -288,7 +287,7 @@ gdp_pdu_proc_cmd(void *cpdu_)
 	if (false)
 	{
 fail0:
-		ep_log(estat, "gdp_pdu_proc_cmd: cannot allocate request; dropping PDU");
+		ep_log(estat, "process_cmd: cannot allocate request; dropping PDU");
 		if (cpdu != NULL)
 			_gdp_pdu_free(cpdu);
 	}
@@ -296,7 +295,7 @@ fail0:
 	if (cmd == GDP_CMD_CREATE)
 		ep_thr_mutex_unlock(&GclCreateMutex);
 
-	ep_dbg_cprintf(Dbg, 40, "gdp_pdu_proc_cmd <<< done\n");
+	ep_dbg_cprintf(Dbg, 40, "process_cmd <<< done\n");
 }
 
 
@@ -356,7 +355,7 @@ find_req_in_channel_list(
 
 
 /*
-**  GDP_PDU_PROC_RESP --- process response (ack/nak) PDU
+**  PROCESS_RESP --- process response (ack/nak) PDU
 **
 **		When this is called, the rpdu passed in will be the actual
 **		PDU off the wire and req->cpdu should be the original command
@@ -367,7 +366,7 @@ find_req_in_channel_list(
 */
 
 static void
-gdp_pdu_proc_resp(void *rpdu_)
+process_resp(void *rpdu_)
 {
 	gdp_pdu_t *rpdu = rpdu_;
 	gdp_chan_t *chan = _GdpChannel;
@@ -385,7 +384,7 @@ gdp_pdu_proc_resp(void *rpdu_)
 		char ebuf[120];
 		gdp_pname_t rpdu_pname;
 
-		ep_dbg_printf("gdp_pdu_proc_resp: cmd %s rpdu %p ->src %s) gcl %p stat %s\n",
+		ep_dbg_printf("process_resp: cmd %s rpdu %p ->src %s) gcl %p stat %s\n",
 			_gdp_proto_cmd_name(cmd),
 			rpdu, gdp_printable_name(rpdu->src, rpdu_pname), gcl,
 			ep_stat_tostr(estat, ebuf, sizeof ebuf));
@@ -406,7 +405,7 @@ gdp_pdu_proc_resp(void *rpdu_)
 						rpdu->cmd == GDP_NAK_R_NOROUTE ? 19 : 1))
 			{
 				gdp_pname_t pname;
-				ep_dbg_printf("gdp_pdu_proc_resp: discarding %d (%s) PDU"
+				ep_dbg_printf("process_resp: discarding %d (%s) PDU"
 							" for unknown GCL\n",
 							rpdu->cmd, _gdp_proto_cmd_name(rpdu->cmd));
 				if (ep_dbg_test(DbgProcResp, 24))
@@ -440,7 +439,7 @@ gdp_pdu_proc_resp(void *rpdu_)
 
 		// find the corresponding request
 		ep_dbg_cprintf(DbgProcResp, 23,
-				"gdp_pdu_proc_resp: searching gcl %p for rid %" PRIgdp_rid "\n",
+				"process_resp: searching gcl %p for rid %" PRIgdp_rid "\n",
 				gcl, rpdu->rid);
 		req = _gdp_req_find(gcl, rpdu->rid);
 		if (ep_dbg_test(DbgProcResp, 51))
@@ -455,7 +454,7 @@ gdp_pdu_proc_resp(void *rpdu_)
 			// no req for incoming response --- "can't happen"
 			if (ep_dbg_test(DbgProcResp, 1))
 			{
-				ep_dbg_printf("gdp_pdu_proc_resp: no req for incoming response\n");
+				ep_dbg_printf("process_resp: no req for incoming response\n");
 				_gdp_pdu_dump(rpdu, ep_dbg_getfile());
 				_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
 			}
@@ -466,7 +465,7 @@ gdp_pdu_proc_resp(void *rpdu_)
 		{
 			if (ep_dbg_test(DbgProcResp, 1))
 			{
-				ep_dbg_printf("gdp_pdu_proc_resp: trying to use free ");
+				ep_dbg_printf("process_resp: trying to use free ");
 				_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
 			}
 			_gdp_pdu_free(rpdu);
@@ -477,7 +476,7 @@ gdp_pdu_proc_resp(void *rpdu_)
 			// this could be an assertion
 			if (ep_dbg_test(DbgProcResp, 1))
 			{
-				ep_dbg_printf("gdp_pdu_proc_resp(%d): rpdu == req->rpdu\n",
+				ep_dbg_printf("process_resp(%d): rpdu == req->rpdu\n",
 							rpdu->cmd);
 				_gdp_pdu_dump(rpdu, ep_dbg_getfile());
 			}
@@ -490,7 +489,7 @@ gdp_pdu_proc_resp(void *rpdu_)
 	if (req->cpdu == NULL)
 	{
 		ep_dbg_cprintf(DbgProcResp, 1,
-				"gdp_pdu_proc_resp(%d): no corresponding command PDU\n",
+				"process_resp(%d): no corresponding command PDU\n",
 				rpdu->cmd);
 		ocmd = rpdu->cmd;
 		//XXX return here?  with req->pdu == NULL, _gdp_req_dispatch
@@ -507,7 +506,7 @@ gdp_pdu_proc_resp(void *rpdu_)
 		// this can happen in multiread/subscription and async I/O
 		if (ep_dbg_test(DbgProcResp, 41))
 		{
-			ep_dbg_printf("gdp_pdu_proc_resp: req->rpdu already set\n    ");
+			ep_dbg_printf("process_resp: req->rpdu already set\n    ");
 			_gdp_pdu_dump(req->rpdu, ep_dbg_getfile());
 		}
 		_gdp_pdu_free(req->rpdu);
@@ -516,7 +515,7 @@ gdp_pdu_proc_resp(void *rpdu_)
 
 	if (ep_dbg_test(DbgProcResp, 43))
 	{
-		ep_dbg_printf("gdp_pdu_proc_resp: ");
+		ep_dbg_printf("process_resp: ");
 		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
@@ -543,7 +542,7 @@ gdp_pdu_proc_resp(void *rpdu_)
 	{
 		char ebuf[100];
 
-		ep_dbg_printf("gdp_pdu_proc_resp(%s for %s): %s\n",
+		ep_dbg_printf("process_resp(%s for %s): %s\n",
 				_gdp_proto_cmd_name(cmd),
 				_gdp_proto_cmd_name(ocmd),
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
@@ -573,7 +572,7 @@ gdp_pdu_proc_resp(void *rpdu_)
 
 		if (ep_dbg_test(DbgProcResp, 40))
 		{
-			ep_dbg_printf("gdp_pdu_proc_resp: signaling ");
+			ep_dbg_printf("process_resp: signaling ");
 			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 		}
 
@@ -588,11 +587,11 @@ gdp_pdu_proc_resp(void *rpdu_)
 	{
 		// since this is common and expected, don't sully output
 		ep_dbg_cprintf(DbgProcResp, 19,
-				"gdp_pdu_proc_resp: discarding GDP_NAK_R_NOROUTE\n");
+				"process_resp: discarding GDP_NAK_R_NOROUTE\n");
 	}
 	else if (ep_dbg_test(DbgProcResp, 1))
 	{
-		ep_dbg_printf("gdp_pdu_proc_resp: discarding response ");
+		ep_dbg_printf("process_resp: discarding response ");
 		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
@@ -615,7 +614,7 @@ gdp_pdu_proc_resp(void *rpdu_)
 		_gdp_req_unlock(req);
 	}
 
-	ep_dbg_cprintf(DbgProcResp, 40, "gdp_pdu_proc_resp <<< done\n");
+	ep_dbg_cprintf(DbgProcResp, 40, "process_resp <<< done\n");
 }
 
 
@@ -635,16 +634,16 @@ _gdp_pdu_process(gdp_pdu_t *pdu, gdp_chan_t *chan)
 	if (GDP_CMD_IS_COMMAND(pdu->cmd))
 	{
 		if (_GdpRunCmdInThread)
-			ep_thr_pool_run(&gdp_pdu_proc_cmd, pdu);
+			ep_thr_pool_run(&process_cmd, pdu);
 		else
-			gdp_pdu_proc_cmd(pdu);
+			process_cmd(pdu);
 	}
 	else
 	{
 		if (_GdpRunRespInThread)
-			ep_thr_pool_run(&gdp_pdu_proc_resp, pdu);
+			ep_thr_pool_run(&process_resp, pdu);
 		else
-			gdp_pdu_proc_resp(pdu);
+			process_resp(pdu);
 	}
 }
 
