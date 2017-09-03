@@ -393,7 +393,6 @@ _gdp_gcl_incref(gdp_gcl_t *gcl)
 	GDP_GCL_ASSERT_ISLOCKED(gcl);
 
 	gcl->refcnt++;
-	_gdp_gcl_touch(gcl);
 	ep_dbg_cprintf(Dbg, 51, "_gdp_gcl_incref(%p): %d\n", gcl, gcl->refcnt);
 }
 

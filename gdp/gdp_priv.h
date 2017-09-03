@@ -69,7 +69,7 @@ extern bool			_GdpLibInitialized;	// are we initialized?
 #if GDP_OPT_EXTENDED_CACHE_CHECK
 #define IF_LIST_CHECK_OK(list, item, chain, type)						\
 	type *_x_ ## item;													\
-	if (ep_dbg_test(Dbg, 14))											\
+	if (ep_dbg_test(Dbg, 10))											\
 	{																	\
 		LIST_FOREACH(_x_ ## item, list, chain)							\
 		{																\

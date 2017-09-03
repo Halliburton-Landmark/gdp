@@ -288,7 +288,10 @@ _gdp_gcl_cache_get(
 			gcl = NULL;
 		}
 		else if (iomode != _GDP_MODE_PEEK)
+		{
 			_gdp_gcl_incref(gcl);
+			_gdp_gcl_touch(gcl);
+		}
 	}
 	if (gcl == NULL)
 	{
@@ -423,6 +426,7 @@ _gdp_gcl_touch(gdp_gcl_t *gcl)
 	else
 	{
 		// both locked and in cache
+		EP_THR_MUTEX_ASSERT_ISLOCKED(&GclCacheMutex);
 		LIST_REMOVE(gcl, ulist);
 		IF_LIST_CHECK_OK(&GclsByUse, gcl, ulist, gdp_gcl_t)
 			LIST_INSERT_HEAD(&GclsByUse, gcl, ulist);
@@ -667,6 +671,7 @@ _gdp_gcl_cache_dump(int plev, FILE *fp)
 	fprintf(fp, "\n<<< Showing cached GCLs by usage >>>\n");
 	LIST_FOREACH(gcl, &GclsByUse, ulist)
 	{
+		VALGRIND_HG_DISABLE_CHECKING(gcl, sizeof *gcl);
 		if (check_for_loops)
 		{
 			// check for loops, starting with quick bloom filter on address
@@ -711,6 +716,7 @@ _gdp_gcl_cache_dump(int plev, FILE *fp)
 		if (ep_hash_search(_OpenGCLCache, sizeof gcl->name, (void *) gcl->name) == NULL)
 			fprintf(fp, "    ===> WARNING: %s not in primary cache\n",
 					gcl->pname);
+		VALGRIND_HG_ENABLE_CHECKING(gcl, sizeof *gcl);
 	}
 
 	ep_hash_forall(_OpenGCLCache, check_cache, fp);
