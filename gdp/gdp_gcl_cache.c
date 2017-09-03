@@ -167,7 +167,7 @@ check_cache_helper(size_t klen, const void *key, void *val, va_list av)
 */
 
 static bool
-check_cache_consistency(void)
+check_cache_consistency(const char *where)
 {
 	bool rval = true;
 	gdp_gcl_t *gcl;
@@ -183,31 +183,33 @@ check_cache_consistency(void)
 	EP_THR_MUTEX_ASSERT_ISLOCKED(&GclCacheMutex);
 	LIST_FOREACH(gcl, &GclsByUse, ulist)
 	{
-		VALGRIND_HG_DISABLE_CHECKING(gcl, sizeof *gcl);
-		{
-			// check for loops, starting with quick bloom filter on address
-			uint32_t bmask;
-			int bindex;
+		// check for loops, starting with quick bloom filter on address
+		uint32_t bmask;
+		int bindex;
 
-			MD4((unsigned char *) &gcl, sizeof gcl, md4buf.md4out);
-			bindex = md4buf.md4eq[0];			// just use first 32-bit word
-			bmask = 1 << (bindex & 0x1f);		// mask on single word
-			bindex = (bindex >> 4) & ((1 << (LOG2_BLOOM_SIZE - 1)) - 1);
-			if (EP_UT_BITSET(bmask, bloom[bindex]))
+		VALGRIND_HG_DISABLE_CHECKING(gcl, sizeof *gcl);
+
+		MD4((unsigned char *) &gcl, sizeof gcl, md4buf.md4out);
+		bindex = md4buf.md4eq[0];			// just use first 32-bit word
+		bmask = 1 << (bindex & 0x1f);		// mask on single word
+		bindex = (bindex >> 4) & ((1 << (LOG2_BLOOM_SIZE - 1)) - 1);
+		if (EP_UT_BITSET(bmask, bloom[bindex]))
+		{
+			// may have a conflict --- do explicit check
+			gdp_gcl_t *g2 = LIST_NEXT(gcl, ulist);
+			while (g2 != NULL && g2 != gcl)
+				g2 = LIST_NEXT(g2, ulist);
+			if (g2 != NULL)
 			{
-				// may have a conflict --- do explicit check
-				gdp_gcl_t *g2 = LIST_NEXT(gcl, ulist);
-				while (g2 != NULL && g2 != gcl)
-					g2 = LIST_NEXT(g2, ulist);
-				if (g2 != NULL)
-				{
-					EP_ASSERT_PRINT("Loop in GclsByUse on %p", gcl);
-					rval = false;
-					break;
-				}
+				EP_ASSERT_PRINT("Loop in GclsByUse on %p at %s",
+						gcl, where);
+				_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
+				rval = false;
+				VALGRIND_HG_ENABLE_CHECKING(gcl, sizeof *gcl);
+				break;
 			}
-			bloom[bindex] |= bmask;
 		}
+		bloom[bindex] |= bmask;
 		VALGRIND_HG_ENABLE_CHECKING(gcl, sizeof *gcl);
 	}
 
@@ -286,7 +288,7 @@ add_cache_unlocked(gdp_gcl_t *gcl)
 		return;
 	EP_THR_MUTEX_ASSERT_ISLOCKED(&GclCacheMutex);
 
-	check_cache_consistency();
+	check_cache_consistency("add_cache_unlocked");
 
 	if (EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
 	{
@@ -372,7 +374,7 @@ _gdp_gcl_cache_changename(gdp_gcl_t *gcl, gdp_name_t newname)
 	EP_ASSERT_ELSE(EP_UT_BITSET(GCLF_INCACHE, gcl->flags), return);
 
 	ep_thr_mutex_lock(&GclCacheMutex);
-	check_cache_consistency();
+	check_cache_consistency("_gdp_gcl_cache_changename");
 	(void) ep_hash_delete(_OpenGCLCache, sizeof (gdp_name_t), gcl->name);
 	(void) memcpy(gcl->name, newname, sizeof (gdp_name_t));
 	(void) ep_hash_insert(_OpenGCLCache, sizeof (gdp_name_t), newname, gcl);
@@ -411,7 +413,7 @@ _gdp_gcl_cache_get(
 	EP_STAT estat = EP_STAT_OK;
 
 	ep_thr_mutex_lock(&GclCacheMutex);
-	if (!check_cache_consistency())
+	if (!check_cache_consistency("_gdp_gcl_cache_get"))
 		rebuild_lru_list();
 
 	// see if we have a pointer to this GCL in the cache
@@ -498,7 +500,7 @@ _gdp_gcl_cache_drop(gdp_gcl_t *gcl, bool cleanup)
 	if (cleanup)
 	{
 		EP_THR_MUTEX_ASSERT_ISLOCKED(&GclCacheMutex);
-		check_cache_consistency();
+		check_cache_consistency("_gdp_gcl_cache_drop");
 	}
 	else
 	{
@@ -524,7 +526,7 @@ _gdp_gcl_cache_drop(gdp_gcl_t *gcl, bool cleanup)
 		// now lock the cache and then re-lock the GCL
 		_gdp_gcl_unlock(gcl);
 		ep_thr_mutex_lock(&GclCacheMutex);
-		check_cache_consistency();
+		check_cache_consistency("_gdp_gcl_cache_drop");
 		_gdp_gcl_lock(gcl);
 
 		// sanity checks (XXX should these be assertions? XXX)
@@ -580,7 +582,7 @@ _gdp_gcl_touch(gdp_gcl_t *gcl)
 	{
 		// both locked and in cache
 		EP_THR_MUTEX_ASSERT_ISLOCKED(&GclCacheMutex);
-		check_cache_consistency();
+		check_cache_consistency("_gdp_gcl_touch");
 		LIST_REMOVE(gcl, ulist);
 		IF_LIST_CHECK_OK(&GclsByUse, gcl, ulist, gdp_gcl_t)
 			LIST_INSERT_HEAD(&GclsByUse, gcl, ulist);
@@ -640,7 +642,7 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 		mintime = tv.tv_sec - maxage;
 
 		ep_thr_mutex_lock(&GclCacheMutex);
-		if (!check_cache_consistency())
+		if (!check_cache_consistency("_gdp_gcl_cache_reclaim"))
 			rebuild_lru_list();
 		for (g1 = LIST_FIRST(&GclsByUse); g1 != NULL; g1 = g2)
 		{
