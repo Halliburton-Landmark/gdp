@@ -101,6 +101,7 @@ _gdp_gcl_create(gdp_name_t gclname,
 
 	// create the request
 	_gdp_gcl_lock(gcl);
+	reqflags |= GDP_REQ_ROUTEFAIL;		// don't retry on route failure
 	estat = _gdp_req_new(GDP_CMD_CREATE, gcl, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
@@ -112,8 +113,8 @@ _gdp_gcl_create(gdp_name_t gclname,
 
 	// send command and wait for results
 	estat = _gdp_invoke(req);
-	EP_STAT_CHECK(estat, goto fail1);
 	GDP_GCL_ASSERT_ISLOCKED(gcl);
+	EP_STAT_CHECK(estat, goto fail0);
 
 	// change GCL name
 	(void) memcpy(gcl->name, gclname, sizeof (gdp_name_t));
@@ -129,10 +130,15 @@ _gdp_gcl_create(gdp_name_t gclname,
 	*pgcl = gcl;
 
 fail0:
-fail1:
 	if (req != NULL)
 		_gdp_req_free(&req);
-	_gdp_gcl_unlock(gcl);
+	if (gcl != NULL)
+	{
+		if (!EP_STAT_ISOK(estat))
+			_gdp_gcl_decref(&gcl, false);
+		else
+			_gdp_gcl_unlock(gcl);
+	}
 
 	{
 		char ebuf[100];

@@ -166,14 +166,23 @@ _gdp_invoke(gdp_req_t *req)
 				break;
 			}
 		}
+
+		if (ep_dbg_test(Dbg, 46))
+		{
+			char e1buf[100], e2buf[100];
+			ep_dbg_printf(
+					"_gdp_invoke: after cond_wait, estat %s, req->stat %s\n",
+					ep_stat_tostr(estat, e1buf, sizeof e1buf),
+					ep_stat_tostr(req->stat, e2buf, sizeof e2buf));
+		}
 		req->state = GDP_REQ_ACTIVE;
 		if (EP_STAT_ISOK(estat))
 		{
 			estat = req->stat;
 
 			// if we succeeded or it's our fault, don't try again
-			if (EP_STAT_ISOK(estat) || GDP_STAT_IS_C_NAK(estat) ||
-					GDP_STAT_IS_S_NAK(estat))
+			if (EP_STAT_ISOK(req->stat) || GDP_STAT_IS_C_NAK(req->stat) ||
+					GDP_STAT_IS_S_NAK(req->stat))
 			{
 				break;				// we're done, don't retry
 			}
@@ -184,19 +193,16 @@ _gdp_invoke(gdp_req_t *req)
 				break;
 			}
 		}
-		else
+
+		// do a retry, after re-locking the GCL
+		estat = _gdp_req_unsend(req);
+		EP_STAT_CHECK(estat, break);
+		estat = GDP_STAT_INVOKE_TIMEOUT;	//XXX why?
+		if (retries > 1)
 		{
-			// do a retry, after re-locking the GCL
-			estat = _gdp_req_unsend(req);
-			if (!EP_STAT_ISOK(estat))
-				break;
-			estat = GDP_STAT_INVOKE_TIMEOUT;
-			if (retries > 1)
-			{
-				// if ETIMEDOUT, maybe the router had a glitch:
-				//   wait and try again
-				ep_time_nanosleep(retry_delay MILLISECONDS);
-			}
+			// if ETIMEDOUT, maybe the router had a glitch:
+			//   wait and try again
+			ep_time_nanosleep(retry_delay MILLISECONDS);
 		}
 	} while (--retries > 0);
 
