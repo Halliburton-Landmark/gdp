@@ -449,6 +449,11 @@ gdp_gcl_open(gdp_name_t name,
 		return GDP_STAT_BAD_IOMODE;
 	}
 
+	//XXX modes apparently just confuse applications
+	//XXX	The apps should be fixed, but this is easier.
+	iomode = GDP_MODE_ANY;
+	cmd = GDP_CMD_OPEN_RA;
+
 	if (!gdp_name_is_valid(name))
 	{
 		// illegal GCL name

@@ -112,6 +112,7 @@ _gdp_gcl_newhandle(gdp_name_t gcl_name, gdp_gcl_t **pgcl)
 	LIST_INIT(&gcl->reqs);
 	gcl->refcnt = 1;
 	gcl->nrecs = 0;
+	gcl->iomode = GDP_MODE_ANY;
 	NGclsAllocated++;
 
 	// create a name if we don't have one passed in
