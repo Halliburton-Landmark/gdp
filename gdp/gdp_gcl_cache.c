@@ -460,9 +460,9 @@ done:
 
 		gdp_printable_name(gcl_name, pname);
 		if (gcl == NULL)
-			ep_dbg_printf("gdp_gcl_cache_get: %s => NULL\n", pname);
+			ep_dbg_printf("_gdp_gcl_cache_get: %s => NULL\n", pname);
 		else
-			ep_dbg_printf("gdp_gcl_cache_get: %s =>\n\t%p refcnt %d\n",
+			ep_dbg_printf("_gdp_gcl_cache_get: %s =>\n\t%p refcnt %d\n",
 						pname, gcl, gcl->refcnt);
 	}
 fail0:
@@ -492,11 +492,6 @@ _gdp_gcl_cache_drop(gdp_gcl_t *gcl, bool cleanup)
 	GDP_GCL_ASSERT_ISLOCKED(gcl);
 	if (!EP_ASSERT(EP_UT_BITSET(GCLF_INCACHE, gcl->flags)))
 		return;
-	if (EP_UT_BITSET(GCLF_DROPPING, gcl->flags))
-	{
-		// already being dropped
-		return;
-	}
 	if (cleanup)
 	{
 		EP_THR_MUTEX_ASSERT_ISLOCKED(&GclCacheMutex);

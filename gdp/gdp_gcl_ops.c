@@ -288,10 +288,7 @@ fail1:
 
 fail0:
 	if (req != NULL)
-	{
-		req->gcl = NULL;		// owned by caller
 		_gdp_req_free(&req);
-	}
 
 	// log failure
 	if (EP_STAT_ISOK(estat))
@@ -367,8 +364,8 @@ _gdp_gcl_close(gdp_gcl_t *gcl,
 	//XXX should probably check status (and do what with it?)
 
 	// release resources held by this handle
-	_gdp_req_free(&req);
 	_gdp_event_free_all(gcl);
+	_gdp_req_free(&req);
 finis:
 fail0:
 	_gdp_gcl_decref(&gcl, false);
