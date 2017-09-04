@@ -446,7 +446,9 @@ cmd_close(gdp_req_t *req)
 	flush_input_data(req, "cmd_close");
 
 	// a bit wierd to open the GCL only to close it again....
+	_gdp_req_unlock(req);				// lock ordering
 	estat = get_open_handle(req, GDP_MODE_ANY);
+	_gdp_req_lock(req);
 	if (!EP_STAT_ISOK(estat))
 	{
 		return gdpd_gcl_error(req->cpdu->dst, "cmd_close: GCL not open",
