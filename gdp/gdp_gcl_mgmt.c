@@ -105,6 +105,8 @@ _gdp_gcl_newhandle(gdp_name_t gcl_name, gdp_gcl_t **pgcl)
 			goto fail1;
 		ep_thr_mutex_setorder(&gcl->mutex, GDP_MUTEX_LORDER_GCL);
 	}
+	if (!EP_ASSERT(gcl->flags == 0))
+		_gdp_gcl_dump(gcl, NULL, GDP_PR_DETAILED, 0);
 	VALGRIND_HG_CLEAN_MEMORY(gcl, sizeof *gcl);
 
 	LIST_INIT(&gcl->reqs);
@@ -159,6 +161,7 @@ _gdp_gcl_freehandle(gdp_gcl_t *gcl)
 	{
 		// drop it from the name -> handle cache and the LRU list
 		_gdp_gcl_cache_drop(gcl, false);
+		EP_ASSERT(!EP_UT_BITSET(GCLF_INCACHE, gcl->flags));
 	}
 
 	// release any remaining requests
