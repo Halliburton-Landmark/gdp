@@ -1,7 +1,8 @@
 [Unit]
 Description=GDP log daemon
-Wants=gdp-router-click.service
 After=gdp-router-click.service
+Requires=network-online.target
+After=network-online.target
 
 [Service]
 Type=notify
@@ -10,7 +11,8 @@ Environment=GDP_ROOT=@GDP_ROOT@
 User=@GDP_USER@
 
 # give router time to start up
-ExecStartPre=/bin/sleep 20
+#ExecStartPre=/bin/sleep 20
+ExecStartPre=/bin/sleep 2
 ExecStart=/bin/sh @GDP_ROOT@/sbin/gdplogd-wrapper.sh
 Restart=always
 
