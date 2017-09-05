@@ -429,6 +429,13 @@ process_resp(void *rpdu_)
 		{
 			LIST_REMOVE(req, gcllist);
 			req->flags &= ~GDP_REQ_ON_GCL_LIST;
+			//DEBUG: without this incref, a gdp_gcl_create call on a log
+			//	that already exists throws the error:
+			//	Assertion failed at gcl-create:gdp_gcl_mgmt.c:435: GDP_GCL_ISGOOD(gcl)
+			//	because the refcnt has gone to zero prematurely.  But with it,
+			//	a successful gdp_gcl_create leaves the refcnt one too high
+			//	leading to a resource leak.
+			_gdp_gcl_incref(req->gcl);		//DEBUG:
 
 			// code below expects request to remain locked
 		}

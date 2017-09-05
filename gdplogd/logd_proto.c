@@ -303,6 +303,7 @@ cmd_create(gdp_req_t *req)
 	req->gcl = gcl;			// for debugging
 	_gdp_req_unlock(req);
 	_gdp_gcl_lock(gcl);
+	_gdp_req_lock(req);
 
 	// assume both read and write modes
 	gcl->iomode = GDP_MODE_RA;
@@ -320,12 +321,10 @@ cmd_create(gdp_req_t *req)
 	}
 
 	// cache the open GCL Handle for possible future use
-	// notice the dance around lock ordering
 	EP_ASSERT(gdp_name_is_valid(gcl->name));
 	gcl->flags |= GCLF_DEFER_FREE;
 	gcl->flags &= ~GCLF_PENDING;
 	_gdp_gcl_cache_add(gcl);
-	_gdp_req_lock(req);
 
 	// advertise this new GCL
 	logd_advertise_one(gcl->name, GDP_CMD_ADVERTISE);

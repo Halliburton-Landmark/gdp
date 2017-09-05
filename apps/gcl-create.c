@@ -93,13 +93,13 @@ select_logd_name(void)
 }
 
 // command line options
-#define OPTIONS		"b:c:C:D:e:G:h:k:K:qs:"
+#define OPTIONS		"b:c:C:D:e:G:h:k:K:qs:S"
 
 void
 usage(void)
 {
 	fprintf(stderr, "Usage: %s [-C creator] [-D dbgspec] [-e key_enc_alg]\n"
-			"\t[-G gdpd_addr] [-q] [-s logd_name]\n"
+			"\t[-G gdpd_addr] [-q] [-s logd_name] [-S]\n"
 			"\t[-h] [-k keytype] [-K keyfile] [-b keybits] [-c curve]\n"
 			"\t[<mdid>=<metadata>...] [gcl_name]\n"
 			"    -C  set name of log creator (owner; for metadata)\n"
@@ -108,6 +108,7 @@ usage(void)
 			"    -G  IP host to contact for GDP router\n"
 			"    -q  don't give error if log already exists\n"
 			"    -s  set name of log daemon on which to create the log\n"
+			"    -S  skip the test to see if log already exists (for debugging)\n"
 			"    -h  set the hash (message digest) algorithm (defaults to sha256)\n"
 			"    -k  type of key; valid key types are \"rsa\", \"dsa\", and \"ec\"\n"
 			"\t(defaults to ec); \"none\" turns off key generation\n"
@@ -141,6 +142,7 @@ main(int argc, char **argv)
 	bool show_usage = false;
 	bool make_new_key = true;
 	bool quiet = false;
+	bool skip_existence_test = false;
 	int md_alg_id = -1;
 	int keytype = EP_CRYPTO_KEYTYPE_UNKNOWN;
 	int keylen = 0;
@@ -236,6 +238,10 @@ main(int argc, char **argv)
 			logdxname = optarg;
 			break;
 
+		 case 'S':
+			skip_existence_test = true;
+			break;
+
 		 default:
 			show_usage = true;
 			break;
@@ -302,16 +308,18 @@ main(int argc, char **argv)
 	if (gclxname != NULL)
 	{
 		gdp_parse_name(gclxname, gcliname);
-
-		// make sure it doesn't already exist
-		estat = gdp_gcl_open(gcliname, GDP_MODE_RO, NULL, &gcl);
-		if (EP_STAT_ISOK(estat))
+		if (!skip_existence_test)
 		{
-			// oops, we shouldn't be able to open it
-			(void) gdp_gcl_close(gcl);
-			if (!quiet)
-				ep_app_error("Cannot create %s: already exists", gclxname);
-			exit(EX_CANTCREAT);
+			// make sure it doesn't already exist
+			estat = gdp_gcl_open(gcliname, GDP_MODE_RO, NULL, &gcl);
+			if (EP_STAT_ISOK(estat))
+			{
+				// oops, we shouldn't be able to open it
+				(void) gdp_gcl_close(gcl);
+				if (!quiet)
+					ep_app_error("Cannot create %s: already exists", gclxname);
+				exit(EX_CANTCREAT);
+			}
 		}
 	}
 
