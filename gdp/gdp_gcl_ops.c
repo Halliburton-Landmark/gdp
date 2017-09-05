@@ -150,51 +150,18 @@ fail0:
 }
 
 
-/*
-**	_GDP_GCL_OPEN --- open a GCL for reading or further appending
-*/
-
-EP_STAT
-_gdp_gcl_open(gdp_gcl_t *gcl,
-			int cmd,
-			gdp_gcl_open_info_t *open_info,
-			gdp_chan_t *chan,
-			uint32_t reqflags)
+static EP_STAT
+find_secret_key(gdp_gcl_t *gcl,
+			gdp_gcl_open_info_t *open_info)
 {
-	EP_STAT estat = EP_STAT_OK;
-	gdp_req_t *req = NULL;
+	// We will write the log, and it does have a public key.  We need
+	// to find the secret to match it.
 	size_t pkbuflen;
 	const uint8_t *pkbuf;
 	int md_alg;
-//	int pktype;
 	EP_CRYPTO_KEY *secretkey = NULL;
 	bool my_secretkey = false;
-
-	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
-					return EP_STAT_ASSERT_ABORT);
-	GDP_GCL_ASSERT_ISLOCKED(gcl);
-
-	// send the request across to the log daemon
-	errno = 0;				// avoid spurious messages
-	reqflags |= GDP_REQ_ALLOC_RID;			// always use a new request id
-	reqflags |= GDP_REQ_ROUTEFAIL;			// don't retry on router errors
-	estat = _gdp_req_new(cmd, gcl, chan, NULL, reqflags, &req);
-	GDP_GCL_ASSERT_ISLOCKED(gcl);					//DEBUG
-	EP_STAT_CHECK(estat, goto fail0);
-	estat = _gdp_invoke(req);
-	GDP_GCL_ASSERT_ISLOCKED(gcl);					//DEBUG
-	EP_STAT_CHECK(estat, goto fail0);
-	// success
-
-	// save the number of records
-	gcl->nrecs = req->rpdu->datum->recno;
-
-	// read in the metadata to internal format
-	gcl->gclmd = _gdp_gclmd_deserialize(req->rpdu->datum->dbuf);
-
-	// if read-only, we're done
-	if (cmd != GDP_CMD_OPEN_AO && cmd != GDP_CMD_OPEN_RA)
-		goto finis;
+	EP_STAT estat;
 
 	// see if we have a public key; if not we're done
 	estat = gdp_gclmd_find(gcl->gclmd, GDP_GCLMD_PUBKEY,
@@ -202,11 +169,10 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 	if (!EP_STAT_ISOK(estat))
 	{
 		ep_dbg_cprintf(Dbg, 30, "_gdp_gcl_open: no public key\n");
-		goto finis;
+		return EP_STAT_OK;
 	}
 
 	md_alg = pkbuf[0];
-//	pktype = pkbuf[1];
 
 	// get the secret key if needed
 	if (open_info != NULL)
@@ -229,9 +195,8 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 		if (secretkey == NULL)
 		{
 			// OK, now we have a problem --- we can't sign
-			estat = GDP_STAT_SKEY_REQUIRED;
 			ep_dbg_cprintf(Dbg, 30, "_gdp_gcl_open: no secret key\n");
-			goto fail0;
+			return GDP_STAT_SKEY_REQUIRED;
 		}
 
 		my_secretkey = true;			// we must deallocate
@@ -253,7 +218,7 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 			// XXX: cheat: use internal interface
 			(void) _ep_crypto_error(estat,
 							"public & secret keys are not compatible");
-			goto fail0;
+			return estat;
 		}
 	}
 
@@ -265,7 +230,7 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 		ep_crypto_key_free(secretkey);
 
 	if (gcl->digest == NULL)
-		goto fail1;
+		return EP_STAT_CRYPTO_DIGEST;
 
 	// add the GCL name to the hashed message digest
 	ep_crypto_sign_update(gcl->digest, gcl->name, sizeof gcl->name);
@@ -282,15 +247,47 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 	}
 
 	// the GCL hash structure now has the fixed part of the hash
+	return estat;
+}
 
-finis:
-	estat = EP_STAT_OK;
 
-	if (false)
-	{
-fail1:
-		estat = EP_STAT_CRYPTO_DIGEST;
-	}
+/*
+**	_GDP_GCL_OPEN --- open a GCL for reading or further appending
+*/
+
+EP_STAT
+_gdp_gcl_open(gdp_gcl_t *gcl,
+			int cmd,
+			gdp_gcl_open_info_t *open_info,
+			gdp_chan_t *chan,
+			uint32_t reqflags)
+{
+	EP_STAT estat = EP_STAT_OK;
+	gdp_req_t *req = NULL;
+
+	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
+					return EP_STAT_ASSERT_ABORT);
+	GDP_GCL_ASSERT_ISLOCKED(gcl);
+
+	// send the request across to the log daemon
+	errno = 0;				// avoid spurious messages
+	reqflags |= GDP_REQ_ALLOC_RID;			// always use a new request id
+	reqflags |= GDP_REQ_ROUTEFAIL;			// don't retry on router errors
+	estat = _gdp_req_new(cmd, gcl, chan, NULL, reqflags, &req);
+	EP_STAT_CHECK(estat, goto fail0);
+	estat = _gdp_invoke(req);
+	EP_STAT_CHECK(estat, goto fail0);
+	// success
+
+	// save the number of records
+	gcl->nrecs = req->rpdu->datum->recno;
+
+	// read in the metadata to internal format
+	gcl->gclmd = _gdp_gclmd_deserialize(req->rpdu->datum->dbuf);
+
+	// if we're not going to write, we don't need a secret key
+	if (cmd == GDP_CMD_OPEN_AO | cmd == GDP_CMD_OPEN_RA)
+			estat = find_secret_key(gcl, open_info);
 
 fail0:
 	if (req != NULL)

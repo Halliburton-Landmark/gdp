@@ -438,6 +438,7 @@ _gdp_gcl_cache_get(
 		{
 			_gdp_gcl_incref(gcl);
 			_gdp_gcl_touch(gcl);
+			gcl->iomode |= iomode & GDP_MODE_ANY;
 		}
 	}
 	if (gcl == NULL)
@@ -449,8 +450,6 @@ _gdp_gcl_cache_get(
 		estat = _gdp_gcl_newhandle(gcl_name, &gcl);
 		EP_STAT_CHECK(estat, goto fail0);
 		_gdp_gcl_lock(gcl);
-//		gcl->iomode = iomode;
-		gcl->iomode = GDP_MODE_ANY;		// work around application bugs
 		add_cache_unlocked(gcl);
 	}
 
