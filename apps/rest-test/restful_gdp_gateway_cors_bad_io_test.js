@@ -1,3 +1,5 @@
+// Variant of restful_gdp_gateway_cors.* where ajax calls allowed to race
+//
 // gdp-rest-01 production side
 //
 // "external-name" : "edu.berkeley.eecs.gdp-rest-demo.cors_testing"
@@ -50,30 +52,30 @@ $(document).ready(function() {
     	    $('#responsecode_1').text(xhr.status)
     	    $('#response_1').text(JSON.stringify(data));
     	}
-    }) .done (function() {
-
-    	var url_get_last = "https://gdp-rest-01.eecs.berkeley.edu/gdp/v1/gcl/" +
-    	    "wnRXJzfgkHhtbtst0AWU4pFR1HPOOKvPJF7Gpqt1ewA?recno=-1";
-    	document.getElementById("method_2").innerHTML = "GET";
-    	document.getElementById("request_2").innerHTML = url_get_last;
-
-    	$.ajax({
-	    
-    	    beforeSend : function(xhr) {
-    		xhr.setRequestHeader('Authorization',
-				     'Basic ZWNkZW1vOnRlcnJhc3dhcm0=');
-    	    },
-    	    url: url_get_last,		    
-    	    error : function(xhr, textStatus, errorThrown) {
-    		$('#responsecode_2').text(xhr.status)
-    		$('#response_2').text(textStatus);
-    	    },
-    	    success : function(data, status, xhr) {
-    		$('#responsecode_2').text(xhr.status)
-    		$('#response_2').text(JSON.stringify(data));
-    	    }
-    	});
     });
+
+    var url_get_last = "https://gdp-rest-01.eecs.berkeley.edu/gdp/v1/gcl/" +
+    	"wnRXJzfgkHhtbtst0AWU4pFR1HPOOKvPJF7Gpqt1ewA?recno=-1";
+    document.getElementById("method_2").innerHTML = "GET";
+    document.getElementById("request_2").innerHTML = url_get_last;
+
+    $.ajax({
+	
+    	beforeSend : function(xhr) {
+    	    xhr.setRequestHeader('Authorization',
+				 'Basic ZWNkZW1vOnRlcnJhc3dhcm0=');
+    	},
+    	url: url_get_last,		    
+    	error : function(xhr, textStatus, errorThrown) {
+    	    $('#responsecode_2').text(xhr.status)
+    	    $('#response_2').text(textStatus);
+    	},
+    	success : function(data, status, xhr) {
+    	    $('#responsecode_2').text(xhr.status)
+    	    $('#response_2').text(JSON.stringify(data));
+    	}
+    });
+
 });
 
 // Due to single writer design, production and development binaries
@@ -131,28 +133,28 @@ $(document).ready(function() {
     	    $('#responsecode_3').text(xhr.status)
     	    $('#response_3').text(JSON.stringify(data));
     	}
-    }) .done (function() {
-
-    	var url_get_last = "https://gdp-rest-01.eecs.berkeley.edu/gdp/v2/gcl/" +
-    	    "4flJ-g4b6IlKlXSUaEX0Xj5TulGq4SaveMrRFmBhT2I?recno=-1";
-    	document.getElementById("method_4").innerHTML = "GET";
-    	document.getElementById("request_4").innerHTML = url_get_last;
-
-    	$.ajax({
-	    
-    	    beforeSend : function(xhr) {
-    		xhr.setRequestHeader('Authorization',
-				     'Basic ZWNkZW1vOnRlcnJhc3dhcm0=');
-    	    },
-    	    url: url_get_last,		    
-    	    error : function(xhr, textStatus, errorThrown) {
-    		$('#responsecode_4').text(xhr.status)
-    		$('#response_4').text(textStatus);
-    	    },
-    	    success : function(data, status, xhr) {
-    		$('#responsecode_4').text(xhr.status)
-    		$('#response_4').text(JSON.stringify(data));
-    	    }
-    	});
     });
+
+    var url_get_last = "https://gdp-rest-01.eecs.berkeley.edu/gdp/v2/gcl/" +
+    	"4flJ-g4b6IlKlXSUaEX0Xj5TulGq4SaveMrRFmBhT2I?recno=-1";
+    document.getElementById("method_4").innerHTML = "GET";
+    document.getElementById("request_4").innerHTML = url_get_last;
+
+    $.ajax({
+	
+    	beforeSend : function(xhr) {
+    	    xhr.setRequestHeader('Authorization',
+				 'Basic ZWNkZW1vOnRlcnJhc3dhcm0=');
+    	},
+    	url: url_get_last,		    
+    	error : function(xhr, textStatus, errorThrown) {
+    	    $('#responsecode_4').text(xhr.status)
+    	    $('#response_4').text(textStatus);
+    	},
+    	success : function(data, status, xhr) {
+    	    $('#responsecode_4').text(xhr.status)
+    	    $('#response_4').text(JSON.stringify(data));
+    	}
+    });
+
 });

@@ -5,12 +5,13 @@
 integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
 crossorigin="anonymous"></script>
 
-<script src="restful_gdp_gateway_cors_test.js"> </script>
+<script src="restful_gdp_gateway_cors_bad_io_test.js"> </script>
 
 </head>
 <body>
   <div>
-    <H1>CORS pre-flight negotiation with GDP RESTful Gateway</H1>
+    <H1>Parallel Ajax Calls Allowed To Race (Bad I/O Test)</H1>
+    <H2>CORS pre-flight negotiation with GDP RESTful Gateway</H2>
 
     <H4>
       <pre>
@@ -20,6 +21,12 @@ crossorigin="anonymous"></script>
 	timestamp, appended to the "testcase" field. A completely
 	successful sequence (all 200 responses) verifies that the server
 	is supporting CORS requirements with basic authentication.
+
+	WARNING: Because the ajax calls are allowed to race in this
+	test case, the GET "testcase" timestamp may or may not match
+	the timestamp displayed before the test. This is a test the
+	libgdp "bad I/O" bug and fix - not an example of good javascript
+	ajax call patterns.
       </pre>
     </H4>
 
@@ -39,7 +46,7 @@ crossorigin="anonymous"></script>
   </div>
 
   <div>
-    <H1>Development binary (gdp-rest-01 /gdp/v2/gcl) also tested if enabled</H1>
+    <H2>Development binary (gdp-rest-01 /gdp/v2/gcl) also tested if enabled</H2>
 
     <div id="method_3"> </div>
     <div id="request_3"> </div>
