@@ -1270,9 +1270,9 @@ ridx_fseek_to_recno(
 			phys->ridx.max_offset = actual_size;
 	}
 
-	if (fseek(phys->ridx.fp, xoff, SEEK_SET) < 0)
+	if (fseeko(phys->ridx.fp, xoff, SEEK_SET) < 0)
 	{
-		return posix_error(errno, "ridx_fseek_to_recno(%s): fseek failed",
+		return posix_error(errno, "ridx_fseek_to_recno(%s): fseeko failed",
 				gclpname);
 	}
 
@@ -1320,6 +1320,10 @@ ridx_entry_read(gdp_gcl_t *gcl,
 	}
 fail3:
 	funlockfile(phys->ridx.fp);
+	char ebuf[100];
+	ep_dbg_cprintf(Dbg, 44,
+			"ridx_entry_read <<< %s\n",
+			ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	return estat;
 }
 
@@ -1833,7 +1837,7 @@ disk_open(gdp_gcl_t *gcl)
 	else
 	{
 		ridx_entry_t xent;
-		if (fseek(phys->ridx.fp, phys->ridx.max_offset - SIZEOF_RIDX_RECORD,
+		if (fseeko(phys->ridx.fp, phys->ridx.max_offset - SIZEOF_RIDX_RECORD,
 					SEEK_SET) < 0 ||
 				fread(&xent, SIZEOF_RIDX_RECORD, 1, phys->ridx.fp) != 1)
 		{
@@ -2007,11 +2011,20 @@ disk_read_by_recno(gdp_gcl_t *gcl,
 	// read record header
 	segment_record_t log_record;
 	flockfile(seg->fp);
-	if (fseek(seg->fp, xent->offset, SEEK_SET) < 0 ||
-			fread(&log_record, sizeof log_record, 1, seg->fp) < 1)
+	if (fseeko(seg->fp, xent->offset, SEEK_SET) < 0)
 	{
-		ep_dbg_cprintf(Dbg, 1, "disk_read_by_recno: header fread failed: %s\n",
-				strerror(errno));
+		ep_dbg_cprintf(Dbg,1,
+				"disk_read_by_recno: header fseek(%" PRIu64 ") failed: %s\n",
+				xent->offset, strerror(errno));
+		estat = ep_stat_from_errno(errno);
+		goto fail1;
+	}
+	int n_recs_read;
+	if ((n_recs_read = fread(&log_record, sizeof log_record, 1, seg->fp)) < 1)
+	{
+		ep_dbg_cprintf(Dbg, 1,
+				"disk_read_by_recno: header fread @ %" PRIu64 " failed: %d, %s\n",
+				xent->offset, n_recs_read, strerror(errno));
 		estat = ep_stat_from_errno(errno);
 		goto fail1;
 	}
