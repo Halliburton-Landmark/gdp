@@ -140,6 +140,9 @@ fail0:
 			_gdp_gcl_unlock(gcl);
 	}
 
+	if (!EP_STAT_ISOK(estat))
+		*pgcl = NULL;
+
 	{
 		char ebuf[100];
 

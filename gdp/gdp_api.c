@@ -398,13 +398,15 @@ gdp_gcl_create(gdp_name_t gclname,
 					GDP_REQ_ALLOC_RID, pgcl);
 	if (EP_STAT_ISOK(estat))
 	{
+		if (!EP_ASSERT(GDP_GCL_ISGOOD(*pgcl)))
+			estat = EP_STAT_ASSERT_ABORT;
 		(*pgcl)->iomode = GDP_MODE_ANY;
 	}
 	else
 	{
+fail0:
 		*pgcl = NULL;
 	}
-fail0:
 	ep_thr_mutex_unlock(&GclCreateMutex);
 	prstat(estat, *pgcl, "gdp_gcl_create");
 	return estat;
