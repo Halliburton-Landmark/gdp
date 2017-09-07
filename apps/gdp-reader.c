@@ -452,7 +452,10 @@ print_metadata(gdp_gcl_t *gcl)
 {
 	EP_STAT estat;
 	gdp_gclmd_t *gmd;
+	gdp_recno_t nrecs;
 
+	nrecs = gdp_gcl_getnrecs(gcl);
+	printf("Number of records: %" PRIgdp_recno "\n", nrecs);
 	estat = gdp_gcl_getmetadata(gcl, &gmd);
 	EP_STAT_CHECK(estat, goto fail0);
 

@@ -1,6 +1,6 @@
 {
     "name": "@terraswarm/gdp",
-    "version": "0.8.2",
+    "version": "0.8.3",
     "author": {
         "email": "cxh@eecs.berkeley.edu",
         "name": "Christopher Brooks"
