@@ -1,0 +1,16 @@
+[Unit]
+Description=GDP Health monitoring
+After=network-online.target
+
+[Service]
+Type=simple
+User=gdp
+WorkingDirectory=/opt/gdp/adm/monitoring
+ExecStart=/usr/bin/python monitor.py -s -c emailconfig -l /var/log/gdp/monitor tests.conf
+
+StandardOutput=syslog
+StandardError=inherit
+SyslogIdentifier=gdp-monitor
+
+[Install]
+WantedBy=multi-user.target
