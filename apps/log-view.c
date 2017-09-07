@@ -840,6 +840,7 @@ main(int argc, char *argv[])
 
 	if (argc <= 0)
 		usage("GCL name required");
+	istat = 0;
 	while (argc > 0)
 	{
 		gcl_xname = argv[0];

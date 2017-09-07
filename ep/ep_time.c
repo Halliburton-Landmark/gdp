@@ -235,27 +235,13 @@ ep_time_format(const EP_TIME_SPEC *tv, char *tbuf, size_t tbsiz, uint32_t flags)
 		return tbuf;
 	}
 
-	switch (flags & EP_TIME_FMT_SIGFIGMASK)
-	{
-	  case EP_TIME_FMT_SIGFIG0:
+	sigfigs = (flags & _EP_TIME_FMT_SIGFIGMASK) >> _EP_TIME_FMT_SIGFIGSHIFT;
+	if (sigfigs == 0)
+		sigfigs = 3;		// default
+	else if (sigfigs > 9)
 		sigfigs = 0;
-		break;
 
-	  case EP_TIME_FMT_SIGFIG3:
-		sigfigs = 3;
-		scale = 1000000;
-		break;
-
-	  case EP_TIME_FMT_SIGFIG6:
-		sigfigs = 6;
-		scale = 1000;
-		break;
-
-	  case EP_TIME_FMT_SIGFIG9:
-		sigfigs = 9;
-		scale = 1;
-		break;
-	}
+	scale = 10 ^ (9 - sigfigs);
 
 
 	struct tm tm;

@@ -286,7 +286,7 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 	gcl->gclmd = _gdp_gclmd_deserialize(req->rpdu->datum->dbuf);
 
 	// if we're not going to write, we don't need a secret key
-	if (cmd == GDP_CMD_OPEN_AO | cmd == GDP_CMD_OPEN_RA)
+	if (cmd == GDP_CMD_OPEN_AO || cmd == GDP_CMD_OPEN_RA)
 			estat = find_secret_key(gcl, open_info);
 
 fail0:

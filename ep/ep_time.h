@@ -91,11 +91,12 @@ extern void	ep_time_print(const EP_TIME_SPEC *tv,
 #define EP_TIME_FMT_DEFAULT	0		// pseudo-flag
 #define EP_TIME_FMT_HUMAN	0x00000001	// format for humans
 #define EP_TIME_FMT_NOFUZZ	0x00000002	// suppress accuracy printing
-#define EP_TIME_FMT_SIGFIGMASK	0x0000000C	// number of sig digits
-#define EP_TIME_FMT_SIGFIG9	    0x00000000		// 9 digits (nsec)
-#define EP_TIME_FMT_SIGFIG6	    0x00000004		// 6 digits (usec)
-#define EP_TIME_FMT_SIGFIG3	    0x00000008		// 3 digits (msec)
-#define EP_TIME_FMT_SIGFIG0	    0x0000000c		// 0 digits (sec)
+#define _EP_TIME_FMT_SIGFIGMASK	0x000F0000	// number of sig digits
+#define EP_TIME_FMT_SIGFIG9	    0x00090000		// 9 digits (nsec)
+#define EP_TIME_FMT_SIGFIG6	    0x00060000		// 6 digits (usec)
+#define EP_TIME_FMT_SIGFIG3	    0x00030000		// 3 digits (msec)
+#define EP_TIME_FMT_SIGFIG0	    0x000F0000		// 0 digits (sec)
+#define _EP_TIME_FMT_SIGFIGSHIFT	16
 
 // parse a time string
 extern EP_STAT	ep_time_parse(const char *timestr,
