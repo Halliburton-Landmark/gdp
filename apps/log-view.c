@@ -768,7 +768,7 @@ usage(const char *msg)
 {
 	fprintf(stderr,
 			"Usage error: %s\n"
-			"Usage: log-view [-d dir] [-l] [-r] [gcl_name]\n"
+			"Usage: log-view [-d dir] [-D dbgspec ] [-l] [-r] [-v] [gcl_name ...]\n"
 			"\t-d dir -- set log database root directory\n"
 			"\t-D spec -- set debug flags\n"
 			"\t-l -- list all local GCLs\n"
@@ -788,6 +788,7 @@ main(int argc, char *argv[])
 	char *gcl_xname = NULL;
 	const char *gcl_dir_name = NULL;
 	uint32_t list_flags = 0;
+	int istat;
 
 	ep_lib_init(0);
 
@@ -837,25 +838,23 @@ main(int argc, char *argv[])
 		return list_gcls(gcl_dir_name, verbosity, list_flags);
 	}
 
-	if (argc > 0)
+	if (argc <= 0)
+		usage("GCL name required");
+	while (argc > 0)
 	{
 		gcl_xname = argv[0];
 		argc--;
 		argv++;
-		if (argc > 0)
-			usage("extra arguments");
-	}
-	else
-	{
-		usage("GCL name required");
-	}
 
-	gdp_name_t gcl_name;
+		gdp_name_t gcl_name;
 
-	EP_STAT estat = gdp_parse_name(gcl_xname, gcl_name);
-	if (!EP_STAT_ISOK(estat))
-	{
-		usage("unparsable GCL name");
+		EP_STAT estat = gdp_parse_name(gcl_xname, gcl_name);
+		if (!EP_STAT_ISOK(estat))
+		{
+			ep_app_message(estat, "unparsable GCL name");
+			continue;
+		}
+		istat = show_gcl(gcl_dir_name, gcl_name, verbosity);
 	}
-	exit(show_gcl(gcl_dir_name, gcl_name, verbosity));
+	exit(istat);
 }
