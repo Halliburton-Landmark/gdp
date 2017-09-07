@@ -152,7 +152,7 @@ class AlertMgr(object):
             ## Actually send the alert based on checks above.
             suffix = "ALL PASSING" if all(cur_status) else "SOME PROBLEMS"
             subject = "[GDP health monitor][%s] Status report: %s" %\
-                                                        (time.ctime, suffix)
+                                                        (time.ctime(), suffix)
             self.__sendmail(subject, report)
             self.alert_ts.append(curtime)
 
