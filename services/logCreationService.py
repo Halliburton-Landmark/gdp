@@ -204,6 +204,7 @@ class logCreationService(GDPService):
         resp['cmd'] = nak
         resp['src'] = req['dst']
         resp['dst'] = req['src']
+        resp['rid'] = req['rid']
         return resp
 
 
