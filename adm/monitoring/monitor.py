@@ -16,13 +16,18 @@ import subprocess
 import datetime
 import argparse
 import os
+from os.path import basename
 import time
 import errno
 from tempfile import TemporaryFile
+from email.mime.application import MIMEApplication
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.utils import COMMASPACE, formatdate
 
 LOGDIR = "/tmp/monitoring"
 PERIOD = 10
-MAXEMAILS = 8
+MAXEMAILS = 24
 
 class cmdlineMonitor(object):
     """
@@ -117,11 +122,11 @@ class AlertMgr(object):
         self.maxemails = maxemails
 
 
-    def new_alert(self, cur_status, report):
+    def new_alert(self, cur_status, report, attach_file=None):
         """
         Potentially send a new alert. cur_status is a list of booleans
         with the results of all tests. report is what we will send if
-        we do decide to send an alert.
+        we do decide to send an alert, with an optional attachment
         """
 
         print "> New report ready to be sent out..."
@@ -151,13 +156,13 @@ class AlertMgr(object):
         if send_alert:
             ## Actually send the alert based on checks above.
             suffix = "ALL PASSING" if all(cur_status) else "SOME PROBLEMS"
-            subject = "[GDP health monitor][%s] Status report: %s" %\
-                                                        (time.ctime(), suffix)
-            self.__sendmail(subject, report)
+            subject = "[Health monitor] Status: %s; (alert quota: %d/%d)" %\
+                                (suffix, len(self.alert_ts)+1, self.maxemails)
+            self.__sendmail(subject, report, attach_file)
             self.alert_ts.append(curtime)
 
 
-    def __sendmail(self, subject, body, debug=False):
+    def __sendmail(self, subject, body, attach_file=None, debug=False):
         """ A one shot wrapper for sending an email."""
 
         assert isinstance(subject, str)
@@ -169,25 +174,30 @@ class AlertMgr(object):
             print "Subject: %s" % subject
             print "Body: %s" % body
             return
- 
-        # Add the From: and To: headers at the start!
-        msg = "From: %s\r\n" % self.fromaddr
-        msg = msg + "To: %s\r\n" % ", ".join(self.alertaddrs)
-        # msg = msg + "MIME-Version: 1.0\r\n"
-        # msg = msg + "Content-Type: text/html\r\n"
-        msg = msg + "Subject: %s\r\n" % subject
 
-        print "Sending message with %d bytes in body:\n%s" % (len(body), msg)
+        ## From https://stackoverflow.com/questions/3362600/
 
-        msg = msg + "\r\n%s\r\n" % body
-    
+        msg = MIMEMultipart()
+        msg['From'] = self.fromaddr
+        msg['To'] = COMMASPACE.join(self.alertaddrs)
+        msg['Date'] = formatdate(localtime=True)
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body))
+
+        if attach_file is not None:
+            with open(attach_file, "rb") as fh:
+                part = MIMEApplication(fh.read(), Name=basename(attach_file))
+            part['Content-Disposition'] = "attachment; filename=%s" % \
+                                                        basename(attach_file)
+            msg.attach(part)
+
     
         server = smtplib.SMTP(self.host, self.port)
         if debug:
             server.set_debuglevel(1)
         server.starttls()
         server.login(self.username, self.password)
-        server.sendmail(self.fromaddr, self.alertaddrs, msg)
+        server.sendmail(self.fromaddr, self.alertaddrs, msg.as_string())
         server.quit()
 
 
@@ -199,7 +209,7 @@ class TestSuite(object):
 
 
     def __init__(self, monitors, alertmgr, shell=False,
-                                    logdir=LOGDIR, brief=False,
+                                    logdir=LOGDIR,
                                     period=PERIOD, run_once=False):
 
         self.monitors = monitors    ## a list of (desc, cmd) tuples
@@ -207,7 +217,6 @@ class TestSuite(object):
         ## set other parameters
         self.logdir = logdir
         self.period = period
-        self.brief = brief
         self.shell = shell
         self.run_once = run_once
 
@@ -246,12 +255,13 @@ class TestSuite(object):
             print ""
 
             ## Create and store the report
-            report = self.__gen_stat_report(mons, brief=self.brief)
+            brief_rep = self.__gen_stat_report(mons, brief=True)
+            long_rep = self.__gen_stat_report(mons, brief=False)
             with open(logfile, "w") as fh:
-                fh.write(report)
+                fh.write(long_rep)
 
             all_stats = [mon.status for mon in mons]
-            self.alertmgr.new_alert(all_stats, report)
+            self.alertmgr.new_alert(all_stats, brief_rep, attach_file=logfile)
 
             end_time = time.time()
 
@@ -312,8 +322,6 @@ if __name__ == "__main__":
                                 "ignored if '-o' is set. Use something "
                                 "sensible based on your monitors. "
                                 "default: %d" % PERIOD)
-    parser.add_argument("-b", "--brief", action="store_true",
-                            help="Generate only brief statistics")
     parser.add_argument("-m", "--maxemails", type=int, default=MAXEMAILS,
                             help="Max emails sent per day, "
                                 "default %d" % MAXEMAILS)
@@ -373,6 +381,6 @@ if __name__ == "__main__":
 
     ## run the suite
     suite = TestSuite(monitors, alertmgr, shell=args.shell,
-                                    period=args.period, brief=args.brief,
+                                    period=args.period,
                                     run_once=args.once, logdir=args.logdir)
     suite.main_loop()
