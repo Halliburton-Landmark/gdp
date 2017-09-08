@@ -241,8 +241,10 @@ ep_time_format(const EP_TIME_SPEC *tv, char *tbuf, size_t tbsiz, uint32_t flags)
 	else if (sigfigs > 9)
 		sigfigs = 0;
 
-	scale = 10 ^ (9 - sigfigs);
-
+	scale = 1;
+	int i;
+	for (i = 9; i > sigfigs; i--)
+		scale *= 10;
 
 	struct tm tm;
 	time_t tvsec;
