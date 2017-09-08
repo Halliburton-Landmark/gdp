@@ -1,12 +1,14 @@
 [Unit]
 Description=GDP log-creation service
 After=network-online.target
+OnFailure=unit-status-mail@%n.service  
+
 
 [Service]
 Type=simple
 ; Following should be tweaked for individual environments
 User=gdp
-WorkingDirectory=/opt/gdp/services/
+WorkingDirectory=/opt/log-creation
 ExecStart=/usr/bin/python logCreationService.py \
         -i gdp-01.eecs.berkeley.edu -p 8007 -d logs.db \
          -a "edu.berkeley.eecs.gdp-01.gdplogd" \
