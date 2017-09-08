@@ -80,6 +80,7 @@ usage(void)
 			"Usage: %s [-b] [-D dbgspec] [-h] gdp_name\n"
 			"    -b  print printable base64 name\n"
 			"    -D  set debugging flags\n"
+			"    -f  show file name root\n"
 			"    -h  print hexadecimal name\n",
 			ep_app_getprogname());
 	exit(EX_USAGE);
@@ -95,8 +96,9 @@ main(int argc, char **argv)
 	gdp_pname_t gdppname;
 	bool show_b64 = false;
 	bool show_hex = false;
+	bool show_file_name = false;
 
-	while ((opt = getopt(argc, argv, "bD:h")) > 0)
+	while ((opt = getopt(argc, argv, "bD:fh")) > 0)
 	{
 		switch (opt)
 		{
@@ -106,6 +108,10 @@ main(int argc, char **argv)
 
 			case 'D':
 				ep_dbg_set(optarg);
+				break;
+
+			case 'f':
+				show_file_name = true;
 				break;
 
 			case 'h':
@@ -136,6 +142,10 @@ main(int argc, char **argv)
 		for (i = 0; i < sizeof gdpiname; i++)
 			fprintf(stdout, "%02x", gdpiname[i]);
 		fprintf(stdout, "\n");
+	}
+	else if (show_file_name)
+	{
+		fprintf(stdout, "_%02x/%s\n", gdpiname[0], gdppname);
 	}
 	else
 	{
