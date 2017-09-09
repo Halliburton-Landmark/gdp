@@ -431,6 +431,11 @@ _gdp_gcl_cache_get(
 				 !EP_UT_BITSET(GGCF_GET_PENDING, flags)))
 		{
 			// someone deallocated this in the brief window above
+			if (ep_dbg_test(Dbg, 10))
+			{
+				ep_dbg_printf("_gdp_gcl_cache_get: abandoning ");
+				_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+			}
 			_gdp_gcl_unlock(gcl);
 			gcl = NULL;
 		}

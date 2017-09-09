@@ -129,16 +129,13 @@ do_physical_open(gdp_gcl_t *gcl, void *open_info_)
 
 	// open the physical disk files
 	estat = gcl->x->physimpl->open(gcl);
-	EP_STAT_CHECK(estat, goto fail1);
-
-	gcl->flags |= GCLF_DEFER_FREE;
-	gcl->flags &= ~GCLF_PENDING;
-
-	if (false)
+	if (EP_STAT_ISOK(estat))
 	{
-fail1:
-		_gdp_gcl_decref(&gcl, false);
-
+		gcl->flags |= GCLF_DEFER_FREE;
+		gcl->flags &= ~GCLF_PENDING;
+	}
+	else
+	{
 		// if this isn't a "not found" error, mark it as an internal error
 		if (!EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOTFOUND))
 			estat = GDP_STAT_NAK_INTERNAL;
@@ -180,13 +177,17 @@ get_open_handle(gdp_req_t *req, gdp_iomode_t iomode)
 							GGCF_CREATE, &req->gcl);
 		if (EP_STAT_ISOK(estat) && EP_UT_BITSET(GCLF_PENDING, req->gcl->flags))
 			estat = do_physical_open(req->gcl, NULL);
+		if (!EP_STAT_ISOK(estat) && req->gcl != NULL)
+			_gdp_gcl_decref(&req->gcl, false);
 		if (ep_dbg_test(Dbg, 40))
 		{
 			char ebuf[60];
+			gdp_pname_t pname;
 
+			gdp_printable_name(req->cpdu->dst, pname);
 			ep_stat_tostr(estat, ebuf, sizeof ebuf);
 			ep_dbg_printf("get_open_handle: %s => %p: %s\n",
-					req->gcl->pname, req->gcl, ebuf);
+					pname, req->gcl, ebuf);
 		}
 	}
 	return estat;
