@@ -135,7 +135,7 @@ class AlertMgr(object):
 
         ## Cleanup email alerts sent more than 24 hours ago
         while (len(self.alert_ts)>0 and curtime-self.alert_ts[0]>86400):
-            self.alert_ts.pop[0]
+            self.alert_ts.pop(0)
 
         ## Should we send an email alert or not?
         send_alert = False
