@@ -16,6 +16,7 @@ import random
 import argparse
 import time
 import sqlite3
+import threading
 import logging
 import os
 import sys
@@ -61,6 +62,7 @@ class logCreationService(GDPService):
         self.GDPaddrs = GDPaddrs
         self.logservers = logservers
         self.dbname = dbname
+        self.lock = threading.Lock()
 
         ## Setup a connection to the backend database
         if os.path.exists(self.dbname):
@@ -136,27 +138,32 @@ class logCreationService(GDPService):
                                 "picking server %r", __logname, __srvname)
 
             try:
-                logging.debug("inserting to database %r, %r, %r, %d",
+
+                with self.lock:
+
+                    logging.debug("inserting to database %r, %r, %r, %d",
                                 __logname, __srvname, __creator, rid)
-                self.cur.execute("""INSERT INTO logs (logname, srvname,
+                    self.cur.execute("""INSERT INTO logs (logname, srvname,
                                     creator, rid) VALUES(?,?,?,?);""",
                                     (__logname, __srvname, __creator, rid))
-                self.conn.commit()
+                    self.conn.commit()
 
+                    spoofed_req = req.copy()
+                    spoofed_req['src'] = req['dst']
+                    spoofed_req['dst'] = srvname
+                    spoofed_req['rid'] = self.cur.lastrowid
+        
+                    # now return this spoofed request back to transport layer
+                    # Since we have overridden the destination, it will go
+                    # to a log server instead of the actual client
+                    return spoofed_req
+        
             except sqlite3.IntegrityError:
+
                 logging.info("Log already exists")
                 return self.gen_nak(req, GDP_NAK_C_CONFLICT)
 
             ## Send a spoofed request to the logserver
-            spoofed_req = req.copy()
-            spoofed_req['src'] = req['dst']
-            spoofed_req['dst'] = srvname
-            spoofed_req['rid'] = self.cur.lastrowid
-
-            # now return this spoofed request back to the transport layer
-            # Since we have overridden the destination, it will go
-            # to a log server instead of the actual client
-            return spoofed_req
 
         else: ## response.
 
@@ -165,13 +172,14 @@ class logCreationService(GDPService):
                 logging.info("error: received a non-response from logserver")
                 return self.gen_nak(req, GDP_NAK_C_BADREQ)
 
-            logging.info("Received response from log-server, row %d",
-                                                                req['rid'])
+            logging.info("Response from log-server, row %d", req['rid'])
 
-            ## Fetch the original creator and rid from our database
-            self.cur.execute("""SELECT creator, rid, ack_seen FROM logs
+            with self.lock:
+
+                ## Fetch the original creator and rid from our database
+                self.cur.execute("""SELECT creator, rid, ack_seen FROM logs
                                             WHERE rowid=?""", (req['rid'],))
-            dbrows = self.cur.fetchall()
+                dbrows = self.cur.fetchall()
 
             good_resp = len(dbrows) == 1
             if good_resp:
@@ -181,13 +189,17 @@ class logCreationService(GDPService):
                     good_resp = False
 
             if not good_resp:
+
                 logging.info("error: bogus response")
                 return self.gen_nak(req, GDP_NAK_C_BADREQ)
+
             else:
-                logging.debug("Setting ack_seen to 1 for row %d", req['rid'])
-                self.cur.execute("""UPDATE logs SET ack_seen=1
+
+                with self.lock:
+                    logging.debug("Setting ack_seen to 1 for row %d", req['rid'])
+                    self.cur.execute("""UPDATE logs SET ack_seen=1
                                             WHERE rowid=?""", (req['rid'],))
-                self.conn.commit()
+                    self.conn.commit()
 
             # create a spoofed reply and send it to the client
             spoofed_reply = req.copy()
