@@ -27,6 +27,7 @@ from email.utils import COMMASPACE, formatdate
 
 LOGDIR = "/tmp/monitoring"
 PERIOD = 10
+TIMEOUT = 30
 MAXEMAILS = 24
 
 class cmdlineMonitor(object):
@@ -38,13 +39,14 @@ class cmdlineMonitor(object):
     class NotFinished(Exception):
         pass
 
-    def __init__(self, desc, cmd, shell=False):
+    def __init__(self, desc, cmd, shell=False, timeout=TIMEOUT):
 
         assert isinstance(desc, str)
         assert isinstance(cmd, str)
         self.desc = desc
         self.cmd = cmd
         self.shell = shell
+        self.timeout = timeout
 
         ## following are set when the monitor is executed
         self.status = None
@@ -59,13 +61,17 @@ class cmdlineMonitor(object):
 
             self.start_time = time.ctime()
             __cmd = self.cmd if self.shell else self.cmd.split()
-            ret = subprocess.call(__cmd, shell=self.shell,
+            task = subprocess.Popen(__cmd, shell=self.shell,
                                             stdout=out, stderr=err)
+            __timeout = self.timeout
+            while task.poll() is None and __timeout>0:
+                time.sleep(1)
+                __timeout -= 1
             self.end_time = time.ctime()
 
             out.seek(0)
             err.seek(0)
-            self.status = (ret == 0)
+            self.status = (task.returncode == 0)
             self.stdout = out.read()
             self.stderr = err.read()
 
@@ -209,7 +215,7 @@ class TestSuite(object):
 
 
     def __init__(self, monitors, alertmgr, shell=False,
-                                    logdir=LOGDIR,
+                                    logdir=LOGDIR, timeout=TIMEOUT,
                                     period=PERIOD, run_once=False):
 
         self.monitors = monitors    ## a list of (desc, cmd) tuples
@@ -217,6 +223,7 @@ class TestSuite(object):
         ## set other parameters
         self.logdir = logdir
         self.period = period
+        self.timeout = timeout
         self.shell = shell
         self.run_once = run_once
 
@@ -248,7 +255,8 @@ class TestSuite(object):
             mons = []
             for (desc, cmd) in self.monitors:
                 print "Running > %s" % desc,
-                mon = cmdlineMonitor(desc, cmd, shell=self.shell)
+                mon = cmdlineMonitor(desc, cmd, shell=self.shell,
+                                                timeout=self.timeout)
                 mons.append(mon)
                 mon.run()
                 print "... %s" % ("OK" if mon.status else "FAILED")
@@ -322,6 +330,9 @@ if __name__ == "__main__":
                                 "ignored if '-o' is set. Use something "
                                 "sensible based on your monitors. "
                                 "default: %d" % PERIOD)
+    parser.add_argument("-t", "--timeout", type=int, default=TIMEOUT,
+                            help="Timeout for a single test (in s), "
+                                "default=%d s" % TIMEOUT)
     parser.add_argument("-m", "--maxemails", type=int, default=MAXEMAILS,
                             help="Max emails sent per day, "
                                 "default %d" % MAXEMAILS)
@@ -381,6 +392,6 @@ if __name__ == "__main__":
 
     ## run the suite
     suite = TestSuite(monitors, alertmgr, shell=args.shell,
-                                    period=args.period,
+                                    period=args.period, timeout=args.timeout,
                                     run_once=args.once, logdir=args.logdir)
     suite.main_loop()
