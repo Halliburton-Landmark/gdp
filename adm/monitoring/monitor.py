@@ -6,9 +6,9 @@ send email alerts when necessary.
 """
 # For the moment, the design contains a core loop that runs at a fairly
 # high, but fixed frequency. Each run produces an output that is a
-# potential candidate for email-alerts. 
+# potential candidate for email-alerts.
 # There is at-least 1 email/day and at-most MAX_EMAILS_PER_DAY emails/day
-# that are sent. 
+# that are sent.
 
 
 import smtplib
@@ -36,7 +36,7 @@ def readlines(filename):
     assert os.path.exists(filename)
     lines = []
     with open(filename) as fh:
-         for line in fh:
+        for line in fh:
             ## Ignore comments, i.e. lines that start with '#'
             _line = line.split("#")[0].strip()
             if len(_line) > 0:
@@ -78,7 +78,7 @@ class cmdlineMonitor(object):
             task = subprocess.Popen(__cmd, shell=self.shell,
                                             stdout=out, stderr=err)
             __timeout = self.timeout
-            while task.poll() is None and __timeout>0:
+            while task.poll() is None and __timeout > 0:
                 time.sleep(1)
                 __timeout -= 1
             self.end_time = time.ctime()
@@ -120,11 +120,11 @@ class cmdlineMonitor(object):
 class AlertMgr(object):
     """
     A 'smart' alert manager to send out emails. It makes sure that the
-    number of emails sent are neither too few nor too many. 
+    number of emails sent are neither too few nor too many.
     """
 
     def __init__(self, maxemails, alertaddrs=None, fromaddr=None,
-                        username=None, password=None):
+                        username=None, password=None, skipfirst=False):
         """
         Initialize the alert manager with rate limiting parameters,
         credentials for the smtp server, and service addresses.
@@ -136,8 +136,10 @@ class AlertMgr(object):
         self.password = password
         self.fromaddr = fromaddr
         self.alertaddrs = alertaddrs
+        self.skipfirst = skipfirst
 
         self.last_status = None
+        self.first_alert = True     # Default True, set to False on first run
         self.alert_ts = []
         self.maxemails = maxemails
 
@@ -154,7 +156,7 @@ class AlertMgr(object):
         curtime = time.time()
 
         ## Cleanup email alerts sent more than 24 hours ago
-        while (len(self.alert_ts)>0 and curtime-self.alert_ts[0]>86400):
+        while len(self.alert_ts) > 0 and curtime-self.alert_ts[0] > 86400:
             self.alert_ts.pop(0)
 
         ## Should we send an email alert or not?
@@ -165,8 +167,13 @@ class AlertMgr(object):
             send_alert = True   ## We just started.
         if self.last_status is not None and cur_status != self.last_status:
             send_alert = True   ## we changed status
-        if len(self.alert_ts)>=self.maxemails:
+        if len(self.alert_ts) >= self.maxemails:
             send_alert = False  ## we exceeded the quota. Do not send alert
+        if self.first_alert:
+            self.first_alert = False
+            if self.skipfirst:
+                send_alert = False  ## Skip the first email alert to be sent
+                self.alert_ts.append(curtime)   ## but add to alert_ts
 
         print "> Are conditions for sending alert satisfied? %s" % send_alert
 
@@ -187,7 +194,7 @@ class AlertMgr(object):
 
         assert isinstance(subject, str)
         assert isinstance(body, str)
-    
+
         if None in [self.username, self.password,
                             self.fromaddr, self.alertaddrs]:
             print "> Not sending email (parameters not set)\n"
@@ -211,7 +218,7 @@ class AlertMgr(object):
                                                         basename(attach_file)
             msg.attach(part)
 
-    
+
         server = smtplib.SMTP(self.host, self.port)
         if debug:
             server.set_debuglevel(1)
@@ -354,6 +361,8 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--maxemails", type=int, default=MAXEMAILS,
                             help="Max emails sent per day, "
                                 "default %d" % MAXEMAILS)
+    parser.add_argument("-S", "--skipfirst", action="store_true",
+                            help="Don't send the first email after start")
     parser.add_argument("-c", "--config", type=str,
                             help="A file containing email configuration. "
                                  "The file should contain exactly 4 lines "
@@ -399,8 +408,9 @@ if __name__ == "__main__":
                 toaddr = [addr.strip() for addr in __addrs]
 
     ## Create the alert manager
-    alertmgr =  AlertMgr(args.maxemails, username=username, password=password,
-                            fromaddr=fromaddr, alertaddrs=toaddr)
+    alertmgr = AlertMgr(args.maxemails, username=username, password=password,
+                            fromaddr=fromaddr, alertaddrs=toaddr,
+                            skipfirst=args.skipfirst)
 
     ## run the suite
     suite = TestSuite(args.monitors, alertmgr, shell=args.shell,
