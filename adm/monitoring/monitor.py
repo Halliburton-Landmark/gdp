@@ -12,6 +12,7 @@ send email alerts when necessary.
 
 
 import smtplib
+import hashlib
 import subprocess
 import datetime
 import argparse
@@ -183,8 +184,9 @@ class AlertMgr(object):
         if send_alert:
             ## Actually send the alert based on checks above.
             suffix = "ALL PASSING" if all(cur_status) else "SOME PROBLEMS"
-            subject = "[Health monitor] Status: %s; (alert quota: %d/%d)" %\
-                                (suffix, len(self.alert_ts)+1, self.maxemails)
+            nonce = hashlib.md5(time.ctime()).digest().encode("hex")[:6]
+            subject = "[Health monitor] Status: %s; (%d/%d, %s)" %\
+                        (suffix, len(self.alert_ts)+1, self.maxemails, nonce)
             self.__sendmail(subject, report, attach_file)
             self.alert_ts.append(curtime)
 
