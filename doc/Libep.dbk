@@ -2259,6 +2259,11 @@ ep_logv(
                 const char *name,       // name of the parameter
                 long default)           // value if parameter not set
 
+    intmax_t
+    ep_adm_getintmaxparam(
+                const char *name,       // name of the parameter
+                intmax_t default)       // value if the parameter is not set
+
     bool
     ep_adm_getboolparam(
                 const char *name,       // name of the parameter

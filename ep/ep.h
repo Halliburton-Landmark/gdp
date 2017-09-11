@@ -81,6 +81,9 @@ extern int		ep_adm_getintparam(	// get integer param value
 extern long		ep_adm_getlongparam(	// get long param value
 				const char *name,	// name of param
 				long def);		// default value
+extern intmax_t		ep_adm_getintmaxparam(	// get intmax_t param value
+				const char *name,	// name of param
+				intmax_t def);		// default value
 extern bool		ep_adm_getboolparam(	// get boolean param value
 				const char *name,	// name of param
 				bool def);		// default value

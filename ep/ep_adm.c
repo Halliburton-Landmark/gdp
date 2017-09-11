@@ -300,6 +300,33 @@ ep_adm_getlongparam(
 
 /***********************************************************************
 **
+**  EP_ADM_GETINTMAXPARAM -- get long long parameter from defaults database
+**
+**	Parameters:
+**		pname -- the name of the parameter
+**		def -- the default value if not specified in the
+**			database
+**
+**	Returns:
+**		The value of the parameter or def
+*/
+
+intmax_t
+ep_adm_getintmaxparam(
+	const char *pname,
+	intmax_t def)
+{
+	const char *p = getparamval(pname);
+
+	if (p == NULL)
+		return def;
+	else
+		return strtoll(p, NULL, 0);
+}
+
+
+/***********************************************************************
+**
 **  EP_ADM_GETBOOLPARAM -- get Boolean parameter from defaults database
 **
 **	Parameters:
