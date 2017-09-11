@@ -580,7 +580,8 @@ _gdp_gcl_read(gdp_gcl_t *gcl,
 	estat = _gdp_invoke(req);
 
 	// ok, done!  pass the datum contents to the caller and free the request
-	gdp_datum_copy(datum, req->rpdu->datum);
+	if (EP_STAT_ISOK(estat))
+		gdp_datum_copy(datum, req->rpdu->datum);
 	_gdp_req_free(&req);
 fail0:
 	return estat;
