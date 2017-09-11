@@ -109,6 +109,8 @@ struct ctx
 	gdp_recno_t		recno;
 };
 
+gdp_recno_t		MaxRecno;				// maximum recno value
+
 
 /*
 **  Stubs to replace logging routines
@@ -819,7 +821,20 @@ scan_recs(gdp_gcl_t *gcl,
 			// minor sanity check
 			if (log_record.recno != recno + 1)
 			{
-				if (log_record.recno > recno + 1)
+				if (MaxRecno > 0 && log_record.recno > MaxRecno)
+				{
+					// unreasonable record number, probably trashed
+					estat = GDP_STAT_CORRUPT_GCL;
+					if (Flags.verbose)
+						ep_app_message(estat, "%s\n"
+								"  unreasonable recno %" PRIgdp_recno
+								" max %" PRIgdp_recno ",\n"
+								"  (after recno %" PRIgdp_recno "),"
+								" data offset %jd",
+								gcl->pname, log_record.recno, MaxRecno, recno,
+								(intmax_t) record_offset);
+				}
+				else if (log_record.recno > recno + 1)
 				{
 					// gap in data
 					estat = GDP_STAT_RECORD_MISSING;
@@ -847,13 +862,17 @@ scan_recs(gdp_gcl_t *gcl,
 			if (EP_STAT_SEVERITY(estat) > EP_STAT_SEVERITY(return_stat))
 				return_stat = estat;
 
-			// reset the expected recno to whatever we actually have
-			recno = log_record.recno;
+			// skip crazy recnos
+			if (MaxRecno <= 0 || log_record.recno <= MaxRecno)
+			{
+				// reset the expected recno to whatever we actually have
+				recno = log_record.recno;
 
-			// do per-record processing
-			estat = (*per_rec_f)(gcl, &log_record, record_offset, seg, ctx);
-			if (EP_STAT_SEVERITY(estat) > EP_STAT_SEVERITY(return_stat))
-				return_stat = estat;
+				// do per-record processing
+				estat = (*per_rec_f)(gcl, &log_record, record_offset, seg, ctx);
+				if (EP_STAT_SEVERITY(estat) > EP_STAT_SEVERITY(return_stat))
+					return_stat = estat;
+			}
 
 			// skip over header and data (that part is opaque)
 			record_offset += sizeof log_record + log_record.data_length;
@@ -1196,7 +1215,8 @@ rebuild_record(
 
 	// do some sanity checking on the record header; if it isn't good
 	// we'll just report the record and skip it for rebuilding
-	if (rec->recno < GETPHYS(gcl)->ridx.min_recno)
+	if ((rec->recno < GETPHYS(gcl)->ridx.min_recno) ||
+			(MaxRecno > 0 && rec->recno > MaxRecno))
 	{
 		if (!Flags.silent && !Flags.summaryonly)
 		{
@@ -1206,6 +1226,7 @@ rebuild_record(
 					gcl->pname,
 					rec->recno, GETPHYS(gcl)->ridx.min_recno);
 		}
+		// return OK since (presumably) the damage has been repaired
 		return EP_STAT_OK;
 	}
 
@@ -1519,9 +1540,11 @@ void
 usage(void)
 {
 	fprintf(stderr,
-			"Usage: %s [-D dbg_spec] [-f] [-q] [-r] [-s] [-t] [-v] log-name ...\n"
+			"Usage: %s [-D dbg_spec] [-f] [-M maxrecno] [-q] [-r] [-s]\n"
+			"\t[-t] [-v] log-name ...\n"
 			"    -D  set debugging flags\n"
 			"    -f  force rebuilt index installation (with -r)\n"
+			"    -M  maximum recno value\n"
 			"    -q  run quietly\n"
 			"    -r  rebuild the log (rather than just check consistency)\n"
 			"    -s  print summary only\n"
@@ -1541,8 +1564,9 @@ main(int argc, char **argv)
 	int exitstat = EX_OK;
 
 	initialize();
+	MaxRecno = ep_adm_getintmaxparam("swarm.gdplogd.recno.max", 0);
 
-	while ((opt = getopt(argc, argv, "D:fqrstv")) > 0)
+	while ((opt = getopt(argc, argv, "D:fM:qrstv")) > 0)
 	{
 		switch (opt)
 		{
@@ -1552,6 +1576,10 @@ main(int argc, char **argv)
 
 		 case 'f':
 			 Flags.force = true;
+			 break;
+
+		 case 'M':
+			 MaxRecno = strtoll(optarg, NULL, 0);
 			 break;
 
 		 case 'q':
