@@ -825,7 +825,7 @@ scan_recs(gdp_gcl_t *gcl,
 				{
 					// unreasonable record number, probably trashed
 					estat = GDP_STAT_CORRUPT_GCL;
-					if (Flags.verbose)
+					if (!Flags.summaryonly && !Flags.silent)
 						ep_app_message(estat, "%s\n"
 								"  unreasonable recno %" PRIgdp_recno
 								" max %" PRIgdp_recno ",\n"
