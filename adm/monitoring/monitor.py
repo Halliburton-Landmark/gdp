@@ -30,6 +30,20 @@ PERIOD = 10
 TIMEOUT = 30
 MAXEMAILS = 24
 
+def readlines(filename):
+    """returns a list of lines in filename after ignoring comments"""
+
+    assert os.path.exists(filename)
+    lines = []
+    with open(filename) as fh:
+         for line in fh:
+            ## Ignore comments, i.e. lines that start with '#'
+            _line = line.split("#")[0].strip()
+            if len(_line) > 0:
+                lines.append(line.strip())
+    return lines
+
+
 class cmdlineMonitor(object):
     """
     A monitor object that represents some details about an individual
@@ -214,11 +228,11 @@ class TestSuite(object):
     """
 
 
-    def __init__(self, monitors, alertmgr, shell=False,
+    def __init__(self, monfile, alertmgr, shell=False,
                                     logdir=LOGDIR, timeout=TIMEOUT,
                                     period=PERIOD, run_once=False):
 
-        self.monitors = monitors    ## a list of (desc, cmd) tuples
+        self.monfile = monfile      ## A file with list of (desc, cmd) tuples
         self.alertmgr = alertmgr    ## alerts
         ## set other parameters
         self.logdir = logdir
@@ -226,6 +240,21 @@ class TestSuite(object):
         self.timeout = timeout
         self.shell = shell
         self.run_once = run_once
+
+        ## this is where we store all the monitors
+        self.monitors = None
+
+    @staticmethod
+    def __load_monitors(filename):
+        """ Read a configuration file with a list of (desc, cmd) tuples """
+
+        monitors = []   ## A list of (desc, cmd) tuples populated from a file
+        for line in readlines(filename):
+            __tmp = line.split("|")
+            (desc, cmd) = __tmp[0].strip(), "|".join(__tmp[1:])
+            monitors.append((desc, cmd))
+
+        return monitors
 
 
     @staticmethod
@@ -240,6 +269,9 @@ class TestSuite(object):
         """ start the main loop for testing """
 
         while True:
+
+            print "Loading list of monitors from %s" % self.monfile
+            self.monitors = self.__load_monitors(self.monfile)
 
             start_time = time.time()
 
@@ -303,20 +335,6 @@ class TestSuite(object):
         return s
 
 
-def readlines(filename):
-    """returns a list of lines in filename after ignoring comments"""
-
-    assert os.path.exists(filename)
-    lines = []
-    with open(filename) as fh:
-         for line in fh:
-            ## Ignore comments, i.e. lines that start with '#'
-            _line = line.split("#")[0].strip()
-            if len(_line) > 0:
-                lines.append(line.strip())
-    return lines
-
-
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="A generic monitoring suite")
@@ -357,12 +375,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
 
-    ## first read the monitors file and populate a list
-    monitors = []   ## A list of (desc, cmd) tuples populated from a file
-    for line in readlines(args.monitors):
-        __tmp = line.split("|")
-        (desc, cmd) = __tmp[0].strip(), "|".join(__tmp[1:])
-        monitors.append((desc, cmd))
 
     ## parse email config. we look for four fields:
     ## username, password, from, to. Except 'to', each of the fields
@@ -391,7 +403,7 @@ if __name__ == "__main__":
                             fromaddr=fromaddr, alertaddrs=toaddr)
 
     ## run the suite
-    suite = TestSuite(monitors, alertmgr, shell=args.shell,
+    suite = TestSuite(args.monitors, alertmgr, shell=args.shell,
                                     period=args.period, timeout=args.timeout,
                                     run_once=args.once, logdir=args.logdir)
     suite.main_loop()
