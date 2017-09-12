@@ -287,7 +287,7 @@ class TestSuite(object):
             t = datetime.datetime.now()
             ## setup a directory where we keep all the logs
             logdir = "%s/%d/%02d/%02d" % (self.logdir, t.year, t.month, t.day)
-            logfile = "%s/%02d-%02d-%02d.log" % (logdir, t.hour,
+            logfile = "%s/%02d-%02d-%02d.txt" % (logdir, t.hour,
                                                             t.minute, t.second)
             self.__makedir(logdir)
             print "Using logfile: %s" % logfile
