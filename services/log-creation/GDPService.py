@@ -93,7 +93,7 @@ class GDPProtocol(Protocol):
         """
 
         # This just terminates the connection
-        logging.info("Terminating connection, %r", reason)
+        logging.warning("Terminating connection, %r", reason)
         self.transport.abortConnection()
 
 
@@ -128,8 +128,15 @@ class GDPProtocol(Protocol):
             # check the version number
             version = __get_byte_num(0)
 
-            if version != '\x03':   # bogus version number
+            if version == '\x02':
+                logging.warning("Someone is using old version number")
+                logging.info("buflen: %d, datalen: %d, seekptr: %d, "
+                            "version: %d", l1, l2, l, ord(__get_byte_num(0)))
+
+            if version != '\x02' and version != '\x03':   # bogus version number
                 self.terminateConnection("bogus version number")
+                logging.info("buflen: %d, datalen: %d, seekptr: %d, "
+                            "version: %d", l1, l2, l, ord(__get_byte_num(0)))
                 break
 
             if (l + 80) > (l1 + l2):
