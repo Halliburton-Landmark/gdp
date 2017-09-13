@@ -48,7 +48,7 @@ class GDP_NAME:
     PNAME_LEN = 43          # this is following the convention in gdp.h
     pname_t = c_uint8 * (PNAME_LEN + 1)     # printable name of a GCL
 
-    def __init__(self, name):
+    def __init__(self, name, force_internal=False):
         """
         takes either an internal name, or a printable name, or a human friendly
             name, and creates a python object that can be passed around for the
@@ -94,7 +94,7 @@ class GDP_NAME:
             return bool(str(s).translate(None, textchars))
 
 
-        if len(name) == 32 and __is_binary_string(name)==True:
+        if len(name) == 32 and (__is_binary_string(name) or force_internal):
             # If length of name is exactly 32, treat it as a gdp_name_t
             # This is bit guesswork
 
