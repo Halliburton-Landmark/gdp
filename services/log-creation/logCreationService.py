@@ -103,7 +103,8 @@ class logCreationService(GDPService):
 
         # early exit if a router told us something (usually not a good
         # sign)
-        if req['src'] == GDPROUTER_ADDRESS:
+        if req['cmd'] >= GDP_NAK_R_MIN and req['cmd'] <= GDP_NAK_R_MAX:
+            logger.warning("Routing error, src: %r", req['src'])
             return
 
         # check if it's a request from a client or a response from a logd.
@@ -130,9 +131,12 @@ class logCreationService(GDPService):
 
             ## log this to our backend database. Generate printable
             ## names (except the null character, which causes problems)
-            __logname = gdp.GDP_NAME(logname).printable_name()[:-1]
-            __srvname = gdp.GDP_NAME(srvname).printable_name()[:-1]
-            __creator = gdp.GDP_NAME(creator).printable_name()[:-1]
+            __logname = gdp.GDP_NAME(logname,
+                                force_internal=True).printable_name()[:-1]
+            __srvname = gdp.GDP_NAME(srvname,
+                                force_internal=True).printable_name()[:-1]
+            __creator = gdp.GDP_NAME(creator,
+                                force_internal=True).printable_name()[:-1]
 
             logging.info("Received Create request for logname %r, "
                                 "picking server %r", __logname, __srvname)
@@ -169,7 +173,7 @@ class logCreationService(GDPService):
 
             ## Sanity checking
             if req['src'] not in self.logservers:
-                logging.info("error: received a non-response from logserver")
+                logging.info("error: received a response from non-logserver")
                 return self.gen_nak(req, GDP_NAK_C_BADREQ)
 
             logging.info("Response from log-server, row %d", req['rid'])
