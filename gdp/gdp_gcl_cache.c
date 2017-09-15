@@ -439,11 +439,11 @@ _gdp_gcl_cache_get(
 			_gdp_gcl_unlock(gcl);
 			gcl = NULL;
 		}
-		else if (iomode != _GDP_MODE_PEEK)
+		else if (!EP_UT_BITSET(_GDP_MODE_PEEK, iomode))
 		{
 			_gdp_gcl_incref(gcl);
 			_gdp_gcl_touch(gcl);
-			gcl->iomode |= iomode & GDP_MODE_ANY;
+			gcl->iomode |= iomode & GDP_MODE_MASK;
 		}
 	}
 	if (gcl == NULL)
