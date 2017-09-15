@@ -71,6 +71,7 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.disklog", "GDP Log Daemon Physical Log"
 static const char	*GCLDir;			// the gcl data directory
 static int			GCLfilemode;		// the file mode on create
 static uint32_t		DefaultLogFlags;	// as indicated
+static bool			BdbSyncBeforeClose;	// do db_sync before db_close?
 
 #define GETPHYS(gcl)	((gcl)->x->physinfo)
 
@@ -132,7 +133,9 @@ DB_ENV		*DbEnv;
 static void
 bdb_error(const DB_ENV *dbenv, const char *errpfx, const char *msg)
 {
-	ep_dbg_cprintf(Dbg, 11, "bdb_error: %s\n", msg);
+	if (errpfx == NULL)
+		errpfx = "bdb_error";
+	ep_dbg_cprintf(Dbg, 2, "%s: %s\n", errpfx, msg);
 }
 
 #else
@@ -208,6 +211,9 @@ bdb_init(void)
 			goto fail0;
 	}
 
+	BdbSyncBeforeClose =
+		ep_adm_getboolparam("swarm.gdplogd.gcl.syncbeforeclose", true);
+
 	if (false)
 	{
 fail0:
@@ -275,13 +281,11 @@ bdb_open(const char *filename,
 fail0:
 		db = NULL;
 		estat = ep_stat_from_dbstat(dbstat);
-		ep_dbg_cprintf(Dbg, 1, "bdb_open(%s): error during %s: %s\n",
-					filename == NULL ? "<memory>" : filename,
-					phase, db_strerror(dbstat));
+		DbEnv->err(DbEnv, dbstat, "bdb_open(%s): error during %s",
+					filename == NULL ? "<memory>" : filename, phase);
 		if (db != NULL && (dbstat = db->close(db, 0)) != 0)
 		{
-			ep_dbg_cprintf(Dbg, 1, "db_open: error during dbclose: %s\n",
-					db_strerror(dbstat));
+			DbEnv->err(DbEnv, dbstat, "bdb_open: db->close");
 		}
 	}
 #else
@@ -299,7 +303,7 @@ fail0:
 		int _errno = errno;
 
 		estat = ep_stat_from_errno(_errno);
-		ep_dbg_cprintf(Dbg, 1, "bdb_open: %s\n", strerror(_errno));
+		ep_dbg_cprintf(Dbg, 2, "bdb_open: %s\n", strerror(_errno));
 	}
 #endif
 
@@ -313,14 +317,25 @@ done:
 static EP_STAT
 bdb_close(DB *db)
 {
-	int dbstat;
+	int dbstat = 0;
 
 	ep_thr_mutex_lock(&BdbMutex);
-	(void) db->sync(db, 0);
+	if (BdbSyncBeforeClose)
+	{
+		dbstat = db->sync(db, 0);
+	}
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
+	if (dbstat != 0)
+		DbEnv->err(DbEnv, dbstat, "bdb_close(sync)");
 	dbstat = db->close(db, 0);
+	if (dbstat != 0)
+		DbEnv->err(DbEnv, dbstat, "bdb_close(close)");
 #else
+	if (dbstat != 0)
+		ep_dbg_cprintf(Dbg, 2, "bdb_close(sync): %d\n", dbstat);
 	dbstat = db->close(db);
+	if (dbstat != 0)
+		ep_dbg_cprintf(Dbg, 2, "bdb_close(close): %d\n", dbstat);
 #endif
 	ep_thr_mutex_unlock(&BdbMutex);
 	return ep_stat_from_dbstat(dbstat);
@@ -345,18 +360,18 @@ bdb_get(DB *db,
 
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
 	dbstat = db->get(db, NULL, key, val, 0);
-	if (dbstat != 0 && ep_dbg_test(Dbg, 1))
-		DbEnv->err(DbEnv, dbstat, "db->get");
+	estat = ep_stat_from_dbstat(dbstat);
+	if (dbstat != 0)
+		DbEnv->err(DbEnv, dbstat, "bdb_get");
 #else
 	dbstat = db->get(db, key, val, 0);
-#endif
 	estat = ep_stat_from_dbstat(dbstat);
-	if (!EP_STAT_ISOK(estat) && ep_dbg_test(Dbg, 49))
+	if (dbstat != 0)
 	{
-		char ebuf[80];
-		ep_dbg_printf("bdb_get: dbstat %d (%s)", dbstat,
-					ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		ep_dbg_cprintf(Dbg, EP_STAT_ISWARN(estat) ? 49 : 2,
+				"bdb_get: dbstat %d", dbstat);
 	}
+#endif
 	ep_thr_mutex_unlock(&BdbMutex);
 	return estat;
 }
@@ -383,8 +398,14 @@ bdb_get_first_after_key(DB *db,
 
 	// need cursor to get approximate keys (next entry >= key)
 	dbstat = db->cursor(db, NULL, &dbc, 0);
+	if (dbstat != 0)
+		db->err(db, dbstat, "bdb_get_first_after_key(db->cursor)");
 	if (dbstat == 0)
+	{
 		dbstat = dbc->c_get(dbc, key, val, DB_SET_RANGE);
+		if (dbstat != 0)
+			db->err(db, dbstat, "bdb_get_first_after_key(dbc->c_get)");
+	}
 
 	// we always close the cursor --- XXX we really should cache it
 	if (dbc != NULL)
@@ -414,6 +435,8 @@ bdb_cursor_open(DB *db, DBC **dbcp)
 
 	// need cursor to get approximate keys (next entry >= key)
 	dbstat = db->cursor(db, NULL, dbcp, 0);
+	if (dbstat != 0)
+		db->err(db, dbstat, "bdb_cursor_open(db->cursor)");
 	estat = ep_stat_from_dbstat(dbstat);
 #else
 	*dbcp = db;
@@ -464,8 +487,8 @@ bdb_put(DB *db,
 	ep_thr_mutex_lock(&BdbMutex);
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
 	dbstat = db->put(db, NULL, key, val, 0);
-	if (dbstat != 0 && ep_dbg_test(Dbg, 6))
-		ep_dbg_printf("bdb_put: dbstat %s\n", db_strerror(dbstat));
+	if (dbstat != 0)
+		db->err(db, dbstat, "bdb_put");
 #else
 	dbstat = db->put(db, key, val, 0);
 	if (dbstat != 0 && ep_dbg_test(Dbg, 6))
