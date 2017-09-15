@@ -671,7 +671,9 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 			{
 				if (ep_dbg_test(Dbg, 19))
 				{
-					ep_dbg_printf("_gdp_gcl_cache_reclaim: skipping:\n   ");
+					ep_dbg_printf("_gdp_gcl_cache_reclaim: skipping %s:\n   ",
+							EP_UT_BITSET(GCLF_DROPPING, g1->flags) ?
+								"dropping" : "referenced");
 					_gdp_gcl_dump(g1, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
 				}
 				_gdp_gcl_unlock(g1);
@@ -786,7 +788,7 @@ _gdp_gcl_cache_dump(int plev, FILE *fp)
 
 
 /*
-**  Do a pass over all known GCLs.  Used for reclaimation.
+**  Do a pass over all known GCLs.  Used for reclamation.
 */
 
 void
