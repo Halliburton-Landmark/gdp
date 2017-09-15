@@ -31,6 +31,9 @@
 
 /*
 **  Implement on-disk version of logs.
+**
+**		Note: this file is "#include"d by apps/gdp-log-check.c with
+**		the LOG_CHECK #define set.  Messy.
 */
 
 #include "logd.h"
@@ -178,7 +181,7 @@ ep_stat_from_dbstat(int dbstat)
 }
 
 
-// desparation: make all Berkeley DB operations single threaded for now
+// desperation: make all Berkeley DB operations single threaded for now
 static EP_THR_MUTEX		BdbMutex		EP_THR_MUTEX_INITIALIZER;
 
 
@@ -197,6 +200,7 @@ bdb_init(void)
 		phase = "db_env_create";
 		if ((dbstat = db_env_create(&DbEnv, 0)) != 0)
 			goto fail0;
+		DbEnv->set_errcall(DbEnv, bdb_error);
 		phase = "dbenv->open";
 		uint32_t dbenv_flags = DB_CREATE | DB_INIT_MPOOL | DB_PRIVATE |
 						DB_THREAD;
@@ -279,10 +283,6 @@ fail0:
 			ep_dbg_cprintf(Dbg, 1, "db_open: error during dbclose: %s\n",
 					db_strerror(dbstat));
 		}
-	}
-	else
-	{
-		db->set_errcall(db, bdb_error);
 	}
 #else
 	int fileflags = O_RDWR;
@@ -491,6 +491,15 @@ disk_init()
 
 	// find physical location of GCL directory
 	GCLDir = ep_adm_getstrparam("swarm.gdplogd.gcl.dir", GCL_DIR);
+
+	// we will run out of that directory
+	if (chdir(GCLDir) != 0)
+	{
+		estat = ep_stat_from_errno(errno);
+		ep_dbg_cprintf(Dbg, 1, "disk_init: chdir(%s): %s\n",
+				GCLDir, strerror(errno));
+		return estat;
+	}
 
 	// find the file creation mode
 	GCLfilemode = ep_adm_getintparam("swarm.gdplogd.gcl.mode", 0600);
@@ -1882,7 +1891,7 @@ disk_open(gdp_gcl_t *gcl)
 	**  Open timestamp index (tidx)
 	*/
 
-	phase = "get_gcl_path(tidx)";
+	phase = "tidx_open";
 	estat = tidx_open(gcl, GCL_TIDX_SUFFIX, O_RDWR);
 	EP_STAT_CHECK(estat, goto fail0);
 
