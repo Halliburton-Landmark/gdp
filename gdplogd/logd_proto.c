@@ -376,13 +376,8 @@ cmd_open(gdp_req_t *req)
 	// should have no input data; ignore anything there
 	flush_input_data(req, "cmd_open");
 
-	// it should be safe to unlock the req here, since we should hold the
-	// only reference, and we need to get the lock ordering right
-	_gdp_req_unlock(req);
-
 	// see if we already know about this GCL
 	estat = get_open_handle(req, GDP_MODE_ANY);
-	_gdp_req_lock(req);
 	if (!EP_STAT_ISOK(estat))
 	{
 		estat = gdpd_gcl_error(req->cpdu->dst, "cmd_open: could not open GCL",
@@ -426,12 +421,8 @@ cmd_open(gdp_req_t *req)
 /*
 **  CMD_CLOSE --- close an open GCL
 **
-**		XXX	Since GCLs are shared between clients you really can't just
-**			close things willy-nilly.  Thus, this is currently a no-op
-**			until such time as reference counting works.
-**
-**		XXX	We need to have a way of expiring unused GCLs that are not
-**			closed.
+**		This really doesn't do much except terminate subscriptions.  We
+**		let the usual cache reclaim algorithm do the actual close.
 */
 
 EP_STAT
@@ -445,9 +436,7 @@ cmd_close(gdp_req_t *req)
 	flush_input_data(req, "cmd_close");
 
 	// a bit wierd to open the GCL only to close it again....
-	_gdp_req_unlock(req);				// lock ordering
 	estat = get_open_handle(req, GDP_MODE_ANY);
-	_gdp_req_lock(req);
 	if (!EP_STAT_ISOK(estat))
 	{
 		return gdpd_gcl_error(req->cpdu->dst, "cmd_close: GCL not open",
