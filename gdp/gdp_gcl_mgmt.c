@@ -448,7 +448,10 @@ _gdp_gcl_decref_trace(
 	ep_dbg_cprintf(Dbg, 51, "_gdp_gcl_decref(%p): %d\n",
 			gcl, gcl->refcnt);
 	if (gcl->refcnt == 0 && !EP_UT_BITSET(GCLF_DEFER_FREE, gcl->flags))
+	{
+		EP_ASSERT(!keeplocked && !EP_UT_BITSET(GCLF_KEEPLOCKED, gcl->flags));
 		_gdp_gcl_freehandle(gcl);
+	}
 	else if (!EP_UT_BITSET(GCLF_ISLOCKED, gcl->flags))
 	{
 		ep_dbg_cprintf(Dbg, 1,

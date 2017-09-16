@@ -337,7 +337,21 @@ _gdp_gcl_close(gdp_gcl_t *gcl,
 
 	errno = 0;				// avoid spurious messages
 	if (!GDP_GCL_ISGOOD(gcl))
+	{
+		gdp_pname_t pname;
+
+		ep_dbg_cprintf(Dbg, 1, "_gdp_gcl_close(%s): closing free GCL\n",
+				gdp_printable_name(gcl->name, pname));
 		return GDP_STAT_GCL_NOT_OPEN;
+	}
+	if (gcl->refcnt <= 0)
+	{
+		gdp_pname_t pname;
+
+		ep_dbg_cprintf(Dbg, 1, "_gdp_gcl_close(%s): refcnt %d, failing\n",
+				gdp_printable_name(gcl->name, pname), gcl->refcnt);
+		return GDP_STAT_GCL_NOT_OPEN;
+	}
 
 	if (ep_dbg_test(Dbg, 38))
 	{
