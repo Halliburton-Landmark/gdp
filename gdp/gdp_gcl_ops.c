@@ -357,17 +357,21 @@ _gdp_gcl_close(gdp_gcl_t *gcl,
 
 	if (nrefs > 1)
 	{
-		// nothing more to do
+		// nothing more to do (we have another open instance)
 		goto finis;
 	}
 
-	estat = _gdp_req_new(GDP_CMD_CLOSE, gcl, chan, NULL, reqflags, &req);
-	EP_STAT_CHECK(estat, goto fail0);
+	// no need to send protocol _unless_ we have an open subscription
+	if (gcl->refcnt > 1)
+	{
+		estat = _gdp_req_new(GDP_CMD_CLOSE, gcl, chan, NULL, reqflags, &req);
+		EP_STAT_CHECK(estat, goto fail0);
 
-	// tell the daemon to close it
-	estat = _gdp_invoke(req);
+		// tell the daemon to close it
+		estat = _gdp_invoke(req);
 
-	//XXX should probably check status (and do what with it?)
+		//XXX should probably check status (and do what with it?)
+	}
 
 	// release resources held by this handle
 	_gdp_event_free_all(gcl);
