@@ -348,6 +348,12 @@ find_req_in_channel_list(
 		ep_dbg_cprintf(DbgProcResp, 44,
 				"find_req_in_channel_list: _gdp_req_lock => %s\n",
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		if (!EP_STAT_ISOK(estat))
+		{
+			if (req->gcl != NULL)
+				_gdp_gcl_unlock(req->gcl);
+			req = NULL;
+		}
 	}
 	*reqp = req;
 	return estat;
@@ -465,6 +471,7 @@ process_resp(void *rpdu_)
 				_gdp_pdu_dump(rpdu, ep_dbg_getfile());
 				_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
 			}
+			_gdp_gcl_decref(&gcl, false);
 			_gdp_pdu_free(rpdu);
 			return;
 		}
