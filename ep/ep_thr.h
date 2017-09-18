@@ -114,12 +114,31 @@
 
 typedef pthread_t		EP_THR;
 
-extern EP_THR	ep_thr_gettid(void);
-extern int	_ep_thr_spawn(EP_THR *th, void *(*thfunc)(void *), void *arg, const char *file, int line);
-extern void	_ep_thr_yield(const char *file, int line);
-#define		ep_thr_spawn(thr, thfunc, arg)	_ep_thr_spawn(thr, thfunc, arg, \
-				__FILE__, __LINE__)
-#define		ep_thr_yield()			_ep_thr_yield(__FILE__, __LINE__)
+#if EP_OSCF_HAS_SYS_GETTID
+typedef int			EP_THR_ID;
+# include <sys/syscall.h>
+# define EP_THR_PRItid		"d"
+#else
+typedef void			*EP_THR_ID;
+# define EP_THR_PRItid		"p"
+#endif
+
+
+extern EP_THR_ID	ep_thr_gettid(void);
+extern EP_THR		ep_thr_getself(void);
+
+extern int		_ep_thr_spawn(EP_THR *th,
+					void *(*thfunc)(void *),
+					void *arg,
+					const char *file,
+					int line);
+#define			ep_thr_spawn(thr, thfunc, arg) \
+					_ep_thr_spawn(thr, thfunc, arg, \
+					__FILE__, __LINE__)
+extern void		_ep_thr_yield(const char *file,
+					int line);
+#define			ep_thr_yield() \
+					_ep_thr_yield(__FILE__, __LINE__)
 
 #if EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
 #  define _EP_THR_MUTEX_MAGIC	0x454d5458	// EMTX

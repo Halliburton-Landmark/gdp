@@ -148,8 +148,8 @@ process_cmd(void *cpdu_)
 		ep_thr_mutex_lock(&GclCreateMutex);
 
 	ep_dbg_cprintf(Dbg, 40,
-			"process_cmd(%s, thread %p)\n",
-			_gdp_proto_cmd_name(cmd), (void *) ep_thr_gettid());
+			"process_cmd(%s, thread %" EP_THR_PRItid ")\n",
+			_gdp_proto_cmd_name(cmd), ep_thr_gettid());
 
 	estat = _gdp_gcl_cache_get(cpdu->dst, 0, GGCF_NOCREATE, &gcl);
 	if (gcl != NULL)
