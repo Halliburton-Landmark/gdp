@@ -26,67 +26,78 @@ In this section, we talk about how to get access, install and use the GDP
 client side library. As mentioned earlier, we have a C library for clients with
 wrappers in other languages around this C-library.
 
-As of now, we have packaged the GDP client-side code for Debian based systems
-as `.deb` packages. For other platforms, unfortunately no one-click packages
-exist. However, compilation from source works on Linux, BSD and Mac-OS.
+The main GDP repository can be accessed in read-only mode by using
 
-The source code for GDP client library and
-log-server is maintained in a git repository that can be accessed either over
-HTTPS (requires username, password), or over SSH (requires key setup):
+```
+git clone https://repo.eecs.berkeley.edu/git-anon/projects/swarmlab/gdp.git
+```
+
+Or, in read-write mode either using HTTPS (requires username, password), or
+using SSH (requires key setup):
 
 ```
 git clone https://repo.eecs.berkeley.edu/git/projects/swarmlab/gdp.git
 git clone repoman@repo.eecs.berkeley.edu:projects/swarmlab/gdp.git
 ```
 
-GDP-router is maintained in a separate repository (gdp_router_click.git).
-However, you should not need access to that for just playing around with GDP.
+The main GDP repository contains the core GDP library (`libgdp`), client-side
+applications and language bindings, and the log-server (`gdplogd`). GDP-router
+is maintained in a separate repository (`gdp_router_click.git`).  However, you
+should not need to worry about it if you are just playing around with GDP.
 
-The repository gdp-if.git contains various interfaces to the GDP.  It is
+The repository `gdp-if.git` contains various interfaces to the GDP.  It is
 not really part of the GDP itself, but it may prove instructive.
 
 
 ## Compilation
-Refer to README in the main git tree.
+
+In summary, assuming you have the required dependencies installed, `make
+install-client` should install the C library and basic utility applications in
+system path. `make install-python` should install the Python bindings in the
+system path as well. These `make` targets do not create any necessary
+configuration files, however (see below). For more details, refer to README.md in
+the main git tree.
 
 ## Infrastructure information
-Refer to README in the main git tree.
+Refer to README.md in the main git tree.
 
 *Note that the software/infrastructure is still in very early experimental
 phase. We do not make any guarantees on data retention/backups at this moment.
 As the code stabilizes, we will make better effort to maintain data. In the
 meantime, contact us if you would like to use GDP for anything serious.*
 
-
 ## Configuration
-Refer to README in the main git tree.
 
+The GDP library, log-server, and various other utility programs consult a
+configuration file for the correct parameters to use.  At the very minimum, your
+configuration file should contain the GDP router that your client should connect
+to (unless someone else is running a local router in the same subnet as you are
+in, in which case zeroconf should work). Refer to README.md in the main git
+tree.
 
 ## Creating logs
 
-Until such time as we implement automatic placement, you have to tell the GDP
-where a GCL should be created. By convention we are naming gdplogd instances
-(the daemon that implements physical log storage) by the reversed domain name
-followed by `.gdplogd`, for example, `edu.berkeley.eecs.gdp-01.gdplogd` is the
-name of the gdplogd running on the machine `gdp-01.eecs.berkeley.edu`.
-
-To create a new GCL you need to determine the node on which the log should be
-created and the name of the new log and pass them to `apps/gcl-create`. For
-example,
+The main mechanism to create a log is using `gcl-create` (should be in your
+system path after `make install-*`). For example,
 
 ```
 gcl-create -k none org.example.project.log17a
 ```
 
 will create a log named `org.example.project.log17a` on one of the default
-log-servers at Berkeley. Although you can create logs with any name, please
-stick to this convention (with "project" being the project name or the user
-name, as appropriate) so we can avoid name collisions. `-k none` means that
-`gcl-create` will not attempt to create a new signature key for signing
-appended data.  Although crucial to the operation, key-management is better
-deferred to a stage when you are familiar with the basic operations of the GDP.
-Also, note that `gcl-create`
-has several other command-line options that will be useful later on.
+log-servers at Berkeley.
+
+Although you can create logs with any name, please stick to this convention
+(with "project" being the project name or the user name, as appropriate) so we
+can avoid name collisions. `-k none` means that `gcl-create` will not attempt to
+create a new signature key for signing appended data.  Although crucial to the
+operation, key-management is better deferred to a stage when you are familiar
+with the basic operations of the GDP.  Also, note that `gcl-create` has several
+other command-line options that will be useful later on.
+
+Note that if you don't explicitly specify log-placement, a log-server at
+Berkeley is picked at random for hosting your log. This is especially important
+if you are running your own log-servers and want control over where data goes.
 
 ---
 
@@ -105,11 +116,9 @@ complete interface. For a more thorough API documentation, refer to
 The package `gdp` should be installed in your system path for python packages.
 Once you have the required dependencies for compilation installed, something
 like `make install-python` from the root of repository should do the trick (note
-that running with `sudo` may be required). If, however, you don't want to
-install an experimental package in your system path, and would rather keep
-everything contained to the repository tree, a simple workaround is to create a
-symlink `~/.local/lib/python2.7/site-packages/gdp` that points to
-`lang/python/gdp/` in the repository tree. 
+that running with `sudo` may be required). Note that this also installs the
+client side C libraries and various utilities (such as `gcl-create`) in system
+path.
 
 ## Appending data
 
@@ -125,7 +134,7 @@ We need to import the package `gdp` to begin with.
 Once imported, we need to initialize the GDP package by calling `gdp_init()`.
 An optional argument to `gdp_init()` is the address of a GDP-router. If no
 address provided, a default value of the parameter `swarm.gdp.routers` is used
-as configured by EP library. (See README for details).
+as configured by EP library. (See README.md for details).
 
 ```python
 >>> # the following picks a router based on EP library configuration
@@ -156,7 +165,7 @@ to open the GCL in read-only mode (`gdp.GDP_MODE_RO`), or append-only mode
 ```
 
 Next, let's append a few records to the log. The unit of read/write to a log is
-called a record---data with some automatically generated metadata---represented
+called a record--data with some automatically generated metadata--represented
 as a python dictionary. The special key `data` represents the data we wish to
 append to the log, and its value should be a python (binary) string.
 
@@ -240,7 +249,7 @@ Look at `/lang/python/apps/reader_test_subscribe.py` for a full example.
 Reading one record at a time can be very inefficient, especially when reading
 large amount of data. For this, we support `multiread` to read a range of
 records at a time. The interface is similar to `subscribe` in some
-sense---events are returned as a result of a `multiread` call. 
+sense--events are returned as a result of a `multiread` call. 
 
 Look at `/lang/python/apps/reader_test_multiread.py` for a full example.
 
