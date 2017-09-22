@@ -72,6 +72,7 @@ static const char	*GCLDir;			// the gcl data directory
 static int			GCLfilemode;		// the file mode on create
 static uint32_t		DefaultLogFlags;	// as indicated
 static bool			BdbSyncBeforeClose;	// do db_sync before db_close?
+static bool			BdbSyncAfterPut;	// do db->sync after db->put?
 
 #define GETPHYS(gcl)	((gcl)->x->physinfo)
 
@@ -193,6 +194,11 @@ bdb_init(void)
 {
 	EP_STAT estat = EP_STAT_OK;
 
+	BdbSyncBeforeClose =
+		ep_adm_getboolparam("swarm.gdplogd.gcl.sync-before-close", true);
+	BdbSyncAfterPut =
+		ep_adm_getboolparam("swarm.gdplogd.gcl.sync-after-put", true);
+
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
 	int dbstat;
 	const char *phase;
@@ -210,9 +216,6 @@ bdb_init(void)
 		if ((dbstat = DbEnv->open(DbEnv, NULL, dbenv_flags, 0)) != 0)
 			goto fail0;
 	}
-
-	BdbSyncBeforeClose =
-		ep_adm_getboolparam("swarm.gdplogd.gcl.syncbeforeclose", true);
 
 	if (false)
 	{
@@ -273,6 +276,12 @@ bdb_open(const char *filename,
 	phase = "initfunc";
 	if (cmpf != NULL && dbtype == DB_BTREE)
 		db->set_bt_compare(db, cmpf);
+
+#if 0			//XXX has to happen when database is created
+	phase = "db->set_flags";
+	if ((dbstat = db->set_flags(db, DB_DUPSORT)) != 0)
+		DbEnv->err(DbEnv, dbstat, "bdb_open: db->set_flags");
+#endif
 
 	phase = "db->open";
 	dbstat = db->open(db, NULL, filename, NULL, dbtype, dbflags, filemode);
@@ -489,10 +498,22 @@ bdb_put(DB *db,
 	dbstat = db->put(db, NULL, key, val, 0);
 	if (dbstat != 0)
 		db->err(db, dbstat, "bdb_put");
+	if (BdbSyncAfterPut)
+	{
+		dbstat = db->sync(db, 0);
+		if (dbstat != 0)
+			db->err(db, dbstat, "bdb_sync");
+	}
 #else
 	dbstat = db->put(db, key, val, 0);
 	if (dbstat != 0 && ep_dbg_test(Dbg, 6))
-		ep_dbg_printf("bdb_put: dbstat %d\n", dbstat);
+		ep_dbg_printf("bdb_put: db->put %d\n", dbstat);
+	if (BdbSyncAfterPut)
+	{
+		dbstat = db->sync(db, 0);
+		if (dbstat != 0 && ep_dbg_test(Dbg, 6))
+			ep_dbg_printf("bdb_put: db->sync %d\n", dbstat);
+	}
 #endif
 	ep_thr_mutex_unlock(&BdbMutex);
 	estat = ep_stat_from_dbstat(dbstat);
