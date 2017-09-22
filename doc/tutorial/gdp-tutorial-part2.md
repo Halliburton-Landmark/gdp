@@ -123,7 +123,9 @@ path.
 ## Appending data
 
 Let's start with a simple `Hello world` program, that writes some data to a
-pre-existing log and reads it back.
+log and reads it back. Before we begin, we need to create the log; see *Creating
+logs* above. The tutorial uses the logname `edu.berkeley.eecs.mor.01`, but
+please replace it with the name of the log you create.
 
 We need to import the package `gdp` to begin with.
  

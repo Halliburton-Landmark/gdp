@@ -104,7 +104,7 @@ git clone repoman@repo.eecs.berkeley.edu:projects/swarmlab/gdp.git</code></pre>
 <h2 id="python-package-installation">Python package installation</h2>
 <p>The package <code>gdp</code> should be installed in your system path for python packages. Once you have the required dependencies for compilation installed, something like <code>make install-python</code> from the root of repository should do the trick (note that running with <code>sudo</code> may be required). Note that this also installs the client side C libraries and various utilities (such as <code>gcl-create</code>) in system path.</p>
 <h2 id="appending-data">Appending data</h2>
-<p>Let’s start with a simple <code>Hello world</code> program, that writes some data to a pre-existing log and reads it back.</p>
+<p>Let’s start with a simple <code>Hello world</code> program, that writes some data to a log and reads it back. Before we begin, we need to create the log; see <em>Creating logs</em> above. The tutorial uses the logname <code>edu.berkeley.eecs.mor.01</code>, but please replace it with the name of the log you create.</p>
 <p>We need to import the package <code>gdp</code> to begin with.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="op">&gt;&gt;&gt;</span> <span class="im">import</span> gdp</code></pre></div>
 <p>Once imported, we need to initialize the GDP package by calling <code>gdp_init()</code>. An optional argument to <code>gdp_init()</code> is the address of a GDP-router. If no address provided, a default value of the parameter <code>swarm.gdp.routers</code> is used as configured by EP library. (See README.md for details).</p>
