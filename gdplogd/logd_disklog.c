@@ -190,14 +190,14 @@ static EP_THR_MUTEX		BdbMutex		EP_THR_MUTEX_INITIALIZER;
 
 
 static EP_STAT
-bdb_init(void)
+bdb_init(const char *db_home)
 {
 	EP_STAT estat = EP_STAT_OK;
 
 	BdbSyncBeforeClose =
-		ep_adm_getboolparam("swarm.gdplogd.gcl.sync-before-close", true);
+		ep_adm_getboolparam("swarm.gdplogd.gcl.sync-before-close", false);
 	BdbSyncAfterPut =
-		ep_adm_getboolparam("swarm.gdplogd.gcl.sync-after-put", true);
+		ep_adm_getboolparam("swarm.gdplogd.gcl.sync-after-put", false);
 
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
 	int dbstat;
@@ -211,9 +211,13 @@ bdb_init(void)
 			goto fail0;
 		DbEnv->set_errcall(DbEnv, bdb_error);
 		phase = "dbenv->open";
-		uint32_t dbenv_flags = DB_CREATE | DB_INIT_MPOOL | DB_PRIVATE |
-						DB_THREAD;
-		if ((dbstat = DbEnv->open(DbEnv, NULL, dbenv_flags, 0)) != 0)
+		uint32_t dbenv_flags = DB_CREATE |
+						DB_INIT_TXN |
+						DB_INIT_LOCK |
+						DB_INIT_LOG |
+						DB_INIT_MPOOL |
+						DB_PRIVATE ;
+		if ((dbstat = DbEnv->open(DbEnv, db_home, dbenv_flags, 0)) != 0)
 			goto fail0;
 	}
 
@@ -284,6 +288,7 @@ bdb_open(const char *filename,
 #endif
 
 	phase = "db->open";
+	dbflags |= DB_AUTO_COMMIT | DB_PRIVATE;
 	dbstat = db->open(db, NULL, filename, NULL, dbtype, dbflags, filemode);
 	if (dbstat != 0)
 	{
@@ -559,7 +564,7 @@ disk_init()
 		DefaultLogFlags |= LOG_POSIX_ERRORS;
 
 	// initialize berkeley DB (must be done while single threaded)
-	estat = bdb_init();
+	estat = bdb_init(GCLDir);
 
 	ep_dbg_cprintf(Dbg, 8, "disk_init: log dir = %s, mode = 0%o\n",
 			GCLDir, GCLfilemode);
@@ -1623,7 +1628,7 @@ tidx_create(gdp_gcl_t *gcl, const char *suffix, uint32_t flags)
 	EP_STAT_CHECK(estat, goto fail0);
 
 	ep_dbg_cprintf(Dbg, 20, "tidx_create: creating %s\n", tidx_pbuf);
-	int dbflags = DB_CREATE | DB_THREAD | DB_PRIVATE;
+	int dbflags = DB_CREATE;
 	if (!EP_UT_BITSET(FLAG_TMPFILE, flags))
 		dbflags |= DB_EXCL;
 	estat = bdb_open(tidx_pbuf, dbflags, GCLfilemode,
@@ -1649,7 +1654,7 @@ tidx_open(gdp_gcl_t *gcl, const char *suffix, int openmode)
 	EP_STAT estat;
 	const char *phase;
 	struct physinfo *phys = GETPHYS(gcl);
-	int dbflags = DB_THREAD | DB_PRIVATE;
+	int dbflags = 0;
 	char tidx_pbuf[GCL_PATH_MAX];
 
 	phase = "get_gcl_path";
