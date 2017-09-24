@@ -746,8 +746,9 @@ void
 _gdp_gcl_cache_dump(int plev, FILE *fp)
 {
 	gdp_gcl_t *gcl;
-	int ngcls = 0;
-	int maxgcls = 40;		//XXX should be a parameter
+	int ngcls = 0;			// actual number of GCLs in cache
+	int maxprint = 30;		//XXX should be a parameter
+	int maxgcls = 200;		//XXX ditto (this parameter is a loop breaker)
 
 	if (fp == NULL)
 		fp = ep_dbg_getfile();
@@ -757,6 +758,8 @@ _gdp_gcl_cache_dump(int plev, FILE *fp)
 	{
 		if (++ngcls > maxgcls)
 			break;
+		if (ngcls > maxprint)
+			continue;
 		VALGRIND_HG_DISABLE_CHECKING(gcl, sizeof *gcl);
 
 		if (plev > GDP_PR_PRETTY)
@@ -779,11 +782,11 @@ _gdp_gcl_cache_dump(int plev, FILE *fp)
 					gcl->pname);
 		VALGRIND_HG_ENABLE_CHECKING(gcl, sizeof *gcl);
 	}
-	if (gcl == NULL)
+	if (ngcls <= maxprint)
 		fprintf(fp, "\n<<< End of cached GCL list >>>\n");
 	else
-		fprintf(fp, "\n<<< End of cached GCL list (only %d of %d printed >>>\n",
-				ngcls, maxgcls);
+		fprintf(fp, "\n<<< End of cached GCL list (only %d of %d printed) >>>\n",
+				maxprint, ngcls);
 }
 
 
