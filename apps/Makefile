@@ -55,8 +55,10 @@ MAN5ALL=
 
 MAN7ALL=
 
-MAN8ALL=	gcl-create.8 \
+MAN8ALL=	gcl-clone.8 \
+		gcl-create.8 \
 		gdp-log-check.8 \
+		log-view.8 \
 
 MANALL=		${MAN1ALL} ${MAN3ALL} ${MAN5ALL} ${MAN7ALL} ${MAN8ALL}
 

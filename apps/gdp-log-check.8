@@ -15,6 +15,7 @@
 .Op Fl t
 .Op Fl v
 .Ar log-name ...
+.
 .Sh DESCRIPTION
 .Nm
 checks on-disk logs for index consistency,
@@ -26,10 +27,15 @@ It
 be run while
 .Xr gdplogd 8
 is running.
+It can
+.Em only
+be run on the server that actually hosts the log(s) to be checked,
+that is, it can not be run on a client or on a remotely-hosted log.
 .Pp
 .Nm
 .Fl r
 never changes the on-disk data file, only the index files.
+.
 .Sh OPTIONS
 .
 .Bl -tag
@@ -69,6 +75,7 @@ Only repair the timestamp index (leaving the record index alone).
 .It Fl v
 Run verbosely.
 .El
+.
 .Sh EXIT STATUS
 .Bl -tag
 .It Li EX_DATAERR
@@ -80,13 +87,20 @@ There was some failure during startup.
 .It Li EX_USAGE
 Command line parameters are incorrect.
 .El
+.
 .\".Sh ADMINISTRATIVE PARAMETERS
+.
 .\".Sh ENVIRONMENT
+.
 .\".Sh FILES
-.\".Sh SEE ALSO
+.
+.Sh SEE ALSO
+.Xr gdp-log-check 8
 .\".Xr gdp 7 ,
 .\".Xr gdplogd 8
+.
 .\".Sh EXAMPLES
+.
 .Sh BUGS
 In some cases
 .Nm
