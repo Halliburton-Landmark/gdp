@@ -112,12 +112,14 @@ gdp_event_cb(struct bufferevent *bev, short events, void *ctx)
 	gdp_chan_t **pchan = ctx;
 	gdp_chan_t *chan = *pchan;
 
-	if (ep_dbg_test(Dbg, 25))
+	if (ep_dbg_test(Dbg, 10))
 	{
-		ep_dbg_printf("gdp_event_cb: ");
+		int sockerr = EVUTIL_SOCKET_ERROR();
+		ep_dbg_printf("gdp_event_cb[%d]: ", getpid());
 		ep_prflags(events, EventWhatFlags, ep_dbg_getfile());
-		ep_dbg_printf(", fd=%d , errno=%d\n",
-				bufferevent_getfd(bev), EVUTIL_SOCKET_ERROR());
+		ep_dbg_printf(", fd=%d , errno=%d %s\n",
+				bufferevent_getfd(bev),
+				sockerr, evutil_socket_error_to_string(sockerr));
 	}
 
 	EP_ASSERT(bev == chan->bev);
@@ -136,15 +138,16 @@ gdp_event_cb(struct bufferevent *bev, short events, void *ctx)
 		gdp_buf_t *ievb = bufferevent_get_input(bev);
 		size_t l = gdp_buf_getlength(ievb);
 
-		ep_dbg_cprintf(Dbg, 1, "_gdp_event_cb: got EOF, %zu bytes left\n", l);
+		ep_dbg_cprintf(Dbg, 1, "gdp_event_cb[%d]: got EOF, %zu bytes left\n",
+					getpid(), l);
 		restart_connection = true;
 	}
 	if (EP_UT_BITSET(BEV_EVENT_ERROR, events))
 	{
 		int sockerr = EVUTIL_SOCKET_ERROR();
 
-		ep_dbg_cprintf(Dbg, 1, "_gdp_event_cb: error: %s\n",
-				evutil_socket_error_to_string(sockerr));
+		ep_dbg_cprintf(Dbg, 1, "gdp_event_cb[%d]: error: %s\n",
+				getpid(), evutil_socket_error_to_string(sockerr));
 		restart_connection = true;
 	}
 
@@ -391,8 +394,8 @@ _gdp_chan_open(const char *gdp_addr,
 				// connection failure
 				estat = ep_stat_from_errno(errno);
 				ep_dbg_cprintf(Dbg, 38,
-						"_gdp_chan_open: connect failed: %s\n",
-						strerror(errno));
+						"_gdp_chan_open[%d]: connect failed: %s\n",
+						getpid(), strerror(errno));
 				close(sock);
 				continue;
 			}
@@ -421,8 +424,8 @@ _gdp_chan_open(const char *gdp_addr,
 		char ebuf[80];
 fail0:
 		ep_dbg_cprintf(Dbg, 2,
-				"_gdp_chan_open: could not open channel: %s\n",
-				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+				"_gdp_chan_open[%d]: could not open channel: %s\n",
+				getpid(), ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		//ep_log(estat, "_gdp_chan_open: could not open channel");
 		if (chan != NULL && newchan)
 		{
@@ -434,8 +437,8 @@ fail0:
 		}
 		return estat;
 	}
-	ep_dbg_cprintf(Dbg, 1, "_gdp_chan_open: talking to router at %s:%s\n",
-				host, port);
+	ep_dbg_cprintf(Dbg, 1, "_gdp_chan_open[%d]: talking to router at %s:%s\n",
+				getpid(), host, port);
 	return estat;
 }
 

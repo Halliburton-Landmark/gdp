@@ -439,11 +439,11 @@ _gdp_gcl_cache_get(
 			_gdp_gcl_unlock(gcl);
 			gcl = NULL;
 		}
-		else if (iomode != _GDP_MODE_PEEK)
+		else if (!EP_UT_BITSET(_GDP_MODE_PEEK, iomode))
 		{
 			_gdp_gcl_incref(gcl);
 			_gdp_gcl_touch(gcl);
-			gcl->iomode |= iomode & GDP_MODE_ANY;
+			gcl->iomode |= iomode & GDP_MODE_MASK;
 		}
 	}
 	if (gcl == NULL)
@@ -671,7 +671,9 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 			{
 				if (ep_dbg_test(Dbg, 19))
 				{
-					ep_dbg_printf("_gdp_gcl_cache_reclaim: skipping:\n   ");
+					ep_dbg_printf("_gdp_gcl_cache_reclaim: skipping %s:\n   ",
+							EP_UT_BITSET(GCLF_DROPPING, g1->flags) ?
+								"dropping" : "referenced");
 					_gdp_gcl_dump(g1, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
 				}
 				_gdp_gcl_unlock(g1);
@@ -744,8 +746,9 @@ void
 _gdp_gcl_cache_dump(int plev, FILE *fp)
 {
 	gdp_gcl_t *gcl;
-	int ngcls = 0;
-	int maxgcls = 40;		//XXX should be a parameter
+	int ngcls = 0;			// actual number of GCLs in cache
+	int maxprint = 30;		//XXX should be a parameter
+	int maxgcls = 200;		//XXX ditto (this parameter is a loop breaker)
 
 	if (fp == NULL)
 		fp = ep_dbg_getfile();
@@ -755,6 +758,8 @@ _gdp_gcl_cache_dump(int plev, FILE *fp)
 	{
 		if (++ngcls > maxgcls)
 			break;
+		if (ngcls > maxprint)
+			continue;
 		VALGRIND_HG_DISABLE_CHECKING(gcl, sizeof *gcl);
 
 		if (plev > GDP_PR_PRETTY)
@@ -777,16 +782,16 @@ _gdp_gcl_cache_dump(int plev, FILE *fp)
 					gcl->pname);
 		VALGRIND_HG_ENABLE_CHECKING(gcl, sizeof *gcl);
 	}
-	if (gcl == NULL)
+	if (ngcls <= maxprint)
 		fprintf(fp, "\n<<< End of cached GCL list >>>\n");
 	else
-		fprintf(fp, "\n<<< End of cached GCL list (only %d of %d printed >>>\n",
-				ngcls, maxgcls);
+		fprintf(fp, "\n<<< End of cached GCL list (only %d of %d printed) >>>\n",
+				maxprint, ngcls);
 }
 
 
 /*
-**  Do a pass over all known GCLs.  Used for reclaimation.
+**  Do a pass over all known GCLs.  Used for reclamation.
 */
 
 void

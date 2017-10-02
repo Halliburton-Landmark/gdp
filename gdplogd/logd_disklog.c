@@ -31,6 +31,9 @@
 
 /*
 **  Implement on-disk version of logs.
+**
+**		Note: this file is "#include"d by apps/gdp-log-check.c with
+**		the LOG_CHECK #define set.  Messy.
 */
 
 #include "logd.h"
@@ -68,6 +71,8 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.disklog", "GDP Log Daemon Physical Log"
 static const char	*GCLDir;			// the gcl data directory
 static int			GCLfilemode;		// the file mode on create
 static uint32_t		DefaultLogFlags;	// as indicated
+static bool			BdbSyncBeforeClose;	// do db_sync before db_close?
+static bool			BdbSyncAfterPut;	// do db->sync after db->put?
 
 #define GETPHYS(gcl)	((gcl)->x->physinfo)
 
@@ -129,7 +134,9 @@ DB_ENV		*DbEnv;
 static void
 bdb_error(const DB_ENV *dbenv, const char *errpfx, const char *msg)
 {
-	ep_dbg_cprintf(Dbg, 11, "bdb_error: %s\n", msg);
+	if (errpfx == NULL)
+		errpfx = "bdb_error";
+	ep_dbg_cprintf(Dbg, 2, "%s: %s\n", errpfx, msg);
 }
 
 #else
@@ -178,14 +185,19 @@ ep_stat_from_dbstat(int dbstat)
 }
 
 
-// desparation: make all Berkeley DB operations single threaded for now
+// desperation: make all Berkeley DB operations single threaded for now
 static EP_THR_MUTEX		BdbMutex		EP_THR_MUTEX_INITIALIZER;
 
 
 static EP_STAT
-bdb_init(void)
+bdb_init(const char *db_home)
 {
 	EP_STAT estat = EP_STAT_OK;
+
+	BdbSyncBeforeClose =
+		ep_adm_getboolparam("swarm.gdplogd.gcl.sync-before-close", false);
+	BdbSyncAfterPut =
+		ep_adm_getboolparam("swarm.gdplogd.gcl.sync-after-put", false);
 
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
 	int dbstat;
@@ -197,10 +209,15 @@ bdb_init(void)
 		phase = "db_env_create";
 		if ((dbstat = db_env_create(&DbEnv, 0)) != 0)
 			goto fail0;
+		DbEnv->set_errcall(DbEnv, bdb_error);
 		phase = "dbenv->open";
-		uint32_t dbenv_flags = DB_CREATE | DB_INIT_MPOOL | DB_PRIVATE |
-						DB_THREAD;
-		if ((dbstat = DbEnv->open(DbEnv, NULL, dbenv_flags, 0)) != 0)
+		uint32_t dbenv_flags = DB_CREATE |
+						DB_INIT_TXN |
+						DB_INIT_LOCK |
+						DB_INIT_LOG |
+						DB_INIT_MPOOL |
+						DB_PRIVATE ;
+		if ((dbstat = DbEnv->open(DbEnv, db_home, dbenv_flags, 0)) != 0)
 			goto fail0;
 	}
 
@@ -264,25 +281,26 @@ bdb_open(const char *filename,
 	if (cmpf != NULL && dbtype == DB_BTREE)
 		db->set_bt_compare(db, cmpf);
 
+#if 0			//XXX has to happen when database is created
+	phase = "db->set_flags";
+	if ((dbstat = db->set_flags(db, DB_DUPSORT)) != 0)
+		DbEnv->err(DbEnv, dbstat, "bdb_open: db->set_flags");
+#endif
+
 	phase = "db->open";
+	dbflags |= DB_AUTO_COMMIT | DB_PRIVATE;
 	dbstat = db->open(db, NULL, filename, NULL, dbtype, dbflags, filemode);
 	if (dbstat != 0)
 	{
 fail0:
 		db = NULL;
 		estat = ep_stat_from_dbstat(dbstat);
-		ep_dbg_cprintf(Dbg, 1, "bdb_open(%s): error during %s: %s\n",
-					filename == NULL ? "<memory>" : filename,
-					phase, db_strerror(dbstat));
+		DbEnv->err(DbEnv, dbstat, "bdb_open(%s): error during %s",
+					filename == NULL ? "<memory>" : filename, phase);
 		if (db != NULL && (dbstat = db->close(db, 0)) != 0)
 		{
-			ep_dbg_cprintf(Dbg, 1, "db_open: error during dbclose: %s\n",
-					db_strerror(dbstat));
+			DbEnv->err(DbEnv, dbstat, "bdb_open: db->close");
 		}
-	}
-	else
-	{
-		db->set_errcall(db, bdb_error);
 	}
 #else
 	int fileflags = O_RDWR;
@@ -299,7 +317,7 @@ fail0:
 		int _errno = errno;
 
 		estat = ep_stat_from_errno(_errno);
-		ep_dbg_cprintf(Dbg, 1, "bdb_open: %s\n", strerror(_errno));
+		ep_dbg_cprintf(Dbg, 2, "bdb_open: %s\n", strerror(_errno));
 	}
 #endif
 
@@ -313,14 +331,25 @@ done:
 static EP_STAT
 bdb_close(DB *db)
 {
-	int dbstat;
+	int dbstat = 0;
 
 	ep_thr_mutex_lock(&BdbMutex);
-	(void) db->sync(db, 0);
+	if (BdbSyncBeforeClose)
+	{
+		dbstat = db->sync(db, 0);
+	}
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
+	if (dbstat != 0)
+		DbEnv->err(DbEnv, dbstat, "bdb_close(sync)");
 	dbstat = db->close(db, 0);
+	if (dbstat != 0)
+		DbEnv->err(DbEnv, dbstat, "bdb_close(close)");
 #else
+	if (dbstat != 0)
+		ep_dbg_cprintf(Dbg, 2, "bdb_close(sync): %d\n", dbstat);
 	dbstat = db->close(db);
+	if (dbstat != 0)
+		ep_dbg_cprintf(Dbg, 2, "bdb_close(close): %d\n", dbstat);
 #endif
 	ep_thr_mutex_unlock(&BdbMutex);
 	return ep_stat_from_dbstat(dbstat);
@@ -345,18 +374,18 @@ bdb_get(DB *db,
 
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
 	dbstat = db->get(db, NULL, key, val, 0);
-	if (dbstat != 0 && ep_dbg_test(Dbg, 1))
-		DbEnv->err(DbEnv, dbstat, "db->get");
+	estat = ep_stat_from_dbstat(dbstat);
+	if (dbstat != 0)
+		DbEnv->err(DbEnv, dbstat, "bdb_get");
 #else
 	dbstat = db->get(db, key, val, 0);
-#endif
 	estat = ep_stat_from_dbstat(dbstat);
-	if (!EP_STAT_ISOK(estat) && ep_dbg_test(Dbg, 49))
+	if (dbstat != 0)
 	{
-		char ebuf[80];
-		ep_dbg_printf("bdb_get: dbstat %d (%s)", dbstat,
-					ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		ep_dbg_cprintf(Dbg, EP_STAT_ISWARN(estat) ? 49 : 2,
+				"bdb_get: dbstat %d", dbstat);
 	}
+#endif
 	ep_thr_mutex_unlock(&BdbMutex);
 	return estat;
 }
@@ -383,8 +412,14 @@ bdb_get_first_after_key(DB *db,
 
 	// need cursor to get approximate keys (next entry >= key)
 	dbstat = db->cursor(db, NULL, &dbc, 0);
+	if (dbstat != 0)
+		db->err(db, dbstat, "bdb_get_first_after_key(db->cursor)");
 	if (dbstat == 0)
+	{
 		dbstat = dbc->c_get(dbc, key, val, DB_SET_RANGE);
+		if (dbstat != 0)
+			db->err(db, dbstat, "bdb_get_first_after_key(dbc->c_get)");
+	}
 
 	// we always close the cursor --- XXX we really should cache it
 	if (dbc != NULL)
@@ -414,6 +449,8 @@ bdb_cursor_open(DB *db, DBC **dbcp)
 
 	// need cursor to get approximate keys (next entry >= key)
 	dbstat = db->cursor(db, NULL, dbcp, 0);
+	if (dbstat != 0)
+		db->err(db, dbstat, "bdb_cursor_open(db->cursor)");
 	estat = ep_stat_from_dbstat(dbstat);
 #else
 	*dbcp = db;
@@ -464,12 +501,24 @@ bdb_put(DB *db,
 	ep_thr_mutex_lock(&BdbMutex);
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
 	dbstat = db->put(db, NULL, key, val, 0);
-	if (dbstat != 0 && ep_dbg_test(Dbg, 6))
-		ep_dbg_printf("bdb_put: dbstat %s\n", db_strerror(dbstat));
+	if (dbstat != 0)
+		db->err(db, dbstat, "bdb_put");
+	if (BdbSyncAfterPut)
+	{
+		dbstat = db->sync(db, 0);
+		if (dbstat != 0)
+			db->err(db, dbstat, "bdb_sync");
+	}
 #else
 	dbstat = db->put(db, key, val, 0);
 	if (dbstat != 0 && ep_dbg_test(Dbg, 6))
-		ep_dbg_printf("bdb_put: dbstat %d\n", dbstat);
+		ep_dbg_printf("bdb_put: db->put %d\n", dbstat);
+	if (BdbSyncAfterPut)
+	{
+		dbstat = db->sync(db, 0);
+		if (dbstat != 0 && ep_dbg_test(Dbg, 6))
+			ep_dbg_printf("bdb_put: db->sync %d\n", dbstat);
+	}
 #endif
 	ep_thr_mutex_unlock(&BdbMutex);
 	estat = ep_stat_from_dbstat(dbstat);
@@ -492,6 +541,15 @@ disk_init()
 	// find physical location of GCL directory
 	GCLDir = ep_adm_getstrparam("swarm.gdplogd.gcl.dir", GCL_DIR);
 
+	// we will run out of that directory
+	if (chdir(GCLDir) != 0)
+	{
+		estat = ep_stat_from_errno(errno);
+		ep_dbg_cprintf(Dbg, 1, "disk_init: chdir(%s): %s\n",
+				GCLDir, strerror(errno));
+		return estat;
+	}
+
 	// find the file creation mode
 	GCLfilemode = ep_adm_getintparam("swarm.gdplogd.gcl.mode", 0600);
 
@@ -506,7 +564,7 @@ disk_init()
 		DefaultLogFlags |= LOG_POSIX_ERRORS;
 
 	// initialize berkeley DB (must be done while single threaded)
-	estat = bdb_init();
+	estat = bdb_init(GCLDir);
 
 	ep_dbg_cprintf(Dbg, 8, "disk_init: log dir = %s, mode = 0%o\n",
 			GCLDir, GCLfilemode);
@@ -1570,7 +1628,7 @@ tidx_create(gdp_gcl_t *gcl, const char *suffix, uint32_t flags)
 	EP_STAT_CHECK(estat, goto fail0);
 
 	ep_dbg_cprintf(Dbg, 20, "tidx_create: creating %s\n", tidx_pbuf);
-	int dbflags = DB_CREATE | DB_THREAD | DB_PRIVATE;
+	int dbflags = DB_CREATE;
 	if (!EP_UT_BITSET(FLAG_TMPFILE, flags))
 		dbflags |= DB_EXCL;
 	estat = bdb_open(tidx_pbuf, dbflags, GCLfilemode,
@@ -1596,7 +1654,7 @@ tidx_open(gdp_gcl_t *gcl, const char *suffix, int openmode)
 	EP_STAT estat;
 	const char *phase;
 	struct physinfo *phys = GETPHYS(gcl);
-	int dbflags = DB_THREAD | DB_PRIVATE;
+	int dbflags = 0;
 	char tidx_pbuf[GCL_PATH_MAX];
 
 	phase = "get_gcl_path";
@@ -1882,7 +1940,7 @@ disk_open(gdp_gcl_t *gcl)
 	**  Open timestamp index (tidx)
 	*/
 
-	phase = "get_gcl_path(tidx)";
+	phase = "tidx_open";
 	estat = tidx_open(gcl, GCL_TIDX_SUFFIX, O_RDWR);
 	EP_STAT_CHECK(estat, goto fail0);
 

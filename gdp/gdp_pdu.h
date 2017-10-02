@@ -221,8 +221,8 @@ typedef struct gdp_pdu
 #define GDP_NAK_C_PRECONFAILED	_GDP_NAK_C_FROM_CODE(PRECONFAILED)		// 204
 #define GDP_NAK_C_TOOLARGE		_GDP_NAK_C_FROM_CODE(TOOLARGE)			// 205
 #define GDP_NAK_C_UNSUPMEDIA	_GDP_NAK_C_FROM_CODE(UNSUPMEDIA)		// 207
-#define GDP_NAK_C_REC_MISSING	_GDP_NAK_C_FROM_CODE(MISSING_RECORD)	// 222
-#define GDP_NAK_C_REC_DUP		_GDP_NAK_C_FROM_CODE(DUP_RECORD)		// 223
+#define GDP_NAK_C_REC_MISSING	_GDP_NAK_C_FROM_CODE(REC_MISSING)		// 222
+#define GDP_NAK_C_REC_DUP		_GDP_NAK_C_FROM_CODE(REC_DUP)			// 223
 #define GDP_NAK_C_MAX		223			// maximum client-side nak code
 //		224-239			Negative acks, server side (CoAP, HTTP 500-515)
 #define GDP_NAK_S_MIN		224			// minimum server-side nak code

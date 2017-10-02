@@ -337,7 +337,21 @@ _gdp_gcl_close(gdp_gcl_t *gcl,
 
 	errno = 0;				// avoid spurious messages
 	if (!GDP_GCL_ISGOOD(gcl))
+	{
+		gdp_pname_t pname;
+
+		ep_dbg_cprintf(Dbg, 1, "_gdp_gcl_close(%s): closing free GCL\n",
+				gdp_printable_name(gcl->name, pname));
 		return GDP_STAT_GCL_NOT_OPEN;
+	}
+	if (gcl->refcnt <= 0)
+	{
+		gdp_pname_t pname;
+
+		ep_dbg_cprintf(Dbg, 1, "_gdp_gcl_close(%s): refcnt %d, failing\n",
+				gdp_printable_name(gcl->name, pname), gcl->refcnt);
+		return GDP_STAT_GCL_NOT_OPEN;
+	}
 
 	if (ep_dbg_test(Dbg, 38))
 	{
@@ -357,17 +371,21 @@ _gdp_gcl_close(gdp_gcl_t *gcl,
 
 	if (nrefs > 1)
 	{
-		// nothing more to do
+		// nothing more to do (we have another open instance)
 		goto finis;
 	}
 
-	estat = _gdp_req_new(GDP_CMD_CLOSE, gcl, chan, NULL, reqflags, &req);
-	EP_STAT_CHECK(estat, goto fail0);
+	// no need to send protocol _unless_ we have an open subscription
+	if (gcl->refcnt > 1)
+	{
+		estat = _gdp_req_new(GDP_CMD_CLOSE, gcl, chan, NULL, reqflags, &req);
+		EP_STAT_CHECK(estat, goto fail0);
 
-	// tell the daemon to close it
-	estat = _gdp_invoke(req);
+		// tell the daemon to close it
+		estat = _gdp_invoke(req);
 
-	//XXX should probably check status (and do what with it?)
+		//XXX should probably check status (and do what with it?)
+	}
 
 	// release resources held by this handle
 	_gdp_event_free_all(gcl);

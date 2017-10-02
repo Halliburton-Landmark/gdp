@@ -150,6 +150,9 @@ get_open_handle(gdp_req_t *req, gdp_iomode_t iomode)
 {
 	EP_STAT estat;
 
+	// sanity check
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex);
+
 	// if we already got this (e.g., in _gdp_pdu_process or in cache),
 	//		just let it be
 	if (req->gcl != NULL)
@@ -173,8 +176,13 @@ get_open_handle(gdp_req_t *req, gdp_iomode_t iomode)
 			gdp_printable_name(req->cpdu->dst, pname);
 			ep_dbg_printf("get_open_handle: finding %s in cache\n", pname);
 		}
+
+		// it should be safe to unlock the req here, since we should hold the
+		// only reference, and we need to get the lock ordering right
+		_gdp_req_unlock(req);
 		estat = _gdp_gcl_cache_get(req->cpdu->dst, iomode,
 							GGCF_CREATE, &req->gcl);
+		_gdp_req_lock(req);
 		if (EP_STAT_ISOK(estat) && EP_UT_BITSET(GCLF_PENDING, req->gcl->flags))
 			estat = do_physical_open(req->gcl, NULL);
 		if (!EP_STAT_ISOK(estat) && req->gcl != NULL)

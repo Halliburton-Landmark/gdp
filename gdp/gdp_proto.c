@@ -242,6 +242,15 @@ _gdp_invoke(gdp_req_t *req)
 **
 ***********************************************************************/
 
+typedef struct
+{
+	cmdfunc_t	*func;		// function to call
+	const char	*name;		// name of command (for debugging)
+	EP_STAT		estat;		// corresponding status
+} dispatch_ent_t;
+
+static dispatch_ent_t	DispatchTable[256];
+
 
 /*
 **  Common code for ACKs and NAKs
@@ -252,11 +261,15 @@ _gdp_invoke(gdp_req_t *req)
 static EP_STAT
 acknak(gdp_req_t *req, const char *where, bool reuse_pdu)
 {
+	EP_STAT estat = EP_STAT_WARN;
+	const char *emsg = NULL;
+
 	// we require a request
 	if (req == NULL)
 	{
-		ep_log(GDP_STAT_PROTOCOL_FAIL, "%s: null request", where);
-		return GDP_STAT_PROTOCOL_FAIL;
+		estat = GDP_STAT_PROTOCOL_FAIL;
+		emsg = "null request";
+		goto fail0;
 	}
 
 	ep_dbg_cprintf(Dbg, 20, "%s: received %s for %s\n", where,
@@ -266,22 +279,15 @@ acknak(gdp_req_t *req, const char *where, bool reuse_pdu)
 	// we want to re-use caller's datum for (e.g.) read commands
 	if (req->rpdu == NULL)
 	{
-		if (ep_dbg_test(Dbg, 1))
-		{
-			ep_dbg_printf("acknak: req->rpdu == NULL\n");
-			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
-		}
+		emsg = "acknak: req->rpdu == NULL";
 	}
 	else if (req->rpdu == req->cpdu)
 	{
-		if (ep_dbg_test(Dbg, 1))
-		{
-			ep_dbg_printf("acknak: req->rpdu == req->cpdu\n");
-			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
-		}
+		emsg = "acknak: req->rpdu == req->cpdu";
 	}
 	else
 	{
+		estat = DispatchTable[req->rpdu->cmd].estat;
 		if (req->cpdu->datum != NULL && reuse_pdu)
 		{
 			if (ep_dbg_test(Dbg, 43))
@@ -336,7 +342,31 @@ acknak(gdp_req_t *req, const char *where, bool reuse_pdu)
 			EP_ASSERT(req->rpdu->datum->inuse);
 		}
 	}
-	return EP_STAT_OK;
+
+fail0:
+	if (!EP_STAT_ISOK(estat))
+	{
+		if (EP_STAT_ISSFAIL(estat))
+		{
+			ep_log(estat, "%s: %s",
+					where,
+					emsg != NULL ? emsg : "unknown severe failure");
+		}
+		else if (ep_dbg_test(Dbg, 1))
+		{
+			char ebuf[100];
+			if (emsg != NULL)
+				ep_dbg_printf("%s: %s: %s\n",
+						where, emsg,
+						ep_stat_tostr(estat, ebuf, sizeof ebuf));
+			else
+				ep_dbg_printf("%s: %s\n",
+						where, ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		}
+		if (emsg != NULL && ep_dbg_test(Dbg, 1))
+			_gdp_req_dump(req, NULL, GDP_PR_BASIC, 0);
+	}
+	return estat;
 }
 
 
@@ -456,24 +486,21 @@ nak(gdp_req_t *req, const char *where)
 static EP_STAT
 nak_client(gdp_req_t *req)
 {
-	nak(req, "nak_client");
-	return GDP_STAT_FROM_C_NAK(req->rpdu->cmd);
+	return nak(req, "nak_client");
 }
 
 
 static EP_STAT
 nak_server(gdp_req_t *req)
 {
-	nak(req, "nak_server");
-	return GDP_STAT_FROM_S_NAK(req->rpdu->cmd);
+	return nak(req, "nak_server");
 }
 
 
 static EP_STAT
 nak_router(gdp_req_t *req)
 {
-	acknak(req, "nak_router", false);
-	return GDP_STAT_FROM_R_NAK(req->rpdu->cmd);
+	return acknak(req, "nak_router", false);
 }
 
 
@@ -496,19 +523,13 @@ nak_conflict(gdp_req_t *req)
 **	Command/Ack/Nak Dispatch Table
 */
 
-typedef struct
-{
-	cmdfunc_t	*func;		// function to call
-	const char	*name;		// name of command (for debugging)
-} dispatch_ent_t;
-
-#define NOENT		{ NULL, NULL }
+#define NOENT		{ NULL, NULL, GDP_STAT_NOT_IMPLEMENTED }
 
 static dispatch_ent_t	DispatchTable[256] =
 {
-	{ NULL,				"CMD_KEEPALIVE"			},			// 0
-	{ NULL,				"CMD_ADVERTISE"			},			// 1
-	{ NULL,				"CMD_WITHDRAW"			},			// 2
+	{ NULL,				"CMD_KEEPALIVE",	EP_STAT_OK					},	// 0
+	{ NULL,				"CMD_ADVERTISE",	EP_STAT_OK					},	// 1
+	{ NULL,				"CMD_WITHDRAW",		EP_STAT_OK					},	// 2
 	NOENT,				// 3
 	NOENT,				// 4
 	NOENT,				// 5
@@ -570,21 +591,21 @@ static dispatch_ent_t	DispatchTable[256] =
 	NOENT,				// 61
 	NOENT,				// 62
 	NOENT,				// 63
-	{ NULL,				"CMD_PING"				},			// 64
-	{ NULL,				"CMD_HELLO"				},			// 65
-	{ NULL,				"CMD_CREATE"			},			// 66
-	{ NULL,				"CMD_OPEN_AO"			},			// 67
-	{ NULL,				"CMD_OPEN_RO"			},			// 68
-	{ NULL,				"CMD_CLOSE"				},			// 69
-	{ NULL,				"CMD_READ"				},			// 70
-	{ NULL,				"CMD_APPEND"			},			// 71
-	{ NULL,				"CMD_SUBSCRIBE"			},			// 72
-	{ NULL,				"CMD_MULTIREAD"			},			// 73
-	{ NULL,				"CMD_GETMETADATA"		},			// 74
-	{ NULL,				"CMD_OPEN_RA"			},			// 75
-	{ NULL,				"CMD_NEWSEGMENT"		},			// 76
-	{ NULL,				"CMD_FWD_APPEND"		},			// 77
-	{ NULL,				"CMD_UNSUBSCRIBE"		},			// 78
+	{ NULL,				"CMD_PING",				GDP_STAT_ACK_SUCCESS		},	// 64
+	{ NULL,				"CMD_HELLO",			GDP_STAT_ACK_SUCCESS		},	// 65
+	{ NULL,				"CMD_CREATE",			GDP_STAT_ACK_SUCCESS		},	// 66
+	{ NULL,				"CMD_OPEN_AO",			GDP_STAT_ACK_SUCCESS		},	// 67
+	{ NULL,				"CMD_OPEN_RO",			GDP_STAT_ACK_SUCCESS		},	// 68
+	{ NULL,				"CMD_CLOSE",			GDP_STAT_ACK_SUCCESS		},	// 69
+	{ NULL,				"CMD_READ",				GDP_STAT_ACK_SUCCESS		},	// 70
+	{ NULL,				"CMD_APPEND",			GDP_STAT_ACK_SUCCESS		},	// 71
+	{ NULL,				"CMD_SUBSCRIBE",		GDP_STAT_ACK_SUCCESS		},	// 72
+	{ NULL,				"CMD_MULTIREAD",		GDP_STAT_ACK_SUCCESS		},	// 73
+	{ NULL,				"CMD_GETMETADATA",		GDP_STAT_ACK_SUCCESS		},	// 74
+	{ NULL,				"CMD_OPEN_RA",			GDP_STAT_ACK_SUCCESS		},	// 75
+	{ NULL,				"CMD_NEWSEGMENT",		GDP_STAT_ACK_SUCCESS		},	// 76
+	{ NULL,				"CMD_FWD_APPEND",		GDP_STAT_ACK_SUCCESS		},	// 77
+	{ NULL,				"CMD_UNSUBSCRIBE",		GDP_STAT_ACK_SUCCESS		},	// 78
 	NOENT,				// 79
 	NOENT,				// 80
 	NOENT,				// 81
@@ -634,12 +655,12 @@ static dispatch_ent_t	DispatchTable[256] =
 	NOENT,				// 125
 	NOENT,				// 126
 	NOENT,				// 127
-	{ ack_success,		"ACK_SUCCESS"			},			// 128
-	{ ack_success,		"ACK_DATA_CREATED"		},			// 129
-	{ ack_success,		"ACK_DATA_DEL"			},			// 130
-	{ ack_success,		"ACK_DATA_VALID"		},			// 131
-	{ ack_data_changed,	"ACK_DATA_CHANGED"		},			// 132
-	{ ack_data_content,	"ACK_DATA_CONTENT"		},			// 133
+	{ ack_success,		"ACK_SUCCESS",			GDP_STAT_ACK_SUCCESS		},	// 128
+	{ ack_success,		"ACK_DATA_CREATED",		GDP_STAT_ACK_CREATED		},	// 129
+	{ ack_success,		"ACK_DATA_DEL",			GDP_STAT_ACK_DELETED		},	// 130
+	{ ack_success,		"ACK_DATA_VALID",		GDP_STAT_ACK_VALID			},	// 131
+	{ ack_data_changed,	"ACK_DATA_CHANGED",		GDP_STAT_ACK_CHANGED		},	// 132
+	{ ack_data_content,	"ACK_DATA_CONTENT",		GDP_STAT_ACK_CONTENT		},	// 133
 	NOENT,				// 134
 	NOENT,				// 135
 	NOENT,				// 136
@@ -699,22 +720,22 @@ static dispatch_ent_t	DispatchTable[256] =
 	NOENT,				// 190
 	NOENT,				// 191
 
-	{ nak_client,		"NAK_C_BADREQ"			},			// 192
-	{ nak_client,		"NAK_C_UNAUTH"			},			// 193
-	{ nak_client,		"NAK_C_BADOPT"			},			// 194
-	{ nak_client,		"NAK_C_FORBIDDEN"		},			// 195
-	{ nak_client,		"NAK_C_NOTFOUND"		},			// 196
-	{ nak_client,		"NAK_C_METHNOTALLOWED"	},			// 197
-	{ nak_client,		"NAK_C_NOTACCEPTABLE"	},			// 198
+	{ nak_client,		"NAK_C_BADREQ",			GDP_STAT_NAK_BADREQ			},	// 192
+	{ nak_client,		"NAK_C_UNAUTH",			GDP_STAT_NAK_UNAUTH			},	// 193
+	{ nak_client,		"NAK_C_BADOPT",			GDP_STAT_NAK_BADOPT			},	// 194
+	{ nak_client,		"NAK_C_FORBIDDEN",		GDP_STAT_NAK_FORBIDDEN		},	// 195
+	{ nak_client,		"NAK_C_NOTFOUND",		GDP_STAT_NAK_NOTFOUND		},	// 196
+	{ nak_client,		"NAK_C_METHNOTALLOWED",	GDP_STAT_NAK_METHNOTALLOWED	},	// 197
+	{ nak_client,		"NAK_C_NOTACCEPTABLE",	GDP_STAT_NAK_NOTACCEPTABLE	},	// 198
 	NOENT,				// 199
 	NOENT,				// 200
-	{ nak_conflict,		"NAK_C_CONFLICT"		},			// 201
-	{ nak_client,		"NAK_C_GONE"			},			// 202
+	{ nak_conflict,		"NAK_C_CONFLICT",		GDP_STAT_NAK_CONFLICT		},	// 201
+	{ nak_client,		"NAK_C_GONE",			GDP_STAT_NAK_GONE			},	// 202
 	NOENT,				// 203
-	{ nak_client,		"NAK_C_PRECONFAILED"	},			// 204
-	{ nak_client,		"NAK_C_TOOLARGE"		},			// 205
+	{ nak_client,		"NAK_C_PRECONFAILED",	GDP_STAT_NAK_PRECONFAILED	},	// 204
+	{ nak_client,		"NAK_C_TOOLARGE",		GDP_STAT_NAK_TOOLARGE		},	// 205
 	NOENT,				// 206
-	{ nak_client,		"NAK_C_UNSUPMEDIA"		},			// 207
+	{ nak_client,		"NAK_C_UNSUPMEDIA",		GDP_STAT_NAK_UNSUPMEDIA		},	// 207
 	NOENT,				// 208
 	NOENT,				// 209
 	NOENT,				// 210
@@ -729,15 +750,15 @@ static dispatch_ent_t	DispatchTable[256] =
 	NOENT,				// 219
 	NOENT,				// 220
 	NOENT,				// 221
-	{ nak_client,		"NAK_C_MISSING_RECORD"	},			// 222
-	{ nak_client,		"NAK_C_REC_DUP"			},			// 223
+	{ nak_client,		"NAK_C_MISSING_RECORD",	GDP_STAT_NAK_REC_MISSING	},	// 222
+	{ nak_client,		"NAK_C_REC_DUP",		GDP_STAT_NAK_REC_DUP		},	// 223
 
-	{ nak_server,		"NAK_S_INTERNAL"		},			// 224
-	{ nak_server,		"NAK_S_NOTIMPL"			},			// 225
-	{ nak_server,		"NAK_S_BADGATEWAY"		},			// 226
-	{ nak_server,		"NAK_S_SVCUNAVAIL"		},			// 227
-	{ nak_server,		"NAK_S_GWTIMEOUT"		},			// 228
-	{ nak_server,		"NAK_S_PROXYNOTSUP"		},			// 229
+	{ nak_server,		"NAK_S_INTERNAL",		GDP_STAT_NAK_INTERNAL		},	// 224
+	{ nak_server,		"NAK_S_NOTIMPL"	,		GDP_STAT_NAK_NOTIMPL		},	// 225
+	{ nak_server,		"NAK_S_BADGATEWAY",		GDP_STAT_NAK_BADGATEWAY		},	// 226
+	{ nak_server,		"NAK_S_SVCUNAVAIL",		GDP_STAT_NAK_SVCUNAVAIL		},	// 227
+	{ nak_server,		"NAK_S_GWTIMEOUT",		GDP_STAT_NAK_GWTIMEOUT		},	// 228
+	{ nak_server,		"NAK_S_PROXYNOTSUP",	GDP_STAT_NAK_PROXYNOTSUP	},	// 229
 	NOENT,				// 230
 	NOENT,				// 231
 	NOENT,				// 232
@@ -746,10 +767,10 @@ static dispatch_ent_t	DispatchTable[256] =
 	NOENT,				// 235
 	NOENT,				// 236
 	NOENT,				// 237
-	{ nak_server,		"NAK_S_REC_MISSING"		},			// 238
-	{ nak_server,		"NAK_S_LOSTSUB"			},			// 239
+	{ nak_server,		"NAK_S_REC_MISSING",	GDP_STAT_NAK_REC_MISSING	},	// 238
+	{ nak_server,		"NAK_S_LOSTSUB",		GDP_STAT_NAK_LOST_SUBSCR	},	// 239
 
-	{ nak_router,		"NAK_R_NOROUTE"			},			// 240
+	{ nak_router,		"NAK_R_NOROUTE",		GDP_STAT_NAK_NOROUTE		},	// 240
 	NOENT,				// 241
 	NOENT,				// 242
 	NOENT,				// 243

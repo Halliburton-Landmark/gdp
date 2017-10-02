@@ -44,8 +44,6 @@ bool	_EpThrUsePthreads = false;	// also used by ep_dbg_*
 
 #if EP_OPT_EXTENDED_MUTEX_CHECK & 0x01
 # include <ep_string.h>
-# include <sys/syscall.h>
-# define gettid()		((int) syscall(SYS_gettid))
 #endif
 
 #if EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
@@ -148,7 +146,7 @@ static void
 mtx_printtrace(EP_THR_MUTEX *m, const char *where,
 		const char *file, int line, const char *name)
 {
-	int my_tid = gettid();
+	EP_THR_ID my_tid = ep_thr_gettid();
 
 	GETMTX(m);
 	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__lock, sizeof pmtx->__data.__lock);
@@ -163,9 +161,9 @@ static void
 lock_printtrace(void *lock, const char *where,
 		const char *file, int line, const char *name)
 {
-	int my_tid = gettid();
+	EP_THR_ID my_tid = ep_thr_gettid();
 
-	ep_dbg_printf("ep_thr_%-13s %s:%d %p (%s) [%d]%s\n",
+	ep_dbg_printf("ep_thr_%-13s %s:%d %p (%s) [%" EP_THR_PRItid "]%s\n",
 			where, file, line, lock, name, my_tid,
 			_EpThrUsePthreads ? "" : " (ignored)");
 }
@@ -242,9 +240,20 @@ _ep_thr_yield(const char *file, int line)
 
 
 EP_THR
-ep_thr_gettid(void)
+ep_thr_getself(void)
 {
 	return pthread_self();
+}
+
+
+EP_THR_ID
+ep_thr_gettid(void)
+{
+#if EP_OSCF_HAS_SYS_GETTID
+	return syscall(SYS_gettid);
+#else
+	return pthread_self();
+#endif
 }
 
 
@@ -307,7 +316,7 @@ _ep_thr_mutex_destroy(EP_THR_MUTEX *mtx,
 	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__lock, sizeof pmtx->__data.__lock);
 	if (pmtx->__data.__lock != 0)
 	{
-		if (pmtx->__data.__lock == gettid())
+		if (pmtx->__data.__lock == ep_thr_gettid())
 			ep_assert_print(file, line,
 				"_ep_thr_mutex_destroy: destroying self-locked"
 				" mutex %p (%s)",
@@ -315,8 +324,10 @@ _ep_thr_mutex_destroy(EP_THR_MUTEX *mtx,
 		else
 			ep_assert_print(file, line,
 				"_ep_thr_mutex_destroy: destroying mutex "
-				"%p (%s) locked by %d (I am %d)",
-				pmtx, name, pmtx->__data.__lock, gettid());
+				"%p (%s) locked by %d "
+				"(I am %" EP_THR_PRItid ")",
+				pmtx, name, pmtx->__data.__lock,
+				ep_thr_gettid());
 	}
 #endif // EP_OPT_EXTENDED_MUTEX_CHECK & 0x01
 	if ((err = pthread_mutex_destroy(pmtx)) != 0)
@@ -380,7 +391,7 @@ _ep_thr_mutex_lock(EP_THR_MUTEX *mtx,
 	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__owner, sizeof pmtx->__data.__owner);
 	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__kind, sizeof pmtx->__data.__kind);
 	if (pmtx->__data.__lock != 0 &&
-	    pmtx->__data.__owner == gettid() &&
+	    pmtx->__data.__owner == ep_thr_gettid() &&
 	    pmtx->__data.__kind != PTHREAD_MUTEX_RECURSIVE_NP)
 	{
 		ep_assert_print(file, line,
@@ -438,12 +449,13 @@ _ep_thr_mutex_trylock(EP_THR_MUTEX *mtx,
 	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__owner, sizeof pmtx->__data.__owner);
 	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__kind, sizeof pmtx->__data.__kind);
 	if (pmtx->__data.__lock != 0 &&
-	    pmtx->__data.__owner == gettid() &&
+	    pmtx->__data.__owner == ep_thr_gettid() &&
 	    pmtx->__data.__kind != PTHREAD_MUTEX_RECURSIVE_NP)
 	{
 		// this is not necessarily an error
 		ep_dbg_cprintf(Dbg, 1,
-			"_ep_thr_mutex_lock: mutex %p (%s) already self-locked (%s:%d)\n",
+			"_ep_thr_mutex_lock: mutex %p (%s) "
+			"already self-locked (%s:%d)\n",
 			mtx, name, file, line);
 	}
 #endif
@@ -474,10 +486,11 @@ _ep_thr_mutex_unlock(EP_THR_MUTEX *mtx,
 	CHECKMTX(pmtx, "unlock >>>");
 #if EP_OPT_EXTENDED_MUTEX_CHECK & 0x01
 	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__owner, sizeof pmtx->__data.__owner);
-	if (pmtx->__data.__owner != gettid())
+	if (pmtx->__data.__owner != ep_thr_gettid())
 		ep_assert_print(file, line,
-				"_ep_thr_mutex_unlock: mtx owner = %d, I am %d",
-				pmtx->__data.__owner, gettid());
+				"_ep_thr_mutex_unlock: mtx owner = %d, "
+				"I am %" EP_THR_PRItid,
+				pmtx->__data.__owner, ep_thr_gettid());
 #endif
 	if ((err = pthread_mutex_unlock(pmtx)) != 0)
 		diagnose_thr_err(err, "mutex_unlock", file, line, name, mtx);
@@ -507,10 +520,11 @@ _ep_thr_mutex_tryunlock(EP_THR_MUTEX *mtx,
 	CHECKMTX(pmtx, "tryunlock >>>");
 #if EP_OPT_EXTENDED_MUTEX_CHECK & 0x01
 	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__owner, sizeof pmtx->__data.__owner);
-	if (pmtx->__data.__owner != gettid())
+	if (pmtx->__data.__owner != ep_thr_gettid())
 		ep_assert_print(file, line,
-				"_ep_thr_mutex_unlock: mtx owner = %d, I am %d",
-				pmtx->__data.__owner, gettid());
+				"_ep_thr_mutex_unlock: mtx owner = %d, "
+				"I am %" EP_THR_PRItid,
+				pmtx->__data.__owner, ep_thr_gettid());
 #endif
 	// EAGAIN => mutex was not locked
 	// EPERM  => mutex held by a different thread
@@ -543,7 +557,7 @@ ep_thr_mutex_assert_islocked(
 	GETMTX(m);
 	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__lock, sizeof pmtx->__data.__lock);
 	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__owner, sizeof pmtx->__data.__owner);
-	if (pmtx->__data.__lock != 0 && pmtx->__data.__owner == gettid())
+	if (pmtx->__data.__lock != 0 && pmtx->__data.__owner == ep_thr_gettid())
 	{
 		// OK, this is locked (by me)
 		return true;
@@ -551,11 +565,13 @@ ep_thr_mutex_assert_islocked(
 
 	// oops, not locked or not locked by me
 	if (pmtx->__data.__lock == 0)
-		ep_assert_print(file, line, "mutex %s (%p) is not locked (should be %d)",
-				mstr, m, gettid());
+		ep_assert_print(file, line, "mutex %s (%p) is not locked "
+				"(should be %" EP_THR_PRItid ")",
+				mstr, m, ep_thr_gettid());
 	else
-		ep_assert_print(file, line, "mutex %s (%p) locked by %d (should be %d)",
-				mstr, m, pmtx->__data.__owner, gettid());
+		ep_assert_print(file, line, "mutex %s (%p) locked by %d "
+				"(should be %" EP_THR_PRItid ")",
+				mstr, m, pmtx->__data.__owner, ep_thr_gettid());
 	return false;
 #else
 	return true;
@@ -580,8 +596,9 @@ ep_thr_mutex_assert_isunlocked(
 		return true;
 	}
 	ep_assert_print(file, line,
-			"mutex %s (%p) is locked by %d (should be unlocked; I am %d)",
-			mstr, m, pmtx->__data.__owner, gettid());
+			"mutex %s (%p) is locked by %d "
+			"(should be unlocked; I am %" EP_THR_PRItid ")",
+			mstr, m, pmtx->__data.__owner, ep_thr_gettid());
 	return false;
 #else
 	return true;
@@ -601,13 +618,14 @@ ep_thr_mutex_assert_i_own(
 #if EP_OPT_EXTENDED_MUTEX_CHECK & 0x01
 	GETMTX(m);
 	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__owner, sizeof pmtx->__data.__owner);
-	if (pmtx->__data.__owner == gettid())
+	if (pmtx->__data.__owner == ep_thr_gettid())
 	{
 		return true;
 	}
 	ep_assert_print(file, line,
-			"mutex %s (%p) is locked by %d (should be %d)",
-			mstr, m, pmtx->__data.__owner, gettid());
+			"mutex %s (%p) is locked by %d "
+			"(should be %" EP_THR_PRItid ")",
+			mstr, m, pmtx->__data.__owner, ep_thr_gettid());
 	return false;
 #else
 	return true;

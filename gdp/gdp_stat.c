@@ -97,8 +97,8 @@ static struct ep_stat_to_string Stats[] =
 	{ GDP_STAT_NAK_PRECONFAILED,		"412 precondition failed",			},
 	{ GDP_STAT_NAK_TOOLARGE,			"413 request entity too large",		},
 	{ GDP_STAT_NAK_UNSUPMEDIA,			"415 unsupported media type",		},
-	{ GDP_STAT_NAK_MISSING_RECORD,		"430 missing record",				},
-	{ GDP_STAT_NAK_DUP_RECORD,			"431 duplicate record",				},
+	{ GDP_STAT_NAK_REC_MISSING,			"430 missing record",				},
+	{ GDP_STAT_NAK_REC_DUP,				"431 duplicate record",				},
 
 	{ GDP_STAT_NAK_INTERNAL,			"500 internal server error",		},
 	{ GDP_STAT_NAK_NOTIMPL,				"501 not implemented",				},

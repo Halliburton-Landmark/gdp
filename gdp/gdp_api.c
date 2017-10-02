@@ -461,7 +461,7 @@ gdp_gcl_open(gdp_name_t name,
 	// lock this operation to keep the GCL cache consistent
 	ep_thr_mutex_lock(&OpenMutex);
 
-	// see if we already have this open
+	// see if we already have this open (and initiate open if not)
 	estat = _gdp_gcl_cache_get(name, iomode, GGCF_CREATE, &gcl);
 	EP_STAT_CHECK(estat, goto fail0);
 	EP_ASSERT(gcl != NULL);

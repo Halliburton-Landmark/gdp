@@ -248,7 +248,8 @@ recseq_init(struct ctx *ctx)
 void
 recseq_cleanup(struct ctx *ctx)
 {
-	bdb_close(ctx->recseqdb);
+	if (ctx->recseqdb != NULL)
+		bdb_close(ctx->recseqdb);
 	ctx->recseqdb = NULL;
 }
 
@@ -1137,7 +1138,9 @@ do_check(gdp_gcl_t *gcl, struct ctx *ctx)
 	const char *phase;
 
 	// set up info for recno tracking
-	recseq_init(ctx);
+	phase = "recseq_init";
+	estat = recseq_init(ctx);
+	EP_STAT_CHECK(estat, goto fail0);
 
 	// open recno index for read
 	phase = "ridx_open";
@@ -1532,7 +1535,6 @@ initialize(void)
 	if (getuid() == 0)
 		_gdp_run_as(ep_adm_getstrparam("swarm.gdplogd.runasuser", NULL));
 	signal(SIGINT, sigint);
-	disk_init();
 }
 
 
@@ -1596,6 +1598,7 @@ main(int argc, char **argv)
 
 		 case 't':
 			 Flags.tidx_only = true;
+			 break;
 
 		 case 'v':
 			 Flags.verbose = true;
@@ -1603,6 +1606,7 @@ main(int argc, char **argv)
 
 		 default:
 			 show_usage = true;
+			 break;
 		}
 	}
 	argc -= optind;
@@ -1610,6 +1614,9 @@ main(int argc, char **argv)
 
 	if (show_usage || argc < 1)
 		usage();
+
+	// have to hold this until after -D flag is processed
+	disk_init();
 
 	GdplogdForgive.allow_log_gaps =
 			ep_adm_getboolparam("swarm.gdplogd.sequencing.allowgaps", true);

@@ -72,6 +72,8 @@
 **		System memory free routine; defaults to "free"
 **	EP_OSCF_USE_PTHREADS
 **		Compile in pthreads support
+**	EP_OSCF_HAS_SYS_GETTID
+**		Has gettid syscall
 **	EP_OSCF_HAS_STRPTIME
 **		Use strptime(3) for time/date parsing
 **	EP_OSCF_USE_GETDATE
@@ -139,6 +141,7 @@
 #    define EP_OSCF_HAS_GETDATE_R	1	// getdate_r is available
 #   endif
 #  endif
+# define EP_OSCF_HAS_SYS_GETTID		1	// has syscall(SYS_gettid)
 # endif
 
 # define _BSD_SOURCE			1	// needed to compile on Linux
