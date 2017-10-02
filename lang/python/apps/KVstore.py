@@ -260,8 +260,11 @@ class KVstore:
             datum = self.__root_handle.read(-1)
             self.__num_records = datum["recno"]
             self.__cache[self.__num_records] = datum
-        except gdp.MISC.EP_STAT_SEV_ERROR:
-            self.__num_records = 0
+        except (gdp.MISC.EP_STAT_SEV_ERROR, gdp.MISC.EP_STAT_SEV_WARN) as e:
+            if e.ep_stat.code == 2215380372:    ## For 404 Not found
+                self.__num_records = 0
+            else:
+                raise e
 
         # set up lock for adding new data to the log
         # >> we want the __setitems__ to be atomic, because that also
