@@ -660,6 +660,8 @@ class GDP_GCL(object):
         with cls.ev_queues_lock:
             evlist = cls.ev_queues.get(udata, [])
             if len(evlist)>0:
+                ## sort the list, if it isn't for some reason
+                evlist.sort(key=lambda ev:ev['datum']['recno'])
                 if gclh is None or gcl_handle == evlist[0]["gcl_handle"]:
                     return evlist.pop(0)
 
