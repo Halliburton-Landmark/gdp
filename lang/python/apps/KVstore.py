@@ -261,7 +261,7 @@ class KVstore:
             self.__num_records = datum["recno"]
             self.__cache[self.__num_records] = datum
         except (gdp.MISC.EP_STAT_SEV_ERROR, gdp.MISC.EP_STAT_SEV_WARN) as e:
-            if e.ep_stat.code == 2215380372:    ## For 404 Not found
+            if "Berkeley:Swarm-GDP:404" in e.msg:
                 self.__num_records = 0
             else:
                 raise e
