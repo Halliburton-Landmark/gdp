@@ -583,9 +583,14 @@ class GDP_GCL(object):
 
 
     @classmethod
-    def _helper_get_next_event(cls, __gcl_handle, timeout):
+    def _helper_get_next_event(cls, __gcl_handle, timeout, strict_threading):
         """ Get the events for GCL __gcl_handle.  """
 
+        if not strict_threading:
+            ## this is the old library behavior, no checks on thread
+            return cls._helper_get_next_event_call_clib(__gcl_handle, timeout)
+
+        ## Otherwise, do the threading check on Python side.
         ## use a mix of looking in local queue and calling the
         ## underlying C library.
 
@@ -771,13 +776,13 @@ class GDP_GCL(object):
         return gdp_event
 
     @classmethod
-    def get_next_event(cls, timeout):
+    def get_next_event(cls, timeout, strict_threading=False):
         """ Get events for ANY open gcl """
-        return cls._helper_get_next_event(None, timeout)
+        return cls._helper_get_next_event(None, timeout, strict_threading)
 
-    def __get_next_event(self, timeout):
+    def __get_next_event(self, timeout, strict_threading=False):
         """ Get events for this particular GCL """
-        event = self._helper_get_next_event(self.ptr, timeout)
+        event = self._helper_get_next_event(self.ptr, timeout, strict_threading)
         if event is not None:
             ## the crazy '__repr__.__self__' is needed, because there's no
             ## unproxy. See https://stackoverflow.com/questions/10246116
