@@ -54,6 +54,9 @@ def demo_write(demo_value, gcl_name):
 #
 
 def demo_read(demo_value, gcl_name):
+    # In a get request, recno= may be positive or negative, where 1 obtains
+    # the first record and -1 obtains the last record by counting backwards
+    # one record from the log end.
     rrec = requests.get("https://gdp-rest-01.eecs.berkeley.edu/gdp/v1/gcl/" +
                          gcl_name + "?recno=last",
                          auth = test_auth,
