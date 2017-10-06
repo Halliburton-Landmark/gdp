@@ -28,6 +28,10 @@
 
 
 import weakref
+import threading
+import time
+import random
+import pprint
 from MISC import *
 from GDP_NAME import *
 from GDP_DATUM import *
@@ -73,6 +77,22 @@ class GDP_GCL(object):
 
     # C pointer to python object mapping
     object_dir = {}
+
+    # Event Queues (events that we have extracted out of the C event
+    # queue, but don't belong to us). Maps udata => list of events
+    ev_queues = {}
+    ev_queues_lock = threading.Lock()
+
+
+    # Thread ID => userdata mapping. We need to keep this in someplace other
+    # than a local variable, so that it doesn't get cleaned up by
+    # Garbage collection. Otherwise, our references to the memory get
+    # cleaned up over time, resulting in undefined behaviour
+    tid_udata_map = {}
+
+    # Old udata, so that they don't get garbage collected either
+    __old_udata = []
+
 
     class gdp_gcl_t(Structure):
 
@@ -333,7 +353,7 @@ class GDP_GCL(object):
                                 c_void_p, c_void_p]
         __func.restype = EP_STAT
 
-        estat = __func(self.ptr, gdp_recno_t(recno), None, None)
+        estat = __func(self.ptr, gdp_recno_t(recno), None, self.__gen_udata())
         check_EP_STAT(estat)
 
 
@@ -374,7 +394,7 @@ class GDP_GCL(object):
                             c_void_p, c_void_p ]
         __func.restype = EP_STAT
 
-        estat = __func(self.ptr, datum.gdp_datum, None, None)
+        estat = __func(self.ptr, datum.gdp_datum, None, self.__gen_udata())
         check_EP_STAT(estat)
 
 
@@ -454,7 +474,8 @@ class GDP_GCL(object):
         For now, callbacks are not exposed to end-user. Events are 
             generated instead.
         """
-        return self.__subscribe(start, numrecs, timeout, None, None)
+        return self.__subscribe(start, numrecs, timeout,
+                                                    None, self.__gen_udata())
 
 
     def subscribe_ts(self, startdict, numrecs, timeout):
@@ -463,7 +484,8 @@ class GDP_GCL(object):
             is a timestamp dictionary rather than a record number.
             (See also: 'read_ts')
         """
-        return self.__subscribe(startdict, numrecs, timeout, None, None)
+        return self.__subscribe(startdict, numrecs, timeout,
+                                                    None, self.__gen_udata())
 
 
     def __multiread(self, start, numrecs, cbfunc, cbarg):
@@ -519,7 +541,7 @@ class GDP_GCL(object):
             generated instead.
         """
 
-        return self.__multiread(start, numrecs, None, None)
+        return self.__multiread(start, numrecs, None, self.__gen_udata())
 
 
     def multiread_ts(self, startdict, numrecs):
@@ -529,7 +551,7 @@ class GDP_GCL(object):
             (See also: 'read_ts')
         """
 
-        return self.__multiread(startdict, numrecs, None, None)
+        return self.__multiread(startdict, numrecs, None, self.__gen_udata())
 
 
 
@@ -559,11 +581,105 @@ class GDP_GCL(object):
         gcl_name = string_at(gcl_name_pointer, 32)
         return GDP_NAME(gcl_name)
 
+
     @classmethod
-    def _helper_get_next_event(cls, __gcl_handle, timeout):
+    def _helper_get_next_event(cls, __gcl_handle, timeout, strict_threading):
+        """ Get the events for GCL __gcl_handle.  """
+
+        if not strict_threading:
+            ## this is the old library behavior, no checks on thread
+            return cls._helper_get_next_event_call_clib(__gcl_handle, timeout)
+
+        ## Otherwise, do the threading check on Python side.
+        ## use a mix of looking in local queue and calling the
+        ## underlying C library.
+
+        if timeout is None:
+            # set an insanely high value for infinite timeout
+            timeout = {'tv_sec':10**10, 'tv_nsec':0, 'tv_accuracy':0.0}
+
+        timeout_s = timeout['tv_sec'] + (1.0*timeout['tv_nsec'])/(10**9)
+
+        # 20 ms. seems like a good value for the moment.
+        tiny_t = {'tv_sec':0, 'tv_nsec':20*(10**6), 'tv_accuracy':0.0}
+
+        ev = None
+        start_time = time.time()
+
+        while ev is None and (time.time()-start_time)<timeout_s:
+            ## phase 1: look in local queue
+            ev = cls._helper_get_next_event_check_q(__gcl_handle)
+
+            if ev is not None:
+                # print "############## From the queue"
+                break
+
+            ## phase 2: query from the C library (this blocks)
+            ev = cls._helper_get_next_event_call_clib(__gcl_handle, tiny_t)
+            ## we insert it back to the library, and retrieve it again
+            ## just to make sure nobody snuck something in the queue in the
+            ## meantime
+            if ev is not None:
+                if ev["udata"] == cls.__get_udata():
+                    # print ">>>>>>>>>>>>>> From the library"
+                    pass
+
+                with cls.ev_queues_lock:
+                    evlist = cls.ev_queues.setdefault(ev["udata"], [])
+                    evlist.append(ev)
+
+            ## phase 3: look in local queue once again. If we fetched
+            ## something from the library, it will be in the local queue
+            ## this time, for sure.
+            ev = cls._helper_get_next_event_check_q(__gcl_handle)
+
+        if ev is not None:
+            assert ev["udata"] == cls.__get_udata()
+
+        cls._helper_cleanup_event_q()
+
+        return ev
+
+
+    @classmethod
+    def _helper_cleanup_event_q(cls):
+
+        ## cleanup step (done separately):
+        with cls.ev_queues_lock:
+            for udata in cls.__old_udata:
+                cls.ev_queues.pop(int(udata.value), None)
+
+
+    @classmethod
+    def _helper_get_next_event_check_q(cls, gclh):
         """
-        Get the events for GCL __gcl_handle. If __gcl_handle is None, then get
-            events for any open GCL
+        Either extracts one event from the local queue that matches
+        the requirements and returns that event, Or returns None if
+        no event matches.
+        """
+
+        # pprint.pprint(cls.ev_queues)
+        udata = cls.__get_udata()
+        gcl_handle = cls.object_dir.get(addressof(gclh.contents), None)()
+
+        with cls.ev_queues_lock:
+            evlist = cls.ev_queues.get(udata, [])
+            if len(evlist)>0:
+                ## sort the list, if it isn't for some reason
+                evlist.sort(key=lambda ev:ev['datum']['recno'])
+                if gclh is None or gcl_handle == evlist[0]["gcl_handle"]:
+                    return evlist.pop(0)
+
+        return None
+
+
+    @classmethod
+    def _helper_get_next_event_call_clib(cls, __gcl_handle, timeout):
+        """
+        Get the events for GCL __gcl_handle by calling the C library.
+        If __gcl_handle is None, then get events for any open GCL
+
+        Returns at most one event.
         """
 
         __func1 = gdp.gdp_event_next
@@ -634,12 +750,20 @@ class GDP_GCL(object):
         event_ep_stat = __func5(event_ptr)
         check_EP_STAT(event_ep_stat)
 
-        # also free the event
-        __func6 = gdp.gdp_event_free
+        # get user data
+        __func6 = gdp.gdp_event_getudata
         __func6.argtypes = [POINTER(cls.gdp_event_t)]
-        __func6.restype = EP_STAT
+        __func6.restype = c_void_p
 
-        estat = __func6(event_ptr)
+        _udata = __func6(event_ptr)
+        udata = int(cast(_udata, c_char_p).value)
+
+        # also free the event
+        __func7 = gdp.gdp_event_free
+        __func7.argtypes = [POINTER(cls.gdp_event_t)]
+        __func7.restype = EP_STAT
+
+        estat = __func7(event_ptr)
         check_EP_STAT(estat)
 
         gdp_event = {}
@@ -647,19 +771,50 @@ class GDP_GCL(object):
         gdp_event["datum"] = datum_dict
         gdp_event["type"] = event_type
         gdp_event["stat"] = event_ep_stat
+        gdp_event["udata"] = udata
 
         return gdp_event
 
     @classmethod
-    def get_next_event(cls, timeout):
+    def get_next_event(cls, timeout, strict_threading=False):
         """ Get events for ANY open gcl """
-        return cls._helper_get_next_event(None, timeout)
+        return cls._helper_get_next_event(None, timeout, strict_threading)
 
-    def __get_next_event(self, timeout):
+    def __get_next_event(self, timeout, strict_threading=False):
         """ Get events for this particular GCL """
-        event = self._helper_get_next_event(self.ptr, timeout)
+        event = self._helper_get_next_event(self.ptr, timeout, strict_threading)
         if event is not None:
             ## the crazy '__repr__.__self__' is needed, because there's no
             ## unproxy. See https://stackoverflow.com/questions/10246116
             assert event["gcl_handle"] == self.__repr__.__self__
         return event
+
+    @classmethod
+    def __gen_udata(cls):
+        """
+        returns the current thread id as a c_void_p, that can be passed
+        as user data to asynchronous calls.
+        """
+        tid = cls.__tid()
+        str_buf = create_string_buffer(str(random.randint(0, 2**32)))
+
+        ## Keep this, such that this does not garbage collected
+        old_udata = cls.tid_udata_map.get(tid, None)
+        if old_udata is not None:
+            cls.__old_udata.append(old_udata)
+
+        ## update new udata
+        cls.tid_udata_map[tid] = str_buf
+        udata = cast(str_buf, c_void_p).value
+        return udata
+
+    @classmethod
+    def __get_udata(cls):
+        """ returns the current thread id, just as an integer """
+        tid = cls.__tid()
+        assert tid in cls.tid_udata_map
+        return int(cls.tid_udata_map[tid].value)
+
+    @staticmethod
+    def __tid():
+        return threading.current_thread().ident
