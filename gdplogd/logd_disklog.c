@@ -243,7 +243,7 @@ bdb_init(const char *db_home)
 	{
 fail0:
 		estat = ep_stat_from_dbstat(dbstat);
-		ep_dbg_cprintf(Dbg, 1, "bdb_init: error during %s: %s\n",
+		ep_app_message(estat, "bdb_init: error during %s: %s",
 					phase, db_strerror(dbstat));
 	}
 	ep_thr_mutex_unlock(&BdbMutex);
@@ -580,8 +580,7 @@ disk_init()
 	if (chdir(GCLDir) != 0)
 	{
 		estat = ep_stat_from_errno(errno);
-		ep_dbg_cprintf(Dbg, 1, "disk_init: chdir(%s): %s\n",
-				GCLDir, strerror(errno));
+		ep_app_message(estat, "disk_init: chdir(%s)", GCLDir);
 		return estat;
 	}
 
