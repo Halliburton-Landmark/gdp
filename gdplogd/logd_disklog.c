@@ -221,6 +221,12 @@ bdb_init(const char *db_home)
 		if ((dbstat = db_env_create(&DbEnv, 0)) != 0)
 			goto fail0;
 		DbEnv->set_errcall(DbEnv, bdb_error);
+		if (!ep_adm_getboolparam("swarm.gdplogd.gcl.bdb.sync-write", false))
+		{
+			phase = "dbenv->set_flags DB_TXN_WRITE_NOSYNC";
+			if ((dbstat = DbEnv->set_flags(DbEnv, DB_TXN_WRITE_NOSYNC, 1)) != 0)
+				goto fail0;
+		}
 		phase = "dbenv->open";
 		uint32_t dbenv_flags = DB_CREATE |
 						DB_THREAD |
@@ -233,12 +239,6 @@ bdb_init(const char *db_home)
 			dbenv_flags |= DB_PRIVATE;
 		if ((dbstat = DbEnv->open(DbEnv, db_home, dbenv_flags, 0)) != 0)
 			goto fail0;
-		if (!ep_adm_getboolparam("swarm.gdplogd.gcl.bdb.sync-write", false))
-		{
-			phase = "dbenv->set_flags DB_TXN_WRITE_NOSYNC";
-			if ((dbstat = DbEnv->set_flags(DbEnv, DB_TXN_WRITE_NOSYNC, 1)) != 0)
-				goto fail0;
-		}
 	}
 
 	if (false)
