@@ -68,6 +68,7 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.disklog", "GDP Log Daemon Physical Log"
 
 #define GCL_PATH_MAX		200			// max length of pathname
 
+static bool			DiskInitialized = false;
 static const char	*GCLDir;			// the gcl data directory
 static int			GCLfilemode;		// the file mode on create
 static uint32_t		DefaultLogFlags;	// as indicated
@@ -117,7 +118,7 @@ posix_error(int _errno, const char *fmt, ...)
 	va_start(ap, fmt);
 	if (EP_UT_BITSET(LOG_POSIX_ERRORS, DefaultLogFlags))
 		ep_logv(estat, fmt, ap);
-	else if (ep_dbg_test(Dbg, 1))
+	else if (!DiskInitialized || ep_dbg_test(Dbg, 1))
 		ep_app_messagev(estat, fmt, ap);
 	va_end(ap);
 
@@ -138,7 +139,8 @@ bdb_error(const DB_ENV *dbenv, const char *errpfx, const char *msg)
 {
 	if (errpfx == NULL)
 		errpfx = "bdb_error";
-	ep_dbg_cprintf(Dbg, 2, "%s: %s\n", errpfx, msg);
+	if (!DiskInitialized || ep_dbg_test(Dbg, 1))
+		ep_dbg_printf("%s: %s\n", errpfx, msg);
 }
 
 #else
@@ -600,6 +602,7 @@ disk_init()
 	// initialize berkeley DB (must be done while single threaded)
 	estat = bdb_init(GCLDir);
 
+	DiskInitialized = true;
 	ep_dbg_cprintf(Dbg, 8, "disk_init: log dir = %s, mode = 0%o\n",
 			GCLDir, GCLfilemode);
 
