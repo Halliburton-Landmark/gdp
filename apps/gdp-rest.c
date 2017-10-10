@@ -1467,7 +1467,14 @@ main(int argc, char **argv, char **env)
 	//		scgi_update_connections_port to wait.  It's OK if this
 	//		thread hangs since the other work happens in a different
 	//		thread.
-	poll_delay = ep_adm_getlongparam("swarm.rest.scgi.pollinterval", 100000);
+	//
+	// originally 100000 x 1000LL gave > 200ms response time for EMG demo tests
+	// reducing the poll to 1000 x 1000LL gave 110.83 ms average responses
+	// reducing the poll to 10 x 1000LL improve minimum but widen standard dev.
+	// dialed back the poll to 100 x 1000LL for the 2017 EC Annual Review
+	// Ali/Andy sent a video showing EMG control of the waffle robot with
+	// this setting -- too cool! -- commit the new setting to the repo!
+	poll_delay = ep_adm_getlongparam("swarm.rest.scgi.pollinterval", 100);
 	ep_sd_notifyf("READY=1\n");
 	for (;;)
 	{
