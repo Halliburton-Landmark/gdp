@@ -68,11 +68,14 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.disklog", "GDP Log Daemon Physical Log"
 
 #define GCL_PATH_MAX		200			// max length of pathname
 
+static bool			DiskInitialized = false;
 static const char	*GCLDir;			// the gcl data directory
 static int			GCLfilemode;		// the file mode on create
 static uint32_t		DefaultLogFlags;	// as indicated
 static bool			BdbSyncBeforeClose;	// do db_sync before db_close?
 static bool			BdbSyncAfterPut;	// do db->sync after db->put?
+static uint32_t		BdbPageSize;		// Berkeley DB page size in bytes
+static uint32_t		BdbCacheSize;		// Berkeley DB cache size in units of 1k
 
 #define GETPHYS(gcl)	((gcl)->x->physinfo)
 
@@ -115,7 +118,7 @@ posix_error(int _errno, const char *fmt, ...)
 	va_start(ap, fmt);
 	if (EP_UT_BITSET(LOG_POSIX_ERRORS, DefaultLogFlags))
 		ep_logv(estat, fmt, ap);
-	else if (ep_dbg_test(Dbg, 1))
+	else if (!DiskInitialized || ep_dbg_test(Dbg, 1))
 		ep_app_messagev(estat, fmt, ap);
 	va_end(ap);
 
@@ -136,7 +139,8 @@ bdb_error(const DB_ENV *dbenv, const char *errpfx, const char *msg)
 {
 	if (errpfx == NULL)
 		errpfx = "bdb_error";
-	ep_dbg_cprintf(Dbg, 2, "%s: %s\n", errpfx, msg);
+	if (!DiskInitialized || ep_dbg_test(Dbg, 1))
+		ep_dbg_printf("%s: %s\n", errpfx, msg);
 }
 
 #else
@@ -145,8 +149,6 @@ bdb_error(const DB_ENV *dbenv, const char *errpfx, const char *msg)
 # define DB_CREATE		0x00000001
 # define DB_EXCL		0x00000004
 # define DB_RDONLY		0x00000400
-# define DB_THREAD		0
-# define DB_PRIVATE		0
 
 // fake up a cursor
 typedef DB			DBC;
@@ -180,7 +182,14 @@ ep_stat_from_dbstat(int dbstat)
 		estat = GDP_STAT_NAK_NOTFOUND;
 	else
 		estat = ep_stat_from_errno(errno);
+	ep_dbg_cprintf(Dbg, 40, "ep_stat_from_dbstat(%d):\n", dbstat);
 #endif
+	if (ep_dbg_test(Dbg, 40))
+	{
+		char ebuf[100];
+
+		ep_dbg_printf("   ... %s\n", ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
 	return estat;
 }
 
@@ -194,10 +203,12 @@ bdb_init(const char *db_home)
 {
 	EP_STAT estat = EP_STAT_OK;
 
+	BdbCacheSize = ep_adm_getlongparam("swarm.gdplogd.gcl.bdb.cachesize", 0);
+	BdbPageSize = ep_adm_getlongparam("swarm.gdplogd.gcl.bdb.pagesize", 0);
 	BdbSyncBeforeClose =
-		ep_adm_getboolparam("swarm.gdplogd.gcl.sync-before-close", false);
+		ep_adm_getboolparam("swarm.gdplogd.gcl.bdb.sync-before-close", false);
 	BdbSyncAfterPut =
-		ep_adm_getboolparam("swarm.gdplogd.gcl.sync-after-put", false);
+		ep_adm_getboolparam("swarm.gdplogd.gcl.bdb.sync-after-put", false);
 
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
 	int dbstat;
@@ -210,13 +221,22 @@ bdb_init(const char *db_home)
 		if ((dbstat = db_env_create(&DbEnv, 0)) != 0)
 			goto fail0;
 		DbEnv->set_errcall(DbEnv, bdb_error);
+		if (!ep_adm_getboolparam("swarm.gdplogd.gcl.bdb.sync-write", false))
+		{
+			phase = "dbenv->set_flags DB_TXN_WRITE_NOSYNC";
+			if ((dbstat = DbEnv->set_flags(DbEnv, DB_TXN_WRITE_NOSYNC, 1)) != 0)
+				goto fail0;
+		}
 		phase = "dbenv->open";
 		uint32_t dbenv_flags = DB_CREATE |
+						DB_THREAD |
 						DB_INIT_TXN |
 						DB_INIT_LOCK |
 						DB_INIT_LOG |
 						DB_INIT_MPOOL |
-						DB_PRIVATE ;
+						DB_AUTO_COMMIT ;
+		if (ep_adm_getboolparam("swarm.gdplogd.gcl.bdb.private", true))
+			dbenv_flags |= DB_PRIVATE;
 		if ((dbstat = DbEnv->open(DbEnv, db_home, dbenv_flags, 0)) != 0)
 			goto fail0;
 	}
@@ -225,7 +245,7 @@ bdb_init(const char *db_home)
 	{
 fail0:
 		estat = ep_stat_from_dbstat(dbstat);
-		ep_dbg_cprintf(Dbg, 1, "bdb_init: error during %s: %s\n",
+		ep_app_message(estat, "bdb_init: error during %s: %s",
 					phase, db_strerror(dbstat));
 	}
 	ep_thr_mutex_unlock(&BdbMutex);
@@ -234,6 +254,7 @@ fail0:
 }
 
 
+#define MEGABYTE	* 1024 * 1024
 
 static EP_STAT
 bdb_open(const char *filename,
@@ -284,11 +305,27 @@ bdb_open(const char *filename,
 #if 0			//XXX has to happen when database is created
 	phase = "db->set_flags";
 	if ((dbstat = db->set_flags(db, DB_DUPSORT)) != 0)
-		DbEnv->err(DbEnv, dbstat, "bdb_open: db->set_flags");
+		DbEnv->err(DbEnv, dbstat, "bdb_open: db->set_flags DB_DUPSORT");
 #endif
 
+	if (BdbCacheSize > 0)
+	{
+		phase = "db->set_cachesize";
+		if ((dbstat = db->set_cachesize(db, BdbCacheSize / 1 MEGABYTE,
+						(BdbCacheSize % 1 MEGABYTE) * 1024, 0)) != 0)
+			DbEnv->err(DbEnv, dbstat, "bdb_open: db->set_cachesize %" PRIu32,
+					BdbCacheSize);
+	}
+	if (BdbPageSize > 0)
+	{
+		phase = "db->set_pagesize";
+		if ((dbstat = db->set_pagesize(db, BdbPageSize)) != 0)
+			DbEnv->err(DbEnv, dbstat, "bdb_open: db->set_pagesize %" PRIu32,
+					BdbPageSize);
+	}
+
 	phase = "db->open";
-	dbflags |= DB_AUTO_COMMIT | DB_PRIVATE;
+	dbflags |= DB_AUTO_COMMIT | DB_THREAD;
 	dbstat = db->open(db, NULL, filename, NULL, dbtype, dbflags, filemode);
 	if (dbstat != 0)
 	{
@@ -545,8 +582,7 @@ disk_init()
 	if (chdir(GCLDir) != 0)
 	{
 		estat = ep_stat_from_errno(errno);
-		ep_dbg_cprintf(Dbg, 1, "disk_init: chdir(%s): %s\n",
-				GCLDir, strerror(errno));
+		ep_app_message(estat, "disk_init: chdir(%s)", GCLDir);
 		return estat;
 	}
 
@@ -557,7 +593,7 @@ disk_init()
 	// Setting HIDEFAILURE moves corrupt tidx databases out of the way.
 	// This reduces errors, but makes disk_ts_to_recno fail, which may
 	// not be a good idea.
-	if (ep_adm_getboolparam("swarm.gdplogd.gcl.abandon_corrupt_tidx", true))
+	if (ep_adm_getboolparam("swarm.gdplogd.gcl.abandon-corrupt-tidx", true))
 		DefaultLogFlags |= LOG_TIDX_HIDEFAILURE;
 
 	if (ep_adm_getboolparam("swarm.gdplogd.disklog.log-posix-errors", false))
@@ -566,6 +602,7 @@ disk_init()
 	// initialize berkeley DB (must be done while single threaded)
 	estat = bdb_init(GCLDir);
 
+	DiskInitialized = true;
 	ep_dbg_cprintf(Dbg, 8, "disk_init: log dir = %s, mode = 0%o\n",
 			GCLDir, GCLfilemode);
 

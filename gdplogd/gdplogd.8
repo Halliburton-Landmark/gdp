@@ -140,6 +140,54 @@ are semantically the same.
 This variable is only intended to be used during a transition period;
 it will go away in the future.
 .
+.It swarm.gdplogd.disklog.log-posix-errors
+Send any Posix errors to the system log.
+May be useful for some debugging scenarios.
+Default to
+.Li false .
+.
+.It swarm.gdplogd.gcl.abandon-corrupt-tidx
+If set,
+remove corrupt timestamp indexes;
+this disables the ability to search by timestamp
+but does allows other operations to continue.
+Defaults to
+.Li true .
+.
+.It swarm.gdplogd.gcl.bdb.cachesize
+The size of the Berkeley database cache in kilobytes (1024 bytes).
+Berkeley DB is used for the on-disk timestamp indexes.
+If not set, the Berkeley database default size is used.
+.
+.It swarm.gdplogd.gcl.bdb.pagesize
+The size of the Berkeley database pages in bytes.
+If not set, the Berkeley database default size is used.
+.
+.It swarm.gdplogd.gcl.bdb.private
+If set, use a private database environment.
+This may give a small performance improvement.
+Defaults to
+.Li true .
+.
+.It swarm.gdplogd.gcl.bdb.sync-after-put
+If set, do a database sync operation after every record insertion.
+Should be unneeded.
+Defaults to
+.Li false .
+.
+.It swarm.gdplogd.gcl.bdb.sync-before-close
+If set, do a database sync operation before a database is closed.
+Should be unneeded.
+Defaults to
+.Li false .
+.
+.It swarm.gdplogd.gcl.bdb.sync-write
+If set, always do synchronous database writes.
+Setting this reduces the risk of lost data on crashes,
+but slows the system down considerably.
+Defaults to
+.Li false .
+.
 .It swarm.gdplogd.gcl.dir
 The directory in which physical logs are written.
 Defaults to
@@ -151,7 +199,8 @@ Defaults to 0600.
 .
 .It swarm.gdplogd.gcl.mode
 The file mode for on-disk GCL storage.
-Defaults to 0600.
+Defaults to
+.Li 0600 .
 .
 .It swarm.gdplogd.gdpname
 Sets the name of this instance of
@@ -183,7 +232,8 @@ This should generally be less than
 .It swarm.gdplogd.reclaim.inthread
 If set, resource reclaiming is run in a worker thread
 rather than in the main event loop.
-Defaults to false.
+Defaults to
+.Li false.
 .
 .It swarm.gdplogd.sequencing.allowdups
 Allows duplicate numbered records.

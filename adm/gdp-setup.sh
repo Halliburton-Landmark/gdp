@@ -54,7 +54,6 @@ case "$OS" in
 	package libavahi-common-dev
 	package libavahi-client-dev
 	package avahi-daemon
-	package pandoc
 	if [ -e /etc/systemd/system ]
 	then
 		package libsystemd-dev
@@ -67,6 +66,7 @@ case "$OS" in
 	fi
 	package libmosquitto-dev
 	package mosquitto-clients
+	package pandoc
 	;;
 
     "darwin")
@@ -74,7 +74,6 @@ case "$OS" in
 	package openssl
 	package lighttpd
 	package jansson
-	package pandoc
 	if [ "$PKGMGR" = "brew" ]
 	then
 		package mosquitto
@@ -93,6 +92,7 @@ case "$OS" in
 		warn "Macports doesn't support Mosquitto: install by hand."
 		info "See https://mosquitto.org/ for instructions."
 	fi
+	package pandoc
 	;;
 
     "freebsd")
@@ -128,11 +128,11 @@ case "$OS" in
 	package jansson-devel
 	package avahi-devel
 	package mosquitto
-	package pandoc
 	if [ -e /etc/systemd/system ]
 	then
 		package systemd-dev
 	fi
+	package pandoc
 	;;
 
     *)

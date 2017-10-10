@@ -418,7 +418,7 @@ show_ridx_header(const char *ridx_filename,
 done:
 	fclose(ridx_fp);
 	return ((st.st_size - ridx_header.header_size) / SIZEOF_RIDX_RECORD)
-				+ ridx_header.min_recno;
+				- ridx_header.min_recno + 1;
 
 no_header:
 	fclose(ridx_fp);
@@ -633,7 +633,7 @@ show_gcl(const char *gcl_dir_name, gdp_name_t gcl_name, int plev)
 			gcl_dir_name, gcl_name[0], gcl_pname, GCL_RIDX_SUFFIX);
 	max_recno = show_ridx_header(filename, plev,
 						&min_segment, &max_segment);
-	printf("\t%" PRIgdp_recno " recs\n", max_recno - 1);
+	printf("\t%" PRIgdp_recno " recs\n", max_recno);
 
 	if (plev <= 1)
 	{
@@ -689,6 +689,7 @@ list_gcls(const char *gcl_dir_name, int plev, int list_flags)
 	int subdir;
 	gdp_name_t gcl_iname;
 
+	ep_dbg_cprintf(Dbg, 11, "list_gcls(%s)\n", gcl_dir_name);
 	dir = opendir(gcl_dir_name);
 	if (dir == NULL)
 	{

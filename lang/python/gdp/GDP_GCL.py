@@ -487,6 +487,47 @@ class GDP_GCL(object):
         return self.__subscribe(startdict, numrecs, timeout,
                                                     None, self.__gen_udata())
 
+    def unsubscribe(self):
+        """
+        Terminate subscriptions (created by this current thread).
+        """
+
+        # FIXME: the behavior is unexpected, because of a potential
+        # bug in the C implementation; it neither terminates the
+        # specified subscription with non-null udata, nor terminates
+        # 'all' subscriptions on null udata.
+        # Fortunately, it does terminate the subscriptions by the 
+        # current thread with null udata. It's a workaround that
+        # *will* break soon.
+
+        # return self.__unsubscribe(None, self.__get_udata())
+        return self.__unsubscribe(None, None)
+
+
+    def __unsubscribe(self, cbfunc, cbarg):
+        """
+        Terminate the subscription.
+        """
+
+        # casting the python function to the callback function
+        if cbfunc == None:
+            __cbfunc = None
+        else:
+            __cbfunc = self.gdp_gcl_sub_cbfunc_t(cbfunc)
+
+        __func = gdp.gdp_gcl_unsubscribe
+        if cbfunc is None:
+            __func.argtypes = [POINTER(self.gdp_gcl_t), c_void_p, c_void_p]
+        else:
+            __func.argtypes = [POINTER(self.gdp_gcl_t),
+                                self.gdp_gcl_sub_cbfunc_t, c_void_p]
+        __func.restype = EP_STAT
+
+        estat = __func(self.ptr, __cbfunc, cbarg)
+        check_EP_STAT(estat)
+        return estat
+
+
 
     def __multiread(self, start, numrecs, cbfunc, cbarg):
         """

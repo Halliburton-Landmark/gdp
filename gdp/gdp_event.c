@@ -38,6 +38,7 @@
 #include "gdp_priv.h"
 #include "gdp_event.h"
 
+#include <string.h>
 #include <sys/errno.h>
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.event", "GDP event handling");
@@ -160,8 +161,18 @@ gdp_event_next(gdp_gcl_t *gcl, EP_TIME_SPEC *timeout)
 			err = ep_thr_cond_wait(&ActiveListSig, &ActiveListMutex, abs_to);
 			ep_dbg_cprintf(Dbg, 58, "gdp_event_next: ep_thr_cond_wait => %d\n",
 					err);
-			if (err == ETIMEDOUT)
+			if (err != 0)
+			{
+				if (err != ETIMEDOUT)
+				{
+					char errno_buf[40];
+
+					strerror_r(err, errno_buf, sizeof errno_buf);
+					EP_ASSERT_PRINT("gdp_event_next: ep_thr_cond_wait => %s",
+							errno_buf);
+				}
 				goto fail0;
+			}
 		}
 		while (gev != NULL)
 		{
@@ -178,14 +189,6 @@ gdp_event_next(gdp_gcl_t *gcl, EP_TIME_SPEC *timeout)
 			// found a match!
 			break;
 		}
-
-		// if there is no match, wait until something is added and try again
-		ep_dbg_cprintf(Dbg, 58, "gdp_event_next: no match; waiting\n");
-		err = ep_thr_cond_wait(&ActiveListSig, &ActiveListMutex, abs_to);
-		ep_dbg_cprintf(Dbg, 58, "gdp_event_next: ep_thr_cond_wait => %d\n",
-					err);
-		if (err == ETIMEDOUT)
-			break;
 	}
 
 	if (gev != NULL)

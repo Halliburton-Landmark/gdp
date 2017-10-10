@@ -73,8 +73,9 @@ class GDPcache:
         self.cache = {}     # recno => record cache   (limited size)
         self.atime = {}     # recno => time of access (same size as cache)
 
-        self.__read(1)
-        self.__read(-1)
+        ## populate the limits
+        self.leastRecent()
+        self.mostRecent()
 
     def __cleanup(self):
         """
@@ -104,23 +105,35 @@ class GDPcache:
             self.atime.pop(lru)
 
     
-    def __time(self, recno):        # cache for tMap
+    def __time(self, datum):        # cache for tMap
         """ give us the time function. A way to switch between the log-server
             timestamps and the timestamps in data """
-        datum = self.__read(recno)
         return datum['ts']['tv_sec'] + (datum['ts']['tv_nsec']*1.0/10**9)
 
 
     def __read(self, recno):        # cache for, of course, records
         """ read a single record by recno, but add to cache """
-        if recno in self.cache.keys():
+
+        ## return from cache, if we have it.
+        if recno>0 and recno in self.cache.keys():
             self.atime[recno] = time.time()
             return self.cache[recno]
-        datum = self.lh.read(recno)
-        pos_recno = datum['recno']
-        self.cache[pos_recno] = datum
-        self.atime[pos_recno] = time.time()
-        self.__cleanup()
+
+        try:
+            datum = self.lh.read(recno)
+        except gdp.MISC.EP_STAT_SEV_ERROR as e:
+            datum = None
+            if "Berkeley:Swarm-GDP:404" not in e.msg:
+                raise e
+
+        ## add to the cache, even if we got a 404 not found.
+        pos_recno = datum['recno'] if datum is not None else recno
+
+        if pos_recno>0:     # add only positive recno to cache
+            self.cache[pos_recno] = datum
+            self.atime[pos_recno] = time.time()
+            self.__cleanup()
+
         return datum
 
 
@@ -140,11 +153,20 @@ class GDPcache:
                 numRecords += 1
         ret = []
         while usingMultiread or numRecords>0:
-            event = self.lh.get_next_event(None)
+
+            try:
+                event = self.lh.get_next_event(None)
+            except gdp.MISC.EP_STAT_SEV_ERROR as e:
+                if "Berkeley:Swarm-GDP:404" in e.msg:
+                    numRecords -= 1
+                    continue
+
             if event['type'] == gdp.GDP_EVENT_EOS and usingMultiread:
                 break
+
             if event["type"] not in [gdp.GDP_EVENT_EOS, gdp.GDP_EVENT_DATA]:
                 print "Unknown event type", event
+
             numRecords -= 1
             datum = event['datum']
             recno = datum['recno']
@@ -160,20 +182,81 @@ class GDPcache:
     def __findRec(self, t):
         """ find the most recent record num before t, i.e. a binary search"""
 
-        self.__read(-1)     # just to refresh the cache
-        _startR, _endR = min(self.cache.keys()), max(self.cache.keys())
+        ## records
+        first, last = self.leastRecent(), self.mostRecent()
+        ## record numbers
+        start, end = first['recno'], last['recno']
 
         # first check the obvious out of range condition
-        if t<self.__time(_startR): return _startR
-        if t>=self.__time(_endR): return _endR
+        if t<self.__time(first): return start
+        if t>=self.__time(last): return end
 
-        # t lies in range [_startR, _endR)
-        while _startR < _endR-1:
-            p = (_startR + _endR)/2
-            if t<self.__time(p): _endR = p
-            else: _startR = p
+        # t lies in range [start, end)
+        while start < end-1:
 
-        return _startR
+            p = (start+end)/2
+            rec = self.__read(p)
+            if rec is not None:
+                if t<self.__time(rec): end = p
+                else: start = p
+            else:
+                # print "found a gap, searching boundaries"
+                l = self.__find_left_gap_boundary(start, p)
+                r = self.__find_right_gap_boundary(p, end)
+                # print l, r
+
+                lrec = self.__read(l-1)
+                rrec = self.__read(r+1)
+                # assert self.__time(lrec)<self.__time(rrec)
+
+                if t < self.__time(lrec):
+                    end = l-1
+                else:
+                    start = r+1
+
+        return start
+
+
+    def __find_left_gap_boundary(self, start, end):
+        """
+        """
+
+        # assert self.__read(start) is not None
+        # assert self.__read(end) is None
+
+        while start<end-1:
+            mid = (start+end)/2
+            rec = self.__read(mid)
+            if rec is None:
+                end = mid
+            else:
+                start = mid
+
+        # assert start == end-1
+        # assert self.__read(start) is not None
+        # assert self.__read(end) is None
+        return end
+
+
+    def __find_right_gap_boundary(self, start, end):
+
+        # assert self.__read(start) is None
+        # assert self.__read(end) is not None
+
+        while start<end-1:
+            mid = (start+end)/2
+            rec = self.__read(mid)
+            if rec is None:
+                start = mid
+            else:
+                end = mid
+
+        # assert start == end-1
+        # assert self.__read(start) is None
+        # assert self.__read(end) is not None
+        return start
+
+
 
     def get(self, t):
         """ Get the record just before time t (using a binary search)"""
@@ -183,16 +266,25 @@ class GDPcache:
 
     def getRange(self, tStart, tEnd, numPoints=1000):
         """ return a sampled list of records, *roughly* numPoints long """
-        _startR = self.__findRec(tStart)+1
-        _endR = self.__findRec(tEnd)
+        start = self.__findRec(tStart)+1
+        end = self.__findRec(tEnd)
 
-        if not (_startR<=_endR):
+        if not (start<=end):
             return []
         # Calculate step size
-        stepSize = max((_endR+1-_startR)/numPoints, 1)
-        return self.__multiread(_startR, (_endR+1)-_startR, stepSize)
+        stepSize = max((end+1-start)/numPoints, 1)
+        return self.__multiread(start, (end+1)-start, stepSize)
 
     def mostRecent(self):
-        return self.__read(-1)
+        for idx in xrange(-1,-11,-1):
+            rec = self.__read(idx)
+            if rec is not None:
+                return rec
+        return None
 
-
+    def leastRecent(self):
+        for idx in xrange(1,11):
+            rec = self.__read(idx)
+            if rec is not None:
+                return rec
+        return None

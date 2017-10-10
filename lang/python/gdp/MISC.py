@@ -42,10 +42,10 @@ try:
 except OSError:
     try:
         gdp = CDLL(os.path.join(package_directory,
-                                "..", "..", "..", "gdp",  "libgdp.so.0.7"))
+                                "..", "..", "..", "gdp",  "libgdp.so.0.8"))
     except OSError:
         gdp = CDLL(os.path.join(package_directory,
-                                "..", "..", "..", "gdp",  "libgdp.0.7.dylib"))
+                                "..", "..", "..", "gdp",  "libgdp.0.8.dylib"))
 
 #ep = CDLL(os.path.join(package_directory,
 #          "..", "..", "..", "libs", "libep.so"))

@@ -421,12 +421,15 @@ _gdp_chan_open(const char *gdp_addr,
 	// error cleanup and return
 	if (!EP_STAT_ISOK(estat))
 	{
-		char ebuf[80];
 fail0:
-		ep_dbg_cprintf(Dbg, 2,
-				"_gdp_chan_open[%d]: could not open channel: %s\n",
-				getpid(), ep_stat_tostr(estat, ebuf, sizeof ebuf));
-		//ep_log(estat, "_gdp_chan_open: could not open channel");
+		if (newchan || ep_dbg_test(Dbg, 2))
+		{
+			char ebuf[80];
+			ep_dbg_printf("_gdp_chan_open[%d]: could not open channel: %s\n",
+					getpid(), ep_stat_tostr(estat, ebuf, sizeof ebuf));
+			//ep_log(estat, "_gdp_chan_open: could not open channel");
+		}
+
 		if (chan != NULL && newchan)
 		{
 			if (chan->bev != NULL)
