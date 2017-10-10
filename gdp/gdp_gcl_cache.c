@@ -446,11 +446,8 @@ _gdp_gcl_cache_get(
 			gcl->iomode |= iomode & GDP_MODE_MASK;
 		}
 	}
-	if (gcl == NULL)
+	if (gcl == NULL && EP_UT_BITSET(GGCF_CREATE, flags))
 	{
-		if (!EP_UT_BITSET(GGCF_CREATE, flags))
-			goto done;
-
 		// create a new one
 		estat = _gdp_gcl_newhandle(gcl_name, &gcl);
 		EP_STAT_CHECK(estat, goto fail0);
@@ -458,7 +455,6 @@ _gdp_gcl_cache_get(
 		add_cache_unlocked(gcl);
 	}
 
-done:
 	if (ep_dbg_test(Dbg, 42))
 	{
 		gdp_pname_t pname;
