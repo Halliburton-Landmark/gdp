@@ -107,9 +107,9 @@ gdp_event_free(gdp_event_t *gev)
 		return EP_STAT_NULL_POINTER;
 
 	ep_dbg_cprintf(Dbg, 48, "gdp_event_free(%p)\n", gev);
-	if (gev->type == _GDP_EVENT_FREE)
+	if (!EP_ASSERT(gev->type != _GDP_EVENT_FREE))
 	{
-		ep_dbg_cprintf(Dbg, 1, "gdp_event_free(%p): already free\n", gev);
+		// apparently this is already free
 		return EP_STAT_ASSERT_ABORT;
 	}
 
@@ -150,6 +150,7 @@ gdp_event_next(gdp_gcl_t *gcl, EP_TIME_SPEC *timeout)
 	}
 
 	ep_thr_mutex_lock(&ActiveListMutex);
+restart:
 	for (;;)
 	{
 		int err;
@@ -193,8 +194,12 @@ gdp_event_next(gdp_gcl_t *gcl, EP_TIME_SPEC *timeout)
 
 	if (gev != NULL)
 	{
-		EP_ASSERT(gev->type != _GDP_EVENT_FREE);
 		STAILQ_REMOVE(&ActiveList, gev, gdp_event, queue);
+		if (!EP_ASSERT(gev->type != _GDP_EVENT_FREE))
+		{
+			// bad news, this event is on two lists (Active and Free)
+			goto restart;
+		}
 	}
 fail0:
 	ep_thr_mutex_unlock(&ActiveListMutex);
