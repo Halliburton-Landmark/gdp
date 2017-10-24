@@ -52,6 +52,8 @@
 
 typedef struct gdp_chan		gdp_chan_t;
 typedef struct gdp_req		gdp_req_t;
+typedef struct gdp_gob		gdp_gob_t;
+typedef struct gdp_gin		gdp_gin_t;
 STAILQ_HEAD(gev_list, gdp_event);
 
 extern EP_THR		_GdpIoEventLoopThread;
@@ -181,25 +183,38 @@ extern gdp_datum_t	*gdp_datum_dup(		// duplicate a datum
 
 
 /*
-**  GDP Channel/Logs
+**  GDP Objects
+**
+**		There are two data structures around GCLs.
+**
+**		The gdp_gin is what a gdp_gcl_t represents.  It is
+**		one-to-one with application open instances of a GCL.
+**		Client-side subscriptions are associated with this so
+**		that gdp_event_next can deliver the correct information.
+**		Read and append filters are also considered "external".
+**		It is not used at all by gdplogd.  It is called a
+**		gdp_gcl_t in the public API for historic reasons.
+**
+**		The gdp_gob is the internal representation.  This is what
+**		is in the cache.  It has the request list representing
+**		server-side subscriptions.  It is used both by the
+**		GDP library and by gdplogd.
 */
 
-struct gdp_gcl
+SLIST_HEAD(gcl_head, gdp_gcl);
+
+
+// application per-open-instance information (unused in gdplogd)
+struct gdp_gin
 {
 	EP_THR_MUTEX		mutex;			// lock on this data structure
-	time_t				utime;			// last time used (seconds only)
-	LIST_ENTRY(gdp_gcl)	ulist;			// list sorted by use time
-	struct req_head		reqs;			// list of outstanding requests
-	gdp_name_t			name;			// the internal name
-	gdp_pname_t			pname;			// printable name (for debugging)
+	gdp_gob_t			*gob;			// internal GDP object
+	SLIST_ENTRY(gdp_gin)
+						next;			// chain for freelist
+	uint16_t			flags;			// see below
 	gdp_iomode_t		iomode;			// read only or append only
-	uint16_t			flags;			// flag bits, see below
-	int					refcnt;			// reference counter
-	void				(*freefunc)(struct gdp_gcl *);
-										// called when this is freed
-	gdp_recno_t			nrecs;			// number of records (= last recno)
-	gdp_gclmd_t			*gclmd;			// metadata
-	EP_CRYPTO_MD		*digest;		// base crypto digest
+	void				(*closefunc)(gdp_gcl_t *);
+										// called when this is closed
 	EP_STAT				(*apndfilter)(	// append filter function
 							gdp_datum_t *,
 							void *);
@@ -208,55 +223,84 @@ struct gdp_gcl
 							gdp_datum_t *,
 							void *);
 	void				*readfpriv;		// private data for readfilter
-	struct gdp_gcl_xtra	*x;				// for use by gdplogd, gdp-rest
 };
 
-/* flags for GCL handles */
+// internal GDP object, shared between open instances, used in gdplogd
+struct gdp_gob
+{
+	EP_THR_MUTEX		mutex;			// lock on this data structure
+	time_t				utime;			// last time used (seconds only)
+	LIST_ENTRY(gdp_gob)	ulist;			// list sorted by use time
+	struct req_head		reqs;			// list of outstanding requests
+	gdp_name_t			name;			// the internal name
+	gdp_pname_t			pname;			// printable name (for debugging)
+	uint16_t			flags;			// flag bits, see below
+	int					refcnt;			// reference counter
+	void				(*freefunc)(gdp_gob_t *);
+										// called when this is freed
+	gdp_recno_t			nrecs;			// # of records (actually last recno)
+	gdp_gclmd_t			*gclmd;			// metadata
+	EP_CRYPTO_MD		*digest;		// base crypto digest
+	struct gdp_gob_xtra	*x;				// for use by gdplogd, gdp-rest
+};
+
+// flags for GDP objects (* means shared with gdp_gob_inst)
 #define GCLF_DROPPING		0x0001		// handle is being deallocated
 #define GCLF_INCACHE		0x0002		// handle is in cache
-#define GCLF_ISLOCKED		0x0004		// gcl is locked
-#define GCLF_INUSE			0x0008		// handle is allocated
+#define GCLF_ISLOCKED		0x0004		// gcl is locked *
+#define GCLF_INUSE			0x0008		// handle is allocated *
 #define GCLF_DEFER_FREE		0x0010		// defer actual free until reclaim
 #define GCLF_KEEPLOCKED		0x0020		// don't unlock in _gdp_gcl_decref
 #define GCLF_PENDING		0x0040		// not yet fully open
 
-#define GDP_GCL_ISGOOD(gcl)												\
-				((gcl) != NULL &&										\
-				 EP_UT_BITSET(GCLF_INUSE, (gcl)->flags))
-#define GDP_GCL_ASSERT_ISLOCKED(gcl)									\
+#define GDP_GOB_ISGOOD(gob)												\
+				((gob) != NULL &&										\
+				 EP_UT_BITSET(GCLF_INUSE, (gob)->flags))
+#define GDP_GIN_ISGOOD(gin)												\
+				((gin) != NULL &&										\
+				 EP_UT_BITSET(GCLF_INUSE, (gin)->flags) &&				\
+				 GDP_GOB_ISGOOD((gin)->gob))
+#define GDP_GOB_ASSERT_ISLOCKED(gob)									\
 			(															\
-				EP_ASSERT(GDP_GCL_ISGOOD(gcl)) &&						\
-				EP_ASSERT(EP_UT_BITSET(GCLF_ISLOCKED, (gcl)->flags)) &&	\
-				EP_THR_MUTEX_ASSERT_ISLOCKED(&(gcl)->mutex)				\
+				EP_ASSERT(GDP_GOB_ISGOOD(gob)) &&						\
+				EP_ASSERT(EP_UT_BITSET(GCLF_ISLOCKED, (gob)->flags)) &&	\
+				EP_THR_MUTEX_ASSERT_ISLOCKED(&(gob)->mutex)				\
 			)
-#define GDP_GCL_CHECK_RETURN_STAT(gcl)									\
+#define GDP_GIN_ASSERT_ISLOCKED(gin)									\
+			(															\
+				EP_ASSERT(GDP_GIN_ISGOOD(gin)) &&						\
+				EP_ASSERT(EP_UT_BITSET(GCLF_ISLOCKED, (gin)->flags)) &&	\
+				EP_THR_MUTEX_ASSERT_ISLOCKED(&(gin)->mutex) &&			\
+				GDP_GOB_ASSERT_ISLOCKED((gin)->gob)						\
+			)
+#define GDP_GIN_CHECK_RETURN_STAT(gin)									\
 			do															\
 			{															\
-				if (!EP_ASSERT((gcl) != NULL))							\
+				if (!EP_ASSERT((gin) != NULL))							\
 						return GDP_STAT_NULL_GCL;						\
-				if (!EP_ASSERT(EP_UT_BITSET(GCLF_INUSE, (gcl)->flags)))	\
+				if (!EP_ASSERT(EP_UT_BITSET(GCLF_INUSE, (gin)->flags)))	\
 						return GDP_STAT_GCL_NOT_OPEN;					\
 			} while (false)
-#define GDP_GCL_CHECK_RETURN_NULL(gcl)									\
+#define GDP_GIN_CHECK_RETURN_NULL(gin)									\
 			do															\
 			{															\
-				if (!EP_ASSERT((gcl) != NULL))							\
+				if (!EP_ASSERT((gin) != NULL))							\
 						return NULL;									\
-				if (!EP_ASSERT(EP_UT_BITSET(GCLF_INUSE, (gcl)->flags)))	\
+				if (!EP_ASSERT(EP_UT_BITSET(GCLF_INUSE, (gin)->flags)))	\
 						return NULL;									\
 			} while (false)
 
 
 
 /*
-**  GCL cache.
+**  GOB cache.
 **
-**		Implemented in gdp/gdp_gcl_cache.c.
+**		Implemented in gdp/gdp_gob_cache.c.
 */
 
-EP_STAT			_gdp_gcl_cache_init(void);	// initialize cache
+EP_STAT			_gdp_gob_cache_init(void);	// initialize cache
 
-void			_gdp_gcl_cache_dump(		// print cache (for debugging)
+void			_gdp_gob_cache_dump(		// print cache (for debugging)
 						int plev,
 						FILE *fp);
 
@@ -264,134 +308,148 @@ typedef EP_STAT	gcl_open_func(
 						gdp_gcl_t *gcl,
 						void *open_info);
 
-EP_STAT			_gdp_gcl_cache_get(		// get entry from cache
+EP_STAT			_gdp_gob_cache_get(		// get entry from cache
 						gdp_name_t gcl_name,
-						gdp_iomode_t mode,
 						uint32_t flags,
-						gdp_gcl_t **pgcl);
+						gdp_gob_t **pgob);
 
 #define GGCF_NOCREATE		0			// dummy
 #define GGCF_CREATE			0x00000001	// create cache entry if non existent
 #define GGCF_GET_PENDING	0x00000002	// return "pending" entries
+#define GGCF_PEEK			0x00000004	// don't update cache usage time
 
-void			_gdp_gcl_cache_add(			// add entry to cache
-						gdp_gcl_t *gcl);
+void			_gdp_gob_cache_add(			// add entry to cache
+						gdp_gob_t *gob);
 
-void			_gdp_gcl_cache_changename(	// update the name of a GCL
-						gdp_gcl_t *gcl,
+void			_gdp_gob_cache_changename(	// update the name of a GCL
+						gdp_gob_t *gob,
 						gdp_name_t newname);
 
-void			_gdp_gcl_cache_drop(		// drop entry from cache
-						gdp_gcl_t *gcl,			// GCL to drop
+void			_gdp_gob_cache_drop(		// drop entry from cache
+						gdp_gob_t *gob,			// GCL to drop
 						bool cleanup);			// set if doing cache cleanup
 
-void			_gdp_gcl_cache_reclaim(		// flush old entries
+void			_gdp_gob_cache_reclaim(		// flush old entries
 						time_t maxage);
 
-void			_gdp_gcl_cache_shutdown(	// immediately shut down cache
+void			_gdp_gob_cache_shutdown(	// immediately shut down cache
 						void (*shutdownfunc)(gdp_req_t *));
 
-void			_gdp_gcl_touch(				// move to front of LRU list
-						gdp_gcl_t *gcl);
+void			_gdp_gob_touch(				// move to front of LRU list
+						gdp_gob_t *gob);
 
-void			_gdp_gcl_cache_foreach(		// run over all cached GCLs
-						void (*f)(gdp_gcl_t *));
+void			_gdp_gob_cache_foreach(		// run over all cached GCLs
+						void (*f)(gdp_gob_t *));
 
-void			_gdp_gcl_lock_trace(		// lock the GCL mutex
-						gdp_gcl_t *gcl,
+#define _gdp_gob_lock(g)		_gdp_gob_lock_trace(g, __FILE__, __LINE__, #g)
+#define _gdp_gob_unlock(g)		_gdp_gob_unlock_trace(g, __FILE__, __LINE__, #g)
+#define _gdp_gob_decref(g, k)	_gdp_gob_decref_trace(g, k, __FILE__, __LINE__, #g)
+
+void			_gdp_gob_lock_trace(		// lock the GCL mutex
+						gdp_gob_t *gob,
 						const char *file,
 						int line,
 						const char *id);
 
-#define _gdp_gcl_lock(g)		_gdp_gcl_lock_trace(g, __FILE__, __LINE__, #g)
-
-void			_gdp_gcl_unlock_trace(		// unlock the GCL mutex
-						gdp_gcl_t *gcl,
+void			_gdp_gob_unlock_trace(		// unlock the GCL mutex
+						gdp_gob_t *gob,
 						const char *file,
 						int line,
 						const char *id);
 
-#define _gdp_gcl_unlock(g)		_gdp_gcl_unlock_trace(g, __FILE__, __LINE__, #g)
+void			_gdp_gob_incref(			// increase reference count
+						gdp_gob_t *gob);
 
-void			_gdp_gcl_incref(			// increase reference count
-						gdp_gcl_t *gcl);
-
-void			_gdp_gcl_decref_trace(		// decrease reference count (trace)
-						gdp_gcl_t **gclp,
+void			_gdp_gob_decref_trace(		// decrease reference count (trace)
+						gdp_gob_t **gobp,
 						bool keeplocked,
 						const char *file,
 						int line,
 						const char *id);
 
-#define _gdp_gcl_decref(g, k)	_gdp_gcl_decref_trace(g, k, __FILE__, __LINE__, #g)
+#define _gdp_gin_lock(g)		_gdp_gin_lock_trace(g, __FILE__, __LINE__, #g)
+#define _gdp_gin_unlock(g)		_gdp_gin_unlock_trace(g, __FILE__, __LINE__, #g)
 
-void			_gdp_gcl_pr_stats(			// print (debug) statistics
+void			_gdp_gin_lock_trace(		// lock the GCL mutex
+						gdp_gin_t *gin,
+						const char *file,
+						int line,
+						const char *id);
+
+
+void			_gdp_gin_unlock_trace(		// unlock the GCL mutex
+						gdp_gin_t *gin,
+						const char *file,
+						int line,
+						const char *id);
+
+void			_gdp_gob_pr_stats(			// print (debug) GOB statistics
 						FILE *fp);
 
 /*
 **  Other GCL handling.  These are shared between client access
 **  and the GDP daemon.
 **
-**  Implemented in gdp/gdp_gcl_ops.c.
+**  Implemented in gdp/gdp_gob_ops.c.
 */
 
-EP_STAT			_gdp_gcl_newhandle(			// create new in-mem handle
-						gdp_name_t gcl_name,
-						gdp_gcl_t **gclhp);
+EP_STAT			_gdp_gob_new(				// create new in-mem handle
+						gdp_name_t name,
+						gdp_gob_t **gobhp);
 
-void			_gdp_gcl_freehandle(		// free in-memory handle
-						gdp_gcl_t *gcl);		// GCL to free
+void			_gdp_gob_free(				// free in-memory handle
+						gdp_gob_t **gob);		// GOB to free
 
-EP_STAT			_gdp_gcl_newname(			// create new name based on metadata
-						gdp_gcl_t *gcl);
+EP_STAT			_gdp_gob_newname(			// create new name based on metadata
+						gdp_gob_t *gob);
 
-void			_gdp_gcl_dump(				// dump for debugging
-						const gdp_gcl_t *gcl,	// GCL to print
+void			_gdp_gob_dump(				// dump for debugging
+						const gdp_gob_t *gob,	// GOB to print
 						FILE *fp,				// where to print it
 						int detail,				// how much to print
 						int indent);			// unused at this time
 
-EP_STAT			_gdp_gcl_create(			// create a new GCL
-						gdp_name_t gclname,
+EP_STAT			_gdp_gob_create(			// create a new GDP object
+						gdp_name_t gobname,
 						gdp_name_t logdname,
 						gdp_gclmd_t *gmd,
 						gdp_chan_t *chan,
 						uint32_t reqflags,
-						gdp_gcl_t **pgcl);
+						gdp_gob_t **pgob);
 
-EP_STAT			_gdp_gcl_open(				// open a GCL
-						gdp_gcl_t *gcl,
+EP_STAT			_gdp_gob_open(				// open a GCL
+						gdp_gob_t *gob,
 						int cmd,
 						gdp_gcl_open_info_t *open_info,
 						gdp_chan_t *chan,
 						uint32_t reqflags);
 
-EP_STAT			_gdp_gcl_close(				// close a GCL (handle)
-						gdp_gcl_t *gcl,
+EP_STAT			_gdp_gin_close(				// close a GCL (handle)
+						gdp_gin_t *gin,
 						gdp_chan_t *chan,
 						uint32_t reqflags);
 
-EP_STAT			_gdp_gcl_read(				// read GCL record based on datum
-						gdp_gcl_t *gcl,
+EP_STAT			_gdp_gob_read(				// read GCL record based on datum
+						gdp_gob_t *gob,
 						gdp_datum_t *datum,
 						gdp_chan_t *chan,
 						uint32_t reqflags);
 
-EP_STAT			_gdp_gcl_read_async(		// read asynchronously
-						gdp_gcl_t *gcl,
+EP_STAT			_gdp_gob_read_async(		// read asynchronously
+						gdp_gob_t *gob,
 						gdp_recno_t recno,
 						gdp_event_cbfunc_t cbfunc,
 						void *cbarg,
 						gdp_chan_t *chan);
 
-EP_STAT			_gdp_gcl_append(			// append a record (gdpd shared)
-						gdp_gcl_t *gcl,
+EP_STAT			_gdp_gob_append(			// append a record (gdpd shared)
+						gdp_gob_t *gob,
 						gdp_datum_t *datum,
 						gdp_chan_t *chan,
 						uint32_t reqflags);
 
-EP_STAT			_gdp_gcl_append_async(		// append asynchronously
-						gdp_gcl_t *gcl,
+EP_STAT			_gdp_gob_append_async(		// append asynchronously
+						gdp_gob_t *gob,
 						gdp_datum_t *datum,
 						gdp_event_cbfunc_t cbfunc,
 						void *cbarg,
@@ -406,24 +464,24 @@ EP_STAT			_gdp_gcl_subscribe(			// subscribe to data
 						void *cbarg);
 
 EP_STAT			_gdp_gcl_unsubscribe(		// delete subscriptions
-						gdp_gcl_t *gcl,
+						gdp_gin_t *gin,
 						gdp_event_cbfunc_t cbfunc,
 						void *cbarg,
 						uint32_t reqflags);
 
-EP_STAT			_gdp_gcl_getmetadata(		// retrieve metadata
-						gdp_gcl_t *gcl,
+EP_STAT			_gdp_gob_getmetadata(		// retrieve metadata
+						gdp_gob_t *gob,
 						gdp_gclmd_t **gmdp,
 						gdp_chan_t *chan,
 						uint32_t reqflags);
 
-EP_STAT			_gdp_gcl_newsegment(		// create a new physical segment
-						gdp_gcl_t *gcl,
+EP_STAT			_gdp_gob_newsegment(		// create a new physical segment
+						gdp_gob_t *gob,
 						gdp_chan_t *chan,
 						uint32_t reqflags);
 
-EP_STAT			_gdp_gcl_fwd_append(		// forward APPEND (replication)
-						gdp_gcl_t *gcl,
+EP_STAT			_gdp_gob_fwd_append(		// forward APPEND (replication)
+						gdp_gob_t *gob,
 						gdp_datum_t *datum,
 						gdp_name_t to_server,
 						gdp_event_cbfunc_t cbfunc,
@@ -541,16 +599,16 @@ struct gdp_req
 {
 	EP_THR_MUTEX		mutex;		// lock on this data structure
 	EP_THR_COND			cond;		// pthread wakeup condition variable
-	LIST_ENTRY(gdp_req)	gcllist;	// linked list for cache management
+	uint16_t			state;		// see below
+	LIST_ENTRY(gdp_req)	goblist;	// linked list for cache management
 	LIST_ENTRY(gdp_req)	chanlist;	// reqs associated with a given channel
-	gdp_gcl_t			*gcl;		// the corresponding GCL handle
+	gdp_gob_t			*gob;		// associated GDP Object handle
 	gdp_pdu_t			*cpdu;		// PDU for commands
 	gdp_pdu_t			*rpdu;		// PDU for ack/nak responses
 	gdp_chan_t			*chan;		// the network channel for this req
 	EP_STAT				stat;		// status code from last operation
 	gdp_recno_t			nextrec;	// next record to return (subscriptions)
 	int32_t				numrecs;	// remaining number of records to return
-	uint16_t			state;		// see below
 	uint32_t			flags;		// see below
 	EP_TIME_SPEC		act_ts;		// timestamp of last successful activity
 	void				(*postproc)(struct gdp_req *);
@@ -558,6 +616,9 @@ struct gdp_req
 	gdp_event_cbfunc_t	sub_cbfunc;	// callback function (subscribe & async I/O)
 	void				*sub_cbarg;	// user-supplied opaque data to cb
 	EP_CRYPTO_MD		*md;		// message digest context
+
+	// these are only of interest in clients, never in gdplogd
+	gdp_gin_t			*gin;		// external GCL handle (client only)
 	struct gev_list		events;		// pending events (see above)
 };
 
@@ -575,14 +636,14 @@ struct gdp_req
 #define GDP_REQ_PERSIST			0x00000010	// request persists after response
 #define GDP_REQ_SUBUPGRADE		0x00000020	// can upgrade to subscription
 #define GDP_REQ_ALLOC_RID		0x00000040	// force allocation of new rid
-#define GDP_REQ_ON_GCL_LIST		0x00000080	// this is on a GCL list
+#define GDP_REQ_ON_GOB_LIST		0x00000080	// this is on a GOB list
 #define GDP_REQ_ON_CHAN_LIST	0x00000100	// this is on a channel list
 #define GDP_REQ_CORE			0x00000200	// internal to the core code
 #define GDP_REQ_ROUTEFAIL		0x00000400	// fail immediately on route failure
 
 EP_STAT			_gdp_req_new(				// create new request
 						int cmd,
-						gdp_gcl_t *gcl,
+						gdp_gob_t *gob,
 						gdp_chan_t *chan,
 						gdp_pdu_t *pdu,
 						uint32_t flags,
@@ -598,10 +659,10 @@ void			_gdp_req_unlock(			// unlock a request mutex
 						gdp_req_t *);
 
 gdp_req_t		*_gdp_req_find(				// find a request in a GCL
-						gdp_gcl_t *gcl, gdp_rid_t rid);
+						gdp_gob_t *gob, gdp_rid_t rid);
 
 gdp_rid_t		_gdp_rid_new(				// create new request id
-						gdp_gcl_t *gcl, gdp_chan_t *chan);
+						gdp_gob_t *gob, gdp_chan_t *chan);
 
 EP_STAT			_gdp_req_send(				// send request to daemon (async)
 						gdp_req_t *req);
@@ -617,7 +678,8 @@ EP_STAT			_gdp_invoke(				// send request to daemon (sync)
 						gdp_req_t *req);
 
 void			_gdp_req_freeall(			// free all requests in GCL list
-						gdp_gcl_t *gcl,
+						gdp_gob_t *gob,
+						gdp_gin_t *gin,
 						void (*shutdownfunc)(gdp_req_t *));
 
 void			_gdp_req_dump(				// print (debug) request
@@ -631,14 +693,6 @@ void			_gdp_req_pr_stats(			// print (debug) statistics
 
 void			_gdp_chan_drain_input(		// drain all input from channel
 						gdp_chan_t *chan);
-
-
-/*
-**  GDP Events (as distinct from event loop)
-*/
-
-EP_STAT			_gdp_event_free_all(		// free all events for GCL
-						gdp_gcl_t *gcl);
 
 
 /*
@@ -736,10 +790,11 @@ EP_STAT			_gdp_evloop_init(void);		// start event loop
 **		Lower numbered locks should be acquired before higher numbered locks.
 */
 
-#define GDP_MUTEX_LORDER_GCLCACHE	4
-#define GDP_MUTEX_LORDER_GCL		6
-#define GDP_MUTEX_LORDER_REQ		8
-#define GDP_MUTEX_LORDER_CHAN		12
+#define GDP_MUTEX_LORDER_GIN		6
+#define GDP_MUTEX_LORDER_GOBCACHE	8
+#define GDP_MUTEX_LORDER_GOB		10
+#define GDP_MUTEX_LORDER_REQ		12
+#define GDP_MUTEX_LORDER_CHAN		14
 #define GDP_MUTEX_LORDER_DATUM		18
 #define GDP_MUTEX_LORDER_LEAF		31	// freelists, etc.
 

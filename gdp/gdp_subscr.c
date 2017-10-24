@@ -55,19 +55,19 @@ subscr_resub(gdp_req_t *req)
 	ep_dbg_cprintf(Dbg, 39, "subscr_resub: refreshing req@%p\n", req);
 	EP_ASSERT_ELSE(req != NULL, return EP_STAT_ASSERT_ABORT);
 	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex);
-	EP_ASSERT_ELSE(req->gcl != NULL, return EP_STAT_ASSERT_ABORT);
+	EP_ASSERT_ELSE(req->gin != NULL, return EP_STAT_ASSERT_ABORT);
 	EP_ASSERT_ELSE(req->cpdu != NULL, return EP_STAT_ASSERT_ABORT);
 
 	req->state = GDP_REQ_ACTIVE;
 	req->cpdu->cmd = GDP_CMD_SUBSCRIBE;
-	memcpy(req->cpdu->dst, req->gcl->name, sizeof req->cpdu->dst);
+	memcpy(req->cpdu->dst, req->gob->name, sizeof req->cpdu->dst);
 	memcpy(req->cpdu->src, _GdpMyRoutingName, sizeof req->cpdu->src);
 	//XXX it seems like this should be in a known state
 	if (req->cpdu->datum == NULL)
 		req->cpdu->datum = gdp_datum_new();
 	else if (req->cpdu->datum->dbuf != NULL)
 		gdp_buf_reset(req->cpdu->datum->dbuf);
-	req->cpdu->datum->recno = req->gcl->nrecs + 1;
+	req->cpdu->datum->recno = req->gob->nrecs + 1;
 	gdp_buf_put_uint32(req->cpdu->datum->dbuf, req->numrecs);
 
 	estat = _gdp_invoke(req);
@@ -77,7 +77,7 @@ subscr_resub(gdp_req_t *req)
 		char ebuf[200];
 
 		ep_dbg_printf("subscr_resub(%s) ->\n\t%s\n",
-				req->gcl == NULL ? "(no gcl)" : req->gcl->pname,
+				req->gob == NULL ? "(no gob)" : req->gob->pname,
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 
@@ -127,7 +127,7 @@ subscr_poker_thread(void *chan_)
 		EP_TIME_SPEC t_poke;	// poke if older than this
 
 		// wait for a while to avoid hogging CPU
-		ep_time_nanosleep(delta_poke / 2 SECONDS);
+		ep_time_nanosleep(delta_poke SECONDS / 2);
 		ep_dbg_cprintf(Dbg, 40, "\nsubscr_poker_thread: poking\n");
 
 		ep_time_now(&now);
@@ -153,16 +153,13 @@ subscr_poker_thread(void *chan_)
 					_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 				}
 
-				// if no GCL, it can't be a subscription
-				gdp_gcl_t *gcl = req->gcl;
-				_gdp_req_unlock(req);	// GCLs need to be locked before reqs
-				if (gcl == NULL)
-					continue;
+				gdp_gob_t *gob = req->gob;
+				_gdp_req_unlock(req);	// GOBs need to be locked before reqs
 
-				// lock GCL, then req, then validate req
-				if (ep_thr_mutex_trylock(&gcl->mutex) != 0)
+				// lock GOB, then req, then validate req
+				if (ep_thr_mutex_trylock(&gob->mutex) != 0)
 					continue;
-				gcl->flags |= GCLF_ISLOCKED;
+				gob->flags |= GCLF_ISLOCKED;
 				_gdp_req_lock(req);
 
 				if (!EP_UT_BITSET(GDP_REQ_CLT_SUBSCR, req->flags))
@@ -181,10 +178,9 @@ subscr_poker_thread(void *chan_)
 
 				// if _gdp_invoke failed, try again at the next poke interval
 				_gdp_req_unlock(req);
-				_gdp_gcl_unlock(gcl);
+				_gdp_gob_unlock(gob);
 			}
-		}
-		while (!EP_STAT_ISOK(estat));
+		} while (!EP_STAT_ISOK(estat));
 	}
 
 	// not reached; keep gcc happy
@@ -273,7 +269,7 @@ _gdp_gcl_subscribe(gdp_req_t *req,
 
 
 EP_STAT
-_gdp_gcl_unsubscribe(gdp_gcl_t *gcl,
+_gdp_gcl_unsubscribe(gdp_gin_t *gin,
 		gdp_event_cbfunc_t cbfunc,
 		void *cbarg,
 		uint32_t reqflags)
@@ -282,24 +278,25 @@ _gdp_gcl_unsubscribe(gdp_gcl_t *gcl,
 	gdp_req_t *req;
 	gdp_req_t *sub, *next_sub;
 
-	if (!GDP_GCL_ASSERT_ISLOCKED(gcl))
+	if (!GDP_GIN_ASSERT_ISLOCKED(gin))
 		return EP_STAT_ASSERT_ABORT;
 
 	ep_dbg_cprintf(Dbg, 1, "_gdp_gcl_unsubscribe(%s) cbfunc=%p cbarg=%p\n",
-			gcl->pname, cbfunc, cbarg);
+			gin->gob->pname, cbfunc, cbarg);
 
-	estat = _gdp_req_new(GDP_CMD_UNSUBSCRIBE, gcl, _GdpChannel, NULL,
+	estat = _gdp_req_new(GDP_CMD_UNSUBSCRIBE, gin->gob, _GdpChannel, NULL,
 						reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
-	for (sub = LIST_FIRST(&gcl->reqs); sub != NULL; sub = next_sub)
+	for (sub = LIST_FIRST(&gin->gob->reqs); sub != NULL; sub = next_sub)
 	{
 		_gdp_req_lock(sub);
 		ep_dbg_cprintf(Dbg, 1, "... comparing to cbfunc=%p cbarg=%p\n",
 				sub->sub_cbfunc, sub->sub_cbarg);
 
-		next_sub = LIST_NEXT(req, gcllist);
-		if ((cbfunc != NULL && cbfunc != sub->sub_cbfunc) ||
+		next_sub = LIST_NEXT(req, goblist);
+		if (req->gin != gin ||
+				(cbfunc != NULL && cbfunc != sub->sub_cbfunc) ||
 				(cbarg != NULL && cbarg != sub->sub_cbarg))
 		{
 			// this is not the subscription you are looking for

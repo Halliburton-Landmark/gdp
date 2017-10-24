@@ -81,17 +81,17 @@ _gdp_invoke(gdp_req_t *req)
 	const char *cmdname;
 
 	EP_ASSERT_POINTER_VALID(req);
-	if (req->gcl != NULL)
-		GDP_GCL_ASSERT_ISLOCKED(req->gcl);
+	if (req->gob != NULL)
+		GDP_GOB_ASSERT_ISLOCKED(req->gob);
 	cmdname = _gdp_proto_cmd_name(req->cpdu->cmd);
 	if (ep_dbg_test(Dbg, 10))
 	{
-		ep_dbg_printf("\n>>> _gdp_invoke(req=%p rid=%" PRIgdp_rid "): %s (%d), gcl@%p\n",
+		ep_dbg_printf("\n>>> _gdp_invoke(req=%p rid=%" PRIgdp_rid "): %s (%d), gob@%p\n",
 				req,
 				req->cpdu->rid,
 				cmdname,
 				req->cpdu->cmd,
-				req->gcl);
+				req->gob);
 		if (ep_dbg_test(Dbg, 11))
 		{
 			ep_dbg_printf("\t");
@@ -135,20 +135,20 @@ _gdp_invoke(gdp_req_t *req)
 		req->flags &= ~GDP_REQ_ASYNCIO;
 		while (!EP_UT_BITSET(GDP_REQ_DONE, req->flags))
 		{
-			// release the GCL while we're waiting
-			if (req->gcl != NULL)
-				_gdp_gcl_unlock(req->gcl);
+			// release the GOB while we're waiting
+			if (req->gob != NULL)
+				_gdp_gob_unlock(req->gob);
 
 			// cond_wait will unlock the mutex
 			int e = ep_thr_cond_wait(&req->cond, &req->mutex, &abs_to);
 
-			// re-acquire GCL lock
-			if (req->gcl != NULL)
+			// re-acquire GOB lock
+			if (req->gob != NULL)
 			{
 				// have to unlock the req so lock ordering is right
 				//XXX possible race condition?
 				_gdp_req_unlock(req);
-				_gdp_gcl_lock(req->gcl);
+				_gdp_gob_lock(req->gob);
 				_gdp_req_lock(req);
 			}
 
@@ -194,7 +194,7 @@ _gdp_invoke(gdp_req_t *req)
 			}
 		}
 
-		// do a retry, after re-locking the GCL
+		// do a retry, after re-locking the GOB
 		estat = _gdp_req_unsend(req);
 		EP_STAT_CHECK(estat, break);
 		estat = GDP_STAT_INVOKE_TIMEOUT;	//XXX why?
@@ -399,7 +399,7 @@ static EP_STAT
 ack_success(gdp_req_t *req)
 {
 	EP_STAT estat;
-	gdp_gcl_t *gcl;
+	gdp_gob_t *gob;
 
 	estat = ack(req, "ack_success");
 	EP_STAT_CHECK(estat, goto fail0);
@@ -407,18 +407,18 @@ ack_success(gdp_req_t *req)
 	// mark this request as active (for subscriptions)
 	ep_time_now(&req->act_ts);
 
-	//	If we started with no gcl id, adopt from incoming PDU.
-	//	This can happen when creating a GCL.
-	gcl = req->gcl;
-	if (gcl != NULL && !gdp_name_is_valid(gcl->name))
+	//	If we started with no gob id, adopt from incoming PDU.
+	//	This can happen when creating a GOB.
+	gob = req->gob;
+	if (gob != NULL && !gdp_name_is_valid(gob->name))
 	{
-		memcpy(gcl->name, req->rpdu->src, sizeof gcl->name);
-		gdp_printable_name(gcl->name, gcl->pname);
+		memcpy(gob->name, req->rpdu->src, sizeof gob->name);
+		gdp_printable_name(gob->name, gob->pname);
 	}
 
-	// if this is an open response, the GCL is now fully open
-	if (gcl != NULL)
-		gcl->flags &= ~GCLF_PENDING;
+	// if this is an open response, the GOB is now fully open
+	if (gob != NULL)
+		gob->flags &= ~GCLF_PENDING;
 
 fail0:
 	return estat;
@@ -434,8 +434,8 @@ ack_data_changed(gdp_req_t *req)
 	EP_STAT_CHECK(estat, return estat);
 
 	// keep track of number of records (in case we lose sync)
-	if (req->gcl != NULL && req->rpdu->datum != NULL)
-		req->gcl->nrecs = req->rpdu->datum->recno;
+	if (req->gob != NULL && req->rpdu->datum != NULL)
+		req->gob->nrecs = req->rpdu->datum->recno;
 
 	return estat;
 }
@@ -446,7 +446,7 @@ ack_data_content(gdp_req_t *req)
 {
 	EP_STAT estat;
 
-	EP_ASSERT_ELSE(req->gcl != NULL, return EP_STAT_ASSERT_ABORT);
+	EP_ASSERT_ELSE(req->gob != NULL, return EP_STAT_ASSERT_ABORT);
 	EP_ASSERT_ELSE(req->rpdu != NULL, return EP_STAT_ASSERT_ABORT);
 	EP_ASSERT_ELSE(req->rpdu->datum != NULL, return EP_STAT_ASSERT_ABORT);
 
@@ -454,16 +454,16 @@ ack_data_content(gdp_req_t *req)
 	EP_STAT_CHECK(estat, return estat);
 
 	// hack to try to "self heal" in case we get out of sync
-	if (req->gcl->nrecs < req->rpdu->datum->recno)
-		req->gcl->nrecs = req->rpdu->datum->recno;
+	if (req->gob->nrecs < req->rpdu->datum->recno)
+		req->gob->nrecs = req->rpdu->datum->recno;
 
 	// keep track of how many more records we expect
 	if (req->numrecs > 0)
 		req->numrecs--;
 
 	// do read filtering if requested
-	if (req->gcl->readfilter != NULL)
-		estat = req->gcl->readfilter(req->rpdu->datum, req->gcl->readfpriv);
+	if (req->gin != NULL && req->gin->readfilter != NULL)
+		estat = req->gin->readfilter(req->rpdu->datum, req->gin->readfpriv);
 
 	return estat;
 }
@@ -511,8 +511,8 @@ nak_conflict(gdp_req_t *req)
 	EP_STAT estat = nak_client(req);
 
 	// adjust nrecs to match the server's view
-	if (req->gcl != NULL && req->rpdu->datum != NULL)
-		req->gcl->nrecs = req->rpdu->datum->recno;
+	if (req->gob != NULL && req->rpdu->datum != NULL)
+		req->gob->nrecs = req->rpdu->datum->recno;
 
 	return estat;
 }
@@ -862,10 +862,10 @@ _gdp_req_dispatch(gdp_req_t *req, int cmd)
 	dispatch_ent_t *d;
 	gdp_pname_t pname;
 
-	if (req->gcl != NULL)
+	if (req->gob != NULL)
 	{
-		memcpy(pname, req->gcl->pname, sizeof pname);
-		GDP_GCL_ASSERT_ISLOCKED(req->gcl);
+		memcpy(pname, req->gob->pname, sizeof pname);
+		GDP_GOB_ASSERT_ISLOCKED(req->gob);
 	}
 	else
 	{
@@ -877,9 +877,9 @@ _gdp_req_dispatch(gdp_req_t *req, int cmd)
 		ep_dbg_printf("_gdp_req_dispatch >>> %s",
 				_gdp_proto_cmd_name(cmd));
 		if (pname[0] != '\0')
-			ep_dbg_printf("(%s)", req->gcl->pname);
-		if (req->gcl != NULL && ep_dbg_test(Dbg, 70))
-				ep_dbg_printf(" [gcl->refcnt %d]", req->gcl->refcnt);
+			ep_dbg_printf("(%s)", req->gob->pname);
+		if (req->gob != NULL && ep_dbg_test(Dbg, 70))
+				ep_dbg_printf(" [gob->refcnt %d]", req->gob->refcnt);
 		ep_dbg_printf("\n");
 		if (ep_dbg_test(Dbg, 51))
 		{
@@ -895,9 +895,9 @@ _gdp_req_dispatch(gdp_req_t *req, int cmd)
 	else
 		estat = (*d->func)(req);
 
-	// command function should not change lock state of GCL
-	if (req->gcl != NULL && !GDP_GCL_ASSERT_ISLOCKED(req->gcl))
-		_gdp_gcl_dump(req->gcl, NULL, GDP_PR_BASIC, 0);
+	// command function should not change lock state of GOB
+	if (req->gob != NULL && !GDP_GOB_ASSERT_ISLOCKED(req->gob))
+		_gdp_gob_dump(req->gob, NULL, GDP_PR_BASIC, 0);
 
 	if (ep_dbg_test(Dbg, 18) || ep_dbg_test(DbgCmdTrace, 18))
 	{
@@ -908,10 +908,10 @@ _gdp_req_dispatch(gdp_req_t *req, int cmd)
 				_gdp_proto_cmd_name(cmd));
 		if (pname[0] != '\0')
 			ep_dbg_printf("(%s)", pname);
-		else if (req->gcl != NULL && req->gcl->pname[0] != '\0')
-			ep_dbg_printf("(%s)", req->gcl->pname);
-		if (req->gcl != NULL && ep_dbg_test(Dbg, 70))
-			ep_dbg_printf(" [gcl->refcnt %d]", req->gcl->refcnt);
+		else if (req->gob != NULL && req->gob->pname[0] != '\0')
+			ep_dbg_printf("(%s)", req->gob->pname);
+		if (req->gob != NULL && ep_dbg_test(Dbg, 70))
+			ep_dbg_printf(" [gob->refcnt %d]", req->gob->refcnt);
 		ep_dbg_printf(": %s\n", ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		if (ep_dbg_test(Dbg, 70))
 		{

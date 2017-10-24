@@ -57,55 +57,54 @@ uint32_t	GdpSignatureStrictness;		// how strongly we enforce signatures
 #define GDP_SIG_PUBKEYREQ	0x04		// public key must exist
 
 /*
-**  Private GCL definitions for gdplogd only
+**  Private GOB definitions for gdplogd only
 **
-**		The gcl field is because the LIST macros don't understand
+**		The gob field is because the LIST macros don't understand
 **		having the links in a substructure (i.e., I can't link a
-**		gdp_gcl_xtra to a gdp_gcl).
+**		gdp_gob_xtra to a gdp_gob).
 */
 
-typedef struct physinfo	gcl_physinfo_t;
-struct gdp_gcl_xtra
+typedef struct physinfo	gob_physinfo_t;
+struct gdp_gob_xtra
 {
 	// declarations relating to semantics
-	gdp_gcl_t				*gcl;			// enclosing GCL
+	gdp_gob_t				*gob;			// enclosing GOB
 	uint16_t				n_md_entries;	// number of metadata entries
 	uint16_t				log_type;		// from log header
 
 	// physical implementation declarations
-	struct gcl_phys_impl	*physimpl;		// physical implementation
-	gcl_physinfo_t			*physinfo;		// info needed by physical module
+	struct gob_phys_impl	*physimpl;		// physical implementation
+	gob_physinfo_t			*physinfo;		// info needed by physical module
 };
 
 
 /*
-**  Definitions for the gdpd-specific GCL handling
+**  Definitions for the gdpd-specific GOB handling
 */
 
-extern EP_STAT	gcl_alloc(				// allocate a new GCL
-					gdp_name_t gcl_name,
+extern EP_STAT	gob_alloc(				// allocate a new GOB
+					gdp_name_t gob_name,
 					gdp_iomode_t iomode,
-					gdp_gcl_t **pgcl);
+					gdp_gob_t **pgob);
 
-extern EP_STAT	gcl_open(				// open an existing physical GCL
-					gdp_name_t gcl_name,
+extern EP_STAT	gob_open(				// open an existing physical GOB
+					gdp_name_t gob_name,
 					gdp_iomode_t iomode,
-					gdp_gcl_t **pgcl);
+					gdp_gob_t **pgob);
 
-extern void		gcl_close(				// close an open GCL
-					gdp_gcl_t *gcl);
+extern void		gob_close(				// close an open GOB
+					gdp_gob_t *gob);
 
-extern void		gcl_touch(				// make a GCL recently used
-					gdp_gcl_t *gcl);
+extern void		gob_touch(				// make a GOB recently used
+					gdp_gob_t *gob);
 
-extern void		gcl_showusage(			// show GCL LRU list
+extern void		gob_showusage(			// show GOB LRU list
 					FILE *fp);
 
 extern EP_STAT	get_open_handle(		// get open handle (pref from cache)
-					gdp_req_t *req,
-					gdp_iomode_t iomode);
+					gdp_req_t *req);
 
-extern void		gcl_reclaim_resources(	// reclaim old GCLs
+extern void		gob_reclaim_resources(	// reclaim old GOBs
 					void *null);			// parameter unused
 
 
@@ -138,52 +137,52 @@ extern void		sub_send_message_notification(
 */
 
 // status structure (for administrative use in gdplogd)
-struct gcl_phys_stats
+struct gob_phys_stats
 {
 	gdp_recno_t		nrecs;			// number of records
 	int64_t			size;			// size in bytes
 };
 
 // the service switch entry
-struct gcl_phys_impl
+struct gob_phys_impl
 {
 	EP_STAT		(*init)(void);
 	EP_STAT		(*read_by_recno)(
-						gdp_gcl_t *gcl,
+						gdp_gob_t *gob,
 						gdp_datum_t *datum);
 	EP_STAT		(*create)(
-						gdp_gcl_t *pgcl,
+						gdp_gob_t *pgob,
 						gdp_gclmd_t *gmd);
 	EP_STAT		(*open)(
-						gdp_gcl_t *gcl);
+						gdp_gob_t *gob);
 	EP_STAT		(*close)(
-						gdp_gcl_t *gcl);
+						gdp_gob_t *gob);
 	EP_STAT		(*append)(
-						gdp_gcl_t *gcl,
+						gdp_gob_t *gob,
 						gdp_datum_t *datum);
 	EP_STAT		(*getmetadata)(
-						gdp_gcl_t *gcl,
+						gdp_gob_t *gob,
 						gdp_gclmd_t **gmdp);
 	EP_STAT		(*newsegment)(
-						gdp_gcl_t *gcl);
+						gdp_gob_t *gob);
 	void		(*foreach)(
 						void (*func)(
 							gdp_name_t name,
 							void *ctx),
 						void *ctx);
 	void		(*getstats)(
-						gdp_gcl_t *gcl,
-						struct gcl_phys_stats *stats);
+						gdp_gob_t *gob,
+						struct gob_phys_stats *stats);
 	EP_STAT		(*ts_to_recno)(
-						gdp_gcl_t *gcl,
+						gdp_gob_t *gob,
 						gdp_datum_t *datum);
 	bool		(*recno_exists)(
-						gdp_gcl_t *gcl,
+						gdp_gob_t *gob,
 						gdp_recno_t recno);
 };
 
 // known implementations
-extern struct gcl_phys_impl		GdpDiskImpl;
+extern struct gob_phys_impl		GdpDiskImpl;
 
 
 /*

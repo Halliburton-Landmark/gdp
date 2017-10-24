@@ -218,6 +218,7 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 	gdp_buf_t *obuf;
 	uint8_t sigbuf[EP_CRYPTO_MAX_SIG];
 	bool use_sigbuf = false;
+	const char *where;
 
 	EP_ASSERT_ELSE(pdu != NULL, return EP_STAT_ASSERT_ABORT);
 
@@ -377,12 +378,14 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 
 	// send header
 	gdp_buf_lock(obuf);
+	where = "header";
 	estat = send_data(obuf, pbuf, hdrlen,
 					"header", offset, EP_HEXDUMP_HEX);
 	offset += pbp - pbuf;
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// send data
+	where = "data";
 	EP_ASSERT_ELSE(dlen <= 0 || pdu->datum != NULL, dlen = 0);
 	if (dlen > 0)
 	{
@@ -396,6 +399,7 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 	}
 
 	// send signature
+	where = "signature";
 	if (pdu->datum != NULL && pdu->datum->siglen > 0)
 	{
 		uint8_t *sigp = NULL;
@@ -436,6 +440,8 @@ fail0:
 		funlockfile(ep_dbg_getfile());
 	if (!EP_STAT_ISOK(estat))
 	{
+		ep_dbg_cprintf(Dbg, 20, "_gdp_pdu_out(%s): flushing buffer\n", where);
+
 		// flush buffer so we send nothing once the buffer is unlocked
 		gdp_buf_drain(obuf, gdp_buf_getlength(obuf));
 	}

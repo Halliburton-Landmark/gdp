@@ -54,8 +54,8 @@
 **	Opaque structures
 */
 
-// an open handle on a GCL (opaque)
-typedef struct gdp_gcl		gdp_gcl_t;
+// an open handle on a GCL object instance
+typedef struct gdp_gin		gdp_gcl_t;
 
 // GCL metadata
 typedef struct gdp_gclmd	gdp_gclmd_t;

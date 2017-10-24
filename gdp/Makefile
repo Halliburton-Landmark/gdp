@@ -80,12 +80,12 @@ OBJS_MOST=	\
 	gdp_buf.o \
 	gdp_chan.o \
 	gdp_crypto.o \
-	gdp_event.o \
-	gdp_gcl_cache.o \
-	gdp_gcl_mgmt.o \
-	gdp_gcl_ops.o \
-	gdp_gclmd.o \
 	gdp_datum.o \
+	gdp_event.o \
+	gdp_gclmd.o \
+	gdp_gob_cache.o \
+	gdp_gob_mgmt.o \
+	gdp_gob_ops.o \
 	gdp_main.o \
 	gdp_pdu.o \
 	gdp_proto.o \

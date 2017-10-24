@@ -1,7 +1,7 @@
 /* vim: set ai sw=4 sts=4 ts=4 :*/
 
 /*
-**	This implements GDP Connection Log (GCL) utilities.
+**	This implements GDP Connection Log (GOB) utilities.
 **
 **	----- BEGIN LICENSE BLOCK -----
 **	GDP: Global Data Plane Support Library
@@ -46,42 +46,42 @@
 #include <string.h>
 #include <sys/errno.h>
 
-static EP_DBG	Dbg = EP_DBG_INIT("gdp.gcl.ops", "GCL operations for GDP");
+static EP_DBG	Dbg = EP_DBG_INIT("gdp.gob.ops", "GOB operations for GDP");
 
 
 /*
-**	CREATE_GCL_NAME -- create a name for a new GCL
+**	CREATE_GOB_NAME -- create a name for a new GOB
 */
 
 EP_STAT
-_gdp_gcl_newname(gdp_gcl_t *gcl)
+_gdp_gob_newname(gdp_gob_t *gob)
 {
-	if (!GDP_GCL_ISGOOD(gcl))
+	if (!GDP_GOB_ISGOOD(gob))
 		return GDP_STAT_GCL_NOT_OPEN;
-	_gdp_newname(gcl->name, gcl->gclmd);
-	gdp_printable_name(gcl->name, gcl->pname);
+	_gdp_newname(gob->name, gob->gclmd);
+	gdp_printable_name(gob->name, gob->pname);
 	return EP_STAT_OK;
 }
 
 
 /*
-**	_GDP_GCL_CREATE --- create a new GCL
+**	_GDP_GOB_CREATE --- create a new GOB
 **
 **		Creation is a bit tricky, since we don't start with an existing
-**		GCL, and we address the message to the desired daemon instead
-**		of to the GCL itself.  Some magic needs to occur.
+**		GOB, and we address the message to the desired daemon instead
+**		of to the GOB itself.  Some magic needs to occur.
 */
 
 EP_STAT
-_gdp_gcl_create(gdp_name_t gclname,
+_gdp_gob_create(gdp_name_t gobname,
 				gdp_name_t logdname,
 				gdp_gclmd_t *gmd,
 				gdp_chan_t *chan,
 				uint32_t reqflags,
-				gdp_gcl_t **pgcl)
+				gdp_gob_t **pgob)
 {
 	gdp_req_t *req = NULL;
-	gdp_gcl_t *gcl = NULL;
+	gdp_gob_t *gob = NULL;
 	EP_STAT estat = EP_STAT_OK;
 
 	errno = 0;				// avoid spurious messages
@@ -90,63 +90,63 @@ _gdp_gcl_create(gdp_name_t gclname,
 		gdp_pname_t gxname, dxname;
 
 		ep_dbg_cprintf(Dbg, 17,
-				"_gdp_gcl_create: gcl=%s\n\tlogd=%s\n",
-				gclname == NULL ? "none" : gdp_printable_name(gclname, gxname),
+				"_gdp_gob_create: gob=%s\n\tlogd=%s\n",
+				gobname == NULL ? "none" : gdp_printable_name(gobname, gxname),
 				gdp_printable_name(logdname, dxname));
 	}
 
-	// create a new pseudo-GCL for the daemon so we can correlate the results
-	estat = _gdp_gcl_newhandle(logdname, &gcl);
+	// create a new pseudo-GOB for the daemon so we can correlate the results
+	estat = _gdp_gob_new(logdname, &gob);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// create the request
-	_gdp_gcl_lock(gcl);
+	_gdp_gob_lock(gob);
 	reqflags |= GDP_REQ_ROUTEFAIL;		// don't retry on route failure
-	estat = _gdp_req_new(GDP_CMD_CREATE, gcl, chan, NULL, reqflags, &req);
+	estat = _gdp_req_new(GDP_CMD_CREATE, gob, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// send the name of the log to be created in the payload
-	gdp_buf_write(req->cpdu->datum->dbuf, gclname, sizeof (gdp_name_t));
+	gdp_buf_write(req->cpdu->datum->dbuf, gobname, sizeof (gdp_name_t));
 
 	// add the metadata to the output stream
 	_gdp_gclmd_serialize(gmd, req->cpdu->datum->dbuf);
 
 	// send command and wait for results
 	estat = _gdp_invoke(req);
-	GDP_GCL_ASSERT_ISLOCKED(gcl);
+	GDP_GOB_ASSERT_ISLOCKED(gob);
 	EP_STAT_CHECK(estat, goto fail0);
 
-	// change GCL name
-	(void) memcpy(gcl->name, gclname, sizeof (gdp_name_t));
+	// change GOB name
+	(void) memcpy(gob->name, gobname, sizeof (gdp_name_t));
 
-	// add new GCL to cache
-	EP_ASSERT(req->gcl == gcl);
-	req->gcl = NULL;			// avoid decref in _gdp_req_free
+	// add new GOB to cache
+	EP_ASSERT(req->gob == gob);
+	req->gob = NULL;			// avoid decref in _gdp_req_free
 	_gdp_req_unlock(req);		// lock ordering
-	_gdp_gcl_cache_add(gcl);
+	_gdp_gob_cache_add(gob);
 	_gdp_req_lock(req);			// must be locked for _gdp_req_free
 
 	// free resources and return results
-	*pgcl = gcl;
+	*pgob = gob;
 
 fail0:
 	if (req != NULL)
 		_gdp_req_free(&req);
-	if (gcl != NULL)
+	if (gob != NULL)
 	{
 		if (!EP_STAT_ISOK(estat))
-			_gdp_gcl_decref(&gcl, false);
+			_gdp_gob_decref(&gob, false);
 		else
-			_gdp_gcl_unlock(gcl);
+			_gdp_gob_unlock(gob);
 	}
 
 	if (!EP_STAT_ISOK(estat))
-		*pgcl = NULL;
+		*pgob = NULL;
 
 	{
 		char ebuf[100];
 
-		ep_dbg_cprintf(Dbg, 8, "_gdp_gcl_create <<< %s\n",
+		ep_dbg_cprintf(Dbg, 8, "_gdp_gob_create <<< %s\n",
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 	return estat;
@@ -154,7 +154,7 @@ fail0:
 
 
 static EP_STAT
-find_secret_key(gdp_gcl_t *gcl,
+find_secret_key(gdp_gob_t *gob,
 			gdp_gcl_open_info_t *open_info)
 {
 	// We will write the log, and it does have a public key.  We need
@@ -167,11 +167,11 @@ find_secret_key(gdp_gcl_t *gcl,
 	EP_STAT estat;
 
 	// see if we have a public key; if not we're done
-	estat = gdp_gclmd_find(gcl->gclmd, GDP_GCLMD_PUBKEY,
+	estat = gdp_gclmd_find(gob->gclmd, GDP_GCLMD_PUBKEY,
 				&pkbuflen, (const void **) &pkbuf);
 	if (!EP_STAT_ISOK(estat))
 	{
-		ep_dbg_cprintf(Dbg, 30, "_gdp_gcl_open: no public key\n");
+		ep_dbg_cprintf(Dbg, 30, "_gdp_gob_open: no public key\n");
 		return EP_STAT_OK;
 	}
 
@@ -183,7 +183,7 @@ find_secret_key(gdp_gcl_t *gcl,
 		secretkey = open_info->signkey;
 		if (secretkey == NULL && open_info->signkey_cb != NULL)
 		{
-			estat = (*open_info->signkey_cb)(gcl->name,
+			estat = (*open_info->signkey_cb)(gob->name,
 							open_info->signkey_udata, &secretkey);
 			EP_STAT_CHECK(estat, return estat);
 			my_secretkey = true;				// we must deallocate
@@ -193,12 +193,12 @@ find_secret_key(gdp_gcl_t *gcl,
 	// nothing from user; let's try a standard search
 	if (secretkey == NULL)
 	{
-		secretkey = _gdp_crypto_skey_read(gcl->pname, "pem");
+		secretkey = _gdp_crypto_skey_read(gob->pname, "pem");
 
 		if (secretkey == NULL)
 		{
 			// OK, now we have a problem --- we can't sign
-			ep_dbg_cprintf(Dbg, 30, "_gdp_gcl_open: no secret key\n");
+			ep_dbg_cprintf(Dbg, 30, "_gdp_gob_open: no secret key\n");
 			return GDP_STAT_SKEY_REQUIRED;
 		}
 
@@ -226,40 +226,40 @@ find_secret_key(gdp_gcl_t *gcl,
 	}
 
 	// set up the message digest context
-	gcl->digest = ep_crypto_sign_new(secretkey, md_alg);
+	gob->digest = ep_crypto_sign_new(secretkey, md_alg);
 
 	// we can release the key now
 	if (my_secretkey)
 		ep_crypto_key_free(secretkey);
 
-	if (gcl->digest == NULL)
+	if (gob->digest == NULL)
 		return EP_STAT_CRYPTO_DIGEST;
 
-	// add the GCL name to the hashed message digest
-	ep_crypto_sign_update(gcl->digest, gcl->name, sizeof gcl->name);
+	// add the GOB name to the hashed message digest
+	ep_crypto_sign_update(gob->digest, gob->name, sizeof gob->name);
 
 	// re-serialize the metadata and include it
 	{
 		gdp_buf_t *mdbuf = gdp_buf_new();
-		_gdp_gclmd_serialize(gcl->gclmd, mdbuf);
+		_gdp_gclmd_serialize(gob->gclmd, mdbuf);
 		size_t mdbuflen = gdp_buf_getlength(mdbuf);
-		ep_crypto_sign_update(gcl->digest, gdp_buf_getptr(mdbuf, mdbuflen),
+		ep_crypto_sign_update(gob->digest, gdp_buf_getptr(mdbuf, mdbuflen),
 						mdbuflen);
 		//gdp_buf_drain(mdbuf, mdbuflen);
 		gdp_buf_free(mdbuf);
 	}
 
-	// the GCL hash structure now has the fixed part of the hash
+	// the GOB hash structure now has the fixed part of the hash
 	return estat;
 }
 
 
 /*
-**	_GDP_GCL_OPEN --- open a GCL for reading or further appending
+**	_GDP_GOB_OPEN --- open a GOB for reading or further appending
 */
 
 EP_STAT
-_gdp_gcl_open(gdp_gcl_t *gcl,
+_gdp_gob_open(gdp_gob_t *gob,
 			int cmd,
 			gdp_gcl_open_info_t *open_info,
 			gdp_chan_t *chan,
@@ -268,29 +268,29 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 	EP_STAT estat = EP_STAT_OK;
 	gdp_req_t *req = NULL;
 
-	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
+	EP_ASSERT_ELSE(GDP_GOB_ISGOOD(gob),
 					return EP_STAT_ASSERT_ABORT);
-	GDP_GCL_ASSERT_ISLOCKED(gcl);
+	GDP_GOB_ASSERT_ISLOCKED(gob);
 
 	// send the request across to the log daemon
 	errno = 0;				// avoid spurious messages
 	reqflags |= GDP_REQ_ALLOC_RID;			// always use a new request id
 	reqflags |= GDP_REQ_ROUTEFAIL;			// don't retry on router errors
-	estat = _gdp_req_new(cmd, gcl, chan, NULL, reqflags, &req);
+	estat = _gdp_req_new(cmd, gob, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 	estat = _gdp_invoke(req);
 	EP_STAT_CHECK(estat, goto fail0);
 	// success
 
 	// save the number of records
-	gcl->nrecs = req->rpdu->datum->recno;
+	gob->nrecs = req->rpdu->datum->recno;
 
 	// read in the metadata to internal format
-	gcl->gclmd = _gdp_gclmd_deserialize(req->rpdu->datum->dbuf);
+	gob->gclmd = _gdp_gclmd_deserialize(req->rpdu->datum->dbuf);
 
 	// if we're not going to write, we don't need a secret key
 	if (cmd == GDP_CMD_OPEN_AO || cmd == GDP_CMD_OPEN_RA)
-			estat = find_secret_key(gcl, open_info);
+			estat = find_secret_key(gob, open_info);
 
 fail0:
 	if (req != NULL)
@@ -303,11 +303,11 @@ fail0:
 		if (ep_dbg_test(Dbg, 30))
 		{
 			ep_dbg_printf("Opened ");
-			_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
+			_gdp_gob_dump(gob, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
 		}
 		else
 		{
-			ep_dbg_cprintf(Dbg, 10, "Opened GCL %s\n", gcl->pname);
+			ep_dbg_cprintf(Dbg, 10, "Opened GOB %s\n", gob->pname);
 		}
 	}
 	else
@@ -315,85 +315,51 @@ fail0:
 		char ebuf[100];
 
 		ep_dbg_cprintf(Dbg, 9,
-				"Couldn't open GCL %s:\n\t%s\n",
-				gcl->pname, ep_stat_tostr(estat, ebuf, sizeof ebuf));
+				"Couldn't open GOB %s:\n\t%s\n",
+				gob->pname, ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 	return estat;
 }
 
 
 /*
-**	_GDP_GCL_CLOSE --- share operation for closing a GCL handle
+**	_GDP_GOB_CLOSE --- share operation for closing a GOB handle
 */
 
 EP_STAT
-_gdp_gcl_close(gdp_gcl_t *gcl,
+_gdp_gin_close(gdp_gin_t *gin,
 			gdp_chan_t *chan,
 			uint32_t reqflags)
 {
 	EP_STAT estat = EP_STAT_OK;
 	gdp_req_t *req;
-	int nrefs;
-
-	errno = 0;				// avoid spurious messages
-	if (!GDP_GCL_ISGOOD(gcl))
-	{
-		gdp_pname_t pname;
-
-		ep_dbg_cprintf(Dbg, 1, "_gdp_gcl_close(%s): closing free GCL\n",
-				gdp_printable_name(gcl->name, pname));
-		return GDP_STAT_GCL_NOT_OPEN;
-	}
-	if (gcl->refcnt <= 0)
-	{
-		gdp_pname_t pname;
-
-		ep_dbg_cprintf(Dbg, 1, "_gdp_gcl_close(%s): refcnt %d, failing\n",
-				gdp_printable_name(gcl->name, pname), gcl->refcnt);
-		return GDP_STAT_GCL_NOT_OPEN;
-	}
 
 	if (ep_dbg_test(Dbg, 38))
 	{
-		ep_dbg_printf("_gdp_gcl_close: ");
-		_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
+		ep_dbg_printf("_gdp_gin_close: ");
+		_gdp_gob_dump(gin->gob, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
 	}
 
-	// need to count the number of references /excluding/ subscriptions
-	nrefs = gcl->refcnt;
-	req = LIST_FIRST(&gcl->reqs);
-	while (req != NULL)
+	errno = 0;				// avoid spurious messages
+	if (!GDP_GIN_ISGOOD(gin))
 	{
-		if (EP_UT_BITSET(GDP_REQ_CLT_SUBSCR, req->flags))
-			nrefs--;
-		req = LIST_NEXT(req, gcllist);
+		gdp_pname_t pname;
+
+		ep_dbg_cprintf(Dbg, 1, "_gdp_gin_close(%s): closing free GIN\n",
+				gdp_printable_name(gin->gob->name, pname));
+		return GDP_STAT_GCL_NOT_OPEN;
 	}
 
-	if (nrefs > 1)
-	{
-		// nothing more to do (we have another open instance)
-		goto finis;
-	}
+	estat = _gdp_req_new(GDP_CMD_CLOSE, gin->gob, chan, NULL, reqflags, &req);
+	EP_STAT_CHECK(estat, return estat);
 
-	// no need to send protocol _unless_ we have an open subscription
-	if (gcl->refcnt > 1)
-	{
-		estat = _gdp_req_new(GDP_CMD_CLOSE, gcl, chan, NULL, reqflags, &req);
-		EP_STAT_CHECK(estat, goto fail0);
-
-		// tell the daemon to close it
-		estat = _gdp_invoke(req);
-
-		//XXX should probably check status (and do what with it?)
-	}
+	// tell the daemon to close it
+	estat = _gdp_invoke(req);
 
 	// release resources held by this handle
-	_gdp_event_free_all(gcl);
-	_gdp_req_freeall(gcl, NULL);
+	//XXX should probably be in _gdp_gin_free XXX
+	_gdp_req_freeall(gin->gob, gin, NULL);
 	_gdp_req_free(&req);
-finis:
-fail0:
-	_gdp_gcl_decref(&gcl, false);
 	return estat;
 }
 
@@ -406,7 +372,7 @@ fail0:
 */
 
 static EP_STAT
-append_common(gdp_gcl_t *gcl,
+append_common(gdp_gob_t *gob,
 		gdp_datum_t *datum,
 		gdp_chan_t *chan,
 		uint32_t reqflags,
@@ -417,16 +383,14 @@ append_common(gdp_gcl_t *gcl,
 
 	errno = 0;				// avoid spurious messages
 
-	if (!GDP_GCL_ISGOOD(gcl))
+	if (!GDP_GOB_ISGOOD(gob))
 		return GDP_STAT_GCL_NOT_OPEN;
 	if (!GDP_DATUM_ISGOOD(datum))
 		return GDP_STAT_DATUM_REQUIRED;
 	EP_ASSERT_POINTER_VALID(datum);
-	if (!EP_UT_BITSET(GDP_MODE_AO, gcl->iomode))
-		goto fail0;
 
 	// create a new request structure
-	estat = _gdp_req_new(GDP_CMD_APPEND, gcl, chan, NULL, reqflags, reqp);
+	estat = _gdp_req_new(GDP_CMD_APPEND, gob, chan, NULL, reqflags, reqp);
 	EP_STAT_CHECK(estat, goto fail0);
 	req = *reqp;
 
@@ -434,20 +398,17 @@ append_common(gdp_gcl_t *gcl,
 	EP_ASSERT_ELSE(datum->inuse, return EP_STAT_ASSERT_ABORT);
 
 	// set up for signing (req->md will be updated with data part)
-	req->md = gcl->digest;
-	datum->recno = gcl->nrecs + 1;
+	req->md = gob->digest;
+	datum->recno = gob->nrecs + 1;
 
 	// Note that this is just a guess: the append may still fail,
 	// but we need to do this if there are multiple threads appending
 	// at the same time.
 	// If the append fails, we'll be out of sync and all hell breaks loose.
-	gcl->nrecs++;
-
-	// if doing append filtering (e.g., encryption), call it now.
-	if (gcl->apndfilter != NULL)
-		estat = gcl->apndfilter(datum, gcl->apndfpriv);
+	gob->nrecs++;
 
 	// caller owns datum
+	//XXX why not just take the reference?
 	gdp_datum_copy(req->cpdu->datum, datum);
 
 fail0:
@@ -456,13 +417,13 @@ fail0:
 
 
 /*
-**  _GDP_GCL_APPEND --- shared operation for appending to a GCL
+**  _GDP_GOB_APPEND --- shared operation for appending to a GOB
 **
 **		Used both in GDP client library and gdpd.
 */
 
 EP_STAT
-_gdp_gcl_append(gdp_gcl_t *gcl,
+_gdp_gob_append(gdp_gob_t *gob,
 			gdp_datum_t *datum,
 			gdp_chan_t *chan,
 			uint32_t reqflags)
@@ -470,7 +431,7 @@ _gdp_gcl_append(gdp_gcl_t *gcl,
 	EP_STAT estat = GDP_STAT_BAD_IOMODE;
 	gdp_req_t *req = NULL;
 
-	estat = append_common(gcl, datum, chan, reqflags, &req);
+	estat = append_common(gob, datum, chan, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// send the request to the log server
@@ -478,7 +439,7 @@ _gdp_gcl_append(gdp_gcl_t *gcl,
 	EP_STAT_CHECK(estat, goto fail1);
 
 	// collect results
-	gcl->nrecs = datum->recno;
+	gob->nrecs = datum->recno;
 	gdp_buf_reset(datum->dbuf);
 	if (datum->sig != NULL)
 		gdp_buf_reset(datum->sig);
@@ -489,7 +450,7 @@ fail1:
 fail0:
 	if (ep_dbg_test(Dbg, 42))
 	{
-		ep_dbg_printf("_gdp_gcl_append: returning ");
+		ep_dbg_printf("_gdp_gob_append: returning ");
 		gdp_datum_print(datum, ep_dbg_getfile(), GDP_DATUM_PRDEBUG);
 	}
 	return estat;
@@ -497,7 +458,7 @@ fail0:
 
 
 /*
-**  _GDP_GCL_APPEND_ASYNC --- asynchronous append
+**  _GDP_GOB_APPEND_ASYNC --- asynchronous append
 */
 
 #ifndef SIZE_MAX
@@ -505,8 +466,8 @@ fail0:
 #endif
 
 EP_STAT
-_gdp_gcl_append_async(
-			gdp_gcl_t *gcl,
+_gdp_gob_append_async(
+			gdp_gob_t *gob,
 			gdp_datum_t *datum,
 			gdp_event_cbfunc_t cbfunc,
 			void *cbarg,
@@ -519,7 +480,7 @@ _gdp_gcl_append_async(
 
 	// deliver results asynchronously
 	reqflags |= GDP_REQ_ASYNCIO;
-	estat = append_common(gcl, datum, chan, reqflags, &req);
+	estat = append_common(gob, datum, chan, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// arrange for responses to appear as events or callbacks
@@ -530,7 +491,7 @@ _gdp_gcl_append_async(
 	// synchronous calls clear the data in the datum, so be consistent
 	i = gdp_buf_drain(req->cpdu->datum->dbuf, SIZE_MAX);
 	if (i < 0 && ep_dbg_test(Dbg, 1))
-		ep_dbg_printf("_gdp_gcl_append_async: gdp_buf_drain failure\n");
+		ep_dbg_printf("_gdp_gob_append_async: gdp_buf_drain failure\n");
 
 	gdp_buf_reset(datum->dbuf);
 	if (datum->sig != NULL)
@@ -551,7 +512,7 @@ fail0:
 	if (ep_dbg_test(Dbg, 11))
 	{
 		char ebuf[100];
-		ep_dbg_printf("_gdp_gcl_append_async => %s\n",
+		ep_dbg_printf("_gdp_gob_append_async => %s\n",
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 	return estat;
@@ -559,10 +520,10 @@ fail0:
 
 
 /*
-**  _GDP_GCL_READ --- read a record from a GCL
+**  _GDP_GOB_READ --- read a record from a GOB
 **
 **		Parameters:
-**			gcl --- the gcl from which to read
+**			gob --- the gob from which to read
 **			datum --- the data buffer (to avoid dynamic memory)
 **			chan --- the data channel used to contact the remote
 **			reqflags --- flags for the request
@@ -572,7 +533,7 @@ fail0:
 */
 
 EP_STAT
-_gdp_gcl_read(gdp_gcl_t *gcl,
+_gdp_gob_read(gdp_gob_t *gob,
 			gdp_datum_t *datum,
 			gdp_chan_t *chan,
 			uint32_t reqflags)
@@ -583,16 +544,14 @@ _gdp_gcl_read(gdp_gcl_t *gcl,
 	errno = 0;				// avoid spurious messages
 
 	// sanity checks
-	if (!GDP_GCL_ISGOOD(gcl))
+	if (!GDP_GOB_ISGOOD(gob))
 		return GDP_STAT_GCL_NOT_OPEN;
 	if (!GDP_DATUM_ISGOOD(datum))
 		return GDP_STAT_DATUM_REQUIRED;
 	EP_ASSERT_ELSE(datum->inuse, return EP_STAT_ASSERT_ABORT);
-	if (!EP_UT_BITSET(GDP_MODE_RO, gcl->iomode))
-		goto fail0;
 
 	// create and send a new request
-	estat = _gdp_req_new(GDP_CMD_READ, gcl, chan, NULL, reqflags, &req);
+	estat = _gdp_req_new(GDP_CMD_READ, gob, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 	gdp_datum_copy(req->cpdu->datum, datum);
 	estat = _gdp_invoke(req);
@@ -607,10 +566,10 @@ fail0:
 
 
 /*
-**  _GDP_GCL_READ_ASYNC --- asynchronously read a record from a GCL
+**  _GDP_GOB_READ_ASYNC --- asynchronously read a record from a GOB
 **
 **		Parameters:
-**			gcl --- the gcl from which to read
+**			gob --- the gob from which to read
 **			recno --- the record number to read
 **			cbfunc --- the callback function (NULL => deliver as events)
 **			cbarg --- user argument to cbfunc
@@ -621,7 +580,7 @@ fail0:
 */
 
 EP_STAT
-_gdp_gcl_read_async(gdp_gcl_t *gcl,
+_gdp_gob_read_async(gdp_gob_t *gob,
 			gdp_recno_t recno,
 			gdp_event_cbfunc_t cbfunc,
 			void *cbarg,
@@ -633,13 +592,11 @@ _gdp_gcl_read_async(gdp_gcl_t *gcl,
 	errno = 0;				// avoid spurious messages
 
 	// sanity checks
-	if (!GDP_GCL_ISGOOD(gcl))
+	if (!GDP_GOB_ISGOOD(gob))
 		return GDP_STAT_GCL_NOT_OPEN;
-	if (!EP_UT_BITSET(GDP_MODE_RO, gcl->iomode))
-		return GDP_STAT_BAD_IOMODE;
 
 	// create a new READ request (don't need a special command)
-	estat = _gdp_req_new(GDP_CMD_READ, gcl, chan, NULL, GDP_REQ_ASYNCIO, &req);
+	estat = _gdp_req_new(GDP_CMD_READ, gob, chan, NULL, GDP_REQ_ASYNCIO, &req);
 	EP_STAT_CHECK(estat, return estat);
 	_gdp_event_setcb(req, cbfunc, cbarg);
 
@@ -662,11 +619,11 @@ _gdp_gcl_read_async(gdp_gcl_t *gcl,
 
 
 /*
-**  _GDP_GCL_GETMETADATA --- return metadata for a log
+**  _GDP_GOB_GETMETADATA --- return metadata for a log
 */
 
 EP_STAT
-_gdp_gcl_getmetadata(gdp_gcl_t *gcl,
+_gdp_gob_getmetadata(gdp_gob_t *gob,
 		gdp_gclmd_t **gmdp,
 		gdp_chan_t *chan,
 		uint32_t reqflags)
@@ -674,11 +631,11 @@ _gdp_gcl_getmetadata(gdp_gcl_t *gcl,
 	EP_STAT estat;
 	gdp_req_t *req;
 
-	if (!GDP_GCL_ISGOOD(gcl))
+	if (!GDP_GOB_ISGOOD(gob))
 		return GDP_STAT_GCL_NOT_OPEN;
 
 	errno = 0;				// avoid spurious messages
-	estat = _gdp_req_new(GDP_CMD_GETMETADATA, gcl, chan, NULL, reqflags, &req);
+	estat = _gdp_req_new(GDP_CMD_GETMETADATA, gob, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	estat = _gdp_invoke(req);
@@ -695,20 +652,20 @@ fail0:
 
 
 /*
-**  _GDP_GCL_NEWSEGMENT --- create a new physical segment for a log
+**  _GDP_GOB_NEWSEGMENT --- create a new physical segment for a log
 */
 
 EP_STAT
-_gdp_gcl_newsegment(gdp_gcl_t *gcl,
+_gdp_gob_newsegment(gdp_gob_t *gob,
 		gdp_chan_t *chan,
 		uint32_t reqflags)
 {
 	EP_STAT estat;
 	gdp_req_t *req;
 
-	if (!GDP_GCL_ISGOOD(gcl))
+	if (!GDP_GOB_ISGOOD(gob))
 		return GDP_STAT_GCL_NOT_OPEN;
-	estat = _gdp_req_new(GDP_CMD_NEWSEGMENT, gcl, chan, NULL, reqflags, &req);
+	estat = _gdp_req_new(GDP_CMD_NEWSEGMENT, gob, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	estat = _gdp_invoke(req);
@@ -724,13 +681,13 @@ fail0:
 ***********************************************************************/
 
 /*
-**  _GDP_GCL_FWD_APPEND --- forward APPEND command
+**  _GDP_GOB_FWD_APPEND --- forward APPEND command
 **
 **		Forwards an APPEND command to a different server.  This is one
 **		of the few commands that is directed directly to a gdplogd instance.
 **		However, the response is going to come back from the original
-**		GCL, not the gdplogd instance, so we arrange for the request to
-**		be linked on that GCL's chain.
+**		GOB, not the gdplogd instance, so we arrange for the request to
+**		be linked on that GOB's chain.
 **
 **		Note: Unlike other calls, the datum is not cleared.  This is
 **		because we expect this to be used multiple times on a single
@@ -739,8 +696,8 @@ fail0:
 */
 
 EP_STAT
-_gdp_gcl_fwd_append(
-		gdp_gcl_t *gcl,
+_gdp_gob_fwd_append(
+		gdp_gob_t *gob,
 		gdp_datum_t *datum,
 		gdp_name_t to_server,
 		gdp_event_cbfunc_t cbfunc,
@@ -752,20 +709,20 @@ _gdp_gcl_fwd_append(
 	gdp_req_t *req;
 
 	// sanity checks
-	if (!GDP_GCL_ISGOOD(gcl))
+	if (!GDP_GOB_ISGOOD(gob))
 		return GDP_STAT_GCL_NOT_OPEN;
 	if (GDP_NAME_SAME(to_server, _GdpMyRoutingName))
 	{
 		// forwarding to ourselves: bad idea
-		EP_ASSERT_PRINT("_gdp_gcl_fwd_append: forwarding to myself");
+		EP_ASSERT_PRINT("_gdp_gob_fwd_append: forwarding to myself");
 		return EP_STAT_ASSERT_ABORT;
 	}
 
 	// deliver results asynchronously
 	reqflags |= GDP_REQ_ASYNCIO;
 
-	_gdp_gcl_lock(gcl);
-	estat = _gdp_req_new(GDP_CMD_FWD_APPEND, gcl, chan, NULL, reqflags, &req);
+	_gdp_gob_lock(gob);
+	estat = _gdp_req_new(GDP_CMD_FWD_APPEND, gob, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// arrange for responses to appear as events or callbacks
@@ -774,7 +731,7 @@ _gdp_gcl_fwd_append(
 	// add the actual target GDP name to the data
 	gdp_buf_write(req->cpdu->datum->dbuf, req->cpdu->dst, sizeof req->cpdu->dst);
 
-	// change the destination to be the final server, not the GCL
+	// change the destination to be the final server, not the GOB
 	memcpy(req->cpdu->dst, to_server, sizeof req->cpdu->dst);
 
 	// copy the existing datum, including metadata
@@ -814,11 +771,11 @@ _gdp_gcl_fwd_append(
 	}
 
 fail0:
-	_gdp_gcl_unlock(gcl);
+	_gdp_gob_unlock(gob);
 	if (ep_dbg_test(Dbg, 11))
 	{
 		char ebuf[100];
-		ep_dbg_printf("_gdp_gcl_fwd_append => %s\n",
+		ep_dbg_printf("_gdp_gob_fwd_append => %s\n",
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 	return estat;

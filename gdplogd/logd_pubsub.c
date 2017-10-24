@@ -43,7 +43,7 @@
 static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.pubsub",
 								"GDP Log Daemon pub/sub handling");
 
-extern EP_HASH	*_OpenGCLCache;		// associative cache
+extern EP_HASH	*_OpenGOBCache;		// associative cache
 
 
 /*
@@ -96,7 +96,7 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 	gdp_req_t *nextreq;
 	EP_TIME_SPEC sub_timeout;
 
-	GDP_GCL_ASSERT_ISLOCKED(pubreq->gcl);
+	GDP_GOB_ASSERT_ISLOCKED(pubreq->gob);
 
 	if (ep_dbg_test(Dbg, 32))
 	{
@@ -116,11 +116,11 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 		ep_time_deltanow(&sub_delta, &sub_timeout);
 	}
 
-	pubreq->gcl->flags |= GCLF_KEEPLOCKED;
-	for (req = LIST_FIRST(&pubreq->gcl->reqs); req != NULL; req = nextreq)
+	pubreq->gob->flags |= GCLF_KEEPLOCKED;
+	for (req = LIST_FIRST(&pubreq->gob->reqs); req != NULL; req = nextreq)
 	{
 		_gdp_req_lock(req);
-		nextreq = LIST_NEXT(req, gcllist);
+		nextreq = LIST_NEXT(req, goblist);
 		EP_ASSERT_ELSE(req != nextreq, break);
 
 		// make sure we don't tell ourselves
@@ -152,28 +152,28 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 			{
 				ep_dbg_printf("sub_notify_all_subscribers: subscription timeout: ");
 				_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
-				_gdp_gcl_dump(req->gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+				_gdp_gob_dump(req->gob, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 			}
 
 			// actually remove the subscription
 			//XXX isn't this done by _gdp_req_free???
-			//LIST_REMOVE(req, gcllist);
+			//LIST_REMOVE(req, goblist);
 
-			EP_ASSERT(req->gcl != NULL);
-			EP_ASSERT(EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags));
+			EP_ASSERT(req->gob != NULL);
+			EP_ASSERT(EP_UT_BITSET(GDP_REQ_ON_GOB_LIST, req->flags));
 			_gdp_req_free(&req);
 		}
 		if (req != NULL)
 			_gdp_req_unlock(req);
 	}
-	pubreq->gcl->flags &= ~GCLF_KEEPLOCKED;
+	pubreq->gob->flags &= ~GCLF_KEEPLOCKED;
 }
 
 
 /*
 **  SUB_END_SUBSCRIPTION --- terminate a subscription
 **
-**		req and req->gcl should be locked when this is called.
+**		req and req->gob should be locked when this is called.
 */
 
 void
@@ -181,19 +181,19 @@ sub_end_subscription(gdp_req_t *req)
 {
 
 	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex);
-	GDP_GCL_ASSERT_ISLOCKED(req->gcl);
+	GDP_GOB_ASSERT_ISLOCKED(req->gob);
 
 	// make it not persistent and not a subscription
 	req->flags &= ~(GDP_REQ_PERSIST | GDP_REQ_SRV_SUBSCR);
 
 	// remove the request from the work list
-	if (EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
+	if (EP_UT_BITSET(GDP_REQ_ON_GOB_LIST, req->flags))
 	{
-		gdp_gcl_t *gcl = req->gcl;
-		LIST_REMOVE(req, gcllist);
-		req->flags &= ~GDP_REQ_ON_GCL_LIST;
-		EP_ASSERT(gcl->refcnt > 1);
-		_gdp_gcl_decref(&gcl, true);
+		gdp_gob_t *gob = req->gob;
+		LIST_REMOVE(req, goblist);
+		req->flags &= ~GDP_REQ_ON_GOB_LIST;
+		EP_ASSERT(gob->refcnt > 1);
+		_gdp_gob_decref(&gob, true);
 	}
 
 	// send an "end of subscription" event
@@ -210,13 +210,13 @@ sub_end_subscription(gdp_req_t *req)
 
 
 /*
-**  Unsubscribe all requests for a given gcl and destination.
+**  Unsubscribe all requests for a given gob and destination.
 **  Can also optionally select a particular request id.
 */
 
 EP_STAT
 sub_end_all_subscriptions(
-		gdp_gcl_t *gcl,
+		gdp_gob_t *gob,
 		gdp_name_t dest,
 		gdp_rid_t rid)
 {
@@ -227,43 +227,43 @@ sub_end_all_subscriptions(
 	if (ep_dbg_test(Dbg, 29))
 	{
 		ep_dbg_printf("sub_end_all_subscriptions: ");
-		_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+		_gdp_gob_dump(gob, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
-	GDP_GCL_ASSERT_ISLOCKED(gcl);
-	if (EP_UT_BITSET(GCLF_KEEPLOCKED, gcl->flags) && ep_dbg_test(Dbg, 1))
+	GDP_GOB_ASSERT_ISLOCKED(gob);
+	if (EP_UT_BITSET(GCLF_KEEPLOCKED, gob->flags) && ep_dbg_test(Dbg, 1))
 		ep_dbg_printf("sub_end_all_subscriptions: GCLF_KEEPLOCKED on entry\n");
-	gcl->flags |= GCLF_KEEPLOCKED;
+	gob->flags |= GCLF_KEEPLOCKED;
 
 	do
 	{
 		estat = EP_STAT_OK;
-		for (req = LIST_FIRST(&gcl->reqs); req != NULL; req = nextreq)
+		for (req = LIST_FIRST(&gob->reqs); req != NULL; req = nextreq)
 		{
 			estat = _gdp_req_lock(req);
 			EP_STAT_CHECK(estat, break);
-			nextreq = LIST_NEXT(req, gcllist);
+			nextreq = LIST_NEXT(req, goblist);
 			if (!GDP_NAME_SAME(req->rpdu->dst, dest) ||
 					(rid != GDP_PDU_NO_RID && rid != req->rpdu->rid) ||
-					!EP_ASSERT(req->gcl == gcl))
+					!EP_ASSERT(req->gob == gob))
 			{
 				_gdp_req_unlock(req);
 				continue;
 			}
 
-			// remove subscription for this destination (but keep GCL locked)
+			// remove subscription for this destination (but keep GOB locked)
 			if (ep_dbg_test(Dbg, 39))
 			{
 				ep_dbg_printf("sub_end_all_subscriptions removing ");
 				_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 			}
-			LIST_REMOVE(req, gcllist);
-			req->flags &= ~GDP_REQ_ON_GCL_LIST;
-			_gdp_gcl_decref(&req->gcl, false);
+			LIST_REMOVE(req, goblist);
+			req->flags &= ~GDP_REQ_ON_GOB_LIST;
+			_gdp_gob_decref(&req->gob, false);
 			_gdp_req_free(&req);
 		}
 	} while (!EP_STAT_ISOK(estat));
-	gcl->flags &= ~GCLF_KEEPLOCKED;
+	gob->flags &= ~GCLF_KEEPLOCKED;
 	return estat;
 }
 
@@ -273,15 +273,15 @@ sub_end_all_subscriptions(
 **
 **		This is a bit tricky to get lock ordering correct.  The
 **		obvious implementation is to loop through the channel
-**		list, but when you try to lock a GCL or a request you
+**		list, but when you try to lock a GOB or a request you
 **		have a lock ordering problem (the channel is quite low
 **		in the locking hierarchy).  Instead you run through
-**		the GCL hash table.
+**		the GOB hash table.
 */
 
 // helper (does most of the work)
 static void
-gcl_reclaim_subscriptions(gdp_gcl_t *gcl)
+gob_reclaim_subscriptions(gdp_gob_t *gob)
 {
 	int istat;
 	gdp_req_t *req;
@@ -289,7 +289,7 @@ gcl_reclaim_subscriptions(gdp_gcl_t *gcl)
 	EP_TIME_SPEC sub_timeout;
 
 	// just in case
-	if (gcl == NULL)
+	if (gob == NULL)
 		return;
 
 	{
@@ -300,57 +300,57 @@ gcl_reclaim_subscriptions(gdp_gcl_t *gcl)
 		ep_time_from_nsec(-timeout SECONDS, &sub_delta);
 		ep_time_deltanow(&sub_delta, &sub_timeout);
 		ep_dbg_cprintf(Dbg, 39,
-				"gcl_reclaim_subscriptions: GCL = %p, refcnt = %d, timeout = %ld\n",
-				gcl, gcl->refcnt, timeout);
+				"gob_reclaim_subscriptions: GOB = %p, refcnt = %d, timeout = %ld\n",
+				gob, gob->refcnt, timeout);
 	}
 
-	// don't even try locked GCLs
+	// don't even try locked GOBs
 	// first check is to avoid extraneous errors
-	if (EP_UT_BITSET(GCLF_ISLOCKED, gcl->flags))
+	if (EP_UT_BITSET(GCLF_ISLOCKED, gob->flags))
 	{
-		ep_dbg_cprintf(Dbg, 39, " ... skipping locked GCL\n");
+		ep_dbg_cprintf(Dbg, 39, " ... skipping locked GOB\n");
 		return;
 	}
-	istat = ep_thr_mutex_trylock(&gcl->mutex);
+	istat = ep_thr_mutex_trylock(&gob->mutex);
 	if (istat != 0)
 	{
 		if (ep_dbg_test(Dbg, 21))
 		{
-			ep_dbg_printf("gcl_reclaim_subscriptions: gcl already locked:\n    ");
-			_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+			ep_dbg_printf("gob_reclaim_subscriptions: gob already locked:\n    ");
+			_gdp_gob_dump(gob, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 		}
 		return;
 	}
-	gcl->flags |= GCLF_ISLOCKED;
+	gob->flags |= GCLF_ISLOCKED;
 
-	nextreq = LIST_FIRST(&gcl->reqs);
+	nextreq = LIST_FIRST(&gob->reqs);
 	while ((req = nextreq) != NULL)
 	{
 		if (ep_dbg_test(Dbg, 59))
 		{
-			ep_dbg_printf("gcl_reclaim_subscriptions: checking ");
+			ep_dbg_printf("gob_reclaim_subscriptions: checking ");
 			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 		}
 
-		// now that GCL is locked, we lock the request
+		// now that GOB is locked, we lock the request
 		istat = ep_thr_mutex_trylock(&req->mutex);
 		if (istat != 0)		// checking on status of req lock attempt
 		{
 			// already locked
 			if (ep_dbg_test(Dbg, 41))
 			{
-				ep_dbg_printf("gcl_reclaim_subscriptions: req already locked:\n    ");
+				ep_dbg_printf("gob_reclaim_subscriptions: req already locked:\n    ");
 				_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 			}
-			_gdp_gcl_unlock(req->gcl);
+			_gdp_gob_unlock(req->gob);
 			continue;
 		}
 
 		// get next request while locked and do sanity checks
-		nextreq = LIST_NEXT(req, gcllist);
-		if (!EP_ASSERT(req != nextreq) || !EP_ASSERT(req->gcl == gcl))
+		nextreq = LIST_NEXT(req, goblist);
+		if (!EP_ASSERT(req != nextreq) || !EP_ASSERT(req->gob == gob))
 		{
-			_gdp_gcl_unlock(req->gcl);
+			_gdp_gob_unlock(req->gob);
 			break;
 		}
 
@@ -366,21 +366,21 @@ gcl_reclaim_subscriptions(gdp_gcl_t *gcl)
 			if (ep_dbg_test(Dbg, 18))
 			{
 				ep_dbg_printf("    ...  subscription timeout: ");
-				_gdp_gcl_dump(req->gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+				_gdp_gob_dump(req->gob, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 			}
 
 			// have to manually remove req from lists to avoid lock inversion
-			if (EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
+			if (EP_UT_BITSET(GDP_REQ_ON_GOB_LIST, req->flags))
 			{
-				// gcl is already locked
-				LIST_REMOVE(req, gcllist);
+				// gob is already locked
+				LIST_REMOVE(req, goblist);
 			}
 			if (EP_UT_BITSET(GDP_REQ_ON_CHAN_LIST, req->flags))
 			{
 				LIST_REMOVE(req, chanlist);			// chan already locked
 			}
-			req->flags &= ~(GDP_REQ_ON_GCL_LIST | GDP_REQ_ON_CHAN_LIST);
-			_gdp_gcl_decref(&req->gcl, true);
+			req->flags &= ~(GDP_REQ_ON_GOB_LIST | GDP_REQ_ON_CHAN_LIST);
+			_gdp_gob_decref(&req->gob, true);
 			_gdp_req_free(&req);
 		}
 		else if (ep_dbg_test(Dbg, 59))
@@ -392,12 +392,12 @@ gcl_reclaim_subscriptions(gdp_gcl_t *gcl)
 			_gdp_req_unlock(req);
 	}
 
-	if (gcl != NULL)
-		_gdp_gcl_unlock(gcl);
+	if (gob != NULL)
+		_gdp_gob_unlock(gob);
 }
 
 void
 sub_reclaim_resources(gdp_chan_t *chan)
 {
-	_gdp_gcl_cache_foreach(gcl_reclaim_subscriptions);
+	_gdp_gob_cache_foreach(gob_reclaim_subscriptions);
 }

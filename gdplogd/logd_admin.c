@@ -297,30 +297,30 @@ admin_post_statsv(
 static void
 post_one_log(gdp_name_t gdpname, void *ctx)
 {
-	gdp_gcl_t *gcl;
+	gdp_gob_t *gob;
 	gdp_pname_t gdppname;
 	EP_STAT estat;
 
 	gdp_printable_name(gdpname, gdppname);
 
-	estat = _gdp_gcl_cache_get(gdpname, _GDP_MODE_PEEK, GGCF_NOCREATE, &gcl);
+	estat = _gdp_gob_cache_get(gdpname, GGCF_NOCREATE | GGCF_PEEK, &gob);
 	if (!EP_STAT_ISOK(estat))
 	{
 		char ebuf[100];
 
-		ep_dbg_cprintf(Dbg, 1, "post_one_log: _gdp_gcl_cache_get: %s\n",
+		ep_dbg_cprintf(Dbg, 1, "post_one_log: _gdp_gob_cache_get: %s\n",
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		return;
 	}
-	if (gcl != NULL)
+	if (gob != NULL)
 	{
-		if (gcl->x->physimpl->getstats != NULL)
+		if (gob->x->physimpl->getstats != NULL)
 		{
 			char nrecsbuf[40];
 			char logsizebuf[40];
-			struct gcl_phys_stats stats;
+			struct gob_phys_stats stats;
 
-			gcl->x->physimpl->getstats(gcl, &stats);
+			gob->x->physimpl->getstats(gob, &stats);
 			snprintf(nrecsbuf, sizeof nrecsbuf, "%" PRIgdp_recno, stats.nrecs);
 			snprintf(logsizebuf, sizeof logsizebuf, "%" PRId64, stats.size);
 			admin_post_stats(ADMIN_LOG_SNAPSHOT, "log-snapshot",
@@ -338,7 +338,7 @@ post_one_log(gdp_name_t gdpname, void *ctx)
 					NULL, NULL);
 		}
 
-		_gdp_gcl_unlock(gcl);
+		_gdp_gob_unlock(gob);
 	}
 	else
 	{

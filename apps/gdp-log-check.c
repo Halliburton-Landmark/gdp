@@ -95,7 +95,7 @@ struct ctx
 	// info about the log we are working on
 	const char		*logpath;		// path to the log directory
 	const char		*logxname;		// external name of log
-	gcl_physinfo_t	*phys;			// physical manifestation
+	gob_physinfo_t	*phys;			// physical manifestation
 
 	// info about the record number index
 
@@ -140,42 +140,42 @@ log_override(EP_STAT estat, const char *fmt, ...)
 
 
 /*
-**  Open up a gdp_gcl_t structure but without sending protocol
+**  Open up a gdp_gob_t structure but without sending protocol
 */
 
 EP_STAT
-open_fake_gcl(const char *logxname, gdp_gcl_t **pgcl)
+open_fake_gob(const char *logxname, gdp_gob_t **pgob)
 {
 	EP_STAT estat = EP_STAT_OK;
 	const char *phase;
-	gdp_gcl_t *gcl = NULL;
+	gdp_gob_t *gob = NULL;
 	gdp_name_t loginame;
 
 	phase = "gdp_name_parse";
 	estat = gdp_parse_name(logxname, loginame);
 	EP_STAT_CHECK(estat, goto fail0);
 
-	phase = "gcl_alloc";
-	estat = gcl_alloc(loginame, GDP_MODE_ANY, &gcl);
+	phase = "gob_alloc";
+	estat = gob_alloc(loginame, GDP_MODE_ANY, &gob);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	phase = "physinfo_alloc";
-	gcl->x->physinfo = physinfo_alloc(gcl);
-	if (gcl->x->physinfo == NULL)
+	gob->x->physinfo = physinfo_alloc(gob);
+	if (gob->x->physinfo == NULL)
 		goto fail0;
 
-	// fill in GCL fields we will be using
-	gdp_printable_name(loginame, gcl->pname);
+	// fill in GOB fields we will be using
+	gdp_printable_name(loginame, gob->pname);
 
 	if (!EP_STAT_ISOK(estat))
 	{
 fail0:
 		if (EP_STAT_ISOK(estat))
 			estat = EP_STAT_ERROR;
-		ep_app_message(estat, "open_fake_gcl(%s during %s)",
+		ep_app_message(estat, "open_fake_gob(%s during %s)",
 					logxname, phase);
 	}
-	*pgcl = gcl;
+	*pgob = gob;
 	return estat;
 }
 
@@ -597,21 +597,21 @@ recseq_process(struct ctx *ctx)
 */
 
 EP_STAT
-find_segs(gdp_gcl_t *gcl)
+find_segs(gdp_gob_t *gob)
 {
 	EP_STAT estat = EP_STAT_OK;
 	int allocsegs = 0;				// allocation size of phys->segments
 	bool pre_segment = false;		// set if created before we had segments
-	char dirname[GCL_PATH_MAX];
-	struct physinfo *phys = GETPHYS(gcl);
+	char dirname[GOB_PATH_MAX];
+	struct physinfo *phys = GETPHYS(gob);
 
 	// get the path name (only need the directory part of the path)
-	estat = get_gcl_path(gcl, -1, GCL_LDF_SUFFIX, dirname, sizeof dirname);
+	estat = get_gob_path(gob, -1, GCL_LDF_SUFFIX, dirname, sizeof dirname);
 	EP_STAT_CHECK(estat, return estat);
 	char *p = strrchr(dirname, '/');
 	if (p == NULL)
 	{
-		ep_app_error("find_segs: cannot get root path for %s", gcl->pname);
+		ep_app_error("find_segs: cannot get root path for %s", gob->pname);
 		return GDP_STAT_CORRUPT_GCL;
 	}
 	*p = '\0';
@@ -637,7 +637,7 @@ find_segs(gdp_gcl_t *gcl)
 			break;
 		}
 
-		if (strncmp(dent->d_name, gcl->pname, GDP_GCL_PNAME_LEN) != 0)
+		if (strncmp(dent->d_name, gob->pname, GDP_GCL_PNAME_LEN) != 0)
 		{
 			// not relevant
 			continue;
@@ -700,7 +700,7 @@ find_segs(gdp_gcl_t *gcl)
 	if (pre_segment && phys->nsegments > 1)
 	{
 		ep_app_error("Can't fathom both pre- and post-segment log names for\n"
-				"    %s", gcl->pname);
+				"    %s", gob->pname);
 	}
 
 	// success: return the number of segments found
@@ -716,12 +716,12 @@ find_segs(gdp_gcl_t *gcl)
 */
 
 EP_STAT
-scan_recs(gdp_gcl_t *gcl,
+scan_recs(gdp_gob_t *gob,
 		EP_STAT (*per_seg_f)(
 						segment_t *seg,
 						struct ctx *ctx),
 		EP_STAT (*per_rec_f)(
-						gdp_gcl_t *gcl,
+						gdp_gob_t *gob,
 						segment_record_t *segrec,
 						off_t offset,
 						segment_t *seg,
@@ -731,7 +731,7 @@ scan_recs(gdp_gcl_t *gcl,
 	EP_STAT estat = EP_STAT_OK;
 	EP_STAT return_stat = EP_STAT_OK;
 	int segno;
-	struct physinfo *phys = GETPHYS(gcl);
+	struct physinfo *phys = GETPHYS(gob);
 
 	for (segno = 0; segno < phys->nsegments; segno++)
 	{
@@ -740,12 +740,12 @@ scan_recs(gdp_gcl_t *gcl,
 			continue;
 
 		gdp_recno_t recno;
-		char pbuf[GCL_PATH_MAX];
+		char pbuf[GOB_PATH_MAX];
 		segment_header_t seghdr;
 
 		// get full path of segment file
 		// we use seg->segno here because it might be -1 (for old log)
-		estat = get_gcl_path(gcl, seg->segno, GCL_LDF_SUFFIX,
+		estat = get_gob_path(gob, seg->segno, GCL_LDF_SUFFIX,
 						pbuf, sizeof pbuf);
 
 		estat = segment_hdr_open(pbuf, seg, O_RDONLY, &seghdr);
@@ -832,7 +832,7 @@ scan_recs(gdp_gcl_t *gcl,
 								" max %" PRIgdp_recno ",\n"
 								"  (after recno %" PRIgdp_recno "),"
 								" data offset %jd",
-								gcl->pname, log_record.recno, MaxRecno, recno,
+								gob->pname, log_record.recno, MaxRecno, recno,
 								(intmax_t) record_offset);
 				}
 				else if (log_record.recno > recno + 1)
@@ -843,7 +843,7 @@ scan_recs(gdp_gcl_t *gcl,
 						ep_app_message(estat, "%s\n"
 								"   data records missing, offset %jd,"
 								" records %" PRIgdp_recno "-%" PRIgdp_recno,
-								gcl->pname, (intmax_t) record_offset,
+								gob->pname, (intmax_t) record_offset,
 								recno + 1, log_record.recno);
 				}
 				else
@@ -855,7 +855,7 @@ scan_recs(gdp_gcl_t *gcl,
 								"    data records duplicated, got %"
 								PRIgdp_recno " expected %" PRIgdp_recno "\n"
 								"    (delta = %" PRIgdp_recno ", offset = %jd)",
-								gcl->pname, log_record.recno, recno + 1,
+								gob->pname, log_record.recno, recno + 1,
 								recno + 1 - log_record.recno,
 								(intmax_t) record_offset);
 				}
@@ -870,7 +870,7 @@ scan_recs(gdp_gcl_t *gcl,
 				recno = log_record.recno;
 
 				// do per-record processing
-				estat = (*per_rec_f)(gcl, &log_record, record_offset, seg, ctx);
+				estat = (*per_rec_f)(gob, &log_record, record_offset, seg, ctx);
 				if (EP_STAT_SEVERITY(estat) > EP_STAT_SEVERITY(return_stat))
 					return_stat = estat;
 			}
@@ -954,7 +954,7 @@ check_segment(segment_t *seg, struct ctx *ctx)
 // check a record header
 EP_STAT
 check_record(
-			gdp_gcl_t *gcl,				// the log containing this record
+			gdp_gob_t *gob,				// the log containing this record
 			segment_record_t *rec,		// the record header (from disk)
 			off_t offset,				// the file offset of that record
 			segment_t *seg,				// the segment information
@@ -962,19 +962,19 @@ check_record(
 {
 	EP_STAT estat = EP_STAT_OK;
 	EP_STAT return_stat = EP_STAT_OK;
-	gcl_physinfo_t *phys = GETPHYS(gcl);
+	gob_physinfo_t *phys = GETPHYS(gob);
 
 	// do some sanity checking on the record header; if it isn't good
 	// we'll just report the record and skip it for rebuilding
-	if (rec->recno < GETPHYS(gcl)->ridx.min_recno)
+	if (rec->recno < GETPHYS(gob)->ridx.min_recno)
 	{
 		if (!Flags.silent && !Flags.summaryonly)
 		{
 			ep_app_message(GDP_STAT_CORRUPT_GCL, "%s\n"
-					"    Corrupt GCL: recno = %" PRIgdp_recno
+					"    Corrupt GOB: recno = %" PRIgdp_recno
 					", min = %" PRIgdp_recno " (ignoring)",
-					gcl->pname,
-					rec->recno, GETPHYS(gcl)->ridx.min_recno);
+					gob->pname,
+					rec->recno, GETPHYS(gob)->ridx.min_recno);
 		}
 		return EP_STAT_OK;
 	}
@@ -984,7 +984,7 @@ check_record(
 		ridx_entry_t xentbuf;
 		ridx_entry_t *xent = &xentbuf;
 
-		estat = ridx_entry_read(gcl, rec->recno, gcl->pname, xent);
+		estat = ridx_entry_read(gob, rec->recno, gob->pname, xent);
 		if (!EP_STAT_ISOK(estat))
 		{
 			char ebuf[80];
@@ -1087,7 +1087,7 @@ fail0:
 
 
 EP_STAT
-check_tidx_db(gdp_gcl_t *gcl, struct ctx *ctx, const char **phasep)
+check_tidx_db(gdp_gob_t *gob, struct ctx *ctx, const char **phasep)
 {
 	EP_STAT estat = EP_STAT_OK;
 
@@ -1096,10 +1096,10 @@ check_tidx_db(gdp_gcl_t *gcl, struct ctx *ctx, const char **phasep)
 	DB_ENV *dbenv = NULL;
 	DB *dbp = NULL;
 	int istat;
-	char tidx_pbuf[GCL_PATH_MAX];
+	char tidx_pbuf[GOB_PATH_MAX];
 
-	phase = "tidx_get_gcl_path";
-	estat = get_gcl_path(gcl, -1, GCL_TIDX_SUFFIX,
+	phase = "tidx_get_gob_path";
+	estat = get_gob_path(gob, -1, GCL_TIDX_SUFFIX,
 					tidx_pbuf, sizeof tidx_pbuf);
 
 	// first do a low-level verify on the database
@@ -1132,7 +1132,7 @@ fail1:
 
 
 EP_STAT
-do_check(gdp_gcl_t *gcl, struct ctx *ctx)
+do_check(gdp_gob_t *gob, struct ctx *ctx)
 {
 	EP_STAT estat;
 	const char *phase;
@@ -1144,21 +1144,21 @@ do_check(gdp_gcl_t *gcl, struct ctx *ctx)
 
 	// open recno index for read
 	phase = "ridx_open";
-	estat = ridx_open(gcl, GCL_RIDX_SUFFIX, O_RDONLY);
+	estat = ridx_open(gob, GCL_RIDX_SUFFIX, O_RDONLY);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// check timestamp database
 	phase = "tidx_check";
-	estat = check_tidx_db(gcl, ctx, &phase);
+	estat = check_tidx_db(gob, ctx, &phase);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// open timestamp index for read
 	phase = "tidx_open";
-	estat = tidx_open(gcl, GCL_TIDX_SUFFIX, O_RDONLY);
+	estat = tidx_open(gob, GCL_TIDX_SUFFIX, O_RDONLY);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	phase = NULL;
-	estat = scan_recs(gcl, check_segment, check_record, ctx);
+	estat = scan_recs(gob, check_segment, check_record, ctx);
 
 	// output result of record number scanning
 	recseq_last_recno(ctx);
@@ -1208,7 +1208,7 @@ rebuild_segment(
 
 EP_STAT
 rebuild_record(
-			gdp_gcl_t *gcl,
+			gdp_gob_t *gob,
 			segment_record_t *rec,
 			off_t offset,
 			segment_t *seg,
@@ -1218,16 +1218,16 @@ rebuild_record(
 
 	// do some sanity checking on the record header; if it isn't good
 	// we'll just report the record and skip it for rebuilding
-	if ((rec->recno < GETPHYS(gcl)->ridx.min_recno) ||
+	if ((rec->recno < GETPHYS(gob)->ridx.min_recno) ||
 			(MaxRecno > 0 && rec->recno > MaxRecno))
 	{
 		if (!Flags.silent && !Flags.summaryonly)
 		{
 			ep_app_message(GDP_STAT_CORRUPT_GCL, "%s\n"
-					"    Corrupt GCL: recno = %" PRIgdp_recno
+					"    Corrupt GOB: recno = %" PRIgdp_recno
 					", min = %" PRIgdp_recno " (ignoring)",
-					gcl->pname,
-					rec->recno, GETPHYS(gcl)->ridx.min_recno);
+					gob->pname,
+					rec->recno, GETPHYS(gob)->ridx.min_recno);
 		}
 		// return OK since (presumably) the damage has been repaired
 		return EP_STAT_OK;
@@ -1236,11 +1236,11 @@ rebuild_record(
 	if (!Flags.tidx_only)
 	{
 		// output info to ridx
-		estat1 = ridx_put(gcl, rec->recno, seg->segno, offset);
+		estat1 = ridx_put(gob, rec->recno, seg->segno, offset);
 	}
 
 	// output info to tidx
-	EP_STAT estat2 = tidx_put(gcl,
+	EP_STAT estat2 = tidx_put(gob,
 					rec->timestamp.tv_sec, rec->timestamp.tv_nsec,
 					rec->recno);
 
@@ -1268,49 +1268,49 @@ askuser(const char *query, bool nullanswer)
 
 
 void
-remove_temp_files(gdp_gcl_t *gcl)
+remove_temp_files(gdp_gob_t *gob)
 {
 	// remove the temporary indexes
-	char temp_path[GCL_PATH_MAX];
+	char temp_path[GOB_PATH_MAX];
 	if (!Flags.tidx_only)
 	{
-		get_gcl_path(gcl, -1, ".tmpridx", temp_path, sizeof temp_path);
+		get_gob_path(gob, -1, ".tmpridx", temp_path, sizeof temp_path);
 		unlink(temp_path);
 	}
 
-	get_gcl_path(gcl, -1, ".tmptidx", temp_path, sizeof temp_path);
+	get_gob_path(gob, -1, ".tmptidx", temp_path, sizeof temp_path);
 	unlink(temp_path);
 }
 
 
 EP_STAT
-do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
+do_rebuild(gdp_gob_t *gob, struct ctx *ctx)
 {
 	EP_STAT estat;
 	const char *phase;
-	gcl_physinfo_t *phys = GETPHYS(gcl);
+	gob_physinfo_t *phys = GETPHYS(gob);
 	bool install_new_files = Flags.force;
 
 	// check the tidx database (this is just to see if we need to reinstall)
-	estat = check_tidx_db(gcl, ctx, &phase);
+	estat = check_tidx_db(gob, ctx, &phase);
 	EP_STAT_CHECK(estat, install_new_files = true);
 
 	if (!Flags.tidx_only)
 	{
 		// create temporary recno index
 		phase = "create ridx temp";
-		estat = ridx_create(gcl, ".tmpridx", (gdp_recno_t) 1, FLAG_TMPFILE);
+		estat = ridx_create(gob, ".tmpridx", (gdp_recno_t) 1, FLAG_TMPFILE);
 		EP_STAT_CHECK(estat, goto fail0);
 	}
 
 	// create temporary timestamp index
 	phase = "create tidx temp";
-	estat = tidx_create(gcl, ".tmptidx", FLAG_TMPFILE);
+	estat = tidx_create(gob, ".tmptidx", FLAG_TMPFILE);
 	EP_STAT_CHECK(estat, goto fail1);
 
 	// do the actual scan
 	phase = "rebuild";
-	estat = scan_recs(gcl, rebuild_segment, rebuild_record, ctx);
+	estat = scan_recs(gob, rebuild_segment, rebuild_record, ctx);
 
 	// close the temporary indices
 	if (!Flags.tidx_only)
@@ -1324,10 +1324,10 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 	if (EP_STAT_ISOK(estat))
 	{
 		struct stat tidx_stat;
-		char pbuf[GCL_PATH_MAX];
+		char pbuf[GOB_PATH_MAX];
 
 		// if no tidx file exists, always ask if you want to install
-		estat = get_gcl_path(gcl, -1, GCL_TIDX_SUFFIX, pbuf, sizeof pbuf);
+		estat = get_gob_path(gob, -1, GCL_TIDX_SUFFIX, pbuf, sizeof pbuf);
 		if (!EP_STAT_ISOK(estat))
 		{
 			install_new_files = true;
@@ -1339,12 +1339,12 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 		}
 		else
 		{
-			char tmptidx[GCL_PATH_MAX];
+			char tmptidx[GOB_PATH_MAX];
 			struct stat tmptidx_stat;
 
 			// heuristic: check to see if size has changed
 			// XXX: should really check to see if content has changed
-			estat = get_gcl_path(gcl, -1, ".tmptidx", tmptidx, sizeof tmptidx);
+			estat = get_gob_path(gob, -1, ".tmptidx", tmptidx, sizeof tmptidx);
 			if (EP_STAT_ISOK(estat) &&
 					stat(tmptidx, &tmptidx_stat) >= 0 &&
 					tmptidx_stat.st_size != tidx_stat.st_size)
@@ -1378,30 +1378,30 @@ do_rebuild(gdp_gcl_t *gcl, struct ctx *ctx)
 	if (install_new_files)
 	{
 		// move the new indexes into place
-		char real_path[GCL_PATH_MAX];
-		char save_path[GCL_PATH_MAX];
-		char temp_path[GCL_PATH_MAX];
+		char real_path[GOB_PATH_MAX];
+		char save_path[GOB_PATH_MAX];
+		char temp_path[GOB_PATH_MAX];
 
 		ep_app_info("installing new files for %s", ctx->logxname);
 
 		if (!Flags.tidx_only)
 		{
-			get_gcl_path(gcl, -1, GCL_RIDX_SUFFIX, real_path, sizeof real_path);
-			get_gcl_path(gcl, -1, ".oldridx", save_path, sizeof save_path);
-			get_gcl_path(gcl, -1, ".tmpridx", temp_path, sizeof temp_path);
+			get_gob_path(gob, -1, GCL_RIDX_SUFFIX, real_path, sizeof real_path);
+			get_gob_path(gob, -1, ".oldridx", save_path, sizeof save_path);
+			get_gob_path(gob, -1, ".tmpridx", temp_path, sizeof temp_path);
 			rename(real_path, save_path);
 			rename(temp_path, real_path);
 		}
 
-		get_gcl_path(gcl, -1, GCL_TIDX_SUFFIX, real_path, sizeof real_path);
-		get_gcl_path(gcl, -1, ".oldtidx", save_path, sizeof save_path);
-		get_gcl_path(gcl, -1, ".tmptidx", temp_path, sizeof temp_path);
+		get_gob_path(gob, -1, GCL_TIDX_SUFFIX, real_path, sizeof real_path);
+		get_gob_path(gob, -1, ".oldtidx", save_path, sizeof save_path);
+		get_gob_path(gob, -1, ".tmptidx", temp_path, sizeof temp_path);
 		rename(real_path, save_path);
 		rename(temp_path, real_path);
 	}
 	else
 	{
-		remove_temp_files(gcl);
+		remove_temp_files(gob);
 	}
 
 	if (false)
@@ -1422,7 +1422,7 @@ fail0:
 }
 
 
-gdp_gcl_t	*CurrentGcl;		// only for cleanup on signal during rebuild
+gdp_gob_t	*CurrentGcl;		// only for cleanup on signal during rebuild
 
 void
 sigint(int sig)
@@ -1442,8 +1442,8 @@ EP_STAT
 scan_log(const char *logxname, bool rebuild)
 {
 	EP_STAT estat;
-	gdp_gcl_t *gcl;
-	char pbuf[GCL_PATH_MAX];
+	gdp_gob_t *gob;
+	char pbuf[GOB_PATH_MAX];
 	struct ctx ctxbuf;
 	struct ctx *ctx = &ctxbuf;
 
@@ -1456,16 +1456,16 @@ scan_log(const char *logxname, bool rebuild)
 	memset(&ctxbuf, 0, sizeof ctxbuf);
 	ctx->logxname = logxname;
 
-	estat = open_fake_gcl(logxname, &gcl);
+	estat = open_fake_gob(logxname, &gob);
 	EP_STAT_CHECK(estat, return estat);
 
 	// this is just to get the root of the log name
-	estat = get_gcl_path(gcl, -1, "", pbuf, sizeof pbuf);
+	estat = get_gob_path(gob, -1, "", pbuf, sizeof pbuf);
 
 	char *lname = strrchr(pbuf, '/');
 	if (lname == NULL)
 	{
-		ep_app_severe("Bad GCL path %s", pbuf);
+		ep_app_severe("Bad GOB path %s", pbuf);
 		return EP_STAT_SEVERE;
 	}
 	*lname++ = '\0';
@@ -1473,7 +1473,7 @@ scan_log(const char *logxname, bool rebuild)
 	// pbuf now has the directory name, lname has the root (printable) log name
 
 	// find the segment files applicable to this log
-	estat = find_segs(gcl);
+	estat = find_segs(gob);
 	if (!EP_STAT_ISOK(estat))
 	{
 		// nothing found or error
@@ -1483,21 +1483,21 @@ scan_log(const char *logxname, bool rebuild)
 
 	if (rebuild)
 	{
-		CurrentGcl = gcl;
-		estat = do_rebuild(gcl, ctx);
+		CurrentGcl = gob;
+		estat = do_rebuild(gob, ctx);
 		CurrentGcl = NULL;
 	}
 	else
 	{
-		estat = do_check(gcl, ctx);
+		estat = do_check(gob, ctx);
 	}
 
 	// free up physical info (also closes files, etc.)
-	physinfo_free(GETPHYS(gcl));
-	gcl->x->physinfo = NULL;
-	ep_mem_free(gcl->x);
-	gcl->x = NULL;
-	ep_mem_free(gcl);
+	physinfo_free(GETPHYS(gob));
+	gob->x->physinfo = NULL;
+	ep_mem_free(gob->x);
+	gob->x = NULL;
+	ep_mem_free(gob);
 
 	return estat;
 }

@@ -41,7 +41,7 @@ void			sub_end_subscription(gdp_req_t *req);
 
 // terminate all subscriptions for a given {gcl, client, rid} tuple
 EP_STAT			sub_end_all_subscriptions(
-						gdp_gcl_t *gcl,
+						gdp_gob_t *gob,
 						gdp_name_t dest,
 						gdp_rid_t rid);
 

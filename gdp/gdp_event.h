@@ -42,7 +42,7 @@ struct gdp_event
 {
 	STAILQ_ENTRY(gdp_event)	queue;		// free/active queue link
 	int						type;		// event type
-	gdp_gcl_t				*gcl;		// GCL handle for event
+	gdp_gin_t				*gin;		// GCL instance for event
 	gdp_datum_t				*datum;		// datum for event
 	gdp_event_cbfunc_t		cb;			// callback for event
 	void					*udata;		// user data
@@ -62,5 +62,9 @@ extern EP_STAT			_gdp_event_add_from_req(
 // add pending events to appropriate current queue
 extern void				_gdp_event_trigger_pending(
 								struct gev_list *glist);
+
+// free all events for a given GCL instance
+EP_STAT					_gdp_event_free_all(
+								gdp_gin_t *gin);
 
 #endif // _GDP_EVENT_H_

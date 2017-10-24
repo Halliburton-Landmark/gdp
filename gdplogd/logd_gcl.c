@@ -32,43 +32,42 @@
 #include "logd_pubsub.h"
 
 #if !LOG_CHECK
-static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.gcl", "GDP Log Daemon GCL handling");
+static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.gob", "GDP Log Daemon GOB handling");
 #endif
 
 
 /*
-**  GCL_ALLOC --- allocate a new GCL handle in memory
+**  GOB_ALLOC --- allocate a new GOB handle in memory
 */
 
 EP_STAT
-gcl_alloc(gdp_name_t gcl_name, gdp_iomode_t iomode, gdp_gcl_t **pgcl)
+gob_alloc(gdp_name_t gob_name, gdp_iomode_t iomode, gdp_gob_t **pgob)
 {
 	EP_STAT estat;
-	gdp_gcl_t *gcl;
-	extern void gcl_close(gdp_gcl_t *gcl);
+	gdp_gob_t *gob;
+	extern void gob_close(gdp_gob_t *gob);
 
 	// get the standard handle
-	estat = _gdp_gcl_newhandle(gcl_name, &gcl);
+	estat = _gdp_gob_new(gob_name, &gob);
 	EP_STAT_CHECK(estat, goto fail0);
-	gcl->iomode = GDP_MODE_ANY;		// might change mode later: be permissive
 
 	// add the gdpd-specific information
-	gcl->x = ep_mem_zalloc(sizeof *gcl->x);
-	if (gcl->x == NULL)
+	gob->x = ep_mem_zalloc(sizeof *gob->x);
+	if (gob->x == NULL)
 	{
 		estat = EP_STAT_OUT_OF_MEMORY;
 		goto fail0;
 	}
-	gcl->x->gcl = gcl;
+	gob->x->gob = gob;
 
-	//XXX for now, assume all GCLs are on disk
-	gcl->x->physimpl = &GdpDiskImpl;
+	//XXX for now, assume all GOBs are on disk
+	gob->x->physimpl = &GdpDiskImpl;
 
 	// make sure that if this is freed it gets removed from GclsByUse
-	gcl->freefunc = gcl_close;
+	gob->freefunc = gob_close;
 
 	// OK, return the value
-	*pgcl = gcl;
+	*pgob = gob;
 
 fail0:
 	return estat;
@@ -76,63 +75,63 @@ fail0:
 
 
 /*
-**  GCL_CLOSE --- close a GDP version of a GCL handle
+**  GOB_CLOSE --- close a GDP version of a GOB handle
 **
-**		Called from _gdp_gcl_freehandle, generally when the reference
-**		count drops to zero and the GCL is reclaimed.
+**		Called from _gdp_gob_freehandle, generally when the reference
+**		count drops to zero and the GOB is reclaimed.
 */
 
 void
-gcl_close(gdp_gcl_t *gcl)
+gob_close(gdp_gob_t *gob)
 {
-	if (gcl->x == NULL)
+	if (gob->x == NULL)
 		return;
 
 	// close the underlying files and free memory as needed
-	if (gcl->x->physimpl->close != NULL)
-		gcl->x->physimpl->close(gcl);
+	if (gob->x->physimpl->close != NULL)
+		gob->x->physimpl->close(gob);
 
-	ep_mem_free(gcl->x);
-	gcl->x = NULL;
+	ep_mem_free(gob->x);
+	gob->x = NULL;
 }
 
 #if !LOG_CHECK
 
 /*
-**  Get an open instance of the GCL in the request.
+**  Get an open instance of the GOB in the request.
 **
-**		This maps the GCL name to the internal GCL instance.
+**		This maps the GOB name to the internal GOB instance.
 **		That open instance is returned in the request passed in.
-**		The GCL will have it's reference count bumped, so the
-**		caller must call _gdp_gcl_decref when done with it.
+**		The GOB will have it's reference count bumped, so the
+**		caller must call _gdp_gob_decref when done with it.
 **
-**		GCL is returned locked and with its reference count
+**		GOB is returned locked and with its reference count
 **		incremented.
 */
 
 static EP_STAT
-do_physical_open(gdp_gcl_t *gcl, void *open_info_)
+do_physical_open(gdp_gob_t *gob, void *open_info_)
 {
 	EP_STAT estat;
 
 	if (ep_dbg_test(Dbg, 11))
-		ep_dbg_printf("do_physical_open: %s\n", gcl->pname);
+		ep_dbg_printf("do_physical_open: %s\n", gob->pname);
 
-	gcl->x = ep_mem_zalloc(sizeof *gcl->x);
-	gcl->x->gcl = gcl;
+	gob->x = ep_mem_zalloc(sizeof *gob->x);
+	gob->x->gob = gob;
 
-	//XXX for now, assume all GCLs are on disk
-	gcl->x->physimpl = &GdpDiskImpl;
+	//XXX for now, assume all GOBs are on disk
+	gob->x->physimpl = &GdpDiskImpl;
 
 	// make sure that if this is freed it gets removed from GclsByUse
-	gcl->freefunc = gcl_close;
+	gob->freefunc = gob_close;
 
 	// open the physical disk files
-	estat = gcl->x->physimpl->open(gcl);
+	estat = gob->x->physimpl->open(gob);
 	if (EP_STAT_ISOK(estat))
 	{
-		gcl->flags |= GCLF_DEFER_FREE;
-		gcl->flags &= ~GCLF_PENDING;
+		gob->flags |= GCLF_DEFER_FREE;
+		gob->flags &= ~GCLF_PENDING;
 	}
 	else
 	{
@@ -146,7 +145,7 @@ do_physical_open(gdp_gcl_t *gcl, void *open_info_)
 
 
 EP_STAT
-get_open_handle(gdp_req_t *req, gdp_iomode_t iomode)
+get_open_handle(gdp_req_t *req)
 {
 	EP_STAT estat;
 
@@ -155,7 +154,7 @@ get_open_handle(gdp_req_t *req, gdp_iomode_t iomode)
 
 	// if we already got this (e.g., in _gdp_pdu_process or in cache),
 	//		just let it be
-	if (req->gcl != NULL)
+	if (req->gob != NULL)
 	{
 		estat = EP_STAT_OK;
 		if (ep_dbg_test(Dbg, 40))
@@ -163,8 +162,8 @@ get_open_handle(gdp_req_t *req, gdp_iomode_t iomode)
 			gdp_pname_t pname;
 
 			gdp_printable_name(req->cpdu->dst, pname);
-			ep_dbg_printf("get_open_handle: using existing GCL:\n\t%s => %p\n",
-					pname, req->gcl);
+			ep_dbg_printf("get_open_handle: using existing GOB:\n\t%s => %p\n",
+					pname, req->gob);
 		}
 	}
 	else
@@ -180,13 +179,12 @@ get_open_handle(gdp_req_t *req, gdp_iomode_t iomode)
 		// it should be safe to unlock the req here, since we should hold the
 		// only reference, and we need to get the lock ordering right
 		_gdp_req_unlock(req);
-		estat = _gdp_gcl_cache_get(req->cpdu->dst, iomode,
-							GGCF_CREATE, &req->gcl);
+		estat = _gdp_gob_cache_get(req->cpdu->dst, GGCF_CREATE, &req->gob);
 		_gdp_req_lock(req);
-		if (EP_STAT_ISOK(estat) && EP_UT_BITSET(GCLF_PENDING, req->gcl->flags))
-			estat = do_physical_open(req->gcl, NULL);
-		if (!EP_STAT_ISOK(estat) && req->gcl != NULL)
-			_gdp_gcl_decref(&req->gcl, false);
+		if (EP_STAT_ISOK(estat) && EP_UT_BITSET(GCLF_PENDING, req->gob->flags))
+			estat = do_physical_open(req->gob, NULL);
+		if (!EP_STAT_ISOK(estat) && req->gob != NULL)
+			_gdp_gob_decref(&req->gob, false);
 		if (ep_dbg_test(Dbg, 40))
 		{
 			char ebuf[60];
@@ -195,7 +193,7 @@ get_open_handle(gdp_req_t *req, gdp_iomode_t iomode)
 			gdp_printable_name(req->cpdu->dst, pname);
 			ep_stat_tostr(estat, ebuf, sizeof ebuf);
 			ep_dbg_printf("get_open_handle: %s => %p: %s\n",
-					pname, req->gcl, ebuf);
+					pname, req->gob, ebuf);
 		}
 	}
 	return estat;

@@ -45,6 +45,7 @@
 #include <ep/ep_string.h>
 
 #include "gdp.h"
+#include "gdp_event.h"
 #include "gdp_gclmd.h"
 #include "gdp_stat.h"
 #include "gdp_priv.h"
@@ -56,6 +57,10 @@
 #include <string.h>
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.api", "C API for GDP");
+
+static EP_THR_MUTEX		GinFreeListMutex	EP_THR_MUTEX_INITIALIZER;
+SLIST_HEAD(gin_list_head, gdp_gin)
+						GinFreeList			= SLIST_HEAD_INITIALIZER(GinFreeList);
 
 
 /*
@@ -71,7 +76,7 @@ static EP_THR_MUTEX		OpenMutex		EP_THR_MUTEX_INITIALIZER;
 
 
 static void
-prstat(EP_STAT estat, const gdp_gcl_t *gcl, const char *where)
+prstat(EP_STAT estat, const gdp_gin_t *gin, const char *where)
 {
 	int dbglev = 2;
 	char ebuf[100];
@@ -80,7 +85,7 @@ prstat(EP_STAT estat, const gdp_gcl_t *gcl, const char *where)
 		dbglev = 39;
 	else if (EP_STAT_ISWARN(estat))
 		dbglev = 11;
-	if (gcl == NULL)
+	if (gin == NULL || gin->gob == NULL)
 	{
 		ep_dbg_cprintf(Dbg, dbglev, "<<< %s: %s\n",
 				where, ep_stat_tostr(estat, ebuf, sizeof ebuf));
@@ -88,33 +93,169 @@ prstat(EP_STAT estat, const gdp_gcl_t *gcl, const char *where)
 	else
 	{
 		ep_dbg_cprintf(Dbg, dbglev, "<<< %s(%s): %s\n",
-				where, gcl->pname, ep_stat_tostr(estat, ebuf, sizeof ebuf));
+				where, gin->gob->pname,
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 }
 
+
+/*
+**  Generic GDP Object Instance (GIN) code.
+*/
+
 static EP_STAT
-bad_gcl(const gdp_gcl_t *gcl, const char *where)
+bad_gin(const gdp_gin_t *gin, const char *where, const char *xtra)
 {
 	EP_STAT estat;
+	char wbuf[256];
 
-	if (gcl == NULL)
+	if (where != NULL && xtra != NULL)
+	{
+		snprintf(wbuf, sizeof wbuf, "%s/%s", where, xtra);
+		where = wbuf;
+	}
+	if (gin == NULL)
 		estat = GDP_STAT_NULL_GCL;
 	else
 		estat = GDP_STAT_GCL_NOT_OPEN;
-	prstat(estat, gcl, where);
+	prstat(estat, gin, where);
 	return estat;
 }
 
+void
+_gdp_gin_lock_trace(gdp_gin_t *gin,
+					const char *file,
+					int line,
+					const char *id)
+{
+	_ep_thr_mutex_lock(&gin->mutex, file, line, id);
+	gin->flags |= GCLF_ISLOCKED;
+}
 
-#define CHECK_AND_LOCK_GCL(gcl, where)										\
-				if ((gcl) == NULL)											\
-					return bad_gcl((gcl), (where));							\
-				_gdp_gcl_lock((gcl));										\
-				if (!EP_UT_BITSET(GCLF_INUSE, (gcl)->flags))				\
-				{															\
-					_gdp_gcl_unlock((gcl));									\
-					return bad_gcl((gcl), (where));							\
-				}
+void
+_gdp_gin_unlock_trace(gdp_gin_t *gin,
+					const char *file,
+					int line,
+					const char *id)
+{
+	gin->flags &= ~GCLF_ISLOCKED;
+	_ep_thr_mutex_unlock(&gin->mutex, file, line, id);
+}
+
+static EP_STAT
+check_and_lock_gin(gdp_gin_t *gin, const char *where)
+{
+	if (gin == NULL)
+		return bad_gin(gin, where, "null gin");
+	_gdp_gin_lock(gin);
+	if (!EP_UT_BITSET(GCLF_INUSE, gin->flags))
+	{
+		_gdp_gin_unlock(gin);
+		return bad_gin(gin, where, "gin not inuse");
+	}
+	if (gin->gob == NULL)
+	{
+		_gdp_gin_unlock(gin);
+		return bad_gin(gin, where, "null gob");
+	}
+	return EP_STAT_OK;
+}
+
+static EP_STAT
+check_and_lock_gin_and_gob(gdp_gin_t *gin, const char *where)
+{
+	EP_STAT estat;
+
+	estat = check_and_lock_gin(gin, where);
+	EP_STAT_CHECK(estat, return estat);
+	_gdp_gob_lock(gin->gob);
+	if (!EP_UT_BITSET(GCLF_INUSE, gin->gob->flags))
+	{
+		_gdp_gob_unlock(gin->gob);
+		_gdp_gin_unlock(gin);
+		return bad_gin(gin, where, "gob not inuse");
+	}
+	if (gin->gob->refcnt <= 0)
+	{
+		_gdp_gob_unlock(gin->gob);
+		_gdp_gin_unlock(gin);
+		return bad_gin(gin, where, "gob bad refcnt");
+	}
+	return EP_STAT_OK;
+}
+
+static void
+unlock_gin_and_gob(gdp_gin_t *gin, const char *where)
+{
+	_gdp_gob_unlock(gin->gob);
+	_gdp_gin_unlock(gin);
+}
+
+
+/*
+**  Allocate and Free GCL instance handles.
+*/
+
+gdp_gin_t *
+_gdp_gin_new(gdp_gob_t *gob)
+{
+	gdp_gin_t *gin = NULL;
+
+	for (;;)
+	{
+		ep_thr_mutex_lock(&GinFreeListMutex);
+		if ((gin = SLIST_FIRST(&GinFreeList)) != NULL)
+			SLIST_REMOVE_HEAD(&GinFreeList, next);
+		ep_thr_mutex_unlock(&GinFreeListMutex);
+		if (gin == NULL || !EP_UT_BITSET(GCLF_INUSE, gin->flags))
+			break;
+
+		// gin from freelist is allocated --- abandon it
+		EP_ASSERT_PRINT("_gdp_gin_new: allocated gin %p on free list", gin);
+	}
+
+	if (gin == NULL)
+	{
+		gin = ep_mem_zalloc(sizeof *gin);
+		ep_thr_mutex_init(&gin->mutex, EP_THR_MUTEX_DEFAULT);
+		ep_thr_mutex_setorder(&gin->mutex, GDP_MUTEX_LORDER_GIN);
+	}
+
+	gin->flags = GCLF_INUSE;
+	gin->gob = gob;
+	if (gob != NULL)
+		_gdp_gob_incref(gob);
+
+	VALGRIND_HG_CLEAN_MEMORY(gin, sizeof gin);
+	ep_dbg_cprintf(Dbg, 48, "_gdp_gin_new => %p\n", gin);
+	return gin;
+}
+
+void
+_gdp_gin_free(gdp_gin_t *gin)
+{
+	ep_dbg_cprintf(Dbg, 28, "_gdp_gin_free(%p)\n", gin);
+	if (gin == NULL)
+		return;
+	if (!EP_ASSERT(EP_UT_BITSET(GCLF_INUSE, gin->flags)))
+		return;
+	GDP_GIN_ASSERT_ISLOCKED(gin);
+
+	_gdp_event_free_all(gin);
+	gin->flags = 0;
+
+	if (gin->gob != NULL)
+	{
+		GDP_GOB_ASSERT_ISLOCKED(gin->gob);
+		_gdp_gob_decref(&gin->gob, false);
+	}
+
+	// put gin handle on freelist
+	ep_thr_mutex_lock(&GinFreeListMutex);
+	SLIST_INSERT_HEAD(&GinFreeList, gin, next);
+	_gdp_gin_unlock(gin);
+	ep_thr_mutex_unlock(&GinFreeListMutex);
+}
 
 
 /*
@@ -122,14 +263,14 @@ bad_gcl(const gdp_gcl_t *gcl, const char *where)
 */
 
 const gdp_name_t *
-gdp_gcl_getname(const gdp_gcl_t *gcl)
+gdp_gcl_getname(const gdp_gcl_t *gin)
 {
-	if (!GDP_GCL_ISGOOD(gcl))
+	if (!GDP_GIN_ISGOOD(gin))
 	{
-		(void) bad_gcl(gcl, "gdp_gcl_getname");
+		(void) bad_gin(gin, "gdp_gcl_getname", NULL);
 		return NULL;
 	}
-	return &gcl->name;
+	return &gin->gob->name;
 }
 
 
@@ -271,14 +412,14 @@ gdp_name_is_valid(const gdp_name_t name)
 */
 
 gdp_recno_t
-gdp_gcl_getnrecs(const gdp_gcl_t *gcl)
+gdp_gcl_getnrecs(const gdp_gcl_t *gin)
 {
-	if (!GDP_GCL_ISGOOD(gcl))
+	if (!GDP_GIN_ISGOOD(gin))
 	{
-		(void) bad_gcl(gcl, "gdp_gcl_getnrecs");
+		(void) bad_gin(gin, "gdp_gcl_getnrecs", NULL);
 		return GDP_PDU_NO_RECNO;
 	}
-	return gcl->nrecs;
+	return gin->gob->nrecs;
 }
 
 
@@ -288,11 +429,18 @@ gdp_gcl_getnrecs(const gdp_gcl_t *gcl)
 
 void
 gdp_gcl_print(
-		const gdp_gcl_t *gcl,
+		const gdp_gcl_t *gin,
 		FILE *fp)
 {
-	// _gdp_gcl_dump handles null gcl properly
-	_gdp_gcl_dump(gcl, fp, GDP_PR_PRETTY, 0);
+	if (!GDP_GIN_ISGOOD(gin))
+	{
+		(void) bad_gin(gin, "gdp_gin_print", NULL);
+	}
+	else
+	{
+		// _gdp_gob_dump handles null gob properly
+		_gdp_gob_dump(gin->gob, fp, GDP_PR_PRETTY, 0);
+	}
 }
 
 
@@ -311,7 +459,7 @@ gdp_exit_debug(void)
 	if (ep_dbg_test(Dbg, 10))
 	{
 		_gdp_req_pr_stats(ep_dbg_getfile());
-		_gdp_gcl_pr_stats(ep_dbg_getfile());
+		_gdp_gob_pr_stats(ep_dbg_getfile());
 	}
 }
 
@@ -380,6 +528,8 @@ gdp_gcl_create(gdp_name_t gclname,
 {
 	EP_STAT estat;
 	gdp_name_t namebuf;
+	gdp_gob_t *gob = NULL;
+	gdp_gin_t *gin = NULL;
 
 	ep_dbg_cprintf(Dbg, 19, "\n>>> gdp_gcl_create\n");
 	estat = GDP_CHECK_INITIALIZED;		// make sure gdp_init is done
@@ -394,21 +544,24 @@ gdp_gcl_create(gdp_name_t gclname,
 		_gdp_newname(gclname, gmd);
 	}
 
-	estat = _gdp_gcl_create(gclname, logdname, gmd, _GdpChannel,
-					GDP_REQ_ALLOC_RID, pgcl);
+	estat = _gdp_gob_create(gclname, logdname, gmd, _GdpChannel,
+					GDP_REQ_ALLOC_RID, &gob);
 	if (EP_STAT_ISOK(estat))
 	{
-		if (!EP_ASSERT(GDP_GCL_ISGOOD(*pgcl)))
+		if (!EP_ASSERT(GDP_GOB_ISGOOD(gob)))
 			estat = EP_STAT_ASSERT_ABORT;
-		(*pgcl)->iomode = GDP_MODE_ANY;
+		gin = _gdp_gin_new(gob);
+		gin->iomode = GDP_MODE_ANY;
 	}
 	else
 	{
 fail0:
-		*pgcl = NULL;
+		if (gob != NULL)
+			_gdp_gob_free(&gob);
 	}
 	ep_thr_mutex_unlock(&GclCreateMutex);
-	prstat(estat, *pgcl, "gdp_gcl_create");
+	prstat(estat, gin, "gdp_gcl_create");
+	*pgcl = gin;
 	return estat;
 }
 
@@ -423,10 +576,10 @@ EP_STAT
 gdp_gcl_open(gdp_name_t name,
 			gdp_iomode_t iomode,
 			gdp_gcl_open_info_t *open_info,
-			gdp_gcl_t **pgcl)
+			gdp_gcl_t **pgin)
 {
 	EP_STAT estat;
-	gdp_gcl_t *gcl = NULL;
+	gdp_gob_t *gob = NULL;
 	int cmd;
 
 	if (ep_dbg_test(Dbg, 19))
@@ -462,32 +615,32 @@ gdp_gcl_open(gdp_name_t name,
 	ep_thr_mutex_lock(&OpenMutex);
 
 	// see if we already have this open (and initiate open if not)
-	estat = _gdp_gcl_cache_get(name, iomode, GGCF_CREATE, &gcl);
+	estat = _gdp_gob_cache_get(name, GGCF_CREATE, &gob);
 	EP_STAT_CHECK(estat, goto fail0);
-	EP_ASSERT(gcl != NULL);
-	GDP_GCL_ASSERT_ISLOCKED(gcl);
+	EP_ASSERT(gob != NULL);
+	GDP_GOB_ASSERT_ISLOCKED(gob);
 
 	// if open is partially complete, finish the job
-	if (EP_UT_BITSET(GCLF_PENDING, gcl->flags))
+	if (EP_UT_BITSET(GCLF_PENDING, gob->flags))
 	{
-		estat = _gdp_gcl_open(gcl, cmd, open_info, _GdpChannel, 0);
+		estat = _gdp_gob_open(gob, cmd, open_info, _GdpChannel, 0);
 		EP_STAT_CHECK(estat, goto fail0);
 	}
 
 	if (open_info != NULL && open_info->keep_in_cache)
 	{
-		gcl->flags |= GCLF_DEFER_FREE;
+		gob->flags |= GCLF_DEFER_FREE;
 		_gdp_reclaim_resources_init(NULL);
 	}
-	gcl->flags &= ~GCLF_PENDING;
-	_gdp_gcl_unlock(gcl);
-	*pgcl = gcl;
+	gob->flags &= ~GCLF_PENDING;
+	*pgin = _gdp_gin_new(gob);
+	_gdp_gob_unlock(gob);
 
 fail0:
-	prstat(estat, gcl, "gdp_gcl_open");
-	if (gcl != NULL && !EP_STAT_ISOK(estat))
-		_gdp_gcl_freehandle(gcl);
+	if (gob != NULL && !EP_STAT_ISOK(estat))
+		_gdp_gob_free(&gob);
 	ep_thr_mutex_unlock(&OpenMutex);
+	prstat(estat, *pgin, "gdp_gcl_open");
 	return estat;
 }
 
@@ -497,14 +650,16 @@ fail0:
 */
 
 EP_STAT
-gdp_gcl_close(gdp_gcl_t *gcl)
+gdp_gcl_close(gdp_gcl_t *gin)
 {
 	EP_STAT estat;
 
-	CHECK_AND_LOCK_GCL(gcl, "gdp_gcl_close");
-	ep_dbg_cprintf(Dbg, 19, "\n>>> gdp_gcl_close(%s)\n", gcl->pname);
-	estat = _gdp_gcl_close(gcl, _GdpChannel, 0);
-	prstat(estat, gcl, "gdp_gcl_close");
+	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_close");
+	EP_STAT_CHECK(estat, return estat);
+	ep_dbg_cprintf(Dbg, 19, "\n>>> gdp_gcl_close(%s)\n", gin->gob->pname);
+	estat = _gdp_gin_close(gin, _GdpChannel, 0);
+	_gdp_gin_free(gin);
+	prstat(estat, gin, "gdp_gcl_close");
 	return estat;
 }
 
@@ -514,15 +669,23 @@ gdp_gcl_close(gdp_gcl_t *gcl)
 */
 
 EP_STAT
-gdp_gcl_append(gdp_gcl_t *gcl, gdp_datum_t *datum)
+gdp_gcl_append(gdp_gcl_t *gin, gdp_datum_t *datum)
 {
 	EP_STAT estat;
+	gdp_datum_t zdatum;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_append\n");
-	CHECK_AND_LOCK_GCL(gcl, "gdp_gcl_append");
-	estat = _gdp_gcl_append(gcl, datum, _GdpChannel, 0);
-	_gdp_gcl_unlock(gcl);
-	prstat(estat, gcl, "gdp_gcl_append");
+	if (!GDP_DATUM_ISGOOD(datum))
+		return GDP_STAT_DATUM_REQUIRED;
+	zdatum = *datum;
+	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_append");
+	EP_STAT_CHECK(estat, return estat);
+	if (gin->apndfilter != NULL)
+		estat = gin->apndfilter(&zdatum, gin->apndfpriv);
+	if (EP_STAT_ISOK(estat))
+		estat = _gdp_gob_append(gin->gob, &zdatum, _GdpChannel, 0);
+	unlock_gin_and_gob(gin, "gdp_gcl_append");
+	prstat(estat, gin, "gdp_gcl_append");
 	return estat;
 }
 
@@ -532,7 +695,7 @@ gdp_gcl_append(gdp_gcl_t *gcl, gdp_datum_t *datum)
 */
 
 EP_STAT
-gdp_gcl_append_async(gdp_gcl_t *gcl,
+gdp_gcl_append_async(gdp_gcl_t *gin,
 			gdp_datum_t *datum,
 			gdp_event_cbfunc_t cbfunc,
 			void *udata)
@@ -540,10 +703,11 @@ gdp_gcl_append_async(gdp_gcl_t *gcl,
 	EP_STAT estat;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_append_async\n");
-	CHECK_AND_LOCK_GCL(gcl, "gdp_gcl_append_async");
-	estat = _gdp_gcl_append_async(gcl, datum, cbfunc, udata, _GdpChannel, 0);
-	_gdp_gcl_unlock(gcl);
-	prstat(estat, gcl, "gdp_gcl_append_async");
+	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_append_async");
+	EP_STAT_CHECK(estat, return estat);
+	estat = _gdp_gob_append_async(gin->gob, datum, cbfunc, udata, _GdpChannel, 0);
+	unlock_gin_and_gob(gin, "gdp_gcl_append_async");
+	prstat(estat, gin, "gdp_gcl_append_async");
 	return estat;
 }
 
@@ -556,13 +720,13 @@ gdp_gcl_append_async(gdp_gcl_t *gcl,
 **	Should be named gdp_gcl_read_by_recno.
 **
 **		Parameters:
-**			gcl --- the gcl from which to read
+**			gin --- the gcl instance from which to read
 **			recno --- the record number to read
 **			datum --- the message header (to avoid dynamic memory)
 */
 
 EP_STAT
-gdp_gcl_read(gdp_gcl_t *gcl,
+gdp_gcl_read(gdp_gcl_t *gin,
 			gdp_recno_t recno,
 			gdp_datum_t *datum)
 {
@@ -573,10 +737,14 @@ gdp_gcl_read(gdp_gcl_t *gcl,
 	gdp_datum_reset(datum);
 	datum->recno = recno;
 
-	CHECK_AND_LOCK_GCL(gcl, "gdp_gcl_read");
-	estat = _gdp_gcl_read(gcl, datum, _GdpChannel, 0);
-	_gdp_gcl_unlock(gcl);
-	prstat(estat, gcl, "gdp_gcl_read");
+	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_read");
+	EP_STAT_CHECK(estat, return estat);
+	//XXX somehow have to convey gin->readfilter to _gdp_gob_read
+	//XXX is there any reason not to just do it here?
+	//XXX Answer: read_async and subscriptions
+	estat = _gdp_gob_read(gin->gob, datum, _GdpChannel, 0);
+	unlock_gin_and_gob(gin, "gdp_gcl_read");
+	prstat(estat, gin, "gdp_gcl_read");
 	return estat;
 }
 
@@ -587,7 +755,7 @@ gdp_gcl_read(gdp_gcl_t *gcl,
 **	The data is returned through the passed-in datum.
 **
 **		Parameters:
-**			gcl --- the gcl from which to read
+**			gin --- the gcl instance from which to read
 **			ts --- the lowest timestamp we are interested in.  The
 **				result will be the lowest timestamp that is greater than
 **				or equal to this value.
@@ -595,7 +763,7 @@ gdp_gcl_read(gdp_gcl_t *gcl,
 */
 
 EP_STAT
-gdp_gcl_read_ts(gdp_gcl_t *gcl,
+gdp_gcl_read_ts(gdp_gcl_t *gin,
 			EP_TIME_SPEC *ts,
 			gdp_datum_t *datum)
 {
@@ -606,10 +774,14 @@ gdp_gcl_read_ts(gdp_gcl_t *gcl,
 	memcpy(&datum->ts, ts, sizeof datum->ts);
 	datum->recno = GDP_PDU_NO_RECNO;
 
-	CHECK_AND_LOCK_GCL(gcl, "gdp_gcl_read_ts");
-	estat = _gdp_gcl_read(gcl, datum, _GdpChannel, 0);
-	_gdp_gcl_unlock(gcl);
-	prstat(estat, gcl, "gdp_gcl_read_ts");
+	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_read_ts");
+	EP_STAT_CHECK(estat, return estat);
+	//XXX somehow have to convey gin->readfilter to _gdp_gob_read
+	//XXX is there any reason not to just do it here?
+	//XXX Answer: read_async and subscriptions
+	estat = _gdp_gob_read(gin->gob, datum, _GdpChannel, 0);
+	unlock_gin_and_gob(gin, "gdp_gcl_read_ts");
+	prstat(estat, gin, "gdp_gcl_read_ts");
 	return estat;
 }
 
@@ -622,7 +794,7 @@ gdp_gcl_read_ts(gdp_gcl_t *gcl,
 */
 
 EP_STAT
-gdp_gcl_read_async(gdp_gcl_t *gcl,
+gdp_gcl_read_async(gdp_gcl_t *gin,
 			gdp_recno_t recno,
 			gdp_event_cbfunc_t cbfunc,
 			void *cbarg)
@@ -630,10 +802,11 @@ gdp_gcl_read_async(gdp_gcl_t *gcl,
 	EP_STAT estat;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_read_async\n");
-	CHECK_AND_LOCK_GCL(gcl, "gdp_gcl_read_async");
-	estat = _gdp_gcl_read_async(gcl, recno, cbfunc, cbarg, _GdpChannel);
-	_gdp_gcl_unlock(gcl);
-	prstat(estat, gcl, "gdp_gcl_read_async");
+	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_read_async");
+	EP_STAT_CHECK(estat, return estat);
+	estat = _gdp_gob_read_async(gin->gob, recno, cbfunc, cbarg, _GdpChannel);
+	unlock_gin_and_gob(gin, "gdp_gcl_read_async");
+	prstat(estat, gin, "gdp_gcl_read_async");
 	return estat;
 }
 
@@ -644,7 +817,7 @@ gdp_gcl_read_async(gdp_gcl_t *gcl,
 */
 
 EP_STAT
-gdp_gcl_subscribe(gdp_gcl_t *gcl,
+gdp_gcl_subscribe(gdp_gcl_t *gin,
 		gdp_recno_t start,
 		int32_t numrecs,
 		EP_TIME_SPEC *timeout,
@@ -655,23 +828,25 @@ gdp_gcl_subscribe(gdp_gcl_t *gcl,
 	gdp_req_t *req;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_subscribe\n");
-	CHECK_AND_LOCK_GCL(gcl, "gdp_gcl_subscribe");
+	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_subscribe");
+	EP_STAT_CHECK(estat, return estat);
 
 	// create the subscribe request
-	estat = _gdp_req_new(GDP_CMD_SUBSCRIBE, gcl, _GdpChannel, NULL,
+	estat = _gdp_req_new(GDP_CMD_SUBSCRIBE, gin->gob, _GdpChannel, NULL,
 			GDP_REQ_PERSIST | GDP_REQ_CLT_SUBSCR | GDP_REQ_ALLOC_RID,
 			&req);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// add start and stop parameters to PDU
+	req->gin = gin;
 	req->cpdu->datum->recno = start;
 	req->numrecs = numrecs;
 
 	// now do the hard work
 	estat = _gdp_gcl_subscribe(req, numrecs, timeout, cbfunc, cbarg);
 fail0:
-	_gdp_gcl_unlock(gcl);
-	prstat(estat, gcl, "gdp_gcl_subscribe");
+	unlock_gin_and_gob(gin, "gdp_gcl_subscribe");
+	prstat(estat, gin, "gdp_gcl_subscribe");
 	return estat;
 }
 
@@ -681,7 +856,7 @@ fail0:
 */
 
 EP_STAT
-gdp_gcl_subscribe_ts(gdp_gcl_t *gcl,
+gdp_gcl_subscribe_ts(gdp_gcl_t *gin,
 		EP_TIME_SPEC *start,
 		int32_t numrecs,
 		EP_TIME_SPEC *timeout,
@@ -692,23 +867,25 @@ gdp_gcl_subscribe_ts(gdp_gcl_t *gcl,
 	gdp_req_t *req;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_subscribe_ts\n");
-	CHECK_AND_LOCK_GCL(gcl, "gdp_gcl_subscribe_ts");
+	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_subscribe_ts");
+	EP_STAT_CHECK(estat, return estat);
 
 	// create the subscribe request
-	estat = _gdp_req_new(GDP_CMD_SUBSCRIBE, gcl, _GdpChannel, NULL,
+	estat = _gdp_req_new(GDP_CMD_SUBSCRIBE, gin->gob, _GdpChannel, NULL,
 			GDP_REQ_PERSIST | GDP_REQ_CLT_SUBSCR | GDP_REQ_ALLOC_RID,
 			&req);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// add start and stop parameters to PDU
+	req->gin = gin;
 	memcpy(&req->cpdu->datum->ts, start, sizeof req->cpdu->datum->ts);
 	req->numrecs = numrecs;
 
 	// now do the hard work
 	estat = _gdp_gcl_subscribe(req, numrecs, timeout, cbfunc, cbarg);
 fail0:
-	_gdp_gcl_unlock(gcl);
-	prstat(estat, gcl, "gdp_gcl_subscribe_ts");
+	unlock_gin_and_gob(gin, "gdp_gcl_subscribe_ts");
+	prstat(estat, gin, "gdp_gcl_subscribe_ts");
 	return estat;
 }
 
@@ -718,7 +895,7 @@ fail0:
 */
 
 EP_STAT
-gdp_gcl_unsubscribe(gdp_gcl_t *gcl,
+gdp_gcl_unsubscribe(gdp_gcl_t *gin,
 		gdp_event_cbfunc_t cbfunc,
 		void *cbarg)
 {
@@ -726,11 +903,12 @@ gdp_gcl_unsubscribe(gdp_gcl_t *gcl,
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_unsubscribe\n");
 
-	CHECK_AND_LOCK_GCL(gcl, "gdp_gcl_unsubscribe");
-	estat = _gdp_gcl_unsubscribe(gcl, cbfunc, cbarg, 0);
-	_gdp_gcl_unlock(gcl);
+	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_unsubscribe");
+	EP_STAT_CHECK(estat, return estat);
+	estat = _gdp_gcl_unsubscribe(gin, cbfunc, cbarg, 0);
+	unlock_gin_and_gob(gin, "gdp_gcl_unsubscribe");
 
-	prstat(estat, gcl, "gdp_gcl_unsubscribe");
+	prstat(estat, gin, "gdp_gcl_unsubscribe");
 	return estat;
 }
 
@@ -744,7 +922,7 @@ gdp_gcl_unsubscribe(gdp_gcl_t *gcl,
 */
 
 EP_STAT
-gdp_gcl_multiread(gdp_gcl_t *gcl,
+gdp_gcl_multiread(gdp_gcl_t *gin,
 		gdp_recno_t start,
 		int32_t numrecs,
 		gdp_event_cbfunc_t cbfunc,
@@ -756,21 +934,23 @@ gdp_gcl_multiread(gdp_gcl_t *gcl,
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_multiread\n");
 
 	// create the multiread request
-	CHECK_AND_LOCK_GCL(gcl, "gdp_gcl_multiread");
-	estat = _gdp_req_new(GDP_CMD_MULTIREAD, gcl, _GdpChannel, NULL,
+	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_multiread");
+	EP_STAT_CHECK(estat, return estat);
+	estat = _gdp_req_new(GDP_CMD_MULTIREAD, gin->gob, _GdpChannel, NULL,
 			GDP_REQ_PERSIST | GDP_REQ_CLT_SUBSCR | GDP_REQ_ALLOC_RID,
 			&req);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// add start and stop parameters to PDU
+	req->gin = gin;
 	req->cpdu->datum->recno = start;
 	req->numrecs = numrecs;
 
 	// now do the hard work
 	estat = _gdp_gcl_subscribe(req, numrecs, NULL, cbfunc, cbarg);
 fail0:
-	_gdp_gcl_unlock(gcl);
-	prstat(estat, gcl, "gdp_gcl_multiread");
+	unlock_gin_and_gob(gin, "gdp_gcl_multiread");
+	prstat(estat, gin, "gdp_gcl_multiread");
 	return estat;
 }
 
@@ -783,7 +963,7 @@ fail0:
 */
 
 EP_STAT
-gdp_gcl_multiread_ts(gdp_gcl_t *gcl,
+gdp_gcl_multiread_ts(gdp_gcl_t *gin,
 		EP_TIME_SPEC *start,
 		int32_t numrecs,
 		gdp_event_cbfunc_t cbfunc,
@@ -795,21 +975,23 @@ gdp_gcl_multiread_ts(gdp_gcl_t *gcl,
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_multiread_ts\n");
 
 	// create the multiread request
-	CHECK_AND_LOCK_GCL(gcl, "gdp_gcl_multiread");
-	estat = _gdp_req_new(GDP_CMD_MULTIREAD, gcl, _GdpChannel, NULL,
+	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_multiread");
+	EP_STAT_CHECK(estat, return estat);
+	estat = _gdp_req_new(GDP_CMD_MULTIREAD, gin->gob, _GdpChannel, NULL,
 			GDP_REQ_PERSIST | GDP_REQ_CLT_SUBSCR | GDP_REQ_ALLOC_RID,
 			&req);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// add start and stop parameters to PDU
+	req->gin = gin;
 	memcpy(&req->cpdu->datum->ts, start, sizeof req->cpdu->datum->ts);
 	req->numrecs = numrecs;
 
 	// now do the hard work
 	estat = _gdp_gcl_subscribe(req, numrecs, NULL, cbfunc, cbarg);
 fail0:
-	_gdp_gcl_unlock(gcl);
-	prstat(estat, gcl, "gdp_gcl_multiread_ts");
+	unlock_gin_and_gob(gin, "gdp_gcl_multiread");
+	prstat(estat, gin, "gdp_gcl_multiread_ts");
 	return estat;
 }
 
@@ -819,16 +1001,17 @@ fail0:
 */
 
 EP_STAT
-gdp_gcl_getmetadata(gdp_gcl_t *gcl,
+gdp_gcl_getmetadata(gdp_gcl_t *gin,
 		gdp_gclmd_t **gmdp)
 {
 	EP_STAT estat;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_getmetadata\n");
-	CHECK_AND_LOCK_GCL(gcl, "gdp_gcl_getmetadata");
-	estat = _gdp_gcl_getmetadata(gcl, gmdp, _GdpChannel, 0);
-	_gdp_gcl_unlock(gcl);
-	prstat(estat, gcl, "gdp_gcl_getmetadata");
+	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_getmetadata");
+	EP_STAT_CHECK(estat, return estat);
+	estat = _gdp_gob_getmetadata(gin->gob, gmdp, _GdpChannel, 0);
+	unlock_gin_and_gob(gin, "gdp_gcl_getmetadata");
+	prstat(estat, gin, "gdp_gcl_getmetadata");
 	return estat;
 }
 
@@ -841,15 +1024,16 @@ gdp_gcl_getmetadata(gdp_gcl_t *gcl,
 */
 
 EP_STAT
-gdp_gcl_newsegment(gdp_gcl_t *gcl)
+gdp_gcl_newsegment(gdp_gcl_t *gin)
 {
 	EP_STAT estat;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_newsegment\n");
-	CHECK_AND_LOCK_GCL(gcl, "gdp_gcl_newsegment");
-	estat = _gdp_gcl_newsegment(gcl, _GdpChannel, 0);
-	_gdp_gcl_unlock(gcl);
-	prstat(estat, gcl, "gdp_gcl_newsegment");
+	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_newsegment");
+	EP_STAT_CHECK(estat, return estat);
+	estat = _gdp_gob_newsegment(gin->gob, _GdpChannel, 0);
+	unlock_gin_and_gob(gin, "gdp_gcl_newsegment");
+	prstat(estat, gin, "gdp_gcl_newsegment");
 	return estat;
 }
 
@@ -859,15 +1043,18 @@ gdp_gcl_newsegment(gdp_gcl_t *gcl)
 */
 
 EP_STAT
-gdp_gcl_set_append_filter(gdp_gcl_t *gcl,
+gdp_gcl_set_append_filter(gdp_gcl_t *gin,
 		EP_STAT (*appendfilter)(gdp_datum_t *, void *),
 		void *filterdata)
 {
+	EP_STAT estat;
+
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_set_append_filter\n");
-	CHECK_AND_LOCK_GCL(gcl, "gdp_gcl_set_append_filter");
-	gcl->apndfilter = appendfilter;
-	gcl->apndfpriv = filterdata;
-	_gdp_gcl_unlock(gcl);
+	estat = check_and_lock_gin(gin, "gdp_gcl_set_append_filter");
+	EP_STAT_CHECK(estat, return estat);
+	gin->apndfilter = appendfilter;
+	gin->apndfpriv = filterdata;
+	_gdp_gin_unlock(gin);
 	return EP_STAT_OK;
 }
 
@@ -877,15 +1064,18 @@ gdp_gcl_set_append_filter(gdp_gcl_t *gcl,
 */
 
 EP_STAT
-gdp_gcl_set_read_filter(gdp_gcl_t *gcl,
+gdp_gcl_set_read_filter(gdp_gcl_t *gin,
 		EP_STAT (*readfilter)(gdp_datum_t *, void *),
 		void *filterdata)
 {
+	EP_STAT estat;
+
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_set_read_filter\n");
-	CHECK_AND_LOCK_GCL(gcl, "gdp_gcl_set_read_filter");
-	gcl->readfilter = readfilter;
-	gcl->readfpriv = filterdata;
-	_gdp_gcl_unlock(gcl);
+	estat = check_and_lock_gin(gin, "gdp_gcl_set_read_filter");
+	EP_STAT_CHECK(estat, return estat);
+	gin->readfilter = readfilter;
+	gin->readfpriv = filterdata;
+	_gdp_gin_unlock(gin);
 	return EP_STAT_OK;
 }
 

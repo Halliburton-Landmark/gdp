@@ -135,13 +135,13 @@ gdp_event_free(gdp_event_t *gev)
 */
 
 gdp_event_t *
-gdp_event_next(gdp_gcl_t *gcl, EP_TIME_SPEC *timeout)
+gdp_event_next(gdp_gcl_t *gin, EP_TIME_SPEC *timeout)
 {
 	gdp_event_t *gev;
 	EP_TIME_SPEC *abs_to = NULL;
 	EP_TIME_SPEC tv;
 
-	ep_dbg_cprintf(Dbg, 59, "gdp_event_next: gcl %p\n", gcl);
+	ep_dbg_cprintf(Dbg, 59, "gdp_event_next: gin %p\n", gin);
 
 	if (timeout != NULL)
 	{
@@ -178,7 +178,7 @@ restart:
 		while (gev != NULL)
 		{
 			// if this isn't the GCL we want, keep searching the list
-			if (gcl == NULL || gev->gcl == gcl)
+			if (gin == NULL || gev->gin == gin)
 				break;
 
 			// not the event we want
@@ -216,17 +216,17 @@ fail0:
 */
 
 EP_STAT
-_gdp_event_free_all(gdp_gcl_t *gcl)
+_gdp_event_free_all(gdp_gin_t *gin)
 {
 	gdp_event_t *gev, *next_gev;
 
-	GDP_GCL_CHECK_RETURN_STAT(gcl);
+	GDP_GIN_CHECK_RETURN_STAT(gin);
 
 	ep_thr_mutex_lock(&ActiveListMutex);
 	for (gev = STAILQ_FIRST(&ActiveList); gev != NULL; gev = next_gev)
 	{
 		next_gev = STAILQ_NEXT(gev, queue);
-		if (gev->gcl != gcl)
+		if (gev->gin != gin)
 			continue;
 		else if (gev->type == _GDP_EVENT_FREE)
 			STAILQ_REMOVE(&ActiveList, gev, gdp_event, queue);
@@ -439,7 +439,7 @@ _gdp_event_add_from_req(gdp_req_t *req)
 	EP_STAT_CHECK(estat, return estat);
 
 	gev->type = evtype;
-	gev->gcl = req->gcl;
+	gev->gin = req->gin;
 	gev->stat = req->stat;
 	gev->udata = req->sub_cbarg;
 	gev->cb = req->sub_cbfunc;
@@ -546,7 +546,7 @@ gdp_gcl_t *
 gdp_event_getgcl(gdp_event_t *gev)
 {
 	EP_ASSERT_POINTER_VALID(gev);
-	return gev->gcl;
+	return gev->gin;
 }
 
 

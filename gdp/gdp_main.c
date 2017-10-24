@@ -139,7 +139,7 @@ process_cmd(void *cpdu_)
 	gdp_pdu_t *cpdu = cpdu_;
 	int cmd = cpdu->cmd;
 	EP_STAT estat;
-	gdp_gcl_t *gcl = NULL;
+	gdp_gob_t *gob = NULL;
 	gdp_req_t *req = NULL;
 	int resp;
 
@@ -151,19 +151,19 @@ process_cmd(void *cpdu_)
 			"process_cmd(%s, thread %" EP_THR_PRItid ")\n",
 			_gdp_proto_cmd_name(cmd), ep_thr_gettid());
 
-	estat = _gdp_gcl_cache_get(cpdu->dst, 0, GGCF_NOCREATE, &gcl);
-	if (gcl != NULL)
+	estat = _gdp_gob_cache_get(cpdu->dst, GGCF_NOCREATE, &gob);
+	if (gob != NULL)
 	{
-		GDP_GCL_ASSERT_ISLOCKED(gcl);
-		EP_ASSERT(gcl->refcnt > 0);
+		GDP_GOB_ASSERT_ISLOCKED(gob);
+		EP_ASSERT(gob->refcnt > 0);
 	}
 
 	ep_dbg_cprintf(Dbg, 43,
-			"process_cmd: allocating new req for GCL %p\n", gcl);
-	estat = _gdp_req_new(cmd, gcl, cpdu->chan, cpdu, GDP_REQ_CORE, &req);
+			"process_cmd: allocating new req for GOB %p\n", gob);
+	estat = _gdp_req_new(cmd, gob, cpdu->chan, cpdu, GDP_REQ_CORE, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex);
-	EP_ASSERT(gcl == req->gcl);
+	EP_ASSERT(gob == req->gob);
 
 	ep_dbg_cprintf(Dbg, 40, "process_cmd >>> req=%p\n", req);
 
@@ -187,25 +187,25 @@ process_cmd(void *cpdu_)
 		_gdp_req_dump(req, ep_dbg_getfile(), 0, 0);
 	}
 
-	// make sure request or GCL haven't gotten fubared
+	// make sure request or GOB haven't gotten fubared
 	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex);
-	if (gcl != NULL)
+	if (gob != NULL)
 	{
-		GDP_GCL_ASSERT_ISLOCKED(gcl);
-		if (!EP_ASSERT(gcl == req->gcl) && ep_dbg_test(Dbg, 1))
+		GDP_GOB_ASSERT_ISLOCKED(gob);
+		if (!EP_ASSERT(gob == req->gob) && ep_dbg_test(Dbg, 1))
 		{
-			ep_dbg_printf("process_cmd, after dispatch:\n  gcl = ");
-			_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
-			ep_dbg_printf("  req->gcl = ");
-			_gdp_gcl_dump(req->gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+			ep_dbg_printf("process_cmd, after dispatch:\n  gob = ");
+			_gdp_gob_dump(gob, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+			ep_dbg_printf("  req->gob = ");
+			_gdp_gob_dump(req->gob, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 		}
 	}
 
-	// cmd_open and cmd_create can return a new GCL in the req
-	if (gcl == NULL && req->gcl != NULL)
+	// cmd_open and cmd_create can return a new GOB in the req
+	if (gob == NULL && req->gob != NULL)
 	{
-		gcl = req->gcl;
-		_gdp_gcl_incref(gcl);
+		gob = req->gob;
+		_gdp_gob_incref(gob);
 	}
 
 	// figure out potential response code
@@ -247,11 +247,11 @@ process_cmd(void *cpdu_)
 		//XXX anything to do with estat here?
 	}
 
-	EP_ASSERT(gcl == req->gcl);
-	if (gcl != NULL)
+	EP_ASSERT(gob == req->gob);
+	if (gob != NULL)
 	{
-		GDP_GCL_ASSERT_ISLOCKED(gcl);
-		EP_ASSERT(gcl->refcnt > 0);
+		GDP_GOB_ASSERT_ISLOCKED(gob);
+		EP_ASSERT(gob->refcnt > 0);
 	}
 
 	// do command post processing
@@ -261,8 +261,8 @@ process_cmd(void *cpdu_)
 		(req->postproc)(req);
 		req->postproc = NULL;
 
-		// postproc shouldn't change GCL lock status
-		EP_ASSERT(gcl == req->gcl);
+		// postproc shouldn't change GOB lock status
+		EP_ASSERT(gob == req->gob);
 	}
 
 	// free up resources
@@ -271,17 +271,17 @@ process_cmd(void *cpdu_)
 	if (EP_UT_BITSET(GDP_REQ_CORE, req->flags) &&
 			!EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
 	{
-		_gdp_req_free(&req);		// also decref's req->gcl (leaves locked)
+		_gdp_req_free(&req);		// also decref's req->gob (leaves locked)
 	}
 	else
 	{
 		_gdp_req_unlock(req);
 	}
-	if (gcl != NULL)
+	if (gob != NULL)
 	{
-		if (!GDP_GCL_ASSERT_ISLOCKED(gcl) || !EP_ASSERT(gcl->refcnt > 0))
-			_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_BASIC, 0);
-		_gdp_gcl_decref(&gcl, false);	// ref from _gdp_gcl_cache_get
+		if (!GDP_GOB_ASSERT_ISLOCKED(gob) || !EP_ASSERT(gob->refcnt > 0))
+			_gdp_gob_dump(gob, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+		_gdp_gob_decref(&gob, false);	// ref from _gdp_gob_cache_get
 	}
 
 	if (false)
@@ -304,7 +304,7 @@ fail0:
 **
 **		This is a fall-back that should be used only for finding requests
 **		sent by FWD_APPEND to a server that isn't accessible.  Since that
-**		command links the request to a different GCL than the destination
+**		command links the request to a different GOB than the destination
 **		address in the PDU, a NOROUTE response won't find it.
 */
 
@@ -341,17 +341,17 @@ find_req_in_channel_list(
 	{
 		char ebuf[100];
 
-		// since GCL has to be locked before req, do it now
-		if (req->gcl != NULL)
-			_gdp_gcl_lock(req->gcl);
+		// since GOB has to be locked before req, do it now
+		if (req->gob != NULL)
+			_gdp_gob_lock(req->gob);
 		estat = _gdp_req_lock(req);
 		ep_dbg_cprintf(DbgProcResp, 44,
 				"find_req_in_channel_list: _gdp_req_lock => %s\n",
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		if (!EP_STAT_ISOK(estat))
 		{
-			if (req->gcl != NULL)
-				_gdp_gcl_unlock(req->gcl);
+			if (req->gob != NULL)
+				_gdp_gob_unlock(req->gob);
 			req = NULL;
 		}
 	}
@@ -378,25 +378,25 @@ process_resp(void *rpdu_)
 	gdp_chan_t *chan = _GdpChannel;
 	int cmd = rpdu->cmd;
 	EP_STAT estat;
-	gdp_gcl_t *gcl = NULL;
+	gdp_gob_t *gob = NULL;
 	gdp_req_t *req = NULL;
 	int resp;
 	int ocmd;					// original command prompting this response
 
-	estat = _gdp_gcl_cache_get(rpdu->src, 0,
-						GGCF_NOCREATE | GGCF_GET_PENDING, &gcl);
+	estat = _gdp_gob_cache_get(rpdu->src,
+						GGCF_NOCREATE | GGCF_GET_PENDING, &gob);
 	if (ep_dbg_test(DbgProcResp, 20))
 	{
 		char ebuf[120];
 		gdp_pname_t rpdu_pname;
 
-		ep_dbg_printf("process_resp: cmd %s rpdu %p ->src %s) gcl %p stat %s\n",
+		ep_dbg_printf("process_resp: cmd %s rpdu %p ->src %s) gob %p stat %s\n",
 			_gdp_proto_cmd_name(cmd),
-			rpdu, gdp_printable_name(rpdu->src, rpdu_pname), gcl,
+			rpdu, gdp_printable_name(rpdu->src, rpdu_pname), gob,
 			ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 	// check estat here?
-	if (gcl == NULL)
+	if (gob == NULL)
 	{
 		char ebuf[200];
 
@@ -412,7 +412,7 @@ process_resp(void *rpdu_)
 			{
 				gdp_pname_t pname;
 				ep_dbg_printf("process_resp: discarding %d (%s) PDU"
-							" for unknown GCL\n",
+							" for unknown GOB\n",
 							rpdu->cmd, _gdp_proto_cmd_name(rpdu->cmd));
 				if (ep_dbg_test(DbgProcResp, 24))
 					_gdp_pdu_dump(rpdu, ep_dbg_getfile());
@@ -424,37 +424,37 @@ process_resp(void *rpdu_)
 		}
 
 		EP_ASSERT_ELSE(req->state != GDP_REQ_FREE, return);
-		if (req->gcl != NULL)
+		if (req->gob != NULL)
 		{
-			GDP_GCL_ASSERT_ISLOCKED(req->gcl);
+			GDP_GOB_ASSERT_ISLOCKED(req->gob);
 		}
 
-		// remove the request from the GCL list it is already on
+		// remove the request from the GOB list it is already on
 		// req is already locked by find_req_in_channel_list
-		if (EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
+		if (EP_UT_BITSET(GDP_REQ_ON_GOB_LIST, req->flags))
 		{
-			LIST_REMOVE(req, gcllist);
-			req->flags &= ~GDP_REQ_ON_GCL_LIST;
-			//DEBUG: without this incref, a gdp_gcl_create call on a log
+			LIST_REMOVE(req, goblist);
+			req->flags &= ~GDP_REQ_ON_GOB_LIST;
+			//DEBUG: without this incref, a gdp_gob_create call on a log
 			//	that already exists throws the error:
-			//	Assertion failed at gcl-create:gdp_gcl_mgmt.c:435: GDP_GCL_ISGOOD(gcl)
+			//	Assertion failed at gob-create:gdp_gob_mgmt.c:435: GDP_GOB_ISGOOD(gob)
 			//	because the refcnt has gone to zero prematurely.  But with it,
-			//	a successful gdp_gcl_create leaves the refcnt one too high
+			//	a successful gdp_gob_create leaves the refcnt one too high
 			//	leading to a resource leak.
-			_gdp_gcl_incref(req->gcl);		//DEBUG:
+			_gdp_gob_incref(req->gob);		//DEBUG:
 
 			// code below expects request to remain locked
 		}
 	}
 	else
 	{
-		GDP_GCL_ASSERT_ISLOCKED(gcl);
+		GDP_GOB_ASSERT_ISLOCKED(gob);
 
 		// find the corresponding request
 		ep_dbg_cprintf(DbgProcResp, 23,
-				"process_resp: searching gcl %p for rid %" PRIgdp_rid "\n",
-				gcl, rpdu->rid);
-		req = _gdp_req_find(gcl, rpdu->rid);
+				"process_resp: searching gob %p for rid %" PRIgdp_rid "\n",
+				gob, rpdu->rid);
+		req = _gdp_req_find(gob, rpdu->rid);
 		if (ep_dbg_test(DbgProcResp, 51))
 		{
 			ep_dbg_printf("... found ");
@@ -469,9 +469,9 @@ process_resp(void *rpdu_)
 			{
 				ep_dbg_printf("process_resp: no req for incoming response\n");
 				_gdp_pdu_dump(rpdu, ep_dbg_getfile());
-				_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
+				_gdp_gob_dump(gob, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
 			}
-			_gdp_gcl_decref(&gcl, false);
+			_gdp_gob_decref(&gob, false);
 			_gdp_pdu_free(rpdu);
 			return;
 		}
@@ -495,10 +495,10 @@ process_resp(void *rpdu_)
 				_gdp_pdu_dump(rpdu, ep_dbg_getfile());
 			}
 		}
-		EP_ASSERT(gcl == req->gcl);
+		EP_ASSERT(gob == req->gob);
 	}
 
-	GDP_GCL_ASSERT_ISLOCKED(req->gcl);
+	GDP_GOB_ASSERT_ISLOCKED(req->gob);
 
 	if (req->cpdu == NULL)
 	{
@@ -533,9 +533,9 @@ process_resp(void *rpdu_)
 		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
-	// request is locked, GCL should be too
-	if (req->gcl != NULL)
-		GDP_GCL_ASSERT_ISLOCKED(req->gcl);
+	// request is locked, GOB should be too
+	if (req->gob != NULL)
+		GDP_GOB_ASSERT_ISLOCKED(req->gob);
 
 	// mark this request as active (for subscriptions)
 	ep_time_now(&req->act_ts);
@@ -544,8 +544,8 @@ process_resp(void *rpdu_)
 	estat = _gdp_req_dispatch(req, cmd);
 
 	// dispatch should leave it locked
-	if (req->gcl != NULL)
-		GDP_GCL_ASSERT_ISLOCKED(req->gcl);
+	if (req->gob != NULL)
+		GDP_GOB_ASSERT_ISLOCKED(req->gob);
 
 	// figure out potential response code
 	// we compute even if unused so we can log server errors
@@ -610,12 +610,12 @@ process_resp(void *rpdu_)
 	}
 
 	// free up resources
-	if (req->gcl != NULL)
+	if (req->gob != NULL)
 	{
-		// use a shadow variables so req does not lose gcl
-		gdp_gcl_t *gcl = req->gcl;
-		GDP_GCL_ASSERT_ISLOCKED(gcl);
-		_gdp_gcl_decref(&gcl, false);
+		// use a shadow variables so req does not lose gob
+		gdp_gob_t *gob = req->gob;
+		GDP_GOB_ASSERT_ISLOCKED(gob);
+		_gdp_gob_decref(&gob, false);
 	}
 
 	if (EP_UT_BITSET(GDP_REQ_CORE, req->flags) &&
@@ -665,7 +665,7 @@ _gdp_pdu_process(gdp_pdu_t *pdu, gdp_chan_t *chan)
 /*
 **  _GDP_RECLAIM_RESOURCES --- find unused GDP resources and reclaim them
 **
-**		This should really also have a maximum number of GCLs to leave
+**		This should really also have a maximum number of GOBs to leave
 **		open so we don't run out of file descriptors under high load.
 **
 **		This implementation locks the GclsByUse list during the
@@ -676,7 +676,7 @@ void
 _gdp_reclaim_resources(void *null)
 {
 	char pbuf[200];
-	time_t reclaim_age;		// how long to leave GCLs open before reclaiming
+	time_t reclaim_age;		// how long to leave GOBs open before reclaiming
 
 	ep_dbg_cprintf(Dbg, 69, "_gdp_reclaim_resources\n");
 	snprintf(pbuf, sizeof pbuf, "swarm.%s.reclaim.age", ep_app_getprogname());
@@ -684,7 +684,7 @@ _gdp_reclaim_resources(void *null)
 	if (reclaim_age == -1)
 		reclaim_age = ep_adm_getlongparam("swarm.gdp.reclaim.age",
 									GDP_RECLAIM_AGE_DEF);
-	_gdp_gcl_cache_reclaim(reclaim_age);
+	_gdp_gob_cache_reclaim(reclaim_age);
 }
 
 // stub for libevent
@@ -901,14 +901,14 @@ _gdp_dump_state(int plev)
 {
 	flockfile(stderr);
 	fprintf(stderr, "\n<<< GDP STATE >>>\nVersion: %s\n", GdpVersion);
-	_gdp_gcl_cache_dump(plev, stderr);
+	_gdp_gob_cache_dump(plev, stderr);
 	fprintf(stderr, "\n<<< Open file descriptors >>>\n");
 	ep_app_dumpfds(stderr);
 	fprintf(stderr, "\n<<< Stack backtrace >>>\n");
 	ep_dbg_backtrace();
 	fprintf(stderr, "\n<<< Statistics >>>\n");
 	_gdp_req_pr_stats(stderr);
-	_gdp_gcl_pr_stats(stderr);
+	_gdp_gob_pr_stats(stderr);
 	funlockfile(stderr);
 }
 
@@ -928,7 +928,7 @@ siginfo(int sig, short what, void *arg)
 **  Initialization, Part 1:
 **		Initialize the various external libraries.
 **		Set up the I/O event loop base.
-**		Initialize the GCL cache.
+**		Initialize the GOB cache.
 **		Start the event loop.
 */
 
@@ -1046,8 +1046,8 @@ gdp_lib_init(const char *myname)
 				gdp_printable_name(_GdpMyRoutingName, pname));
 	}
 
-	// initialize the GCL cache.  In theory this "cannot fail"
-	estat = _gdp_gcl_cache_init();
+	// initialize the GOB cache.  In theory this "cannot fail"
+	estat = _gdp_gob_cache_init();
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// tell the event library that we're using pthreads
