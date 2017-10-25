@@ -210,7 +210,7 @@ _gdp_gob_free(gdp_gob_t **pgob)
 **  _GDP_GOB_DUMP --- print a GOB (for debugging)
 */
 
-EP_PRFLAGS_DESC	GobFlags[] =
+EP_PRFLAGS_DESC	_GdpGobFlags[] =
 {
 	{ GCLF_DROPPING,		GCLF_DROPPING,			"DROPPING"			},
 	{ GCLF_INCACHE,			GCLF_INCACHE,			"INCACHE"			},
@@ -255,7 +255,7 @@ _gdp_gob_dump(
 					"\n\tflags = ",
 					gob->refcnt, LIST_FIRST(&gob->reqs),
 					gob->nrecs);
-			ep_prflags(gob->flags, GobFlags, fp);
+			ep_prflags(gob->flags, _GdpGobFlags, fp);
 			fprintf(fp, "\n");
 			if (detail >= GDP_PR_DETAILED)
 			{

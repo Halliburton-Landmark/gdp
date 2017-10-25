@@ -42,6 +42,7 @@
 #include <ep/ep_app.h>
 #include <ep/ep_b64.h>
 #include <ep/ep_dbg.h>
+#include <ep/ep_prflags.h>
 #include <ep/ep_string.h>
 
 #include "gdp.h"
@@ -140,6 +141,59 @@ _gdp_gin_unlock_trace(gdp_gin_t *gin,
 {
 	gin->flags &= ~GCLF_ISLOCKED;
 	_ep_thr_mutex_unlock(&gin->mutex, file, line, id);
+}
+
+void
+_gdp_gin_dump(
+		const gdp_gin_t *gin,
+		FILE *fp,
+		int detail)
+{
+	extern EP_PRFLAGS_DESC _GdpGobFlags[];	// defined in gdp_gob_mgmt.c
+
+	if (fp == NULL)
+		fp = ep_dbg_getfile();
+	if (detail >= GDP_PR_BASIC)
+		fprintf(fp, "GIN@%p: ", gin);
+	VALGRIND_HG_DISABLE_CHECKING(gin, sizeof *gin);
+	if (gin == NULL)
+	{
+		fprintf(fp, "NULL\n");
+	}
+	else
+	{
+		gdp_gob_t *gob = gin->gob;
+
+		if (gob == NULL)
+			fprintf(fp, "No GOB\n");
+		else
+		{
+			VALGRIND_HG_DISABLE_CHECKING(gob, sizeof *gob);
+			if (!gdp_name_is_valid(gob->name))
+				fprintf(fp, "no name\n");
+			else
+				fprintf(fp, "%s\n", gob->pname);
+			VALGRIND_HG_ENABLE_CHECKING(gob, sizeof *gob);
+		}
+		fprintf(fp, "\tflags = ");
+		ep_prflags(gin->flags, _GdpGobFlags, fp);
+
+		if (detail >= GDP_PR_BASIC)
+		{
+			fprintf(fp, "\n\tgob = %p, iomode = %d", gob,  gin->iomode);
+			if (detail >= GDP_PR_DETAILED)
+			{
+				fprintf(fp, ", closefunc = %p\n"
+						"\tapndfilter = %p, apndfpriv = %p,"
+						" readfilter = %p, readfpriv = %p",
+						gin->closefunc,
+						gin->apndfilter, gin->apndfpriv,
+						gin->readfilter, gin->readfpriv);
+			}
+		}
+		fprintf(fp, "\n");
+	}
+	VALGRIND_HG_ENABLE_CHECKING(gin, sizeof *gin);
 }
 
 static EP_STAT
@@ -641,6 +695,12 @@ fail0:
 		_gdp_gob_free(&gob);
 	ep_thr_mutex_unlock(&OpenMutex);
 	prstat(estat, *pgin, "gdp_gcl_open");
+	if (ep_dbg_test(Dbg, 10))
+	{
+		_gdp_gin_dump(*pgin, NULL, GDP_PR_DETAILED);
+		if (ep_dbg_test(Dbg, 14))
+			_gdp_gob_dump(gob, NULL, GDP_PR_BASIC, 0);
+	}
 	return estat;
 }
 
