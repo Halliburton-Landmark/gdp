@@ -248,6 +248,10 @@ unlock_gin_and_gob(gdp_gin_t *gin, const char *where)
 
 /*
 **  Allocate and Free GCL instance handles.
+**
+**		Note that the reference count on the input GOB is not
+**		increased; it is assumed that the GIN "takes over" the
+**		reference that is passed in.
 */
 
 gdp_gin_t *
@@ -277,8 +281,6 @@ _gdp_gin_new(gdp_gob_t *gob)
 
 	gin->flags = GCLF_INUSE;
 	gin->gob = gob;
-	if (gob != NULL)
-		_gdp_gob_incref(gob);
 
 	VALGRIND_HG_CLEAN_MEMORY(gin, sizeof gin);
 	ep_dbg_cprintf(Dbg, 48, "_gdp_gin_new => %p\n", gin);
