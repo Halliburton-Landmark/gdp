@@ -63,6 +63,7 @@ main(int argc, char **argv)
 	const char *lname;
 	gdp_name_t gcliname;
 	const char *phase;
+	int exitstat = EX_OK;
 
 	while ((opt = getopt(argc, argv, "D:G:")) > 0)
 	{
@@ -91,6 +92,7 @@ main(int argc, char **argv)
 	estat = gdp_init(gdpd_addr);
 	if (!EP_STAT_ISOK(estat))
 	{
+		exitstat = EX_UNAVAILABLE;
 		ep_app_error("GDP Initialization failed");
 		goto fail0;
 	}
@@ -103,20 +105,26 @@ main(int argc, char **argv)
 	gdp_parse_name(lname, gcliname);
 	phase = "open";
 	estat = gdp_gcl_open(gcliname, GDP_MODE_AO, NULL, &gcl);
-	EP_STAT_CHECK(estat, goto fail1);
+	if (!EP_STAT_ISOK(estat))
+	{
+		exitstat = EX_NOINPUT;
+		goto fail1;
+	}
 
 	// delete and close log
 	phase = "delete";
 	estat = gdp_gcl_delete(gcl);
-	EP_STAT_CHECK(estat, goto fail1);
 
 	if (!EP_STAT_ISOK(estat))
 	{
+		exitstat = EX_NOPERM;
 fail1:
 		ep_app_error("could not %s %s", phase, lname);
 	}
 
 fail0:
 	ep_app_message(estat, "exiting with status");
-	return EP_STAT_ISOK(estat) ? EX_OK : EX_UNAVAILABLE;
+	if (exitstat == EX_OK && !EP_STAT_ISOK(estat))
+		exitstat = EX_UNAVAILABLE;
+	return exitstat;
 }
