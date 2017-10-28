@@ -129,6 +129,7 @@ acknak_from_estat(EP_STAT estat, int def)
 **  PROCESS_CMD --- process command PDU
 **
 **		Usually done in a thread since it may be heavy weight.
+**		This usually only applies to gdplogd.
 */
 
 static EP_THR_MUTEX		GclCreateMutex			EP_THR_MUTEX_INITIALIZER;
@@ -189,6 +190,14 @@ process_cmd(void *cpdu_)
 
 	// make sure request or GOB haven't gotten fubared
 	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex);
+
+	// special case: if we have deleted a GOB, it will have disappeared now
+	if (req->gob == NULL && gob != NULL && req->cpdu->cmd == GDP_CMD_DELETE)
+	{
+		_gdp_gob_unlock(gob);
+		gob = NULL;
+	}
+
 	if (gob != NULL)
 	{
 		GDP_GOB_ASSERT_ISLOCKED(gob);

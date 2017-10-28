@@ -424,8 +424,13 @@ EP_STAT			_gdp_gob_open(				// open a GCL
 						gdp_chan_t *chan,
 						uint32_t reqflags);
 
-EP_STAT			_gdp_gin_close(				// close a GCL (handle)
-						gdp_gin_t *gin,
+EP_STAT			_gdp_gob_close(				// close a GCL (handle)
+						gdp_gob_t *gob,
+						gdp_chan_t *chan,
+						uint32_t reqflags);
+
+EP_STAT			_gdp_gob_delete(			// delete and close a GCL (handle)
+						gdp_gob_t *gob,
 						gdp_chan_t *chan,
 						uint32_t reqflags);
 

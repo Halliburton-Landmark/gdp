@@ -456,6 +456,71 @@ cmd_close(gdp_req_t *req)
 
 
 /*
+**  CMD_DELETE --- delete a GOB
+**
+**		This also does all the close actions.
+*/
+
+static EP_STAT
+verify_req_signature(gdp_req_t *req)
+{
+	//XXX IMPLEMENT_ME XXX
+	//return EP_STAT_OK;
+	//return GDP_STAT_NAK_UNAUTH;
+	return GDP_STAT_NOT_IMPLEMENTED;
+}
+
+EP_STAT
+cmd_delete(gdp_req_t *req)
+{
+	EP_STAT estat = EP_STAT_OK;
+
+	req->rpdu->cmd = GDP_ACK_DELETED;
+
+	// should have no input data; ignore anything there
+	flush_input_data(req, "cmd_delete");
+
+	// a bit wierd to open the GOB only to close it again....
+	estat = get_open_handle(req);
+	if (!EP_STAT_ISOK(estat))
+	{
+		return gdpd_gob_error(req->cpdu->dst, "cmd_delete: GOB not open",
+							estat, GDP_STAT_NAK_BADREQ);
+	}
+
+	estat = verify_req_signature(req);
+	if (!EP_STAT_ISOK(estat))
+	{
+		return gdpd_gob_error(req->cpdu->dst, "cmd_delete: signature failure",
+							estat, GDP_STAT_NAK_UNAUTH);
+	}
+
+	// remove log advertisement
+	logd_advertise_one(req->gob->name, GDP_CMD_WITHDRAW);
+
+	// remove any subscriptions
+	sub_end_all_subscriptions(req->gob, req->cpdu->src, GDP_PDU_NO_RID);
+
+	// return number of records
+	req->rpdu->datum->recno = req->gob->nrecs;
+
+	// we will force a close and delete now
+	req->gob->freefunc = NULL;
+	gob_delete(req->gob);
+	req->gob = NULL;
+
+	if (ep_dbg_test(Dbg, 10))
+	{
+		char ebuf[100];
+		ep_dbg_printf("<<< cmd_delete: %s\n",
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
+
+	return estat;
+}
+
+
+/*
 **  CMD_READ --- read a single record from a GOB
 **
 **		This returns the data as part of the response.  To get multiple
@@ -530,7 +595,6 @@ init_sig_digest(gdp_gob_t *gob)
 
 	mdtype = pkbuf[0];
 	pktype = pkbuf[1];
-	//pkbits = (pkbuf[2] << 8) | pkbuf[3];
 	ep_dbg_cprintf(Dbg, 40, "init_sig_data: mdtype=%d, pktype=%d, pklen=%zd\n",
 			mdtype, pktype, pklen);
 	key = ep_crypto_key_read_mem(pkbuf + 4, pklen - 4,
@@ -1277,6 +1341,7 @@ static struct cmdfuncs	CmdFuncs[] =
 	{ GDP_CMD_OPEN_AO,		cmd_open				},
 	{ GDP_CMD_OPEN_RO,		cmd_open				},
 	{ GDP_CMD_CLOSE,		cmd_close				},
+	{ GDP_CMD_DELETE,		cmd_delete				},
 	{ GDP_CMD_READ,			cmd_read				},
 	{ GDP_CMD_APPEND,		cmd_append				},
 	{ GDP_CMD_SUBSCRIBE,	cmd_subscribe			},

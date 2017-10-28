@@ -606,7 +606,7 @@ static dispatch_ent_t	DispatchTable[256] =
 	{ NULL,				"CMD_NEWSEGMENT",		GDP_STAT_ACK_SUCCESS		},	// 76
 	{ NULL,				"CMD_FWD_APPEND",		GDP_STAT_ACK_SUCCESS		},	// 77
 	{ NULL,				"CMD_UNSUBSCRIBE",		GDP_STAT_ACK_SUCCESS		},	// 78
-	NOENT,				// 79
+	{ NULL,				"CMD_DELETE",			GDP_STAT_ACK_SUCCESS		},	// 79
 	NOENT,				// 80
 	NOENT,				// 81
 	NOENT,				// 82

@@ -198,6 +198,7 @@ typedef struct gdp_pdu
 #define GDP_CMD_NEWSEGMENT		76			// create a new segment for a log
 #define GDP_CMD_FWD_APPEND		77			// forward (replicate) APPEND
 #define GDP_CMD_UNSUBSCRIBE		78			// delete all subscriptions
+#define GDP_CMD_DELETE			79			// delete a GCL
 //		128-191			Positive acks (HTTP 200-263)
 #define GDP_ACK_MIN			128			// minimum ack code
 #define GDP_ACK_SUCCESS			_GDP_ACK_FROM_CODE(SUCCESS)				// 128

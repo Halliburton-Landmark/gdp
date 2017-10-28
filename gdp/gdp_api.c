@@ -224,18 +224,17 @@ check_and_lock_gin_and_gob(gdp_gin_t *gin, const char *where)
 	EP_STAT_CHECK(estat, return estat);
 	_gdp_gob_lock(gin->gob);
 	if (!EP_UT_BITSET(GCLF_INUSE, gin->gob->flags))
+		estat = bad_gin(gin, where, "gob not inuse");
+	else if (EP_UT_BITSET(GCLF_DROPPING, gin->gob->flags))
+		estat = bad_gin(gin, where, "gob not open");
+	else if (gin->gob->refcnt <= 0)
+		estat = bad_gin(gin, where, "gob bad refcnt");
+	if (!EP_STAT_ISOK(estat))
 	{
 		_gdp_gob_unlock(gin->gob);
 		_gdp_gin_unlock(gin);
-		return bad_gin(gin, where, "gob not inuse");
 	}
-	if (gin->gob->refcnt <= 0)
-	{
-		_gdp_gob_unlock(gin->gob);
-		_gdp_gin_unlock(gin);
-		return bad_gin(gin, where, "gob bad refcnt");
-	}
-	return EP_STAT_OK;
+	return estat;
 }
 
 static void
@@ -297,17 +296,18 @@ _gdp_gin_free(gdp_gin_t *gin)
 		return;
 	GDP_GIN_ASSERT_ISLOCKED(gin);
 
-	_gdp_event_free_all(gin);
-	gin->flags = 0;
-
+	// release resources: requests (subscriptions) and events
 	if (gin->gob != NULL)
 	{
 		GDP_GOB_ASSERT_ISLOCKED(gin->gob);
+		_gdp_req_freeall(gin->gob, gin, NULL);
 		_gdp_gob_decref(&gin->gob, false);
 	}
+	_gdp_event_free_all(gin);
 
 	// put gin handle on freelist
 	ep_thr_mutex_lock(&GinFreeListMutex);
+	gin->flags = 0;
 	SLIST_INSERT_HEAD(&GinFreeList, gin, next);
 	_gdp_gin_unlock(gin);
 	ep_thr_mutex_unlock(&GinFreeListMutex);
@@ -719,9 +719,32 @@ gdp_gcl_close(gdp_gcl_t *gin)
 	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_close");
 	EP_STAT_CHECK(estat, return estat);
 	ep_dbg_cprintf(Dbg, 19, "\n>>> gdp_gcl_close(%s)\n", gin->gob->pname);
-	estat = _gdp_gin_close(gin, _GdpChannel, 0);
+	estat = _gdp_gob_close(gin->gob, _GdpChannel, 0);
 	_gdp_gin_free(gin);
 	prstat(estat, gin, "gdp_gcl_close");
+	return estat;
+}
+
+
+/*
+**  GDP_GCL_DELETE --- delete and close an open GCL
+**
+**		This is not intended to be an end-user API.  Deletion should
+**		only be done by a system service on the basis of expiration
+**		criteria.  This API is intended for testing.
+*/
+
+EP_STAT
+gdp_gcl_delete(gdp_gcl_t *gin)
+{
+	EP_STAT estat;
+
+	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_delete");
+	EP_STAT_CHECK(estat, return estat);
+	ep_dbg_cprintf(Dbg, 19, "\n>>> gdp_gcl_delete(%s)\n", gin->gob->pname);
+	estat = _gdp_gob_delete(gin->gob, _GdpChannel, 0);
+	_gdp_gin_free(gin);
+	prstat(estat, gin, "gdp_gcl_delete");
 	return estat;
 }
 

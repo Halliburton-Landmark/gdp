@@ -98,6 +98,29 @@ gob_close(gdp_gob_t *gob)
 #if !LOG_CHECK
 
 /*
+**   GOB_DELETE --- delete and close a GOB
+*/
+
+void
+gob_delete(gdp_gob_t *gob)
+{
+	if (gob->x == NULL)
+		return;
+
+	// close the underlying files and free memory as needed
+	if (gob->x->physimpl->close != NULL)
+		gob->x->physimpl->close(gob);
+
+	// now delete the files
+	if (gob->x->physimpl->delete != NULL)
+		gob->x->physimpl->delete(gob);
+
+	ep_mem_free(gob->x);
+	gob->x = NULL;
+}
+
+
+/*
 **  Get an open instance of the GOB in the request.
 **
 **		This maps the GOB name to the internal GOB instance.

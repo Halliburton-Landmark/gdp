@@ -327,7 +327,7 @@ fail0:
 */
 
 EP_STAT
-_gdp_gin_close(gdp_gin_t *gin,
+_gdp_gob_close(gdp_gob_t *gob,
 			gdp_chan_t *chan,
 			uint32_t reqflags)
 {
@@ -336,29 +336,53 @@ _gdp_gin_close(gdp_gin_t *gin,
 
 	if (ep_dbg_test(Dbg, 38))
 	{
-		ep_dbg_printf("_gdp_gin_close: ");
-		_gdp_gob_dump(gin->gob, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
+		ep_dbg_printf("_gdp_gob_close: ");
+		_gdp_gob_dump(gob, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
 	}
 
 	errno = 0;				// avoid spurious messages
-	if (!GDP_GIN_ISGOOD(gin))
-	{
-		gdp_pname_t pname;
-
-		ep_dbg_cprintf(Dbg, 1, "_gdp_gin_close(%s): closing free GIN\n",
-				gdp_printable_name(gin->gob->name, pname));
-		return GDP_STAT_GCL_NOT_OPEN;
-	}
-
-	estat = _gdp_req_new(GDP_CMD_CLOSE, gin->gob, chan, NULL, reqflags, &req);
+	estat = _gdp_req_new(GDP_CMD_CLOSE, gob, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, return estat);
 
 	// tell the daemon to close it
 	estat = _gdp_invoke(req);
 
-	// release resources held by this handle
-	//XXX should probably be in _gdp_gin_free XXX
-	_gdp_req_freeall(gin->gob, gin, NULL);
+	_gdp_req_free(&req);
+	return estat;
+}
+
+
+/*
+**	_GDP_GOB_DELETE --- close and delete a GOB
+*/
+
+EP_STAT
+_gdp_gob_delete(gdp_gob_t *gob,
+			gdp_chan_t *chan,
+			uint32_t reqflags)
+{
+	EP_STAT estat = EP_STAT_OK;
+	gdp_req_t *req;
+
+	if (ep_dbg_test(Dbg, 38))
+	{
+		ep_dbg_printf("_gdp_gob_delete: ");
+		_gdp_gob_dump(gob, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
+	}
+
+	errno = 0;				// avoid spurious messages
+	estat = _gdp_req_new(GDP_CMD_DELETE, gob, chan, NULL, reqflags, &req);
+	EP_STAT_CHECK(estat, return estat);
+
+	// tell the daemon to delete it
+	estat = _gdp_invoke(req);
+
+	if (EP_STAT_ISOK(estat))
+	{
+		// invalidate gob regardless of reference count (but leave memory)
+		gob->flags |= GCLF_DROPPING;
+	}
+
 	_gdp_req_free(&req);
 	return estat;
 }

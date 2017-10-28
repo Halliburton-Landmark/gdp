@@ -95,6 +95,9 @@ extern EP_STAT	gob_open(				// open an existing physical GOB
 extern void		gob_close(				// close an open GOB
 					gdp_gob_t *gob);
 
+extern void		gob_delete(				// close and delete a GCL
+					gdp_gob_t *gob);
+
 extern void		gob_touch(				// make a GOB recently used
 					gdp_gob_t *gob);
 
@@ -164,6 +167,8 @@ struct gob_phys_impl
 						gdp_gob_t *gob,
 						gdp_gclmd_t **gmdp);
 	EP_STAT		(*newsegment)(
+						gdp_gob_t *gob);
+	EP_STAT		(*delete)(
 						gdp_gob_t *gob);
 	void		(*foreach)(
 						void (*func)(

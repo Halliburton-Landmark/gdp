@@ -217,6 +217,10 @@ extern EP_STAT	gdp_gcl_open(
 extern EP_STAT	gdp_gcl_close(
 					gdp_gcl_t *gcl);		// GCL handle to close
 
+// delete and close an open GCL
+extern EP_STAT	gdp_gcl_delete(
+					gdp_gcl_t *gcl);		// GCL handle to delete
+
 // append to a writable GCL
 extern EP_STAT	gdp_gcl_append(
 					gdp_gcl_t *gcl,			// writable GCL handle

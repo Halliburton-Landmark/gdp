@@ -42,6 +42,7 @@ SBINALL=	gdp-rest \
 		gdp-log-check \
 		gdp-name-xlate \
 		gdp-newsegment \
+		gdp-delete \
 		$(SBINALL_ZC) \
 
 MAN1ALL=	gdp-reader.1 \

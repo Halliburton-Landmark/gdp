@@ -2020,6 +2020,7 @@ static EP_STAT
 disk_close(gdp_gob_t *gob)
 {
 	EP_ASSERT_POINTER_VALID(gob);
+	ep_dbg_cprintf(Dbg, 20, "disk_close(%s)\n", gob->pname);
 
 	if (gob->x == NULL || GETPHYS(gob) == NULL)
 	{
@@ -2030,6 +2031,80 @@ disk_close(gdp_gob_t *gob)
 	gob->x->physinfo = NULL;
 
 	return EP_STAT_OK;
+}
+
+
+/*
+**  DISK_DELETE --- delete a disk-based log
+**
+**		It is assume that permission has already been granted.
+*/
+
+static EP_STAT
+disk_delete(gdp_gob_t *gob)
+{
+	EP_STAT estat = EP_STAT_OK;
+	gob_physinfo_t *phys;
+
+	if (!EP_ASSERT_POINTER_VALID(gob) || !EP_ASSERT_POINTER_VALID(gob->x))
+		return EP_STAT_ASSERT_ABORT;
+	phys = GETPHYS(gob);
+
+	ep_dbg_cprintf(Dbg, 18, "disk_delete(%s)\n", gob->pname);
+
+	DIR *dir;
+	char dbuf[GOB_PATH_MAX];
+
+	snprintf(dbuf, sizeof dbuf, "%s/_%02x", GclDir, gob->name[0]);
+	ep_dbg_cprintf(Dbg, 21, "  delete directory %s%s%s\n",
+					EpChar->lquote, dbuf, EpChar->rquote);
+	dir = opendir(dbuf);
+	if (dir == NULL)
+	{
+		estat = ep_stat_from_errno(errno);
+		goto fail0;
+	}
+
+	for (;;)
+	{
+		struct dirent dentbuf;
+		struct dirent *dent;
+
+		// read the next directory entry
+		int i = readdir_r(dir, &dentbuf, &dent);
+		if (i != 0)
+		{
+			estat = ep_stat_from_errno(i);
+			ep_log(estat, "disk_delete: readdir_r(%s) failed", dbuf);
+			break;
+		}
+		if (dent == NULL)
+			break;
+
+		ep_dbg_cprintf(Dbg, 50, "  delete trial %s%s%s ",
+						EpChar->lquote, dent->d_name, EpChar->rquote);
+		if (strncmp(gob->pname, dent->d_name, GDP_GCL_PNAME_LEN) == 0)
+		{
+			char filenamebuf[GOB_PATH_MAX];
+
+			ep_dbg_cprintf(Dbg, 50, "unlinking\n");
+			snprintf(filenamebuf, sizeof filenamebuf, "_%02x/%s",
+					gob->name[0], dent->d_name);
+			if (unlink(filenamebuf) < 0)
+				estat = posix_error(errno, "unlink(%s)", filenamebuf);
+		}
+		else
+		{
+			ep_dbg_cprintf(Dbg, 50, "skipping\n");
+		}
+	}
+	closedir(dir);
+
+fail0:
+	physinfo_free(GETPHYS(gob));
+	gob->x->physinfo = NULL;
+
+	return estat;
 }
 
 
@@ -2649,6 +2724,7 @@ struct gob_phys_impl	GdpDiskImpl =
 #if SEGMENT_SUPPORT
 	.newsegment =		disk_newsegment,
 #endif
+	.delete =			disk_delete,
 	.foreach =			disk_foreach,
 	.getstats =			disk_getstats,
 	.recno_exists =		disk_recno_exists,
