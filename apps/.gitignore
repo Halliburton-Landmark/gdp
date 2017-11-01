@@ -1,5 +1,6 @@
 gcl-clone
 gcl-create
+gdp-delete
 gdp-find-xname
 gdp-log-check
 gdp-name-xlate
