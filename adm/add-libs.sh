@@ -28,3 +28,4 @@ try_lib() {
 try_lib db
 try_lib execinfo
 try_lib systemd
+try_lib uuid

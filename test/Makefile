@@ -28,6 +28,7 @@
 
 BINALL= \
 		gdp-stresser \
+		t_ep_uuid \
 		t_fwd_append \
 		t_multimultiread \
 		t_sub_and_append \
@@ -76,6 +77,10 @@ INCSEARCH=	${INCLOCAL} \
 		-I${LOCAL1}/include \
 		-I${LOCAL2}/include \
 		-I${LOCAL3}/include
+INCGDP=		-I${INCROOT}
+INCEP=
+INCS=		${INCSEARCH} ${INCGDP} ${INCEP}
+
 LIBROOT=	${INCROOT}
 LIBSEARCH=	${LIBLOCAL} \
 		-L${LIBROOT}/gdp \
@@ -83,19 +88,24 @@ LIBSEARCH=	${LIBLOCAL} \
 		-L${LOCAL1}/lib \
 		-L${LOCAL2}/lib \
 		-L${LOCAL3}/lib
-INCGDP=		-I${INCROOT}
 LIBGDP=		-lgdp
-INCEP=
 LIBEP=		-lep
 LIBJANSSON=	-L${LOCAL1}/lib -L${LOCAL2}/lib -ljansson
 INCEVENT2=
 LIBEVENT2=	-levent -levent_pthreads -pthread
 LIBCRYPTO=	-lcrypto
 LIBAVAHI=	-lavahi-client -lavahi-common
-INCS=		${INCSEARCH} ${INCGDP} ${INCEP}
+LIBADD=		`sh ../adm/add-libs.sh`
+LDLIBS=		${LIBGDP} \
+		${LIBEP} \
+		${LIBJANSSON}  \
+		${LIBEVENT2}  \
+		${LIBCRYPTO}  \
+		${LIBAVAHI} \
+		${LIBADD}
 LDFLAGS+=	t_common_support.o \
-		${LIBSEARCH} ${LIBGDP} ${LIBEP} \
-		${LIBJANSSON} ${LIBEVENT2} ${LIBCRYPTO} ${LIBAVAHI}
+		${LIBSEARCH} \
+		${LDLIBS}
 CC=		cc
 PG=
 WALL=		-Wall
@@ -111,6 +121,9 @@ all:	${ALL}
 
 gdp-stresser:	gdp-stresser.o t_common_support.o
 	${CC} -o $@ gdp-stresser.o ${LDFLAGS}
+
+t_ep_uuid:	t_ep_uuid.o t_common_support.o
+	${CC} -o $@ t_ep_uuid.o ${LDFLAGS}
 
 t_fwd_append:	t_fwd_append.o t_common_support.o
 	${CC} -o $@ t_fwd_append.o ${LDFLAGS}

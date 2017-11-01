@@ -36,6 +36,8 @@
 **  that needs tweaks.
 **
 **  Possible options:
+**	EP_OSCF_HAS_BSD_UUID
+**		Use BSD-style UUID implementation
 **	EP_OSCF_HAS_INTTYPES_H
 **		Set if <inttypes.h> exists
 **	EP_OSCF_HAS_STDBOOL_H
@@ -116,6 +118,7 @@
 #  endif
 #  define EP_OSCF_NEED_OPTRESET		1	// optreset needed in getopt(3)
 #  define EP_OSCF_HAS_BACKTRACE		0	// no backtrace(3) call
+#  define EP_OSCF_HAS_BSD_UUID		1	// use BSD-style UUID
 # endif // __FreeBSD__
 
 # ifdef __APPLE__

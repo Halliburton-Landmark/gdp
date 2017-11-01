@@ -89,6 +89,7 @@ OBJS_MOST=	\
 	ep_thr.o \
 	ep_thr_pool.o \
 	ep_time.o \
+	ep_uuid.o \
 	ep_xlate.o \
 
 OBJS=	\
@@ -153,6 +154,7 @@ HFILES=	\
 	ep_syslog.h \
 	ep_thr.h \
 	ep_time.h \
+	ep_uuid.h \
 	ep_xlate.h \
 	ep_version.h \
 

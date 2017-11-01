@@ -52,6 +52,9 @@ static struct ep_stat_to_string	Stats[] =
     { EP_STAT_ASSERT_ABORT,	"assertion failure",			},
     { EP_STAT_NULL_POINTER,	"invalid null pointer",			},
     { EP_STAT_NOT_INITIALIZED,	"initialization required",		},
+    { EP_STAT_UUID_PARSE_ERROR,	"cannot parse UUID",			},
+    { EP_STAT_UUID_VERSION,	"illegal UUID version",			},
+    { EP_STAT_SOFTWARE_ERROR,	"internal software error",		},
 
     // cryptographic status codes
     { _EP_STAT_INTERNAL(OK, EP_STAT_MOD_CRYPTO, 0), "crypto"		},
