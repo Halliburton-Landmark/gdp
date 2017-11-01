@@ -2044,11 +2044,9 @@ static EP_STAT
 disk_delete(gdp_gob_t *gob)
 {
 	EP_STAT estat = EP_STAT_OK;
-	gob_physinfo_t *phys;
 
 	if (!EP_ASSERT_POINTER_VALID(gob) || !EP_ASSERT_POINTER_VALID(gob->x))
 		return EP_STAT_ASSERT_ABORT;
-	phys = GETPHYS(gob);
 
 	ep_dbg_cprintf(Dbg, 18, "disk_delete(%s)\n", gob->pname);
 
