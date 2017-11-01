@@ -11,34 +11,20 @@
 
 module=${1-none}
 
-candidates=`ls \
-	/lib/libdb.* \
-	/usr/lib*/libdb.* \
-	/usr/lib/*/libdb.* \
-	/usr/local/lib*/libdb.* \
-	2>/dev/null`
-if [ ! -z "$candidates" ]
-then
-	echo "-ldb"
-fi
+try_lib() {
+	lib=$1
+	candidates=`ls \
+		/lib/lib$lib.* \
+		/usr/lib*/lib$lib.* \
+		/usr/lib/*/lib$lib.* \
+		/usr/local/lib*/lib$lib.* \
+		2>/dev/null`
+	if [ ! -z "$candidates" ]
+	then
+		echo "-l$lib"
+	fi
+}
 
-candidates=`ls \
-	/lib/libexecinfo.* \
-	/usr/lib*/libexecinfo.* \
-	/usr/lib/*/libexecinfo.* \
-	/usr/local/lib*/libexecinfo.* \
-	2>/dev/null`
-if [ ! -z "$candidates" ]
-then
-	echo "-lexecinfo"
-fi
-
-candidates=`ls \
-	/usr/lib/libsystemd.* \
-	/usr/lib/*/libsystemd.* \
-	/usr/local/lib*/libsystemd.* \
-	2>/dev/null`
-if [ ! -z "$candidates" ]
-then
-	echo "-lsystemd"
-fi
+try_lib db
+try_lib execinfo
+try_lib systemd
