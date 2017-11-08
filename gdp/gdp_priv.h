@@ -53,6 +53,7 @@ typedef struct gdp_cursor	gdp_cursor_t;
 typedef struct gdp_req		gdp_req_t;
 typedef struct gdp_gob		gdp_gob_t;
 typedef struct gdp_gin		gdp_gin_t;
+typedef struct event_base	event_base_t;
 STAILQ_HEAD(gev_list, gdp_event);
 
 extern EP_THR		_GdpIoEventLoopThread;
@@ -725,6 +726,9 @@ EP_STAT			_gdp_advertise_me(			// advertise me only
 
 #define GDP_SUBSCR_REFRESH_DEF	60L			// default refresh interval (sec)
 #define GDP_SUBSCR_TIMEOUT_DEF	180L		// default timeout (sec)
+
+extern EP_THR_MUTEX		_GdpSubscriptionMutex;
+struct req_head			_GdpSubscriptionRequests;
 
 void			_gdp_subscr_lost(			// subscription disappeared
 						gdp_req_t *req);

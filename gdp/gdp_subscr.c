@@ -47,6 +47,7 @@ static bool			SubscriptionThreadRunning;
 static EP_THR		SubscriptionThreadId;
 EP_THR_MUTEX		_GdpSubscriptionMutex	EP_THR_MUTEX_INITIALIZER;
 
+
 /*
 **  Re-subscribe to a GCL
 */
@@ -104,7 +105,7 @@ subscr_resub(gdp_req_t *req)
 */
 
 static void *
-subscr_poker_thread(void *unused)
+subscr_poker_thread(void *chan_)
 {
 	gdp_chan_t *chan = chan_;
 	long timeout = ep_adm_getlongparam("swarm.gdp.subscr.timeout",
@@ -258,7 +259,7 @@ _gdp_gcl_subscribe(gdp_req_t *req,
 			if (spawnthread)
 			{
 				int istat = ep_thr_spawn(&SubscriptionThreadId,
-									subscr_poker_thread, NULL);
+									subscr_poker_thread, req->chan);
 				if (istat != 0)
 				{
 					EP_STAT spawn_stat = ep_stat_from_errno(istat);

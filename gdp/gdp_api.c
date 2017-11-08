@@ -39,6 +39,7 @@
 */
 
 #include "gdp.h"
+#include "gdp_chan.h"
 #include "gdp_event.h"
 #include "gdp_gclmd.h"
 #include "gdp_stat.h"
