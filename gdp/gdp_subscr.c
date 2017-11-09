@@ -28,14 +28,15 @@
 **  ----- END LICENSE BLOCK -----
 */
 
+#include "gdp.h"
+#include "gdp_chan.h"
+#include "gdp_event.h"
+#include "gdp_priv.h"
+
 #include <ep/ep.h>
 #include <ep/ep_app.h>
 #include <ep/ep_dbg.h>
 #include <ep/ep_log.h>
-
-#include "gdp.h"
-#include "gdp_event.h"
-#include "gdp_priv.h"
 
 #include <string.h>
 #include <sys/errno.h>
@@ -105,9 +106,8 @@ subscr_resub(gdp_req_t *req)
 */
 
 static void *
-subscr_poker_thread(void *chan_)
+subscr_poker_thread(void *unused)
 {
-	gdp_chan_t *chan = chan_;
 	long timeout = ep_adm_getlongparam("swarm.gdp.subscr.timeout",
 							GDP_SUBSCR_TIMEOUT_DEF);
 	long delta_poke = ep_adm_getlongparam("swarm.gdp.subscr.refresh",
@@ -120,7 +120,6 @@ subscr_poker_thread(void *chan_)
 	ep_dbg_cprintf(Dbg, 10,
 			"Starting subscription poker thread, delta_poke = %ld\n",
 			delta_poke);
-	chan->flags |= GDP_CHAN_HAS_SUB_THR;
 
 	// loop forever poking subscriptions
 	for (;;)

@@ -310,7 +310,7 @@ post_one_log(gdp_name_t gdpname, void *ctx)
 
 		ep_dbg_cprintf(Dbg, 1, "post_one_log: _gdp_gob_cache_get: %s\n",
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
-		return;
+		return estat;
 	}
 	if (gob != NULL)
 	{

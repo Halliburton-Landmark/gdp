@@ -472,7 +472,7 @@ chan_open_helper(
 	if (chan->bev == NULL)
 	{
 		estat = ep_stat_from_errno(errno);
-		ep_dbg_cprintf(Dbg, 18, "_gdp_chan_open: no bufferevent\n");
+		ep_dbg_cprintf(Dbg, 18, "chan_open_helper: no bufferevent\n");
 		goto fail0;
 	}
 
@@ -528,7 +528,7 @@ chan_open_helper(
 				sizeof abuf);
 	}
 
-	ep_dbg_cprintf(Dbg, 28, "_gdp_chan_open(%s)\n", abuf);
+	ep_dbg_cprintf(Dbg, 28, "chan_open_helper(%s)\n", abuf);
 
 	// strip off addresses and try them
 	estat = GDP_STAT_NOTFOUND;				// anything that is not OK
@@ -576,7 +576,7 @@ chan_open_helper(
 			port = pbuf;
 		}
 
-		ep_dbg_cprintf(Dbg, 20, "_gdp_chan_open: trying host %s port %s\n",
+		ep_dbg_cprintf(Dbg, 20, "chan_open_helper: trying host %s port %s\n",
 				host, port);
 
 		// parsing done....  let's try the lookup
@@ -607,7 +607,7 @@ chan_open_helper(
 				estat = EP_STAT_DNS_FAILURE;
 			}
 			ep_dbg_cprintf(Dbg, 1,
-					"_gdp_chan_open: getaddrinfo(%s, %s) =>\n"
+					"chan_open_helper: getaddrinfo(%s, %s) =>\n"
 					"    %s\n",
 					host, port, gai_strerror(r));
 			continue;
@@ -624,7 +624,7 @@ chan_open_helper(
 			{
 				// bad news, but keep trying
 				estat = ep_stat_from_errno(errno);
-				ep_log(estat, "_gdp_chan_open: cannot create socket");
+				ep_log(estat, "chan_open_helper: cannot create socket");
 				continue;
 			}
 
@@ -636,7 +636,7 @@ chan_open_helper(
 							(void *) &enable, sizeof enable) != 0)
 				{
 					estat = ep_stat_from_errno(errno);
-					ep_log(estat, "_gdp_chan_open: cannot set TCP_NODELAY");
+					ep_log(estat, "chan_open_helper: cannot set TCP_NODELAY");
 					// error not fatal, let's just go on
 				}
 			}
@@ -645,7 +645,7 @@ chan_open_helper(
 				// connection failure
 				estat = ep_stat_from_errno(errno);
 				ep_dbg_cprintf(Dbg, 38,
-						"_gdp_chan_open[%d]: connect failed: %s\n",
+						"chan_open_helper[%d]: connect failed: %s\n",
 						getpid(), strerror(errno));
 				close(sock);
 				continue;
@@ -673,26 +673,20 @@ chan_open_helper(
 	if (!EP_STAT_ISOK(estat))
 	{
 fail0:
-		if (newchan || ep_dbg_test(Dbg, 2))
+		if (ep_dbg_test(Dbg, 2))
 		{
 			char ebuf[80];
-			ep_dbg_printf("_gdp_chan_open[%d]: could not open channel: %s\n",
+			ep_dbg_printf("chan_open_helper[%d]: could not open channel: %s\n",
 					getpid(), ep_stat_tostr(estat, ebuf, sizeof ebuf));
-			//ep_log(estat, "_gdp_chan_open: could not open channel");
+			//ep_log(estat, "chan_open_helper: could not open channel");
 		}
-
-		if (chan != NULL && newchan)
-		{
-			if (chan->bev != NULL)
-				bufferevent_free(chan->bev);
-			chan->bev = NULL;
-			ep_mem_free(chan);
-			*pchan = NULL;
-		}
-		return estat;
 	}
-	ep_dbg_cprintf(Dbg, 1, "_gdp_chan_open[%d]: talking to router at %s:%s\n",
-				getpid(), host, port);
+	else
+	{
+		ep_dbg_cprintf(Dbg, 1,
+					"chan_open_helper[%d]: talking to router at %s:%s\n",
+					getpid(), host, port);
+	}
 	return estat;
 }
 

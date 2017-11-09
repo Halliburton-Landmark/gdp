@@ -323,7 +323,7 @@ cmd_create(gdp_req_t *req)
 	_gdp_gob_cache_add(gob);
 
 	// advertise this new GOB
-	logd_advertise_one(gob->name, GDP_CMD_ADVERTISE);
+	logd_advertise_one(req->chan, gob->name, GDP_CMD_ADVERTISE);
 
 	// pass any creation info back to the caller
 	// (none at this point)
@@ -496,7 +496,7 @@ cmd_delete(gdp_req_t *req)
 	}
 
 	// remove log advertisement
-	logd_advertise_one(req->gob->name, GDP_CMD_WITHDRAW);
+	logd_advertise_one(req->chan, req->gob->name, GDP_CMD_WITHDRAW);
 
 	// remove any subscriptions
 	sub_end_all_subscriptions(req->gob, req->cpdu->src, GDP_PDU_NO_RID);
