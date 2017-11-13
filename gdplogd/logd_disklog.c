@@ -199,7 +199,7 @@ static EP_THR_MUTEX		BdbMutex		EP_THR_MUTEX_INITIALIZER;
 
 
 static EP_STAT
-bdb_init(const char *db_home)
+bdb_init(const char *db_home, bool use_auto_commit)
 {
 	EP_STAT estat = EP_STAT_OK;
 
@@ -233,8 +233,9 @@ bdb_init(const char *db_home)
 						DB_INIT_TXN |
 						DB_INIT_LOCK |
 						DB_INIT_LOG |
-						DB_INIT_MPOOL |
-						DB_AUTO_COMMIT ;
+						DB_INIT_MPOOL ;
+		if (use_auto_commit)
+			dbenv_flags |= DB_AUTO_COMMIT;
 		if (ep_adm_getboolparam("swarm.gdplogd.gob.bdb.private", true))
 			dbenv_flags |= DB_PRIVATE;
 		if ((dbstat = DbEnv->open(DbEnv, db_home, dbenv_flags, 0)) != 0)
@@ -571,7 +572,7 @@ bdb_put(DB *db,
 */
 
 static EP_STAT
-disk_init()
+disk_init_internal(bool use_auto_commit)
 {
 	EP_STAT estat = EP_STAT_OK;
 
@@ -600,13 +601,19 @@ disk_init()
 		DefaultLogFlags |= LOG_POSIX_ERRORS;
 
 	// initialize berkeley DB (must be done while single threaded)
-	estat = bdb_init(GclDir);
+	estat = bdb_init(GclDir, use_auto_commit);
 
 	DiskInitialized = true;
 	ep_dbg_cprintf(Dbg, 8, "disk_init: log dir = %s, mode = 0%o\n",
 			GclDir, GOBfilemode);
 
 	return estat;
+}
+
+static EP_STAT
+disk_init()
+{
+	return disk_init_internal(true);
 }
 
 
