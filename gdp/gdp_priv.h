@@ -659,7 +659,7 @@ void			_gdp_req_pr_stats(			// print (debug) statistics
 **  Channel and I/O Event support
 */
 
-// extended channel information (passed as channel "udata")
+// extended channel information (passed as channel "cdata")
 struct gdp_chan_x
 {
 	struct req_head		reqs;			// reqs associated with this channel

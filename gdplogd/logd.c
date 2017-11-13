@@ -391,7 +391,7 @@ main(int argc, char **argv)
 						NULL,					// send callback
 						&_gdp_io_event,			// close/error/eof callback
 						&logd_advertise_all,	// advertise callback
-						NULL,					// cdata
+						chanx,					// cdata
 						&_GdpChannel);			// output: new channel
 	EP_STAT_CHECK(estat, goto fail0);
 

@@ -426,8 +426,10 @@ chan_event_cb(struct bufferevent *bev, short events, void *ctx)
 				ep_time_nanosleep(delay * INT64_C(1000000));
 			estat = chan_reopen(chan);
 		} while (!EP_STAT_ISOK(estat));
-		(*chan->advert_cb)(chan, GDP_CMD_ADVERTISE, ctx);
 	}
+
+	if (chan->state == GDP_CHAN_CONNECTED)
+		(*chan->advert_cb)(chan, GDP_CMD_ADVERTISE, ctx);
 }
 
 
@@ -465,7 +467,8 @@ chan_do_close(gdp_chan_t *chan, int what)
 
 static EP_STAT
 chan_open_helper(
-		gdp_chan_t *chan)
+		gdp_chan_t *chan,
+		void *adata)
 {
 	EP_STAT estat = EP_STAT_OK;
 
@@ -686,6 +689,7 @@ fail0:
 		ep_dbg_cprintf(Dbg, 1,
 					"chan_open_helper[%d]: talking to router at %s:%s\n",
 					getpid(), host, port);
+		(*chan->advert_cb)(chan, GDP_CMD_ADVERTISE, adata);
 	}
 	return estat;
 }
@@ -732,7 +736,7 @@ _gdp_chan_open(
 	bufferevent_enable(chan->bev, EV_READ | EV_WRITE);
 	*pchan = chan;
 
-	estat = chan_open_helper(chan);
+	estat = chan_open_helper(chan, NULL);
 
 	if (!EP_STAT_ISOK(estat))
 	{
@@ -754,7 +758,7 @@ chan_reopen(gdp_chan_t *chan)
 
 	ep_dbg_cprintf(Dbg, 12, "chan_reopen: %p\n	 advert_cb = %p\n",
 			chan, chan->advert_cb);
-	estat = chan_open_helper(chan);
+	estat = chan_open_helper(chan, NULL);
 	return estat;
 }
 
