@@ -49,6 +49,7 @@ case "$OS" in
 	package libevent-dev
 	package libevent-pthreads
 	package libssl-dev
+	package uuid-dev
 	package lighttpd
 	package libjansson-dev
 	package libavahi-common-dev
