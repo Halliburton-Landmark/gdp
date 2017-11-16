@@ -713,6 +713,8 @@ _gdp_chan_open(
 	EP_STAT estat;
 	gdp_chan_t *chan;
 
+	ep_dbg_cprintf(Dbg, 11, "_gdp_chan_open(%s)\n", router_addr);
+
 	// allocate a new channel structure
 	chan = ep_mem_zalloc(sizeof *chan);
 	ep_thr_mutex_init(&chan->mutex, EP_THR_MUTEX_DEFAULT);

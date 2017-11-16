@@ -523,6 +523,7 @@ gdp_init(const char *router_addr)
 {
 	EP_STAT estat = EP_STAT_OK;
 
+	ep_dbg_cprintf(Dbg, 9, "gdp_init, initialized = %d\n", _GdpLibInitialized);
 	if (_GdpLibInitialized)				// set in gdp_lib_init
 		goto done;
 
