@@ -167,7 +167,7 @@ main(int argc, char **argv)
 #endif
 
 	// preinit library (must be early due to crypto code in arg processing)
-	gdp_lib_init(NULL);
+	ep_crypto_init(0);
 
 	// collect command-line arguments
 	while ((opt = getopt(argc, argv, OPTIONS)) > 0)
