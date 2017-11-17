@@ -1162,6 +1162,17 @@ _gdp_io_recv(
 	_gdp_cursor_get_endpoints(cursor, &pdu->src, &pdu->dst);
 	//pdu->payload_len = payload_len;
 	estat = _gdp_pdu_in(pdu, cursor);
+	EP_STAT_CHECK(estat, goto fail0);
+
+	_gdp_pdu_process(pdu, _gdp_cursor_get_chan(cursor));
+
+fail0:
+	{
+		char ebuf[100];
+		ep_dbg_cprintf(Dbg, EP_STAT_ISOK(estat) ? 21 : 3,
+				"_gdp_io_recv: %s\n",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
 	return estat;
 }
 

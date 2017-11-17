@@ -173,7 +173,7 @@ static SLIST_HEAD(cursor_list, gdp_cursor)
 static EP_THR_MUTEX		CursorFreeListMutex		EP_THR_MUTEX_INITIALIZER;
 
 static gdp_cursor_t *
-cursor_new(gdp_buf_t *ibuf)
+cursor_new(gdp_chan_t *chan, gdp_buf_t *ibuf)
 {
 	gdp_cursor_t *cursor;
 
@@ -188,8 +188,8 @@ cursor_new(gdp_buf_t *ibuf)
 		cursor = ep_mem_zalloc(sizeof *cursor);
 	}
 
-	// save this buffer: note: reference, not copy
-	cursor->ibuf = ibuf;
+	cursor->chan = chan;
+	cursor->ibuf = ibuf;		// reference, not copy
 
 	return cursor;
 }
@@ -238,10 +238,12 @@ read_header(gdp_cursor_t *cursor)
 	if (pbp == NULL)
 	{
 		// fewer than MIN_HEADER_LENGTH bytes in buffer
+		ep_dbg_cprintf(Dbg, 11, "read_header: pbp == NULL\n");
 		estat = GDP_STAT_KEEP_READING;
 		goto done;
 	}
 
+# if PROTOCOL_V4
 	GET8(b);				// PDU version number
 	if (b != GDP_CHAN_PROTO_VERSION)
 	{
@@ -277,6 +279,7 @@ read_header(gdp_cursor_t *cursor)
 
 	// consume entire header
 	gdp_buf_drain(ibuf, hdr_len);
+# endif
 
 done: {
 		char ebuf[100];
@@ -314,7 +317,7 @@ chan_read_cb(struct bufferevent *bev, void *ctx)
 	EP_ASSERT(bev == chan->bev);
 
 	// we store the header data in a cursor
-	gdp_cursor_t *cursor = cursor_new(ibuf);
+	gdp_cursor_t *cursor = cursor_new(chan, ibuf);
 
 	while (gdp_buf_getlength(ibuf) > MIN_HEADER_LENGTH)
 	{
@@ -323,8 +326,13 @@ chan_read_cb(struct bufferevent *bev, void *ctx)
 
 		// pass it to the L5 callback
 		// note that if the callback is not set, the PDU is thrown away
-		if (EP_STAT_ISOK(estat) && chan->recv_cb != NULL)
-			estat = (*chan->recv_cb)(cursor, 0);
+		if (EP_STAT_ISOK(estat))
+		{
+			if (chan->recv_cb != NULL)
+				estat = (*chan->recv_cb)(cursor, 0);
+			else
+				ep_dbg_cprintf(Dbg, 1, "chan_read_cb: NULL recv_cb\n");
+		}
 		char ebuf[100];
 		ep_dbg_cprintf(Dbg, 32, "chan_read_cb: %s\n",
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
@@ -793,6 +801,7 @@ send_helper(gdp_chan_t *chan,
 	EP_STAT estat = EP_STAT_OK;
 	int i;
 
+# if PROTOCOL_V4
 	// build the header in memory
 	PUT8(GDP_CHAN_PROTO_VERSION);		// version number
 	PUT8(15);							// time to live
@@ -811,6 +820,7 @@ send_helper(gdp_chan_t *chan,
 		estat = GDP_STAT_PDU_WRITE_FAIL;
 		goto fail0;
 	}
+# endif
 
 	// and the payload
 	i = bufferevent_write_buffer(chan->bev, payload);
@@ -859,6 +869,9 @@ _gdp_chan_advertise(
 	estat = _gdp_req_new(GDP_CMD_ADVERTISE, NULL, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 	memcpy(req->cpdu->dst, RoutingLayerAddr, sizeof req->cpdu->dst);
+
+	// might batch several adverts into one PDU
+	gdp_buf_write(req->cpdu->datum->dbuf, gname, sizeof (gdp_name_t));
 
 	// send the request
 	estat = _gdp_req_send(req);

@@ -81,7 +81,8 @@
 **			"seq" since this is a lower-level concept that is
 **			subsumed by TCP.
 **
-**		The structure of a PDU is shown below.  This does not show
+#if PROTOCOL_V4
+**		The intended structure of a PDU is shown below.  This does not show
 **		the source and destination address, which are passed in from
 **		the layer below --- that is, if this is a "Layer 5" or "Session
 **		Layer" protocol, then "Layer 4" or "Transport Layer" deals
@@ -92,13 +93,37 @@
 **			2	6	signature length & digest algorithm
 **			1	8	optionals length (in 32 bit words)
 **			1	9	flags (indicate presence/lack of optional fields)
-**			4	10	length of data portion
+**			4	10	length of data portion  [[We may reduce this to 16 bits]]
 **			[8	__	record number (optional)]
 **			[8	__	sequence number (optional)]
 **			[16	__	commit timestamp (optional)]
 **			V	__	additional optional data
 **			V	__	data (length indicated above)
 **			V	__	signature (length indicated above)
+**
+#else // PROTOCOL_V3
+**		Note that the above is for the future.  At the moment this
+**		implements the old (protocol version 3) scheme, which merges
+**		layers 4 and 5:
+**			1	0	protocol version and format (3)
+**			1	1	time to live (in hops)
+**			1	2	reserved
+**			1	3	command or ack/nak
+**			32	4	destination address
+**			32	36	source address
+**			4	68	request id
+**			2	72	signature length & digest algorithm
+**			1	74	optionals length (in 32 bit words)
+**			1	75	flags (indicate presence/lack of optional fields)
+**			4	76	length of data portion
+**			[8	__	record number (optional)]
+**			[8	__	sequence number (optional)]
+**			[16	__	commit timestamp (optional)]
+**			V	__	additional optional data
+**			V	__	data (length indicated above)
+**			V	__	signature (length indicated above)
+#endif
+**
 **		The structure shown below is the in-memory version and does
 **		not correspond 1::1 to the on-wire format.
 */
@@ -117,6 +142,7 @@ typedef struct gdp_pdu
 	gdp_chan_t				*chan;		// I/O channel for this PDU entry
 	bool					inuse:1;	// indicates that this is allocated
 
+# if PROTOCOL_V4
 	// copied from lower layer
 	gdp_name_t				dst;		// destination address
 	gdp_name_t				src;		// source address
@@ -128,6 +154,19 @@ typedef struct gdp_pdu
 	uint8_t					olen;		//  8 optionals length (in 32-bit words)
 	uint8_t					flags;		//  9 see below
 	gdp_seqno_t				seqno;		// ?? sequence number (XXX used?)
+# else // PROTOCOL_V3
+	// PDU data
+	uint8_t					ver;		//  0 protocol version and format
+	uint8_t					ttl;		//  1 time to live
+	uint8_t					rsvd1;		//  2 reserved
+	uint8_t					cmd;		//  3 command or ack/nak
+	gdp_name_t				dst;		//  4 destination address
+	gdp_name_t				src;		// 36 source address
+	gdp_rid_t				rid;		// 68 req id (GDP_PDU_NO_RID => none)
+	uint8_t					olen;		// 74 optionals length (in 32-bit words)
+	uint8_t					flags;		// 75 see below
+	gdp_seqno_t				seqno;		// ?? sequence number (XXX used?)
+# endif
 
 	// data length, recno, timestamp, signature, and data are in the datum
 	gdp_datum_t				*datum;		// pointer to data record
@@ -147,8 +186,13 @@ typedef struct gdp_pdu
 /***** manifest constants *****/
 
 // size of fixed size part of header
+# if PROTOCOL_V4
 // (ver, cmd, rid, siglen, olen, flags, dlen)
 #define _GDP_PDU_FIXEDHDRSZ		(1+1+4+2+1+1+4)
+# else // PROTOCOL_V3
+// (ver, ttl, rsvd, cmd, dst, src, rid, sigalg, siglen, olen, flags, dlen)
+#define _GDP_PDU_FIXEDHDRSZ		(1+1+1+1+32+32+4+1+1+1+1+4)
+# endif
 
 //* maximum size of options portion
 #define _GDP_PDU_MAXOPTSZ		(255 * 4)

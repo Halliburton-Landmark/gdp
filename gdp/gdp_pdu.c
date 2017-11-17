@@ -82,17 +82,26 @@ _gdp_pdu_dump(const gdp_pdu_t *pdu, FILE *fp)
 	}
 
 	int len = _GDP_PDU_FIXEDHDRSZ + pdu->olen;
+# if PROTOCOL_V4
 	fprintf(fp, "\n\tver=%d, cmd=%d=%s",
 				pdu->ver, pdu->cmd, _gdp_proto_cmd_name(pdu->cmd));
+# else
+	fprintf(fp, "\n\tv=%d, ttl=%d, rsvd1=%d, cmd=%d=%s",
+				pdu->ver, pdu->ttl, pdu->rsvd1,
+				pdu->cmd, _gdp_proto_cmd_name(pdu->cmd));
+#endif
 	fprintf(fp, "\n\tdst=");
 	gdp_print_name(pdu->dst, fp);
 	fprintf(fp, "\n\tsrc=");
 	gdp_print_name(pdu->src, fp);
+# if PROTOCOL_V4
 	fprintf(fp, "\n\trid=%u, olen=%d, seqno=%" PRIgdp_seqno "\n\tflags=",
 				pdu->rid, pdu->olen, pdu->seqno);
-//	fprintf(fp, "\n\trid=%u, olen=%d, chan=%p, seqno=%" PRIgdp_seqno
-//				"\n\tflags=",
-//				pdu->rid, pdu->olen, pdu->chan, pdu->seqno);
+# else // PROTOCOL_V3
+	fprintf(fp, "\n\trid=%u, olen=%d, chan=%p, seqno=%" PRIgdp_seqno
+				"\n\tflags=",
+				pdu->rid, pdu->olen, pdu->chan, pdu->seqno);
+# endif
 	ep_prflags(pdu->flags, PduFlags, fp);
 	fprintf(fp, "\n\tdatum=%p", pdu->datum);
 	if (pdu->datum != NULL)
@@ -132,11 +141,6 @@ send_data(gdp_buf_t *obuf,
 {
 	EP_STAT estat = GDP_STAT_PDU_WRITE_FAIL;
 
-	if (ep_dbg_test(DbgOut, 33))
-	{
-		ep_hexdump(data, len, ep_dbg_getfile(), dbgmode, offset);
-	}
-
 	if (data == NULL)
 	{
 		ep_dbg_cprintf(DbgOut, 1, "_gdp_pdu_out: %s: no data\n", where);
@@ -146,19 +150,25 @@ send_data(gdp_buf_t *obuf,
 		ep_dbg_cprintf(DbgOut, 1, "_gdp_pdu_out: %s: empty data (%zd)\n",
 				where, len);
 	}
-	else if (gdp_buf_write(obuf, data, len) < 0)
-	{
-		char nbuf[40];
-
-		// couldn't write output
-		strerror_r(errno, nbuf, sizeof nbuf);
-		ep_dbg_cprintf(DbgOut, 1,
-				"_gdp_pdu_out: %s write failure (len = %zd): %s\n",
-				where, len, nbuf);
-	}
 	else
 	{
-		estat = EP_STAT_OK;
+		if (ep_dbg_test(DbgOut, 33))
+			ep_hexdump(data, len, ep_dbg_getfile(), dbgmode, offset);
+
+		if (gdp_buf_write(obuf, data, len) < 0)
+		{
+			char nbuf[40];
+
+			// couldn't write output
+			strerror_r(errno, nbuf, sizeof nbuf);
+			ep_dbg_cprintf(DbgOut, 1,
+					"_gdp_pdu_out: %s write failure (len = %zd): %s\n",
+					where, len, nbuf);
+		}
+		else
+		{
+			estat = EP_STAT_OK;
+		}
 	}
 
 	return estat;
@@ -172,8 +182,13 @@ send_data(gdp_buf_t *obuf,
 **		Outputs PDU, including all the data in the dbuf.
 */
 
+# if PROTOCOL_V4
 #define OOFF		8		// offset of olen from beginning of pdu
 #define FOFF		9		// offset of flags from beginning of pdu
+# else // PROTOCOL_V3
+#define OOFF		74		// offset of olen from beginning of pdu
+#define FOFF		75		// offset of flags from beginning of pdu
+# endif
 
 EP_STAT
 _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
@@ -196,6 +211,7 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 	{
 		return GDP_STAT_DEAD_DAEMON;
 	}
+	pdu->chan = chan;
 
 	obuf = gdp_buf_new();
 
@@ -266,8 +282,26 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 	else
 		*pbp++ = pdu->ver;
 
+# if !PROTOCOL_V4
+	// time to live (in hops)
+	*pbp++ = pdu->ttl;
+
+	// reserved field
+	*pbp++ = pdu->rsvd1;
+# endif
+
 	// command
 	*pbp++ = pdu->cmd;
+
+# if !PROTOCOL_V4
+	// destination address
+	memcpy(pbp, pdu->dst, sizeof pdu->dst);
+	pbp += sizeof pdu->dst;
+
+	// source address
+	memcpy(pbp, pdu->src, sizeof pdu->src);
+	pbp += sizeof pdu->src;
+# endif
 
 	// request id
 	PUT32(pdu->rid);
@@ -465,8 +499,8 @@ _gdp_pdu_hdr_in(gdp_pdu_t *pdu,
 		return GDP_STAT_KEEP_READING;
 	}
 
-	// hack: store metadata
-	//XXX pdu->chan = chan;
+	// XXX hack: store metadata
+	pdu->chan = _gdp_cursor_get_chan(cursor);
 
 	// read the fixed part of the PDU header in
 	pbp = pbuf;
@@ -489,7 +523,17 @@ _gdp_pdu_hdr_in(gdp_pdu_t *pdu,
 	}
 
 	// ok, we recognize it
+# if !PROTOCOL_V4
+	pdu->ttl = *pbp++;
+	pdu->rsvd1 = *pbp++;
+#endif
 	pdu->cmd = *pbp++;
+# if !PROTOCOL_V4
+	memcpy(pdu->dst, pbp, sizeof pdu->dst);
+	pbp += sizeof pdu->dst;
+	memcpy(pdu->src, pbp, sizeof pdu->src);
+	pbp += sizeof pdu->src;
+# endif
 	GET32(pdu->rid);
 	uint16_t sigtmp;
 	GET16(sigtmp);
@@ -713,6 +757,9 @@ _gdp_pdu_new(void)
 	// initialize the PDU
 	memset(pdu, 0, sizeof *pdu);
 	pdu->ver = GDP_PROTO_CUR_VERSION;
+# if !PROTOCOL_V4
+	pdu->ttl = GDP_TTL_DEFAULT;
+# endif
 	pdu->datum = gdp_datum_new();
 	pdu->inuse = true;
 

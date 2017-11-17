@@ -281,12 +281,6 @@ main(int argc, char **argv)
 		argc--;
 	}
 
-	// if we don't have a log daemon, pick one
-	if (logdxname == NULL)
-		logdxname = select_logd_name();
-
-	gdp_parse_name(logdxname, logdiname);
-
 	// name is optional ; if omitted one will be created
 	if (argc-- > 0)
 		gclxname = *argv++;
@@ -304,6 +298,11 @@ main(int argc, char **argv)
 
 	// allow thread to settle to avoid interspersed debug output
 	ep_time_nanosleep(INT64_C(100000000));
+
+	// if we don't have a log daemon, pick one
+	if (logdxname == NULL)
+		logdxname = select_logd_name();
+	gdp_parse_name(logdxname, logdiname);
 
 	if (gclxname != NULL)
 	{
