@@ -121,7 +121,6 @@ _gdp_gob_create(gdp_name_t gobname,
 
 	// add new GOB to cache
 	EP_ASSERT(req->gob == gob);
-	req->gob = NULL;			// avoid decref in _gdp_req_free
 	_gdp_req_unlock(req);		// lock ordering
 	_gdp_gob_cache_add(gob);
 	_gdp_req_lock(req);			// must be locked for _gdp_req_free
