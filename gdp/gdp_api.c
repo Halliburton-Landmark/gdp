@@ -774,6 +774,7 @@ gdp_gcl_append(gdp_gcl_t *gin, gdp_datum_t *datum)
 		estat = gin->apndfilter(&zdatum, gin->apndfpriv);
 	if (EP_STAT_ISOK(estat))
 		estat = _gdp_gob_append(gin->gob, &zdatum, _GdpChannel, 0);
+	*datum = zdatum;
 	unlock_gin_and_gob(gin, "gdp_gcl_append");
 	prstat(estat, gin, "gdp_gcl_append");
 	return estat;
