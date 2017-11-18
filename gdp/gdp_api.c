@@ -762,19 +762,16 @@ EP_STAT
 gdp_gcl_append(gdp_gcl_t *gin, gdp_datum_t *datum)
 {
 	EP_STAT estat;
-	gdp_datum_t zdatum;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_append\n");
 	if (!GDP_DATUM_ISGOOD(datum))
 		return GDP_STAT_DATUM_REQUIRED;
-	zdatum = *datum;
 	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_append");
 	EP_STAT_CHECK(estat, return estat);
 	if (gin->apndfilter != NULL)
-		estat = gin->apndfilter(&zdatum, gin->apndfpriv);
+		estat = gin->apndfilter(datum, gin->apndfpriv);
 	if (EP_STAT_ISOK(estat))
-		estat = _gdp_gob_append(gin->gob, &zdatum, _GdpChannel, 0);
-	*datum = zdatum;
+		estat = _gdp_gob_append(gin->gob, datum, _GdpChannel, 0);
 	unlock_gin_and_gob(gin, "gdp_gcl_append");
 	prstat(estat, gin, "gdp_gcl_append");
 	return estat;
