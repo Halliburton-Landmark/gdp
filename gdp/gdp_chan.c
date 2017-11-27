@@ -231,8 +231,6 @@ read_header(gdp_cursor_t *cursor)
 	gdp_buf_t *ibuf = GDP_BUF_FROM_EVBUFFER(
 								bufferevent_get_input(cursor->chan->bev));
 	uint8_t *pbp = gdp_buf_getptr(ibuf, MIN_HEADER_LENGTH);
-	int b;
-	int hdr_len;
 	EP_STAT estat = EP_STAT_OK;
 
 	if (pbp == NULL)
@@ -244,6 +242,8 @@ read_header(gdp_cursor_t *cursor)
 	}
 
 # if PROTOCOL_V4
+	int b;
+	int hdr_len;
 	GET8(b);				// PDU version number
 	if (b != GDP_CHAN_PROTO_VERSION)
 	{
@@ -796,13 +796,13 @@ send_helper(gdp_chan_t *chan,
 			gdp_buf_t *payload,
 			int tos)
 {
-	char pb[MAX_HEADER_LENGTH];
-	char *pbp = pb;
 	EP_STAT estat = EP_STAT_OK;
 	int i;
 
 # if PROTOCOL_V4
 	// build the header in memory
+	char pb[MAX_HEADER_LENGTH];
+	char *pbp = pb;
 	PUT8(GDP_CHAN_PROTO_VERSION);		// version number
 	PUT8(15);							// time to live
 	PUT8(tos);							// type of service
