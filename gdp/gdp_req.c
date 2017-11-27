@@ -120,7 +120,7 @@ _gdp_req_new(int cmd,
 
 	// if the caller wants asynchronous results, tweak flags accordingly
 	if (EP_UT_BITSET(GDP_REQ_ASYNCIO, flags))
-		flags |= GDP_REQ_PERSIST | GDP_REQ_ALLOC_RID;
+		flags |= GDP_REQ_ALLOC_RID;
 
 	// if assertion fails, may be working with an unallocated GOB
 	if (gob != NULL && !GDP_GOB_ASSERT_ISLOCKED(gob))
@@ -609,7 +609,6 @@ static EP_PRFLAGS_DESC	ReqFlags[] =
 	{ GDP_REQ_ALLOC_RID,	GDP_REQ_ALLOC_RID,		"ALLOC_RID"		},
 	{ GDP_REQ_ON_GOB_LIST,	GDP_REQ_ON_GOB_LIST,	"ON_GOB_LIST"	},
 	{ GDP_REQ_ON_CHAN_LIST,	GDP_REQ_ON_CHAN_LIST,	"ON_CHAN_LIST"	},
-	{ GDP_REQ_CORE,			GDP_REQ_CORE,			"CORE"			},
 	{ GDP_REQ_ROUTEFAIL,	GDP_REQ_ROUTEFAIL,		"ROUTEFAIL"		},
 	{ 0,					0,						NULL			}
 };

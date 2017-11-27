@@ -742,7 +742,7 @@ _gdp_gob_fwd_append(
 	}
 
 	// deliver results asynchronously
-	reqflags |= GDP_REQ_ASYNCIO;
+	reqflags |= GDP_REQ_ASYNCIO | GDP_REQ_PERSIST;
 
 	_gdp_gob_lock(gob);
 	estat = _gdp_req_new(GDP_CMD_FWD_APPEND, gob, chan, NULL, reqflags, &req);

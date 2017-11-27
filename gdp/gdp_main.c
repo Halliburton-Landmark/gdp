@@ -162,7 +162,7 @@ process_cmd(void *cpdu_)
 
 	ep_dbg_cprintf(Dbg, 43,
 			"process_cmd: allocating new req for GOB %p\n", gob);
-	estat = _gdp_req_new(cmd, gob, cpdu->chan, cpdu, GDP_REQ_CORE, &req);
+	estat = _gdp_req_new(cmd, gob, cpdu->chan, cpdu, 0, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex);
 	EP_ASSERT(gob == req->gob);
@@ -278,15 +278,10 @@ process_cmd(void *cpdu_)
 	// free up resources
 	if (req->rpdu->datum != NULL)
 		ep_thr_mutex_unlock(&req->rpdu->datum->mutex);
-	if (EP_UT_BITSET(GDP_REQ_CORE, req->flags) &&
-			!EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
-	{
-		_gdp_req_free(&req);		// also decref's req->gob (leaves locked)
-	}
-	else
-	{
+	if (EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
 		_gdp_req_unlock(req);
-	}
+	else
+		_gdp_req_free(&req);		// also decref's req->gob (leaves locked)
 	if (gob != NULL)
 	{
 		if (!GDP_GOB_ASSERT_ISLOCKED(gob) || !EP_ASSERT(gob->refcnt > 0))
@@ -603,7 +598,7 @@ process_resp(void *rpdu_)
 		req->flags |= GDP_REQ_DONE;
 
 		// any further data or status is delivered via event
-		req->flags |= GDP_REQ_ASYNCIO;
+		req->flags |= GDP_REQ_ASYNCIO | GDP_REQ_PERSIST;	//XXX PERSIST?
 
 		if (ep_dbg_test(DbgProcResp, 40))
 		{
@@ -631,23 +626,22 @@ process_resp(void *rpdu_)
 	}
 
 	// free up resources
-	if (req->gob != NULL)
+	gob = req->gob;
+	if (gob != NULL)
 	{
-		// use a shadow variables so req does not lose gob
-		gdp_gob_t *gob = req->gob;
+		// use a shadow variable so req does not lose gob
 		GDP_GOB_ASSERT_ISLOCKED(gob);
-		_gdp_gob_decref(&gob, false);
+		_gdp_gob_decref(&gob, true);
+		gob = req->gob;
 	}
 
-	if (EP_UT_BITSET(GDP_REQ_CORE, req->flags) &&
-		!EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
-	{
-		_gdp_req_free(&req);
-	}
-	else
-	{
+	if (EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
 		_gdp_req_unlock(req);
-	}
+	else
+		_gdp_req_free(&req);
+
+	if (gob != NULL)
+		_gdp_gob_unlock(gob);
 
 	ep_dbg_cprintf(DbgProcResp, 40, "process_resp <<< done\n");
 }
