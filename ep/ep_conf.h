@@ -36,8 +36,6 @@
 **  that needs tweaks.
 **
 **  Possible options:
-**	EP_OSCF_HAS_BSD_UUID
-**		Use BSD-style UUID implementation
 **	EP_OSCF_HAS_INTTYPES_H
 **		Set if <inttypes.h> exists
 **	EP_OSCF_HAS_STDBOOL_H
@@ -84,6 +82,12 @@
 **		Use sd_notify(3) for system notification
 **	EP_OSCF_HAS_BACKTRACE
 **		Use backtrace(3) for printing stack backtraces
+**	EP_OSCF_HAS_BSD_UUID
+**		Use BSD-style UUID implementation
+**	EP_OSCF_HAS_OSSP_UUID
+**		Use OSSP-style (Redhat) UUID implementation
+**	EP_OSCF_HAS_TSO_UUID
+**		Use Tso-style (Debian) UUID implementation
 **	EP_OSCF_USE_VALGRIND
 **		Include hints for valgrind(1)
 **
@@ -132,6 +136,7 @@
 #   define EP_OSCF_USE_GETDATE		1	// does getdate(3) exist?
 #  endif
 #  define EP_OSCF_NEED_OPTRESET		1	// optreset needed in getopt(3)
+#  define EP_OSCF_HAS_TSO_UUID		1	// use Tso-style UUID
 # endif // __APPLE__
 
 #ifdef __linux__
@@ -146,7 +151,14 @@
 #  endif
 # define EP_OSCF_HAS_SYS_GETTID		1	// has syscall(SYS_gettid)
 # endif
-
+# ifdef __has_include				// XXX warning: bad hack
+#  if __has_include("uuid/uuid.h")
+#   define EP_OSCF_HAS_TSO_UUID		1	// Ted T'so style UUID
+#  endif
+# endif
+# ifndef EP_OSCF_HAS_TSO_UUID
+#  define EP_OSCF_HAS_OSSP_UUID		1	// OSSP (Redhat/CentOS) UUID
+# endif
 # define _BSD_SOURCE			1	// needed to compile on Linux
 # define _POSIX_C_SOURCE		200809L	// specify a modern environment
 #endif

@@ -42,7 +42,7 @@ static struct ep_stat_to_string	Stats[] =
     { EP_STAT_ABORT,		"generic abort",			},
 
     { EP_STAT_OUT_OF_MEMORY,	"out of memory",			},
-    { EP_STAT_ARG_OUT_OF_RANGE,	"argument out of range",		},
+    { EP_STAT_INVALID_ARG,	"invalid argument",			},
     { EP_STAT_END_OF_FILE,	"end of file",				},
     { EP_STAT_TIME_BADFORMAT,	"bad time format",			},
     { EP_STAT_BUF_OVERFLOW,	"potential buffer overflow",		},
@@ -55,6 +55,7 @@ static struct ep_stat_to_string	Stats[] =
     { EP_STAT_UUID_PARSE_ERROR,	"cannot parse UUID",			},
     { EP_STAT_UUID_VERSION,	"illegal UUID version",			},
     { EP_STAT_SOFTWARE_ERROR,	"internal software error",		},
+    { EP_STAT_NOT_IMPLEMENTED,	"not implemented",			},
 
     // cryptographic status codes
     { _EP_STAT_INTERNAL(OK, EP_STAT_MOD_CRYPTO, 0), "crypto"		},

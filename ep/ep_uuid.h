@@ -28,22 +28,31 @@
 **  ----- END LICENSE BLOCK -----
 ***********************************************************************/
 
-#if EP_OSCF_HAS_BSD_UUID
+#include <ep/ep.h>
+#if EP_OSCF_HAS_BSD_UUID || EP_OSCF_HAS_OSSP_UUID
 # include <uuid.h>
-#else
+#elif EP_OSCF_HAS_TSO_UUID
 # include <uuid/uuid.h>
+#else
+# error unknown UUID implementation
 #endif
 
 
 struct ep_uuid
 {
+#if EP_OSCF_HAS_OSSP_UUID
+	uuid_t		*uu;			// system UUID representation
+#else
 	uuid_t		uu;			// system UUID representation
+#endif
 };
 
 typedef struct ep_uuid	EP_UUID;		// internal (16 octet) format
 typedef char		EP_UUID_STR[37];	// string representation
 
 extern EP_STAT	ep_uuid_generate(		// generate new UUID
+			EP_UUID *uu);
+extern EP_STAT	ep_uuid_destroy(		// free UUID memory
 			EP_UUID *uu);
 extern EP_STAT	ep_uuid_tostr(			// make printable UUID
 			EP_UUID *uu,
