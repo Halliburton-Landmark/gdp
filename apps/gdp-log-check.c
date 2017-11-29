@@ -1616,7 +1616,7 @@ main(int argc, char **argv)
 		usage();
 
 	// have to hold this until after -D flag is processed
-	disk_init();
+	disk_init_internal(false);
 
 	GdplogdForgive.allow_log_gaps =
 			ep_adm_getboolparam("swarm.gdplogd.sequencing.allowgaps", true);
