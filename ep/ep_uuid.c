@@ -97,6 +97,8 @@ ep_uuid_generate(EP_UUID *uu)
 	return EP_STAT_OK;
 # else
 	ep_crypto_random_buf(uu->uu, sizeof uu->uu);
+	// make this a version 4 (random-based) UUID
+	uu->uu[6] = (uu->uu[6] & 0x0f) | 0x40;
 	return EP_STAT_OK;
 #endif
 }
