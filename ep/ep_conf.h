@@ -58,6 +58,8 @@
 **		Set if strlcpy(3) is available
 **	EP_OSCF_HAS_GETPROGNAME
 **		Set if getprogname(3) is available
+**	EP_OSCF_HAS_ARC4RANDOM
+**		Set if arc4random(3) exists
 **	EP_OSCF_MEM_PAGESIZE
 **		Memory page size; defaults to getpagesize()
 **	EP_OSCF_MEM_ALIGNMENT
@@ -82,12 +84,6 @@
 **		Use sd_notify(3) for system notification
 **	EP_OSCF_HAS_BACKTRACE
 **		Use backtrace(3) for printing stack backtraces
-**	EP_OSCF_HAS_BSD_UUID
-**		Use BSD-style UUID implementation
-**	EP_OSCF_HAS_OSSP_UUID
-**		Use OSSP-style (Redhat) UUID implementation
-**	EP_OSCF_HAS_TSO_UUID
-**		Use Tso-style (Debian) UUID implementation
 **	EP_OSCF_USE_VALGRIND
 **		Include hints for valgrind(1)
 **
@@ -120,9 +116,9 @@
 #  if __FreeBSD_version >= 440000
 #   define EP_OSCF_HAS_GETPROGNAME	1	// does getprogname(3) exist?
 #  endif
+#  define EP_OSCF_HAS_ARC4RANDOM	1	// does arc4random(3) exist?
 #  define EP_OSCF_NEED_OPTRESET		1	// optreset needed in getopt(3)
 #  define EP_OSCF_HAS_BACKTRACE		0	// no backtrace(3) call
-#  define EP_OSCF_HAS_BSD_UUID		1	// use BSD-style UUID
 # endif // __FreeBSD__
 
 # ifdef __APPLE__
@@ -131,12 +127,12 @@
 #  define EP_OSCF_HAS_STRLCPY		1	// does strlcat exist?
 #  define EP_OSCF_HAS_LSTAT		1	// does lstat(2) exist?
 #  define EP_OSCF_HAS_GETPROGNAME	1	// does getprogname(3) exist?
+#  define EP_OSCF_HAS_ARC4RANDOM	1	// does arc4random(3) exist?
 #  define EP_OSCF_SYSTEM_VALLOC		valloc	// aligned memory allocator
 #  ifndef EP_OSCF_USE_GETDATE
 #   define EP_OSCF_USE_GETDATE		1	// does getdate(3) exist?
 #  endif
 #  define EP_OSCF_NEED_OPTRESET		1	// optreset needed in getopt(3)
-#  define EP_OSCF_HAS_TSO_UUID		1	// use Tso-style UUID
 # endif // __APPLE__
 
 #ifdef __linux__
