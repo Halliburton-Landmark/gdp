@@ -1,0 +1,16 @@
+[Unit]
+Description=GDP directory service
+After=mysql.service
+After=network-online.target
+
+[Service]
+Type=simple
+User=gdp
+ExecStart=/usr/sbin/gdp-directoryd
+Restart=always
+StandardOutput=syslog
+StandardError=inherit
+SyslogIdentifier=gdp-directoryd
+
+[Install]
+WantedBy=multi-user.target
