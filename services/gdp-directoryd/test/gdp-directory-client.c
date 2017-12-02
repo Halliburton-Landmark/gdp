@@ -160,7 +160,6 @@ int main(int argc, char *argv[])
 		printf("eguid is [");
 		for (int i = 0; i < sizeof(gdp_name_t); i++)
 		{
-			//dgram[MSG_OFFSET_SRC + i] = gdp_eguid[i];
 			printf("%.2x", gdp_eguid[i]);
 		}
 		printf("]\n");
