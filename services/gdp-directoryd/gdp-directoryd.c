@@ -85,7 +85,7 @@ char query[GDP_QUERY_STRING];
 #define WARN  2
 #define INFO  3
 #define VERB  4
-int debug_knob = WARN;
+int debug_knob = INFO;
 #define debug(d, fmt, ...)						 \
 	do											 \
 	{											 \
@@ -97,7 +97,7 @@ int debug_knob = WARN;
 #define debug(...)
 #endif
 
-void fail (MYSQL *con, char *s)
+void fail(MYSQL *con, char *s)
 {
 	perror(s);
 	if (con)
