@@ -6,7 +6,7 @@ Connector/C client library on the same host as gdp-directoryd.
 After mariadb is installed on the desired "blackbox" host,
 configure the database:
 
-oot@gdp-04:/etc/mysql# mysql
+$ mysql
 Welcome to the MariaDB monitor.  Commands end with ; or \g.
 Your MariaDB connection id is 56
 Server version: 10.0.31-MariaDB-0ubuntu0.16.04.2 Ubuntu 16.04
