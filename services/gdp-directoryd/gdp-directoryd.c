@@ -56,8 +56,7 @@
 #define GDP_CMD_DIR_LOOKUP	9
 
 // FIXME eventually maintain this in gdp_chan.h or other appropriate shared .h
-#pragma pack(push, 1)
-typedef struct otw_pdu_v3_s
+typedef struct __attribute((packed)) otw_pdu_v3_s
 {
 	uint8_t ver;
 	uint8_t ttl;
@@ -66,7 +65,6 @@ typedef struct otw_pdu_v3_s
 	uint8_t dst[sizeof(gdp_name_t)];
 	uint8_t src[sizeof(gdp_name_t)];
 } otw_pdu_v3_t;
-#pragma pack(pop)
 
 // on the wire pdu
 #define OTW_PDU_SIZE 68 // sanity check otw_pdu structure size
@@ -85,7 +83,7 @@ char query[GDP_QUERY_STRING];
 #define WARN  2
 #define INFO  3
 #define VERB  4
-int debug_knob = INFO;
+int debug_knob = WARN;
 #define debug(d, fmt, ...)						 \
 	do											 \
 	{											 \
@@ -109,7 +107,7 @@ int main(int argc, char **argv)
 {
 	struct sockaddr_in si_loc;
 	struct sockaddr_in si_rem;
-	int si_rem_len = sizeof(si_rem);
+	socklen_t si_rem_len = sizeof(si_rem);
 	int fd_listen;
 	int on = 1;
 	int otw_pdu_len;
@@ -118,7 +116,7 @@ int main(int argc, char **argv)
 	unsigned int mysql_fields;
 	MYSQL_ROW mysql_row;
 
-	// sanity check structure alterations
+	// sanity check structure packing
 	assert(sizeof(otw_pdu) == OTW_PDU_SIZE);
 	
 	if ((fd_listen = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
