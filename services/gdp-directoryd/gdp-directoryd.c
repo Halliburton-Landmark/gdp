@@ -188,7 +188,7 @@ int main(int argc, char **argv)
 			
 		case GDP_CMD_DIR_ADD:
 			// one entry per key for now (via replace instead of insert)
-			debug(INFO, "add:\n");
+			debug(INFO, "cmd -> add\n");
 
 			// replace or create
 			sprintf(query, "replace into blackbox.gdpd values (x'%s', x'%s')",
@@ -204,7 +204,7 @@ int main(int argc, char **argv)
 			
 		case GDP_CMD_DIR_LOOKUP:
 			// one entry per key, so no multiple replies for now
-			debug(INFO, "lookup:\n");
+			debug(INFO, "cmd -> lookup\n");
 
 			// search
 			sprintf(query,
@@ -255,7 +255,7 @@ int main(int argc, char **argv)
 			
 		case GDP_CMD_DIR_REMOVE:
 			// one entry per key, so remove is simple for now
-			debug(INFO, "remove:\n");
+			debug(INFO, "cmd -> remove\n");
 
 			// query
 			sprintf(query, "delete from blackbox.gdpd where dguid = x'%s'",
