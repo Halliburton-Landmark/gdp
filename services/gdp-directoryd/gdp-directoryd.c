@@ -1,5 +1,5 @@
 /*
-**  GDP-DIRECTORYD handles (UDP) requests to add, lookup, or remove
+**  GDP-DIRECTORYD handles (UDP) requests to add, find, or remove
 **  "dguid,eguid" (destination guid, egress guid) tuples within the
 **  gdp directory service's database (mariadb). This is an interim
 **  "blackbox" to facilitate the transition to gdp net4...
@@ -43,32 +43,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <gdp/gdp.h>
-
-// FIXME temporary assignment
-#define PORT 9001
-
-// FIXME version 3 otw_pdu support for the moment...
-#define GDP_CHAN_PROTO_VERSION 3
-
-// FIXME temporary until cmd extensions designed and added to gdp_pdu.h
-#define GDP_CMD_DIR_ADD		7
-#define GDP_CMD_DIR_REMOVE	8
-#define GDP_CMD_DIR_LOOKUP	9
-
-// FIXME eventually maintain this in gdp_chan.h or other appropriate shared .h
-typedef struct __attribute((packed)) otw_pdu_v3_s
-{
-	uint8_t ver;
-	uint8_t ttl;
-	uint8_t rsvd1;
-	uint8_t cmd;
-	uint8_t dst[sizeof(gdp_name_t)];
-	uint8_t src[sizeof(gdp_name_t)];
-} otw_pdu_v3_t;
-
-// on the wire pdu
-#define OTW_PDU_SIZE 68 // sanity check otw_pdu structure size
-otw_pdu_v3_t otw_pdu;
+#include "gdp-directoryd.h"
 
 #define GDP_NAME_HEX_FORMAT (2 * sizeof(gdp_name_t))
 #define GDP_NAME_HEX_STRING (GDP_NAME_HEX_FORMAT + 1)
@@ -76,24 +51,8 @@ otw_pdu_v3_t otw_pdu;
 char dguid_s[GDP_NAME_HEX_STRING];
 char eguid_s[GDP_NAME_HEX_STRING];
 char query[GDP_QUERY_STRING];
-
-// optional debug with levels
-#if 1
-#define ERR   1
-#define WARN  2
-#define INFO  3
-#define VERB  4
-int debug_knob = WARN;
-#define debug(d, fmt, ...)						 \
-	do											 \
-	{											 \
-		if (d <= debug_knob)					 \
-			fprintf(stderr, fmt, ##__VA_ARGS__); \
-	} while (0)
-
-#else
-#define debug(...)
-#endif
+gdp_name_t gdp_guid_swap;
+otw_pdu_v3_t otw_pdu;
 
 void fail(MYSQL *con, char *s)
 {
@@ -144,39 +103,38 @@ int main(int argc, char **argv)
 	while (1)
 	{
 		// await request (blocking)
-		otw_pdu_len = recvfrom(fd_listen, &otw_pdu.ver, OTW_PDU_SIZE, 0,
-							 (struct sockaddr *)&si_rem, &si_rem_len);
+		otw_pdu_len = recvfrom(fd_listen, (uint8_t *) &otw_pdu.ver,
+							   OTW_PDU_SIZE, 0,
+							   (struct sockaddr *)&si_rem, &si_rem_len);
 
 		// parse request
-		if (otw_pdu_len != OTW_PDU_SIZE ||
-			otw_pdu.ver != GDP_CHAN_PROTO_VERSION)
+		if (otw_pdu.ver != GDP_CHAN_PROTO_VERSION)
 		{
 			debug(WARN, "Info: unrecognized packet from %s:%d len %d",
 				  inet_ntoa(si_rem.sin_addr),
 				  ntohs(si_rem.sin_port), otw_pdu_len);
 			continue;
 		}
-		debug(INFO, "Received packet from %s:%d\n", 
-			  inet_ntoa(si_rem.sin_addr),
-			  ntohs(si_rem.sin_port));
+		debug(INFO, "Received packet len %d from %s:%d\n", otw_pdu_len,
+			  inet_ntoa(si_rem.sin_addr), ntohs(si_rem.sin_port));
 		
-		debug(VERB, "dguid: ");
+		debug(VERB, "-> dguid [");
 		for (int i = 0; i < sizeof(gdp_name_t); i++)
 		{
-			debug(VERB, "%.2x", otw_pdu.dst[i]);
-			sprintf(dguid_s + (i * 2), "%.2x", otw_pdu.dst[i]);
+			debug(VERB, "%.2x", otw_pdu.dguid[i]);
+			sprintf(dguid_s + (i * 2), "%.2x", otw_pdu.dguid[i]);
 		}
-		debug(VERB, "\n");
+		debug(VERB, "]\n");
 		dguid_s[64] = '\0';
 		debug(INFO, "dguid is [%s]\n", dguid_s);
 
-		debug(VERB, "dguid: ");
+		debug(VERB, "-> eguid [");
 		for (int i = 0; i < sizeof(gdp_name_t); i++)
 		{
-			debug(VERB, "%.2x", otw_pdu.src[i]);
-			sprintf(eguid_s + (i * 2), "%.2x", otw_pdu.src[i]);
+			debug(VERB, "%.2x", otw_pdu.eguid[i]);
+			sprintf(eguid_s + (i * 2), "%.2x", otw_pdu.eguid[i]);
 		}
-		debug(VERB, "\n");
+		debug(VERB, "]\n");
 		eguid_s[64] = '\0';
 		debug(INFO, "eguid is [%s]\n", eguid_s);
 
@@ -185,93 +143,107 @@ int main(int argc, char **argv)
 		{
 			
 		case GDP_CMD_DIR_ADD:
+		{
 			// one entry per key for now (via replace instead of insert)
 			debug(INFO, "cmd -> add\n");
 
-			// replace or create
-			sprintf(query, "replace into blackbox.gdpd values (x'%s', x'%s')",
+			// sql replace (create or replace row)
+			sprintf(query, "replace into blackbox.gdpd values (x'%s', x'%s') ;",
 					dguid_s, eguid_s);
-			if (mysql_query(mysql_con, query))
-			{
-				fprintf(stderr, "Error: %s\n", mysql_error(mysql_con));
-				fail(mysql_con, query);
-			}
-			
-			// FIXME add ack?
-			break;
-			
-		case GDP_CMD_DIR_LOOKUP:
+		}
+		break;
+
+		case GDP_CMD_DIR_FIND:
+		{
 			// one entry per key, so no multiple replies for now
-			debug(INFO, "cmd -> lookup\n");
+			debug(INFO, "cmd -> find\n");
 
 			// search
 			sprintf(query,
-					"select eguid from blackbox.gdpd where dguid = x'%s'",
+					"select eguid from blackbox.gdpd where dguid = x'%s' ;",
 					dguid_s);
-			if (mysql_query(mysql_con, query))
-			{
-				fprintf(stderr, "Error: %s\n", mysql_error(mysql_con));
-				fail(mysql_con, query);
-			}
+		}
+		break;
 
-			// parse search result
-			mysql_result = mysql_store_result(mysql_con);
-			if (mysql_result == NULL)
-			{
-				fprintf(stderr, "Error: %s\n", mysql_error(mysql_con));
-				fail(mysql_con, query);
-			}
-			mysql_fields = mysql_field_count(mysql_con);
-			mysql_row = mysql_fetch_row(mysql_result);
-			if (!mysql_row || mysql_fields != 1 || mysql_row[0] == NULL)
-			{
-				debug(INFO, "dguid not found\n");
-				memset(&otw_pdu.src[0], 0, sizeof(gdp_name_t));
-			}
-			else
-			{
-				debug(INFO, "dguid found\neguid is [");
-				for (int c = 0; c < sizeof(gdp_name_t); c++)
-				{
-					debug(INFO, "%.2x", (uint8_t) mysql_row[0][c]);
-					otw_pdu.src[c] = (uint8_t) mysql_row[0][c];
-				}
-				debug(INFO, "]\n");
-
-				// signal lookup succeeded by changing cmd from LOOKUP to ADD
-				otw_pdu.cmd = GDP_CMD_DIR_ADD;
-			}
-			mysql_free_result(mysql_result);
-
-			otw_pdu_len = sendto(fd_listen, &otw_pdu.ver, OTW_PDU_SIZE, 0,
-							   (struct sockaddr *)&si_rem, sizeof(si_rem));
-			debug(INFO, "sendto len %d\n", otw_pdu_len);
-			if (otw_pdu_len < 0)
-				fprintf(stderr, "Error: sendto len %d error %s\n",
-						otw_pdu_len, strerror(errno));
-			break;
-			
 		case GDP_CMD_DIR_REMOVE:
+		{
 			// one entry per key, so remove is simple for now
 			debug(INFO, "cmd -> remove\n");
 
 			// query
-			sprintf(query, "delete from blackbox.gdpd where dguid = x'%s'",
-					dguid_s);
-			if (mysql_query(mysql_con, query))
+			sprintf(query, "delete from blackbox.gdpd where "
+					"dguid = x'%s' && eguid = x'%s' ;", dguid_s, eguid_s);
+		}
+		break;
+
+		default:
+		{
+			fprintf(stderr, "Error: packet with unknown cmd\n");
+		}
+		break;
+			
+		} // switch (otw_pdu.cmd)
+
+		// mysql_real_query may be able to handle raw binary addresses, if
+		// this implementation isn't replaced quickly...
+		if (mysql_query(mysql_con, query))
+		{
+			fprintf(stderr, "Error: query %s\n", mysql_error(mysql_con));
+			fail(mysql_con, query);
+		}
+			
+		// handle result
+		mysql_result = mysql_store_result(mysql_con);
+
+		if (otw_pdu.cmd != GDP_CMD_DIR_FIND)
+		{
+			otw_pdu_len = sendto(fd_listen, (uint8_t *) &otw_pdu.ver,
+								 OTW_PDU_SIZE - sizeof(gdp_name_t), 0,
+								 (struct sockaddr *)&si_rem, sizeof(si_rem));
+		}
+		else
+		{
+			if (mysql_result == NULL)
 			{
-				fprintf(stderr, "Error: %s\n", mysql_error(mysql_con));
+				fprintf(stderr, "Error: result %s\n", mysql_error(mysql_con));
 				fail(mysql_con, query);
 			}
-			
-			// FIXME add ack?
-			break;
-			
-		default:
-			fprintf(stderr, "Error: packet with unknown cmd\n");
-			break;
-			
+			else
+			{
+				mysql_fields = mysql_field_count(mysql_con);
+				mysql_row = mysql_fetch_row(mysql_result);
+				if (!mysql_row || mysql_fields != 1 || mysql_row[0] == NULL)
+				{
+					debug(INFO, "dguid not found\n");
+					// should already be zero from sender...
+					// memset(&otw_pdu.eguid[0], 0, sizeof(gdp_name_t));
+				}
+				else
+				{
+					debug(INFO, "dguid found\n\teguid is [");
+					for (int c = 0; c < sizeof(gdp_name_t); c++)
+					{
+						debug(INFO, "%.2x", (uint8_t) mysql_row[0][c]);
+						otw_pdu.eguid[c] = (uint8_t) mysql_row[0][c];
+					}
+					debug(INFO, "]\n");
+					// tell submitter to add eguid (response to find)
+					otw_pdu.cmd = GDP_CMD_DIR_FOUND;
+				}
+				// good or bad, free result now
+				mysql_free_result(mysql_result);
+			}
+
+			otw_pdu_len = sendto(fd_listen, (uint8_t *) &otw_pdu.ver,
+								 OTW_PDU_SIZE, 0,
+								 (struct sockaddr *)&si_rem, sizeof(si_rem));
 		}
+
+		if (otw_pdu_len < 0)
+			fprintf(stderr, "Error: sendto len %d error %s\n",
+					otw_pdu_len, strerror(errno));
+		else
+			debug(INFO, "sendto len %d\n", otw_pdu_len);
 	}
 
 	// unreachable at the moment, but leave as a reminder to future expansion

@@ -1,5 +1,5 @@
 /*
-**  GDP-DIRECTORYD handles (UDP) requests to add, lookup, or remove
+**  GDP-DIRECTORYD handles (UDP) requests to add, find, or remove
 **  "dguid,eguid" (destination guid, egress guid) tuples within the
 **  gdp directory service's database (mariadb). This is an interim
 **  "blackbox" to facilitate the transition to gdp net4...
@@ -42,41 +42,21 @@
 #include <net/if.h>
 #include <assert.h>
 #include <gdp/gdp.h>
+#include "../gdp-directoryd.h"
 
-// FIXME temporary assignment
+// gdp directory currently installed on gdp-04
 #define DIRECTORY_IP "128.32.62.174"
-#define PORT 9001
-
-// FIXME version 3 otw_pdu support for the moment...
-#define GDP_CHAN_PROTO_VERSION 3
-
-// FIXME temporary until cmd extensions designed and added to gdp_pdu.h
-#define GDP_CMD_DIR_ADD		7
-#define GDP_CMD_DIR_REMOVE	8
-#define GDP_CMD_DIR_LOOKUP	9
-
-// FIXME eventually maintain this in gdp_chan.h or other appropriate shared .h
-typedef struct __attribute((packed)) otw_pdu_v3_s
-{
-	uint8_t ver;
-	uint8_t ttl;
-	uint8_t rsvd1;
-	uint8_t cmd;
-	uint8_t dst[sizeof(gdp_name_t)];
-	uint8_t src[sizeof(gdp_name_t)];
-} otw_pdu_v3_t;
-
-// on the wire pdu
-#define OTW_PDU_SIZE 68 // sanity check otw_pdu structure size
-otw_pdu_v3_t otw_pdu;
 
 gdp_name_t gdp_dguid;
 gdp_name_t gdp_eguid;
+gdp_name_t gdp_cguid;
+
+otw_pdu_v3_t otw_pdu;
 
 void help(char *s)
 {
 	printf("Error: %s\n", s);
-	printf("Usage: bb-test { add | lookup | remove } <dguid> [ <eguid> ]\n");
+	printf("Usage: bb-test { add | find | remove } <dguid> [ <eguid> ]\n");
 	exit(1);
 }
 
@@ -99,13 +79,13 @@ int main(int argc, char *argv[])
 	if (argc < 3)
 		help("invalid parameter(s)");
 	
-	if (strcmp(argv[1], "lookup") == 0)
+	if (strcmp(argv[1], "find") == 0)
 	{
 		if (argc > 3)
 			help("extraneous parameter(s)");
 		if (argc < 3)
 			help("software bug");
-		otw_pdu.cmd = GDP_CMD_DIR_LOOKUP;
+		otw_pdu.cmd = GDP_CMD_DIR_FIND;
 	}
 	else if (strcmp(argv[1], "add") == 0)
 	{
@@ -139,56 +119,90 @@ int main(int argc, char *argv[])
 	if (connect(fd_connect, (struct sockaddr *)&si_rem, sizeof(si_rem)) < 0)
 		fail("connect");
 
-	// build the request packet
-	otw_pdu.ver = GDP_CHAN_PROTO_VERSION;
-	
-	gdp_parse_name(argv[2], gdp_dguid);
-	if (otw_pdu.cmd != GDP_CMD_DIR_LOOKUP)
-		gdp_parse_name(argv[3], gdp_eguid);
-	
-	memcpy(&otw_pdu.dst[0], gdp_dguid, sizeof(gdp_name_t));
+	//
+	// build request
+	//
+	// add/delete advert: dguid (client), eguid (egress router)
+	// find: dguid (find), eguid (0 or found), cguid (client)
+	//
 
-	printf("dguid is [");
+	otw_pdu.ver = GDP_CHAN_PROTO_VERSION;
+
+	// dguid
+	gdp_parse_name(argv[2], gdp_dguid);
+	memcpy(&otw_pdu.dguid[0], gdp_dguid, sizeof(gdp_name_t));
+	printf("-> dguid [");
 	for (int i = 0; i < sizeof(gdp_name_t); i++)
 	{
-		printf("%.2x", gdp_dguid[i]);
+		printf("%.2x", otw_pdu.dguid[i]);
 	}
 	printf("]\n");
 
-	if (otw_pdu.cmd != GDP_CMD_DIR_LOOKUP)
+	if (otw_pdu.cmd != GDP_CMD_DIR_FIND)
 	{
-		memcpy(&otw_pdu.src[0], gdp_eguid, sizeof(gdp_name_t));
-		
-		printf("eguid is [");
+		// eguid 
+		gdp_parse_name(argv[3], gdp_eguid);
+	    memcpy(&otw_pdu.eguid[0], gdp_eguid, sizeof(gdp_name_t));
+		printf("-> eguid [");
 		for (int i = 0; i < sizeof(gdp_name_t); i++)
 		{
-			printf("%.2x", gdp_eguid[i]);
+			printf("%.2x", otw_pdu.eguid[i]);
 		}
 		printf("]\n");
+
+		// connection-oriented udp - hardwired destination, simply send
+		send(fd_connect, (uint8_t *) &otw_pdu.ver,
+			 OTW_PDU_SIZE - sizeof(gdp_name_t), 0);
 	}
 	else
-		memset(&otw_pdu.src[0], 0, sizeof(gdp_name_t));
-
-	// connection-oriented udp - hardwired destination
-	send(fd_connect, &otw_pdu.ver, OTW_PDU_SIZE, 0);
-
-	if (otw_pdu.cmd == GDP_CMD_DIR_LOOKUP)
 	{
-		// connection-oriented udp - kernel filters unsolicited packets out
-		if (recv(fd_connect, &otw_pdu.ver, OTW_PDU_SIZE, 0) < 0)
-			fail("recv");
+		// find eguid
+		memset(&otw_pdu.eguid[0], 0x00, sizeof(gdp_name_t));
 
-		if (otw_pdu.cmd == GDP_CMD_DIR_ADD)
+		// set (fake) cguid to verify (0xc1c1c1... is) returned by server
+		memset(&otw_pdu.cguid[0], 0xC1, sizeof(gdp_name_t));
+		printf("-> cguid [");
+		for (int i = 0; i < sizeof(gdp_name_t); i++)
 		{
-			printf("eguid is [");
-			for (int i = 0; i < sizeof(gdp_name_t); i++)
-			{
-				printf("%.2x", (uint8_t) otw_pdu.src[i]);
-			}
-			printf("]\n");
+			printf("%.2x", (uint8_t) otw_pdu.cguid[i]);
 		}
-		else
-			printf("eguid not found\n");
+		printf("]\n");
+
+		// connection-oriented udp - hardwired destination, simply send
+		send(fd_connect, (uint8_t *) &otw_pdu.ver, OTW_PDU_SIZE, 0);
+	}
+
+	// connection-oriented udp - kernel filters unsolicited packets out, await
+	if (recv(fd_connect, (uint8_t *) &otw_pdu.ver, OTW_PDU_SIZE, 0) < 0)
+		fail("recv");
+
+	if (otw_pdu.cmd != GDP_CMD_DIR_FIND)
+	{
+		printf("<- dguid [");
+		for (int i = 0; i < sizeof(gdp_name_t); i++)
+		{
+			printf("%.2x", otw_pdu.dguid[i]);
+		}
+		printf("]\n");
+		printf("<- eguid [");
+		for (int i = 0; i < sizeof(gdp_name_t); i++)
+		{
+			printf("%.2x", (uint8_t) otw_pdu.eguid[i]);
+		}
+		printf("] ack\n");
+	}
+	else
+		printf("<- eguid nak\n");
+	
+	if (otw_pdu.cmd == GDP_CMD_DIR_FIND ||
+		otw_pdu.cmd == GDP_CMD_DIR_FOUND)
+	{
+		printf("<- cguid [");
+		for (int i = 0; i < sizeof(gdp_name_t); i++)
+		{
+			printf("%.2x", (uint8_t) otw_pdu.cguid[i]);
+		}
+		printf("]\n");
 	}
 	
 	close(fd_connect);
