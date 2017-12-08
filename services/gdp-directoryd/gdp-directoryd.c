@@ -51,8 +51,8 @@
 char dguid_s[GDP_NAME_HEX_STRING];
 char eguid_s[GDP_NAME_HEX_STRING];
 char query[GDP_QUERY_STRING];
-gdp_name_t gdp_guid_swap;
-otw_pdu_v3_t otw_pdu;
+
+otw_pdu_dir_t otw_pdu;
 
 void fail(MYSQL *con, char *s)
 {

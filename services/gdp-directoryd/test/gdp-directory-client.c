@@ -51,7 +51,7 @@ gdp_name_t gdp_dguid;
 gdp_name_t gdp_eguid;
 gdp_name_t gdp_cguid;
 
-otw_pdu_v3_t otw_pdu;
+otw_pdu_dir_t otw_pdu;
 
 void help(char *s)
 {

@@ -59,7 +59,7 @@ int debug_knob = WARN;
 #define GDP_CMD_DIR_FOUND  10
 
 // FIXME eventually maintain this in gdp_chan.h or other appropriate shared .h
-typedef struct __attribute((packed)) otw_pdu_v3_s
+typedef struct __attribute((packed)) otw_pdu_dir_s
 {
 	uint8_t ver;
 	uint8_t ttl;
@@ -68,10 +68,9 @@ typedef struct __attribute((packed)) otw_pdu_v3_s
 	uint8_t dguid[sizeof(gdp_name_t)];
 	uint8_t eguid[sizeof(gdp_name_t)];
 	uint8_t cguid[sizeof(gdp_name_t)];
-} otw_pdu_v3_t;
+} otw_pdu_dir_t;
 
 // on the wire pdu
 #define OTW_PDU_SIZE 100 // sanity check otw_pdu structure size
-otw_pdu_v3_t otw_pdu;
 
 
