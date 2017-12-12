@@ -38,7 +38,10 @@
 */
 
 /*
-**	These headers are not intended for external use.
+**	These headers describe the API between the network (in OSI terms,
+**	"layer 4", i.e., the Transport layer) and the GDP library ("layer
+**	5" or Session layer).  Details of the actual implementation
+**	(including the on-the-wire format) are limited to gdp_chan.c.
 */
 
 #ifndef _GDP_CHAN_H_

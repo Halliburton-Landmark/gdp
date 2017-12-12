@@ -50,10 +50,10 @@
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.chan", "GDP channel processing");
 
 
-#if ___OLD_ROUTER___
-#define GDP_CHAN_PROTO_VERSION	3			// protocol version number in PDU
-#else
+#if PROTOCOL_V4
 #define GDP_CHAN_PROTO_VERSION	4			// protocol version number in PDU
+#else
+#define GDP_CHAN_PROTO_VERSION	3			// protocol version number in PDU
 #endif
 
 static struct event_base	*EventBase;
@@ -105,36 +105,49 @@ struct gdp_cursor
 };
 
 
+#if PROTOCOL_V4
 /*
 **  On-the-Wire PDU Format
 **
-**		Currently does not attempt compression.  This is not
-**		the final design!
+**		This is for client layer to routing layer communications.
+**		It may, in some modified form, also be used for router to
+**		router communications, but that's beyond the scope of this
+**		header file.
 **
 **		off	len	meaning
 **		---	---	-------
-**		0	1	version (must be 4)
-**		1	1	time to live in hops
-**		2	1	type of service (see below)
-**		3	1	header length in units of 32 bits (= H / 4)
-**		4	4	payload (SDU) length
-**		8	32	destination address
-**		40	32	source address
-**		72	?	for future use (probably options)
-**		H	N	payload (SDU) (starts at offset given in octet 3)
+**		0	1	version (must be 4) [1]
+**		1	1	header length in units of 32 bits (= H / 4)
+**		2	1	time to live in hops
+**		3	1	flags / type of service [2]
+**		4	4	payload (SDU) length (= P)
+**		8	4	flow id (if GDP_PDUF_FLOWID flag is set)
+**		8	32	destination address (if GDP_PDUF_FLOWID flag is clear)
+**		40	32	source address (if GDP_PDUF_FLOWID flag is clear)
+**		?	?	for future use (probably options)
+**		H	P	payload (SDU) (starts at offset given in octet 1)
 **
-**		Type of Service is intended for future expansion, and for now
-**		clients should always send this as zero.  However, if the
-**		high order bit is set it indicates that the rest of the octet
-**		is intended for interpretation by the router.  This can be
-**		used for client-router advertisements and router-router
-**		traffic.
+**		[1] If the high order bit of the version is set, this is
+**			reserved for router-to-router communication.  When the
+**			client generates or sees a PDU, the high order bit must
+**			be zero.  The remainder of a router-to-router PDU is not
+**			defined here.
+**		[2] If the high order bit of flags/type of service is set,
+**			this is a client-to-router interaction (e.g.,
+**			advertise) and the low order bits are a specific
+**			command.
+**			It is likely that router-to-router commands will want
+**			to re-use this field as a command.
 */
 
-#if ___OLD_ROUTER___
-#define MIN_HEADER_LENGTH	(1+1+1+1+32+32+4+1+1+1+1+4)
-#else
+// values for flags field
+#define GDP_PDUF_ROUTER		0x80	// router should interpret this PDU
+#define GDP_PDUF_FLOWID		0x40	// uses FlowID instead of dst/src
+
 #define MIN_HEADER_LENGTH	(1 + 1 + 1 + 1 + 4 + 32 + 32)
+#else
+// PDU layout shown in gdp_pdu.h
+#define MIN_HEADER_LENGTH	(1+1+1+1+32+32+4+1+1+1+1+4)
 #endif
 #define MAX_HEADER_LENGTH	(255 * 4)
 
@@ -803,10 +816,11 @@ send_helper(gdp_chan_t *chan,
 	// build the header in memory
 	char pb[MAX_HEADER_LENGTH];
 	char *pbp = pb;
+	tos &= ~GDP_PDUF_FLOWID;			// flowid not yet supported
 	PUT8(GDP_CHAN_PROTO_VERSION);		// version number
-	PUT8(15);							// time to live
-	PUT8(tos);							// type of service
 	PUT8(18);							// header length (= 72 / 4)
+	PUT8(15);							// time to live
+	PUT8(tos);							// flags / type of service
 	PUT32(gdp_buf_getlength(payload));
 	memcpy(pbp, dst, sizeof (gdp_name_t));
 	pbp += sizeof (gdp_name_t);
