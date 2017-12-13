@@ -36,7 +36,6 @@
 #define WARN  2
 #define INFO  3
 #define VERB  4
-int debug_knob = WARN;
 #define debug(d, fmt, ...)						 \
 	do											 \
 	{											 \
@@ -44,10 +43,24 @@ int debug_knob = WARN;
 			fprintf(stderr, fmt, ##__VA_ARGS__); \
 	} while (0)
 
-// production port
+#if 1
+
+// PRODUCTION SETTINGS
 #define PORT 9001
-// development port
-// #define PORT 9002
+int debug_knob = WARN;
+
+#else
+
+// TEST SETTINGS
+#define PORT 9002
+int debug_knob = VERB;
+
+#endif
+
+char dir_add_fmt0[] = "replace into blackbox.gdpd values (x'";
+char dir_add_fmt1[] = "gdpd";
+char dir_add_fmt2[] = "', x'";
+char dir_add_fmt3[] = "')";
 
 // FIXME version 3 otw_pdu support for the moment...
 #define GDP_CHAN_PROTO_VERSION 3
@@ -58,19 +71,20 @@ int debug_knob = WARN;
 #define GDP_CMD_DIR_FIND	9
 #define GDP_CMD_DIR_FOUND  10
 
+// set to <= 508 bytes for IPv4 UDP
+#define DIR_OGUID_MAX 15
+
 // FIXME eventually maintain this in gdp_chan.h or other appropriate shared .h
-typedef struct __attribute((packed)) otw_pdu_dir_s
+typedef struct __attribute__((packed)) otw_dir_s
 {
 	uint8_t ver;
 	uint8_t ttl;
 	uint8_t rsvd1;
 	uint8_t cmd;
-	uint8_t dguid[sizeof(gdp_name_t)];
 	uint8_t eguid[sizeof(gdp_name_t)];
-	uint8_t cguid[sizeof(gdp_name_t)];
-} otw_pdu_dir_t;
+	uint8_t dguid[sizeof(gdp_name_t)];
+	uint8_t oguid[sizeof(gdp_name_t) * DIR_OGUID_MAX];	
+} otw_dir_t;
 
-// on the wire pdu
-#define OTW_PDU_SIZE 100 // sanity check otw_pdu structure size
-
-
+// on the wire pdu - sanity check compiler directive is operational
+#define OTW_DIR_SIZE_ASSERT 484
