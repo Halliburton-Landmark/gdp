@@ -66,7 +66,7 @@ int debug_knob = VERB;
 #define GDP_CMD_DIR_FIND	9
 #define GDP_CMD_DIR_FOUND  10
 
-// set to <= 508 bytes for IPv4 UDP
+// 516 bytes max for IPv4 UDP
 #define DIR_OGUID_MAX 14
 
 // FIXME eventually maintain this in gdp_chan.h or other appropriate shared .h
