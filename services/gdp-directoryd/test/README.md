@@ -2,28 +2,33 @@ If this service is ever deployed for real, might be wise to test against a
 test table rather than the real table, to avoid disturbing the real table.
 
 Please follow ../README.md to start gdp-directoryd with an appropriate
-db set up. Once installed, this binary can be used (locally or
+db set up. Once installed, the gdc-test binary can be used (locally or
 remotely) to test the gdp directory service (test cguid is hardwired
 0xc1c1c1...):
 
-Start with empty table:
 
-MariaDB [blackbox]> select hex(dguid),hex(eguid) from blackbox.gdpd;
-Empty set (0.01 sec)
+./gdc-test add 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+./gdc-test add 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+./gdc-test find 2
+./gdc-test find 3
+./gdc-test find 15
+./gdc-test find 16
+./gdc-test remove 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+./gdc-test remove 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+./gdc-test find 2
+./gdc-test find 3
+./gdc-test find 15
 
-MariaDB [blackbox]>
 
+Sample test run:
 
-gdp-04[220] ./gdc-test add 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17
+gdp-04[301] ./gdc-test add 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
 Error: extraneous parameter(s)
-Usage: gdc-test {
-{ add | remove } <eguid> <dguid> <dguid>* | find <dguid>
-
-}
-gdp-04[221] ./gdc-test add 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+Usage: gdc-test { { add | remove } <eguid> <dguid>+ | find <dguid> }
+gdp-04[302] ./gdc-test add 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
 -> eguid [6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b]
 -> dguid [d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35]
-oguid len 448
+oguid len 416
 -> oguid [4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce]
 -> oguid [4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a]
 -> oguid [ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d]
@@ -37,12 +42,11 @@ oguid len 448
 -> oguid [3fdba35f04dc8c462986c992bcf875546257113072a909c162f7e470e581e278]
 -> oguid [8527a891e224136950ff32ca212b45bc93f69fbb801c3b1ebedac52775f99e61]
 -> oguid [e629fa6598d732768f7c726b4b621285f9c3b85303900aa912017db7617d8bdb]
--> oguid [b17ef6d19c7a5b1ee83b907c595526dcb1eb06db8227d650d5dda0a9f4ce8cd9]
-Send len 516
+Send len 484
 ...awaiting reply...
-Recv len 516
+Recv len 484
 <- dguid [d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35]
-oguid len 448
+oguid len 416
 <- oguid [4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce]
 <- oguid [4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a]
 <- oguid [ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d]
@@ -56,8 +60,7 @@ oguid len 448
 <- oguid [3fdba35f04dc8c462986c992bcf875546257113072a909c162f7e470e581e278]
 <- oguid [8527a891e224136950ff32ca212b45bc93f69fbb801c3b1ebedac52775f99e61]
 <- oguid [e629fa6598d732768f7c726b4b621285f9c3b85303900aa912017db7617d8bdb]
-<- oguid [b17ef6d19c7a5b1ee83b907c595526dcb1eb06db8227d650d5dda0a9f4ce8cd9]
-gdp-04[222] ./gdc-test find 2
+gdp-04[303] ./gdc-test find 2
 -> dguid [d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35]
 -> cguid [c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1]
 ...awaiting reply...
@@ -65,7 +68,7 @@ Recv len 100
 <- dguid [d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35]
 <- eguid [6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b]
 <- cguid [c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1]
-gdp-04[223] ./gdc-test find 3
+gdp-04[304] ./gdc-test find 3
 -> dguid [4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce]
 -> cguid [c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1]
 ...awaiting reply...
@@ -73,31 +76,25 @@ Recv len 100
 <- dguid [4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce]
 <- eguid [6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b]
 <- cguid [c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1]
-gdp-04[224] ./gdc-test find 16
+gdp-04[305] ./gdc-test find 15
+-> dguid [e629fa6598d732768f7c726b4b621285f9c3b85303900aa912017db7617d8bdb]
+-> cguid [c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1]
+...awaiting reply...
+Recv len 100
+<- dguid [e629fa6598d732768f7c726b4b621285f9c3b85303900aa912017db7617d8bdb]
+<- eguid [6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b]
+<- cguid [c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1]
+gdp-04[306] ./gdc-test find 16
 -> dguid [b17ef6d19c7a5b1ee83b907c595526dcb1eb06db8227d650d5dda0a9f4ce8cd9]
 -> cguid [c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1]
 ...awaiting reply...
 Recv len 100
 <- dguid [b17ef6d19c7a5b1ee83b907c595526dcb1eb06db8227d650d5dda0a9f4ce8cd9]
-<- eguid [6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b]
-<- cguid [c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1]
-gdp-04[225] ./gdc-test find 17
--> dguid [4523540f1504cd17100c4835e85b7eefd49911580f8efff0599a8f283be6b9e3]
--> cguid [c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1]
-...awaiting reply...
-Recv len 100
-<- dguid [4523540f1504cd17100c4835e85b7eefd49911580f8efff0599a8f283be6b9e3]
 <- eguid nak
-gdp-04[226] ./gdc-test remove 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17
-Error: extraneous parameter(s)
-Usage: gdc-test {
-{ add | remove } <eguid> <dguid> <dguid>* | find <dguid>
-
-}
-gdp-04[227] ./gdc-test remove 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+gdp-04[307] ./gdc-test remove 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
 -> eguid [6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b]
 -> dguid [d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35]
-oguid len 448
+oguid len 416
 -> oguid [4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce]
 -> oguid [4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a]
 -> oguid [ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d]
@@ -111,12 +108,11 @@ oguid len 448
 -> oguid [3fdba35f04dc8c462986c992bcf875546257113072a909c162f7e470e581e278]
 -> oguid [8527a891e224136950ff32ca212b45bc93f69fbb801c3b1ebedac52775f99e61]
 -> oguid [e629fa6598d732768f7c726b4b621285f9c3b85303900aa912017db7617d8bdb]
--> oguid [b17ef6d19c7a5b1ee83b907c595526dcb1eb06db8227d650d5dda0a9f4ce8cd9]
-Send len 516
+Send len 484
 ...awaiting reply...
-Recv len 516
+Recv len 484
 <- dguid [d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35]
-oguid len 448
+oguid len 416
 <- oguid [4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce]
 <- oguid [4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a]
 <- oguid [ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d]
@@ -130,40 +126,7 @@ oguid len 448
 <- oguid [3fdba35f04dc8c462986c992bcf875546257113072a909c162f7e470e581e278]
 <- oguid [8527a891e224136950ff32ca212b45bc93f69fbb801c3b1ebedac52775f99e61]
 <- oguid [e629fa6598d732768f7c726b4b621285f9c3b85303900aa912017db7617d8bdb]
-<- oguid [b17ef6d19c7a5b1ee83b907c595526dcb1eb06db8227d650d5dda0a9f4ce8cd9]
-gdp-04[228] ./gdc-test find 17
--> dguid [4523540f1504cd17100c4835e85b7eefd49911580f8efff0599a8f283be6b9e3]
--> cguid [c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1]
-...awaiting reply...
-Recv len 100
-<- dguid [4523540f1504cd17100c4835e85b7eefd49911580f8efff0599a8f283be6b9e3]
-<- eguid nak
-gdp-04[229] ./gdc-test find 2
--> dguid [d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35]
--> cguid [c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1]
-...awaiting reply...
-Recv len 100
-<- dguid [d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35]
-<- eguid nak
-gdp-04[230] ./gdc-test find 3
--> dguid [4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce]
--> cguid [c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1]
-...awaiting reply...
-Recv len 100
-<- dguid [4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce]
-<- eguid nak
-gdp-04[231] ./gdc-test find 16
--> dguid [b17ef6d19c7a5b1ee83b907c595526dcb1eb06db8227d650d5dda0a9f4ce8cd9]
--> cguid [c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1]
-...awaiting reply...
-Recv len 100
-<- dguid [b17ef6d19c7a5b1ee83b907c595526dcb1eb06db8227d650d5dda0a9f4ce8cd9]
-<- eguid nak
-gdp-04[232] 
-
-End with an empty table:
-
-MariaDB [blackbox]> select hex(dguid),hex(eguid) from blackbox.gdpd;
-Empty set (0.01 sec)
-
-MariaDB [blackbox]>
+gdp-04[308] ./gdc-test remove 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+Error: extraneous parameter(s)
+Usage: gdc-test { { add | remove } <eguid> <dguid>+ | find <dguid> }
+gdp-04[309] 

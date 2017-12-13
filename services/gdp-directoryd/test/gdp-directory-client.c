@@ -56,9 +56,8 @@ otw_dir_t otw_dir;
 void help(char *s)
 {
 	printf("Error: %s\n", s);
-	printf("Usage: gdc-test {\n"
-		   "{ add | remove } <eguid> <dguid> <dguid>* | find <dguid>\n"
-		   "\n}\n");
+	printf("Usage: gdc-test "
+		   "{ { add | remove } <eguid> <dguid>+ | find <dguid> }\n");
 	exit(1);
 }
 
@@ -78,7 +77,7 @@ int main(int argc, char *argv[])
 	int oguid_len;
 
 	// sanity check compiler directive is operational
-	// FIXME assert(sizeof(otw_dir_t) == OTW_DIR_SIZE_ASSERT);
+	assert(sizeof(otw_dir_t) == OTW_DIR_SIZE_ASSERT);
 
 	if (strcmp(argv[1], "find") == 0)
 	{

@@ -67,7 +67,7 @@ int debug_knob = VERB;
 #define GDP_CMD_DIR_FOUND  10
 
 // set to <= 508 bytes for IPv4 UDP
-#define DIR_OGUID_MAX 15
+#define DIR_OGUID_MAX 14
 
 // FIXME eventually maintain this in gdp_chan.h or other appropriate shared .h
 typedef struct __attribute__((packed)) otw_dir_s
@@ -82,4 +82,4 @@ typedef struct __attribute__((packed)) otw_dir_s
 } otw_dir_t;
 
 // on the wire pdu - sanity check compiler directive is operational
-#define OTW_DIR_SIZE_ASSERT 484
+#define OTW_DIR_SIZE_ASSERT 516

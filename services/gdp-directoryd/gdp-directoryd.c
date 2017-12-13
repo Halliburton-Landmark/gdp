@@ -94,7 +94,7 @@ int main(int argc, char **argv)
 	int oguid_len;
 	
 	// sanity check compiler directive is operational
-	// FIXME assert(sizeof(otw_dir_t) == OTW_DIR_SIZE_ASSERT);
+	assert(sizeof(otw_dir_t) == OTW_DIR_SIZE_ASSERT);
 	
 	if ((fd_listen = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
 		fail(NULL, "socket");
