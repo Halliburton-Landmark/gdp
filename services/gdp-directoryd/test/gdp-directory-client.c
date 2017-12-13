@@ -89,13 +89,13 @@ int main(int argc, char *argv[])
 	}
 	else if (strcmp(argv[1], "add") == 0)
 	{
-		if (argc > 3 + DIR_OGUID_MAX)
+		if (argc > 4 + DIR_OGUID_MAX)
 			help("extraneous parameter(s)");			
 		otw_dir.cmd = GDP_CMD_DIR_ADD;
 	}
 	else if (strcmp(argv[1], "remove") == 0)
 	{
-		if (argc > 3 + DIR_OGUID_MAX)
+		if (argc > 4 + DIR_OGUID_MAX)
 			help("extraneous parameter(s)");			
 		otw_dir.cmd = GDP_CMD_DIR_REMOVE;
 	}
