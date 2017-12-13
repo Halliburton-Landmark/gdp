@@ -57,11 +57,6 @@ int debug_knob = VERB;
 
 #endif
 
-char dir_add_fmt0[] = "replace into blackbox.gdpd values (x'";
-char dir_add_fmt1[] = "gdpd";
-char dir_add_fmt2[] = "', x'";
-char dir_add_fmt3[] = "')";
-
 // FIXME version 3 otw_pdu support for the moment...
 #define GDP_CHAN_PROTO_VERSION 3
 
