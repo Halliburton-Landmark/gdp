@@ -1,0 +1,24 @@
+[Unit]
+Description=GDP log daemon
+Wants=gdp-router-click
+After=gdp-router-click
+
+[Service]
+Type=notify
+NotifyAccess=all
+Environment=GDP_ROOT=@GDP_ROOT@
+User=@GDP_USER@
+
+# give router time to start up
+ExecStartPre=/bin/sleep 20
+ExecStart=/bin/sh @GDP_ROOT@/sbin/gdplogd-wrapper.sh
+Restart=always
+
+StandardOutput=syslog
+StandardError=inherit
+SyslogIdentifier=gdplogd
+SyslogFacility=@GDP_SYSLOG_FACILITY@
+SyslogLevel=@GDP_SYSLOG_LEVEL@
+
+[Install]
+WantedBy=multi-user.target
