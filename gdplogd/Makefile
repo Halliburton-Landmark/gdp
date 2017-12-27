@@ -26,6 +26,7 @@
 #  ----- END LICENSE BLOCK -----
 #
 
+
 BINALL=
 
 SBINALL=	gdplogd
