@@ -72,6 +72,7 @@ char* str_errinfo( int  errno )
 		case EX_NOTINIT:		return "Do not all initialization work";
 		case EX_NOT_IMPL:		return "Not implemented yet";
 
+
 		case EX_NULL_GCL:		return "No related GCL";
 		case EX_NULL_SESSION:	return "No related Session";
 		case EX_FAIL_SMSG:		return "Fail to process sent message on Session";
@@ -79,6 +80,7 @@ char* str_errinfo( int  errno )
 		case EX_TOKEN_ERR:		return "Fail to handle access token";
 		case EX_KS_REQ_ERR:		return "Fail to request KS service";
 		case EX_RCV_KEY_ERR:	return "Fail to process the received key";
+
 
 		default:				return "Undefined error";
 	}
