@@ -222,8 +222,6 @@ struct gdp_gcl
 #define GDP_GCL_ISGOOD(gcl)												\
 				((gcl) != NULL &&										\
 				 EP_UT_BITSET(GCLF_INUSE, (gcl)->flags))
-#define GDP_ASSERT_GCL_ISGOOD(gcl)										\
-				(EP_ASSERT(GDP_GCL_ISGOOD(gcl))
 
 
 /*
@@ -289,6 +287,9 @@ void			_gdp_gcl_decref_trace(		// decrease reference count (trace)
 
 #define _gdp_gcl_decref(g)		_gdp_gcl_decref_trace(g, __FILE__, __LINE__, #g)
 
+void			_gdp_gcl_pr_stats(			// print (debug) statistics
+						FILE *fp);
+
 /*
 **  Other GCL handling.  These are shared between client access
 **  and the GDP daemon.
@@ -323,7 +324,7 @@ EP_STAT			_gdp_gcl_create(			// create a new GCL
 EP_STAT			_gdp_gcl_open(				// open a GCL
 						gdp_gcl_t *gcl,
 						int cmd,
-						EP_CRYPTO_KEY *skey,
+						gdp_gcl_open_info_t *info,
 						gdp_chan_t *chan,
 						uint32_t reqflags);
 
@@ -366,10 +367,6 @@ EP_STAT			_gdp_gcl_subscribe(			// subscribe to data
 						gdp_event_cbfunc_t cbfunc,
 						void *cbarg);
 
-EP_STAT			_gdp_gcl_unsubscribe(		// unsubscribe
-						gdp_gcl_t *gcl,			// the GCL with the subscription
-						gdp_name_t dest);		// the name of the subscriber
-
 EP_STAT			_gdp_gcl_getmetadata(		// retrieve metadata
 						gdp_gcl_t *gcl,
 						gdp_gclmd_t **gmdp,
@@ -396,7 +393,13 @@ EP_STAT			_gdp_gcl_fwd_append(		// forward APPEND (replication)
 
 struct gdp_gcl_open_info
 {
-	EP_CRYPTO_KEY		*signkey;		// signing key
+	EP_CRYPTO_KEY		*signkey;			// signing key
+	EP_STAT				(*signkey_cb)(		// callback to get signing key
+							gdp_name_t	name,
+							void *signkey_udata,
+							EP_CRYPTO_KEY **);
+	void				*signkey_udata;
+	bool				keep_in_cache:1;	// defer GCL free
 };
 
 
@@ -609,11 +612,21 @@ const char		*_gdp_proto_cmd_name(		// return printable cmd name
 						uint8_t cmd);
 
 /*
-**  Initialization.
+**  Initialization and Maintenance.
 */
 
 void			_gdp_newname(gdp_name_t gname,
 						gdp_gclmd_t *gmd);
+
+void			_gdp_reclaim_resources(		// reclaim system resources
+						void *);				// unused
+
+void			_gdp_reclaim_resources_init(
+						void (*f)(int, short, void *));
+
+void			_gdp_dump_state(int plev);
+
+#define GDP_RECLAIM_AGE_DEF		300L		// default reclaim age (sec)
 
 
 /*
@@ -671,9 +684,9 @@ EP_STAT			_gdp_evloop_init(void);		// start event loop
 **		Lower numbered locks should be acquired before higher numbered locks.
 */
 
-#define GDP_MUTEX_LORDER_REQ		4
-#define GDP_MUTEX_LORDER_CHAN		8
-#define GDP_MUTEX_LORDER_GCL		12
+#define GDP_MUTEX_LORDER_GCL		4
+#define GDP_MUTEX_LORDER_REQ		8
+#define GDP_MUTEX_LORDER_CHAN		12
 #define GDP_MUTEX_LORDER_GCLCACHE	15
 #define GDP_MUTEX_LORDER_DATUM		18
 #define GDP_MUTEX_LORDER_LEAF		31	// freelists, etc.

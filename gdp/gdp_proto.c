@@ -83,9 +83,8 @@ _gdp_invoke(gdp_req_t *req)
 	EP_ASSERT_POINTER_VALID(req);
 	if (req->gcl != NULL)
 	{
-		EP_ASSERT_ELSE(GDP_GCL_ISGOOD(req->gcl), );
-		EP_THR_MUTEX_ASSERT_ISUNLOCKED(&req->gcl->mutex, );
-		_gdp_gcl_lock(req->gcl);
+		EP_ASSERT(GDP_GCL_ISGOOD(req->gcl));
+		EP_THR_MUTEX_ASSERT_ISLOCKED(&req->gcl->mutex);
 	}
 	cmdname = _gdp_proto_cmd_name(req->cpdu->cmd);
 	if (ep_dbg_test(Dbg, 10))
@@ -103,7 +102,7 @@ _gdp_invoke(gdp_req_t *req)
 		}
 	}
 	EP_ASSERT_ELSE(req->state == GDP_REQ_ACTIVE, return EP_STAT_ASSERT_ABORT);
-	//EP_ASSERT_REQUIRE(ep_thr_mutex_islocked(&req->mutex));
+	//EP_ASSERT(ep_thr_mutex_islocked(&req->mutex));
 
 	// scale timeout to milliseconds
 	delta_to = ep_adm_getlongparam("swarm.gdp.invoke.timeout", 10000L);
@@ -114,7 +113,7 @@ _gdp_invoke(gdp_req_t *req)
 	retries = ep_adm_getintparam("swarm.gdp.invoke.retries", 3);
 	if (retries < 1)
 		retries = 1;
-	while (retries-- > 0)
+	do
 	{
 		/*
 		**  Top Half: sending the command
@@ -131,10 +130,6 @@ _gdp_invoke(gdp_req_t *req)
 		**  Bottom Half: read the response
 		*/
 
-		// release the GCL while we're waiting
-		if (req->gcl != NULL)
-			_gdp_gcl_unlock(req->gcl);
-
 		// wait until we receive a result
 		ep_dbg_cprintf(Dbg, 37, "_gdp_invoke: waiting on %p\n", req);
 		ep_time_deltanow(&delta_ts, &abs_to);
@@ -143,8 +138,21 @@ _gdp_invoke(gdp_req_t *req)
 		req->flags &= ~GDP_REQ_ASYNCIO;
 		while (!EP_UT_BITSET(GDP_REQ_DONE, req->flags))
 		{
+			// release the GCL while we're waiting
+			if (req->gcl != NULL)
+				_gdp_gcl_unlock(req->gcl);
+
 			// cond_wait will unlock the mutex
 			int e = ep_thr_cond_wait(&req->cond, &req->mutex, &abs_to);
+
+			if (req->gcl != NULL)
+			{
+				// have to unlock the req so lock ordering is right
+				//XXX possible race condition?
+				_gdp_req_unlock(req);
+				_gdp_gcl_lock(req->gcl);
+				_gdp_req_lock(req);
+			}
 
 			char ebuf[100];
 			ep_dbg_cprintf(Dbg, 52,
@@ -177,25 +185,22 @@ _gdp_invoke(gdp_req_t *req)
 				// route failure on open: don't retry
 				break;
 			}
-			else if (retries <= 0)
-			{
+		}
+		else
+		{
+			// do a retry, after re-locking the GCL
+			estat = _gdp_req_unsend(req);
+			if (!EP_STAT_ISOK(estat))
 				break;
+			estat = GDP_STAT_INVOKE_TIMEOUT;
+			if (retries > 1)
+			{
+				// if ETIMEDOUT, maybe the router had a glitch:
+				//   wait and try again
+				ep_time_nanosleep(retry_delay MILLISECONDS);
 			}
 		}
-		else if (retries <= 0)
-		{
-			break;
-		}
-
-		// do a retry, after re-locking the GCL
-		if (req->gcl != NULL)
-			_gdp_gcl_lock(req->gcl);
-		_gdp_req_unsend(req);
-
-		// if ETIMEDOUT, maybe the router had a glitch:
-		//   wait and try again
-		ep_time_nanosleep(retry_delay MILLISECONDS);
-	}
+	} while (--retries > 0);
 
 	// if we had any pending asynchronous events, deliver them
 	_gdp_event_trigger_pending(&req->events);
@@ -324,7 +329,7 @@ acknak(gdp_req_t *req, const char *where, bool reuse_pdu)
 			// point the new PDU at the old datum
 			req->rpdu->datum = req->cpdu->datum;
 			req->cpdu->datum = NULL;
-			(void) EP_ASSERT_TEST(req->rpdu->datum->inuse);
+			EP_ASSERT(req->rpdu->datum->inuse);
 		}
 	}
 	return EP_STAT_OK;
@@ -410,7 +415,9 @@ ack_data_content(gdp_req_t *req)
 	estat = ack_success(req);
 	EP_STAT_CHECK(estat, return estat);
 
-	req->gcl->nrecs = req->rpdu->datum->recno;
+	// hack to try to "self heal" in case we get out of sync
+	if (req->gcl->nrecs < req->rpdu->datum->recno)
+		req->gcl->nrecs = req->rpdu->datum->recno;
 
 	// keep track of how many more records we expect
 	if (req->numrecs > 0)
@@ -683,6 +690,7 @@ static dispatch_ent_t	DispatchTable[256] =
 	NOENT,				// 189
 	NOENT,				// 190
 	NOENT,				// 191
+
 	{ nak_client,		"NAK_C_BADREQ"			},			// 192
 	{ nak_client,		"NAK_C_UNAUTH"			},			// 193
 	{ nak_client,		"NAK_C_BADOPT"			},			// 194
@@ -713,8 +721,9 @@ static dispatch_ent_t	DispatchTable[256] =
 	NOENT,				// 219
 	NOENT,				// 220
 	NOENT,				// 221
-	NOENT,				// 222
+	{ nak_client,		"NAK_C_MISSING_RECORD"	},			// 222
 	{ nak_client,		"NAK_C_REC_DUP"			},			// 223
+
 	{ nak_server,		"NAK_S_INTERNAL"		},			// 224
 	{ nak_server,		"NAK_S_NOTIMPL"			},			// 225
 	{ nak_server,		"NAK_S_BADGATEWAY"		},			// 226
@@ -731,6 +740,7 @@ static dispatch_ent_t	DispatchTable[256] =
 	NOENT,				// 237
 	{ nak_server,		"NAK_S_REC_MISSING"		},			// 238
 	{ nak_server,		"NAK_S_LOSTSUB"			},			// 239
+
 	{ nak_router,		"NAK_R_NOROUTE"			},			// 240
 	NOENT,				// 241
 	NOENT,				// 242
@@ -821,25 +831,27 @@ _gdp_req_dispatch(gdp_req_t *req, int cmd)
 {
 	EP_STAT estat;
 	dispatch_ent_t *d;
+	gdp_pname_t pname;
 
-	if (ep_dbg_test(Dbg, 18) || ep_dbg_test(DbgCmdTrace, 40))
+	if (req->gcl != NULL)
+		memcpy(pname, req->gcl->pname, sizeof pname);
+	else
+		pname[0] = '\0';
+	if (ep_dbg_test(Dbg, 28) || ep_dbg_test(DbgCmdTrace, 28))
 	{
 		flockfile(ep_dbg_getfile());
-		ep_dbg_printf("_gdp_req_dispatch >>> %s (%d)",
-				_gdp_proto_cmd_name(cmd), cmd);
-		if (ep_dbg_test(Dbg, 18))
-		{
-			if (req->gcl != NULL)
-			{
+		ep_dbg_printf("_gdp_req_dispatch >>> %s",
+				_gdp_proto_cmd_name(cmd));
+		if (pname[0] != '\0')
+			ep_dbg_printf("(%s)", req->gcl->pname);
+		if (req->gcl != NULL && ep_dbg_test(Dbg, 70))
 				ep_dbg_printf(" [gcl->refcnt %d]", req->gcl->refcnt);
-			}
-			if (ep_dbg_test(Dbg, 30))
-			{
-				ep_dbg_printf(", ");
-				_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
-			}
-		}
 		ep_dbg_printf("\n");
+		if (ep_dbg_test(Dbg, 51))
+		{
+			ep_dbg_printf("    ");
+			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+		}
 		funlockfile(ep_dbg_getfile());
 	}
 
@@ -849,16 +861,20 @@ _gdp_req_dispatch(gdp_req_t *req, int cmd)
 	else
 		estat = (*d->func)(req);
 
-	if (ep_dbg_test(Dbg, 18))
+	if (ep_dbg_test(Dbg, 18) || ep_dbg_test(DbgCmdTrace, 18))
 	{
 		char ebuf[200];
 
 		flockfile(ep_dbg_getfile());
 		ep_dbg_printf("_gdp_req_dispatch <<< %s",
 				_gdp_proto_cmd_name(cmd));
-		if (req->gcl != NULL)
+		if (pname[0] != '\0')
+			ep_dbg_printf("(%s)", pname);
+		else if (req->gcl != NULL && req->gcl->pname[0] != '\0')
+			ep_dbg_printf("(%s)", req->gcl->pname);
+		if (req->gcl != NULL && ep_dbg_test(Dbg, 70))
 			ep_dbg_printf(" [gcl->refcnt %d]", req->gcl->refcnt);
-		ep_dbg_printf("\n    %s\n", ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		ep_dbg_printf(": %s\n", ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		if (ep_dbg_test(Dbg, 70))
 		{
 			ep_dbg_printf("    ");

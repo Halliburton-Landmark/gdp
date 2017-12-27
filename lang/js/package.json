@@ -1,6 +1,6 @@
 {
     "name": "@terraswarm/gdp",
-    "version": "0.7.34",
+    "version": "0.7.43",
     "author": {
         "email": "cxh@eecs.berkeley.edu",
         "name": "Christopher Brooks"
@@ -24,7 +24,7 @@
     ],
     "description": "The Global Data Plane",
     "dependencies": {
-        "ffi": "2.0.0",
+        "ffi": ">2.0.0",
         "fs": "",
         "jsesc": "~2.2.0",
         "os": "",
@@ -56,6 +56,10 @@
     ],
     "main": "index.js",
     "os" : [ "darwin", "linux" ],
+    "repository" :
+    { "type" : "git",
+      "url" : "https://repo.eecs.berkeley.edu/git-anon/projects/swarmlab/gdp.git"
+    },
     "scripts": {
         "test": "node_modules/.bin/mocha test/mocha"
     }

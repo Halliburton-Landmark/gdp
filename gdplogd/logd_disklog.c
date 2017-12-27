@@ -108,7 +108,10 @@ posix_error(int _errno, const char *fmt, ...)
 	EP_STAT estat = ep_stat_from_errno(_errno);
 
 	va_start(ap, fmt);
-	ep_logv(estat, fmt, ap);
+	if (EP_UT_BITSET(LOG_POSIX_ERRORS, DefaultLogFlags))
+		ep_logv(estat, fmt, ap);
+	else if (ep_dbg_test(Dbg, 1))
+		ep_app_messagev(estat, fmt, ap);
 	va_end(ap);
 
 	return estat;
@@ -120,6 +123,8 @@ posix_error(int _errno, const char *fmt, ...)
 
 #define DB_VERSION_THRESHOLD	4	// XXX not clear the number is right
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
+
+DB_ENV		*DbEnv;
 
 static void
 bdb_error(const DB_ENV *dbenv, const char *errpfx, const char *msg)
@@ -133,6 +138,8 @@ bdb_error(const DB_ENV *dbenv, const char *errpfx, const char *msg)
 # define DB_CREATE		0x00000001
 # define DB_EXCL		0x00000004
 # define DB_RDONLY		0x00000400
+# define DB_THREAD		0
+# define DB_PRIVATE		0
 
 // fake up a cursor
 typedef DB			DBC;
@@ -176,6 +183,11 @@ bdb_open(const char *filename,
 		int dbflags,
 		int filemode,
 		int dbtype,
+#if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
+		int (*cmpf)(DB *, const DBT *, const DBT *),
+#else
+		int (*cmpf)(const DBT *, const DBT *),
+#endif
 		DB **pdb)
 {
 	DB *db = NULL;
@@ -190,10 +202,28 @@ bdb_open(const char *filename,
 	}
 
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
-	const char *phase = "db_create";
-	int dbstat = db_create(&db, NULL, 0);
-	if (dbstat != 0)
+	int dbstat;
+	const char *phase;
+
+	if (DbEnv == NULL)
+	{
+		phase = "db_env_create";
+		if ((dbstat = db_env_create(&DbEnv, 0)) != 0)
+			goto fail0;
+		phase = "dbenv->open";
+		uint32_t dbenv_flags = DB_CREATE | DB_INIT_MPOOL | DB_PRIVATE;
+		if ((dbstat = DbEnv->open(DbEnv, NULL, dbenv_flags, 0)) != 0)
+			goto fail0;
+	}
+
+	phase = "db_create";
+	if ((dbstat = db_create(&db, NULL, 0)) != 0)
 		goto fail0;
+
+	phase = "initfunc";
+	if (cmpf != NULL && dbtype == DB_BTREE)
+		db->set_bt_compare(db, cmpf);
+
 	phase = "db->open";
 	dbstat = db->open(db, NULL, filename, NULL, dbtype, dbflags, filemode);
 	if (dbstat != 0)
@@ -201,7 +231,8 @@ bdb_open(const char *filename,
 fail0:
 		db = NULL;
 		estat = ep_stat_from_dbstat(dbstat);
-		ep_dbg_cprintf(Dbg, 1, "db_open: error during %s: %s\n",
+		ep_dbg_cprintf(Dbg, 1, "bdb_open(%s): error during %s: %s\n",
+					filename == NULL ? "<memory>" : filename,
 					phase, db_strerror(dbstat));
 		if (db != NULL && (dbstat = db->close(db, 0)) != 0)
 		{
@@ -209,16 +240,21 @@ fail0:
 					db_strerror(dbstat));
 		}
 	}
-	db->set_errcall(db, bdb_error);
+	else
+	{
+		db->set_errcall(db, bdb_error);
+	}
 #else
 	int fileflags = O_RDWR;
+	BTREEINFO btinfo;
 
 	if (EP_UT_BITSET(DB_CREATE, dbflags))
 		fileflags |= O_CREAT;
 	if (EP_UT_BITSET(DB_EXCL, dbflags))
 		fileflags |= O_EXCL;
-	db = dbopen(filename, fileflags, filemode, dbtype, NULL);
-	if (db == NULL)
+	memset(&btinfo, 0, sizeof btinfo);
+	btinfo.compare = cmpf;
+	if ((db = dbopen(filename, fileflags, filemode, dbtype, &btinfo)) == NULL)
 	{
 		int _errno = errno;
 
@@ -264,12 +300,18 @@ bdb_get(DB *db,
 
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
 	dbstat = db->get(db, NULL, key, val, 0);
+	if (dbstat != 0 && ep_dbg_test(Dbg, 1))
+		DbEnv->err(DbEnv, dbstat, "db->get");
 #else
 	dbstat = db->get(db, key, val, 0);
 #endif
 	estat = ep_stat_from_dbstat(dbstat);
-	if (!EP_STAT_ISOK(estat))
-		ep_log(estat, "bdb_get: dbstat %d", dbstat);
+	if (!EP_STAT_ISOK(estat) && ep_dbg_test(Dbg, 49))
+	{
+		char ebuf[80];
+		ep_dbg_printf("bdb_get: dbstat %d (%s)", dbstat,
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
 	return estat;
 }
 #endif // LOG_CHECK
@@ -400,6 +442,9 @@ disk_init()
 	// not be a good idea.
 	if (ep_adm_getboolparam("swarm.gdplogd.gcl.abandon_corrupt_tidx", true))
 		DefaultLogFlags |= LOG_TIDX_HIDEFAILURE;
+
+	if (ep_adm_getboolparam("swarm.gdplogd.disklog.log-posix-errors", false))
+		DefaultLogFlags |= LOG_POSIX_ERRORS;
 
 	ep_dbg_cprintf(Dbg, 8, "disk_init: log dir = %s, mode = 0%o\n",
 			GCLDir, GCLfilemode);
@@ -717,7 +762,7 @@ fail1:
 	ep_dbg_cprintf(Dbg, 9, "segment_open: closing fp %p (error)\n", seg->fp);
 	fclose(seg->fp);
 fail0:
-	EP_ASSERT_ENSURE(!EP_STAT_ISOK(estat));
+	EP_ASSERT(!EP_STAT_ISOK(estat));
 	return estat;
 }
 
@@ -799,7 +844,7 @@ segment_get(gdp_gcl_t *gcl, int segno)
 		phys->segments[segno] = seg = segment_alloc(segno);
 	}
 
-	EP_ASSERT_ENSURE(seg != NULL);
+	EP_ASSERT(seg != NULL);
 	return seg;
 }
 
@@ -1040,7 +1085,6 @@ physinfo_free(gcl_physinfo_t *phys)
 		(void) posix_error(errno, "physinfo_free: cannot destroy rwlock");
 
 	ep_mem_free(phys);
-	return;
 }
 
 
@@ -1181,8 +1225,11 @@ ridx_entry_read(gdp_gcl_t *gcl,
 	EP_STAT_CHECK(estat, goto fail3);
 	if (fread(xent, SIZEOF_RIDX_RECORD, 1, phys->ridx.fp) < 1)
 	{
-		estat = posix_error(errno, "ridx_entry_read(%s): fread failed",
-					gclpname);
+		if (errno == 0)
+			estat = EP_STAT_END_OF_FILE;
+		else
+			estat = posix_error(errno, "ridx_entry_read(%s): fread failed",
+						gclpname);
 		goto fail3;
 	}
 	xent->recno = ep_net_ntoh64(xent->recno);
@@ -1449,11 +1496,11 @@ tidx_create(gdp_gcl_t *gcl, const char *suffix, uint32_t flags)
 	EP_STAT_CHECK(estat, goto fail0);
 
 	ep_dbg_cprintf(Dbg, 20, "tidx_create: creating %s\n", tidx_pbuf);
-	int dbflags = DB_CREATE;
+	int dbflags = DB_CREATE | DB_THREAD | DB_PRIVATE;
 	if (!EP_UT_BITSET(FLAG_TMPFILE, flags))
 		dbflags |= DB_EXCL;
 	estat = bdb_open(tidx_pbuf, dbflags, GCLfilemode,
-						DB_BTREE, &phys->tidx.db);
+						DB_BTREE, NULL, &phys->tidx.db);
 	if (!EP_STAT_ISOK(estat))
 	{
 		ep_log(estat, "tidx_create: create(%s)", tidx_pbuf);
@@ -1475,7 +1522,7 @@ tidx_open(gdp_gcl_t *gcl, const char *suffix, int openmode)
 	EP_STAT estat;
 	const char *phase;
 	struct physinfo *phys = GETPHYS(gcl);
-	int dbflags = 0;
+	int dbflags = DB_THREAD | DB_PRIVATE;
 	char tidx_pbuf[GCL_PATH_MAX];
 
 	phase = "get_gcl_path";
@@ -1488,7 +1535,8 @@ tidx_open(gdp_gcl_t *gcl, const char *suffix, int openmode)
 		dbflags |= DB_RDONLY;
 	else if (EP_UT_BITSET(O_CREAT, openmode))
 		dbflags |= DB_CREATE;
-	estat = bdb_open(tidx_pbuf, dbflags, GCLfilemode, DB_BTREE, &phys->tidx.db);
+	estat = bdb_open(tidx_pbuf, dbflags, GCLfilemode,
+						DB_BTREE, NULL, &phys->tidx.db);
 	if (EP_STAT_IS_SAME(estat, ep_stat_from_errno(ENOENT)))
 	{
 		ep_dbg_cprintf(Dbg, 33, "tidx_open(%s): no tidx\n", gcl->pname);
@@ -1605,11 +1653,7 @@ disk_create(gdp_gcl_t *gcl, gdp_gclmd_t *gmd)
 	if (!gdp_name_is_valid(gcl->name))
 	{
 		estat = _gdp_gcl_newname(gcl);
-		if (!EP_STAT_ISOK(estat))
-		{
-			physinfo_free(phys);
-			return estat;
-		}
+		EP_STAT_CHECK(estat, goto fail0);
 	}
 
 	// create an initial segment for the GCL
@@ -1686,7 +1730,7 @@ disk_open(gdp_gcl_t *gcl)
 	ep_dbg_cprintf(Dbg, 20, "disk_open(%s)\n", gcl->pname);
 
 	// allocate space for physical data
-	EP_ASSERT_REQUIRE(GETPHYS(gcl) == NULL);
+	EP_ASSERT(GETPHYS(gcl) == NULL);
 	phase = "physinfo_alloc";
 	gcl->x->physinfo = phys = physinfo_alloc(gcl);
 	if (phys == NULL)
@@ -1956,7 +2000,7 @@ disk_read_by_recno(gdp_gcl_t *gcl,
 		{
 			fprintf(stderr, "datum->siglen = %d, sizeof read_buffer = %zd\n",
 					datum->siglen, sizeof read_buffer);
-			EP_ASSERT_INSIST(datum->siglen <= sizeof read_buffer);
+			EP_ASSERT(datum->siglen <= sizeof read_buffer);
 		}
 		if (datum->sig == NULL)
 			datum->sig = gdp_buf_new();
@@ -2061,8 +2105,13 @@ disk_ts_to_recno(gdp_gcl_t *gcl,
 	tkey.sec = ep_net_hton64(datum->ts.tv_sec);
 	tkey.nsec = ep_net_hton32(datum->ts.tv_nsec);
 	tkey_dbt.data = &tkey;
-	tkey_dbt.size = sizeof tkey;
 	memset(&tval_dbt, 0, sizeof tval_dbt);
+#if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
+	tidx_value_t tval;
+	tval_dbt.data = &tval;
+	tval_dbt.flags = DB_DBT_USERMEM;
+	tval_dbt.size = tval_dbt.ulen = sizeof tval;
+#endif
 
 	estat = bdb_get_first_after_key(phys->tidx.db, &tkey_dbt, &tval_dbt);
 
@@ -2074,8 +2123,8 @@ disk_ts_to_recno(gdp_gcl_t *gcl,
 			estat = GDP_STAT_CORRUPT_INDEX;
 			goto fail0;
 		}
-		tidx_value_t *tval = tval_dbt.data;
-		datum->recno = tval->recno;
+		tidx_value_t *tvalp = tval_dbt.data;
+		datum->recno = tvalp->recno;
 	}
 
 fail0:
@@ -2162,7 +2211,7 @@ disk_append(gdp_gcl_t *gcl,
 			if (slen > 0)
 				ep_hexdump(p, slen, ep_dbg_getfile(), EP_HEXDUMP_ASCII, 0);
 		}
-		EP_ASSERT_INSIST(datum->siglen == slen);
+		EP_ASSERT(datum->siglen == slen);
 		if (slen > 0 && p != NULL)
 			fwrite(p, slen, 1, seg->fp);
 		record_size += slen;

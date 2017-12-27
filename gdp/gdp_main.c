@@ -145,13 +145,13 @@ gdp_pdu_proc_cmd(void *cpdu_)
 
 	gcl = _gdp_gcl_cache_get(cpdu->dst, 0);
 	if (gcl != NULL)
-		EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
+		EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
 
 	ep_dbg_cprintf(Dbg, 43,
 			"gdp_pdu_proc_cmd: allocating new req for GCL %p\n", gcl);
 	estat = _gdp_req_new(cmd, gcl, cpdu->chan, cpdu, GDP_REQ_CORE, &req);
 	EP_STAT_CHECK(estat, goto fail0);
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex, );
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex);
 
 	ep_dbg_cprintf(Dbg, 40, "gdp_pdu_proc_cmd >>> req=%p\n", req);
 
@@ -365,6 +365,12 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 				"gdp_pdu_proc_resp: searching gcl %p for rid %" PRIgdp_rid "\n",
 				gcl, rpdu->rid);
 		req = _gdp_req_find(gcl, rpdu->rid);
+		if (ep_dbg_test(DbgProcResp, 51))
+		{
+			ep_dbg_printf("... found ");
+			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+		}
+
 		// req is already locked by _gdp_req_find
 		if (req == NULL)
 		{
@@ -378,7 +384,7 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 			_gdp_pdu_free(rpdu);
 			return;
 		}
-		else if (EP_ASSERT_TEST(req->state != GDP_REQ_FREE))
+		else if (!EP_ASSERT(req->state != GDP_REQ_FREE))
 		{
 			if (ep_dbg_test(DbgProcResp, 1))
 			{
@@ -401,7 +407,7 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 	}
 
 	if (gcl != NULL)
-		_gdp_gcl_unlock(gcl);
+		_gdp_gcl_decref(&gcl);
 
 	if (req->cpdu == NULL)
 	{
@@ -420,10 +426,11 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 	// save the response PDU for further processing
 	if (req->rpdu != NULL)
 	{
-		if (ep_dbg_test(DbgProcResp, 1))
+		// this can happen in multiread/subscription and async I/O
+		if (ep_dbg_test(DbgProcResp, 41))
 		{
-			ep_dbg_printf("gdp_pdu_proc_resp: req->rpdu already set\n");
-			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+			ep_dbg_printf("gdp_pdu_proc_resp: req->rpdu already set\n    ");
+			_gdp_pdu_dump(req->rpdu, ep_dbg_getfile());
 		}
 		_gdp_pdu_free(req->rpdu);
 	}
@@ -441,7 +448,6 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 	ep_time_now(&req->act_ts);
 
 	// do ack/nak specific processing
-	//req->pdu = req->rpdu;
 	estat = _gdp_req_dispatch(req, cmd);
 
 	// figure out potential response code
@@ -467,6 +473,10 @@ gdp_pdu_proc_resp(gdp_pdu_t *rpdu, gdp_chan_t *chan)
 	{
 		// send the status as an event
 		estat = _gdp_event_add_from_req(req);
+
+		// since this is asynchronous we can release the PDU
+		_gdp_pdu_free(req->rpdu);
+		req->rpdu = NULL;
 	}
 	else if (req->state == GDP_REQ_WAITING)
 	{
@@ -538,6 +548,71 @@ _gdp_pdu_process(gdp_pdu_t *pdu, gdp_chan_t *chan)
 
 
 /*
+**  _GDP_RECLAIM_RESOURCES --- find unused GDP resources and reclaim them
+**
+**		This should really also have a maximum number of GCLs to leave
+**		open so we don't run out of file descriptors under high load.
+**
+**		This implementation locks the GclsByUse list during the
+**		entire operation.  That's probably not the best idea.
+*/
+
+void
+_gdp_reclaim_resources(void *null)
+{
+	char pbuf[200];
+	time_t reclaim_age;		// how long to leave GCLs open before reclaiming
+
+	ep_dbg_cprintf(Dbg, 69, "_gdp_reclaim_resources\n");
+	snprintf(pbuf, sizeof pbuf, "swarm.%s.reclaim.age", ep_app_getprogname());
+	reclaim_age = ep_adm_getlongparam(pbuf, -1);
+	if (reclaim_age == -1)
+		reclaim_age = ep_adm_getlongparam("swarm.gdp.reclaim.age",
+									GDP_RECLAIM_AGE_DEF);
+	_gdp_gcl_cache_reclaim(reclaim_age);
+}
+
+// stub for libevent
+
+static void
+gdp_reclaim_resources_callback(int fd, short what, void *ctx)
+{
+	ep_dbg_cprintf(Dbg, 69, "gdp_reclaim_resources_callback\n");
+	if (ep_adm_getboolparam("swarm.gdp.reclaim.inthread", false))
+		ep_thr_pool_run(_gdp_reclaim_resources, NULL);
+	else
+		_gdp_reclaim_resources(NULL);
+}
+
+
+void
+_gdp_reclaim_resources_init(void (*f)(int, short, void *))
+{
+	static bool running = false;
+
+	if (running)
+		return;
+	running = true;
+	if (f == NULL)
+		f = &gdp_reclaim_resources_callback;
+
+	long gc_intvl;
+	char pbuf[200];
+
+	snprintf(pbuf, sizeof pbuf, "swarm.%s.reclaim.interval",
+			ep_app_getprogname());
+	gc_intvl = ep_adm_getlongparam(pbuf, -1);
+	if (gc_intvl == -1)
+		gc_intvl = ep_adm_getlongparam("swarm.gdp.reclaim.interval", 15L);
+
+	struct timeval tv = { gc_intvl, 0 };
+	struct event *evtimer = event_new(GdpIoEventBase, -1, EV_PERSIST,
+								f, NULL);
+	event_add(evtimer, &tv);
+}
+
+
+/*
 **	Base loop to be called for event-driven systems.
 **	Their events should have already been added to the event base.
 **
@@ -573,11 +648,6 @@ run_event_loop(void *eli_)
 			&event_loop_timeout, eli);
 	event_add(evtimer, &tv);
 
-	ep_thr_mutex_lock(&GdpIoEventLoopRunningMutex);
-	GdpIoEventLoopRunning = true;
-	ep_thr_cond_broadcast(&GdpIoEventLoopRunningCond);
-	ep_thr_mutex_unlock(&GdpIoEventLoopRunningMutex);
-
 	for (;;)
 	{
 		if (ep_dbg_test(Dbg, 20))
@@ -587,11 +657,18 @@ run_event_loop(void *eli_)
 			event_base_dump_events(evb, ep_dbg_getfile());
 		}
 
+		ep_thr_mutex_lock(&GdpIoEventLoopRunningMutex);
+		GdpIoEventLoopRunning = true;
+		ep_thr_cond_broadcast(&GdpIoEventLoopRunningCond);
+		ep_thr_mutex_unlock(&GdpIoEventLoopRunningMutex);
+
 #ifdef EVLOOP_NO_EXIT_ON_EMPTY
 		event_base_loop(evb, EVLOOP_NO_EXIT_ON_EMPTY);
 #else
 		event_base_loop(evb, 0);
 #endif
+
+		GdpIoEventLoopRunning = false;
 
 		if (ep_dbg_test(Dbg, 1))
 		{
@@ -659,7 +736,7 @@ evlib_log_cb(int severity, const char *msg)
 static void
 exit_on_signal(int sig)
 {
-	fprintf(stderr, "\nExiting on signal %d\n", sig);
+	ep_app_warn("Exiting on signal %d", sig);
 	exit(sig);
 }
 
@@ -668,8 +745,8 @@ exit_on_signal(int sig)
 **  Change user id to something innocuous.
 */
 
-static void
-run_as(const char *runasuser)
+void
+_gdp_run_as(const char *runasuser)
 {
 	if (runasuser != NULL && *runasuser != '\0')
 	{
@@ -692,6 +769,44 @@ run_as(const char *runasuser)
 			ep_app_warn("Cannot set user/group id (%d:%d)", uid, gid);
 	}
 }
+
+
+/*
+**  SIGINFO --- called to print out internal state (for debugging)
+**
+**		On BSD and MacOS this is implemented as a SIGINFO (^T from
+**		the command line), but since Linux doesn't have that we use
+**		SIGUSR1 instead.
+*/
+
+extern const char GdpVersion[];
+
+void
+_gdp_dump_state(int plev)
+{
+	flockfile(stderr);
+	fprintf(stderr, "\n<<< GDP STATE >>>\nVersion: %s\n", GdpVersion);
+	_gdp_gcl_cache_dump(plev, stderr);
+	fprintf(stderr, "\n<<< Open file descriptors >>>\n");
+	ep_app_dumpfds(stderr);
+	fprintf(stderr, "\n<<< Stack backtrace >>>\n");
+	ep_dbg_backtrace();
+	fprintf(stderr, "\n<<< Statistics >>>\n");
+	_gdp_req_pr_stats(stderr);
+	_gdp_gcl_pr_stats(stderr);
+	funlockfile(stderr);
+}
+
+
+static void
+siginfo(int sig, short what, void *arg)
+{
+	if (ep_dbg_test(Dbg, 1))
+		_gdp_dump_state(GDP_PR_DETAILED);
+	else
+		_gdp_dump_state(GDP_PR_PRETTY);
+}
+
 
 
 /*
@@ -750,8 +865,9 @@ gdp_lib_init(const char *myname)
 		(void) signal(SIGTERM, exit_on_signal);
 
 	// get assertion behavior information
+	// [DEPRECATED: use libep.assert.allabort]
 	EpAssertAllAbort = ep_adm_getboolparam("swarm.gdp.debug.assert.allabort",
-									false);
+									EpAssertAllAbort);
 
 	// register status strings
 	_gdp_stat_init();
@@ -787,7 +903,7 @@ gdp_lib_init(const char *myname)
 		if (getuid() == 0)
 		{
 			snprintf(argname, sizeof argname, "swarm.%s.runasuser", progname);
-			run_as(ep_adm_getstrparam(argname, NULL));
+			_gdp_run_as(ep_adm_getstrparam(argname, NULL));
 		}
 
 		// allow log facilities on a per-app basis
@@ -799,7 +915,7 @@ gdp_lib_init(const char *myname)
 	}
 
 	if (getuid() == 0)
-		run_as(ep_adm_getstrparam("swarm.gdp.runasuser", NULL));
+		_gdp_run_as(ep_adm_getstrparam("swarm.gdp.runasuser", NULL));
 
 	if (ep_dbg_test(Dbg, 1))
 	{
@@ -836,6 +952,12 @@ gdp_lib_init(const char *myname)
 			estat = init_error("could not create event base", "gdp_lib_init");
 		event_config_free(ev_cfg);
 		EP_STAT_CHECK(estat, goto fail0);
+
+		// add a debugging signal to print out some internal data structures
+#ifdef SIGINFO
+		event_add(evsignal_new(GdpIoEventBase, SIGINFO, siginfo, NULL), NULL);
+#endif
+		event_add(evsignal_new(GdpIoEventBase, SIGUSR1, siginfo, NULL), NULL);
 	}
 
 done:

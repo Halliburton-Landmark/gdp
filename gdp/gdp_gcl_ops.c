@@ -65,175 +65,6 @@ _gdp_gcl_newname(gdp_gcl_t *gcl)
 
 
 /*
-**	_GDP_GCL_NEWHANDLE --- create a new gcl_handle & initialize
-**
-**		Only initialization done is the mutex and the name.
-**
-**	Parameters:
-**		gcl_name --- internal (256-bit) name of the GCL
-**		pgcl --- location to store the resulting GCL handle
-**
-**		gcl is returned unlocked.
-*/
-
-EP_STAT
-_gdp_gcl_newhandle(gdp_name_t gcl_name, gdp_gcl_t **pgcl)
-{
-	EP_STAT estat = EP_STAT_OK;
-	gdp_gcl_t *gcl;
-
-	// allocate the memory to hold the gcl_handle
-	gcl = ep_mem_zalloc(sizeof *gcl);
-	if (gcl == NULL)
-		goto fail1;
-
-	ep_thr_mutex_init(&gcl->mutex, EP_THR_MUTEX_DEFAULT);
-	ep_thr_mutex_setorder(&gcl->mutex, GDP_MUTEX_LORDER_GCL);
-	LIST_INIT(&gcl->reqs);
-	gcl->refcnt = 1;
-
-	// create a name if we don't have one passed in
-	if (gcl_name == NULL || !gdp_name_is_valid(gcl_name))
-		_gdp_newname(gcl->name, gcl->gclmd);	//XXX bogus: gcl->gclmd isn't set yet
-	else
-		memcpy(gcl->name, gcl_name, sizeof gcl->name);
-	gdp_printable_name(gcl->name, gcl->pname);
-
-	// success
-	gcl->flags |= GCLF_INUSE;
-	*pgcl = gcl;
-	ep_dbg_cprintf(Dbg, 28, "_gdp_gcl_newhandle => %p (%s)\n",
-			gcl, gcl->pname);
-	return estat;
-
-fail1:
-	estat = ep_stat_from_errno(errno);
-	{
-		char ebuf[100];
-
-		ep_dbg_cprintf(Dbg, 4, "_gdp_gcl_newhandle failed: %s\n",
-				ep_stat_tostr(estat, ebuf, sizeof ebuf));
-	}
-	return estat;
-}
-
-/*
-**  _GDP_GCL_FREEHANDLE --- drop an existing handle
-*/
-
-void
-_gdp_gcl_freehandle(gdp_gcl_t *gcl)
-{
-	ep_dbg_cprintf(Dbg, 28, "_gdp_gcl_freehandle(%p)\n", gcl);
-	if (gcl == NULL)
-		return;
-
-	// this is a forced free, so ignore existing refcnts, etc.
-	gcl->refcnt = 0;
-
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
-	gcl->flags |= GCLF_DROPPING | GCLF_ISLOCKED;
-
-	// drop it from the name -> handle cache
-	_gdp_gcl_cache_drop(gcl);
-
-	// should be inacessible now
-	_gdp_gcl_unlock(gcl);
-
-	// release any remaining requests
-	_gdp_req_freeall(&gcl->reqs, NULL);
-
-	// free any additional per-GCL resources
-	if (gcl->freefunc != NULL)
-		(*gcl->freefunc)(gcl);
-	gcl->freefunc = NULL;
-	if (gcl->gclmd != NULL)
-		gdp_gclmd_free(gcl->gclmd);
-	gcl->gclmd = NULL;
-	if (gcl->digest != NULL)
-		ep_crypto_md_free(gcl->digest);
-	gcl->digest = NULL;
-
-	ep_thr_mutex_destroy(&gcl->mutex);
-
-	// if there is any "extra" data, drop that
-	//		(redundant; should be done by the freefunc)
-	if (gcl->x != NULL)
-	{
-		ep_mem_free(gcl->x);
-		gcl->x = NULL;
-	}
-
-	// finally release the memory for the handle itself
-	gcl->flags = 0;
-	ep_mem_free(gcl);
-}
-
-/*
-**  _GDP_GCL_DUMP --- print a GCL (for debugging)
-*/
-
-EP_PRFLAGS_DESC	GclFlags[] =
-{
-	{ GCLF_DROPPING,		GCLF_DROPPING,			"DROPPING"			},
-	{ GCLF_INCACHE,			GCLF_INCACHE,			"INCACHE"			},
-	{ GCLF_ISLOCKED,		GCLF_ISLOCKED,			"ISLOCKED"			},
-	{ GCLF_INUSE,			GCLF_INUSE,				"INUSE"				},
-	{ GCLF_DEFER_FREE,		GCLF_DEFER_FREE,		"DEFER_FREE"		},
-	{ GCLF_KEEPLOCKED,		GCLF_KEEPLOCKED,		"KEEPLOCKED"		},
-	{ 0, 0, NULL }
-};
-
-void
-_gdp_gcl_dump(
-		const gdp_gcl_t *gcl,
-		FILE *fp,
-		int detail,
-		int indent)
-{
-	if (detail >= GDP_PR_BASIC)
-		fprintf(fp, "GCL@%p: ", gcl);
-	if (gcl == NULL)
-	{
-		fprintf(fp, "NULL\n");
-	}
-	else
-	{
-		if (!gdp_name_is_valid(gcl->name))
-		{
-			fprintf(fp, "no name\n");
-		}
-		else
-		{
-			fprintf(fp, "%s\n", gcl->pname);
-		}
-
-		if (detail >= GDP_PR_BASIC)
-		{
-			fprintf(fp, "\tiomode = %d, refcnt = %d, reqs = %p, nrecs = %"
-					PRIgdp_recno "\n"
-					"\tflags = ",
-					gcl->iomode, gcl->refcnt, LIST_FIRST(&gcl->reqs),
-					gcl->nrecs);
-			ep_prflags(gcl->flags, GclFlags, fp);
-			fprintf(fp, "\n");
-			if (detail >= GDP_PR_DETAILED)
-			{
-				char tbuf[40];
-				struct tm tm;
-
-				fprintf(fp, "\tfreefunc = %p, gclmd = %p, digest = %p\n",
-						gcl->freefunc, gcl->gclmd, gcl->digest);
-				gmtime_r(&gcl->utime, &tm);
-				strftime(tbuf, sizeof tbuf, "%Y-%m-%d %H:%M:%S", &tm);
-				fprintf(fp, "\tutime = %s, x = %p\n", tbuf, gcl->x);
-			}
-		}
-	}
-}
-
-
-/*
 **	_GDP_GCL_CREATE --- create a new GCL
 **
 **		Creation is a bit tricky, since we don't start with an existing
@@ -269,6 +100,7 @@ _gdp_gcl_create(gdp_name_t gclname,
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// create the request
+	_gdp_gcl_lock(gcl);
 	estat = _gdp_req_new(GDP_CMD_CREATE, gcl, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
@@ -313,7 +145,7 @@ fail1:
 EP_STAT
 _gdp_gcl_open(gdp_gcl_t *gcl,
 			int cmd,
-			EP_CRYPTO_KEY *secretkey,
+			gdp_gcl_open_info_t *info,
 			gdp_chan_t *chan,
 			uint32_t reqflags)
 {
@@ -323,6 +155,8 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 	const uint8_t *pkbuf;
 	int md_alg;
 //	int pktype;
+	EP_CRYPTO_KEY *secretkey = NULL;
+	bool my_secretkey = false;
 
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
 					return EP_STAT_ASSERT_ABORT);
@@ -330,6 +164,7 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 	// send the request across to the log daemon
 	errno = 0;				// avoid spurious messages
 	reqflags |= GDP_REQ_ROUTEFAIL;			// don't retry on router errors
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
 	estat = _gdp_req_new(cmd, gcl, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 	estat = _gdp_invoke(req);
@@ -358,6 +193,20 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 	md_alg = pkbuf[0];
 //	pktype = pkbuf[1];
 
+	// get the secret key if needed
+	if (info != NULL)
+	{
+		secretkey = info->signkey;
+		if (secretkey == NULL && info->signkey_cb != NULL)
+		{
+			estat = (*info->signkey_cb)(gcl->name,
+							info->signkey_udata, &secretkey);
+			EP_STAT_CHECK(estat, return estat);
+			my_secretkey = true;				// we must deallocate
+		}
+	}
+
+	// nothing from user; let's try a standard search
 	if (secretkey == NULL)
 	{
 		secretkey = _gdp_crypto_skey_read(gcl->pname, "pem");
@@ -369,6 +218,8 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 			ep_dbg_cprintf(Dbg, 30, "_gdp_gcl_open: no secret key\n");
 			goto fail0;
 		}
+
+		my_secretkey = true;			// we must deallocate
 	}
 
 	// validate the compatibility of the public and secret keys
@@ -391,6 +242,11 @@ _gdp_gcl_open(gdp_gcl_t *gcl,
 
 	// set up the message digest context
 	gcl->digest = ep_crypto_sign_new(secretkey, md_alg);
+
+	// we can release the key now
+	if (my_secretkey)
+		ep_crypto_key_free(secretkey);
+
 	if (gcl->digest == NULL)
 		goto fail1;
 
@@ -475,6 +331,8 @@ _gdp_gcl_close(gdp_gcl_t *gcl,
 		_gdp_gcl_dump(gcl, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
 	}
 
+	_gdp_gcl_lock(gcl);
+
 	// need to count the number of references /excluding/ subscriptions
 	nrefs = gcl->refcnt;
 	req = LIST_FIRST(&gcl->reqs);
@@ -500,10 +358,10 @@ _gdp_gcl_close(gdp_gcl_t *gcl,
 	//XXX should probably check status (and do what with it?)
 
 	// release resources held by this handle
-	gcl->flags &= ~GCLF_DEFER_FREE;
 	_gdp_req_free(&req);
 finis:
 fail0:
+	_gdp_gcl_decref(&gcl);
 	return estat;
 }
 
@@ -547,6 +405,12 @@ append_common(gdp_gcl_t *gcl,
 	req->md = gcl->digest;
 	datum->recno = gcl->nrecs + 1;
 
+	// Note that this is just a guess: the append may still fail,
+	// but we need to do this if there are multiple threads appending
+	// at the same time.
+	// If the append fails, we'll be out of sync and all hell breaks loose.
+	gcl->nrecs++;
+
 	// if doing append filtering (e.g., encryption), call it now.
 	if (gcl->apndfilter != NULL)
 		estat = gcl->apndfilter(datum, gcl->apndfpriv);
@@ -585,8 +449,15 @@ _gdp_gcl_append(gdp_gcl_t *gcl,
 	gdp_buf_reset(datum->dbuf);
 	if (datum->sig != NULL)
 		gdp_buf_reset(datum->sig);
+	gdp_datum_copy(datum, req->rpdu->datum);
+
 	_gdp_req_free(&req);
 fail0:
+	if (ep_dbg_test(Dbg, 42))
+	{
+		ep_dbg_printf("_gdp_gcl_append: returning ");
+		gdp_datum_print(datum, ep_dbg_getfile(), GDP_DATUM_PRDEBUG);
+	}
 	return estat;
 }
 
@@ -620,14 +491,7 @@ _gdp_gcl_append_async(
 	// arrange for responses to appear as events or callbacks
 	_gdp_event_setcb(req, cbfunc, cbarg);
 
-	_gdp_gcl_lock(gcl);
 	estat = _gdp_req_send(req);
-	_gdp_gcl_unlock(gcl);
-
-	// Note that this is just a guess: the write may still fail.
-	// If it does, we'll be out of sync and all hell breaks loose.
-	if (EP_STAT_ISOK(estat))
-		gcl->nrecs++;
 
 	// synchronous calls clear the data in the datum, so be consistent
 	i = gdp_buf_drain(req->cpdu->datum->dbuf, SIZE_MAX);
@@ -745,9 +609,7 @@ _gdp_gcl_read_async(gdp_gcl_t *gcl,
 	_gdp_event_setcb(req, cbfunc, cbarg);
 
 	req->cpdu->datum->recno = recno;
-	_gdp_gcl_lock(gcl);
 	estat = _gdp_req_send(req);
-	_gdp_gcl_unlock(gcl);
 
 	if (EP_STAT_ISOK(estat))
 	{
@@ -812,11 +674,12 @@ _gdp_gcl_newsegment(gdp_gcl_t *gcl,
 	if (!GDP_GCL_ISGOOD(gcl))
 		return GDP_STAT_GCL_NOT_OPEN;
 	estat = _gdp_req_new(GDP_CMD_NEWSEGMENT, gcl, chan, NULL, reqflags, &req);
-	EP_STAT_CHECK(estat, return estat);
+	EP_STAT_CHECK(estat, goto fail0);
 
 	estat = _gdp_invoke(req);
 
 	_gdp_req_free(&req);
+fail0:
 	return estat;
 }
 
@@ -866,6 +729,7 @@ _gdp_gcl_fwd_append(
 	// deliver results asynchronously
 	reqflags |= GDP_REQ_ASYNCIO;
 
+	_gdp_gcl_lock(gcl);
 	estat = _gdp_req_new(GDP_CMD_FWD_APPEND, gcl, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
@@ -897,9 +761,7 @@ _gdp_gcl_fwd_append(
 
 	// XXX should we take a callback function?
 
-	_gdp_gcl_lock(gcl);
 	estat = _gdp_req_send(req);
-	_gdp_gcl_unlock(gcl);
 
 	// unlike append_async, we leave the datum intact
 
@@ -917,6 +779,7 @@ _gdp_gcl_fwd_append(
 	}
 
 fail0:
+	_gdp_gcl_unlock(gcl);
 	if (ep_dbg_test(Dbg, 11))
 	{
 		char ebuf[100];

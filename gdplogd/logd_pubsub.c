@@ -90,7 +90,7 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 	gdp_req_t *nextreq;
 	EP_TIME_SPEC sub_timeout;
 
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&pubreq->gcl->mutex, );
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&pubreq->gcl->mutex);
 
 	if (ep_dbg_test(Dbg, 32))
 	{
@@ -173,8 +173,8 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 void
 sub_end_subscription(gdp_req_t *req)
 {
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex, );
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->gcl->mutex, );
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex);
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->gcl->mutex);
 
 	// make it not persistent and not a subscription
 	req->flags &= ~(GDP_REQ_PERSIST | GDP_REQ_SRV_SUBSCR);
@@ -183,7 +183,7 @@ sub_end_subscription(gdp_req_t *req)
 	if (EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
 		LIST_REMOVE(req, gcllist);
 	req->flags &= ~GDP_REQ_ON_GCL_LIST;
-	_gdp_gcl_decref(&req->gcl);			//DEBUG: is this appropriate?
+	_gdp_gcl_decref(&req->gcl);
 
 	// send an "end of subscription" event
 	req->rpdu->cmd = GDP_ACK_DELETED;
@@ -195,6 +195,43 @@ sub_end_subscription(gdp_req_t *req)
 	}
 
 	(void) _gdp_pdu_out(req->rpdu, req->chan, NULL);
+}
+
+
+/*
+**  Unsubscribe all requests for a given gcl and destination.
+*/
+
+EP_STAT
+sub_end_all_subscriptions(
+		gdp_gcl_t *gcl,
+		gdp_name_t dest)
+{
+	EP_STAT estat;
+	gdp_req_t *req;
+	gdp_req_t *nextreq;
+
+	do
+	{
+		estat = EP_STAT_OK;
+		for (req = LIST_FIRST(&gcl->reqs); req != NULL; req = nextreq)
+		{
+			estat = _gdp_req_lock(req);
+			EP_STAT_CHECK(estat, break);
+			nextreq = LIST_NEXT(req, gcllist);
+			if (!GDP_NAME_SAME(req->rpdu->dst, dest) ||
+					!EP_ASSERT(req->gcl == gcl))
+			{
+				_gdp_req_unlock(req);
+				continue;
+			}
+
+			// remove subscription for this destination
+			LIST_REMOVE(req, gcllist);
+			_gdp_req_free(&req);
+		}
+	} while (!EP_STAT_ISOK(estat));
+	return estat;
 }
 
 
@@ -261,12 +298,16 @@ sub_reclaim_resources(gdp_chan_t *chan)
 
 			// have to manually remove req from lists to avoid lock inversion
 			EP_ASSERT(req->gcl != NULL);
-			EP_ASSERT(EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags));
-			_gdp_gcl_lock(req->gcl);
-			LIST_REMOVE(req, gcllist);
-			_gdp_gcl_decref(&req->gcl);			// also unlocks GCL
-			EP_ASSERT(EP_UT_BITSET(GDP_REQ_ON_CHAN_LIST, req->flags));
-			LIST_REMOVE(req, chanlist);			// chan already locked
+			if (EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
+			{
+				_gdp_gcl_lock(req->gcl);
+				LIST_REMOVE(req, gcllist);
+				_gdp_gcl_decref(&req->gcl);			// also unlocks GCL
+			}
+			if (EP_UT_BITSET(GDP_REQ_ON_CHAN_LIST, req->flags))
+			{
+				LIST_REMOVE(req, chanlist);			// chan already locked
+			}
 			req->flags &= ~(GDP_REQ_ON_GCL_LIST | GDP_REQ_ON_CHAN_LIST);
 			_gdp_req_free(&req);
 		}

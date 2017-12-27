@@ -20,6 +20,7 @@ Whi='[0;37m';     BWhi='[1;37m';    UWhi='[4;37m';    IWhi='[0;97m';    BIWh
 
 #################### FUNCTIONS ####################
 
+: ${quiet:=false}
 
 # Error/Information messages
 info() {
@@ -217,26 +218,43 @@ set_os() {
     fi
 }
 
-
-# check to make sure we understand this OS and OSVER; choose PKGMGR & INITsys
-PKGMGR=$OS
-INITguess=""
-
-set_pkgmgr() {
-    case $OS in
-      "debian")
+check_os() {
+    case "$OS" in
+	"debian")
 	    if expr $OSVER \< 80000 > /dev/null
 	    then
 		    fatal_osver "Debian 8 (Jessie)"
 	    fi
 	    ;;
 
-      "ubuntu")
-	    PKGMGR=debian
+	"ubuntu")
 	    if expr $OSVER \< 140400 > /dev/null
 	    then
 		    fatal_osver "Ubuntu 14.04"
 	    fi
+	    ;;
+
+	"raspbian")
+	    warn_unsupported "assume it is debian-based"
+	    ;;
+
+	"centos" | "freebsd" | "darwin" | "redhat" | "gentoo")
+	    warn_unsupported
+	    ;;
+
+	*)
+	    fatal "Oops, we don't support $OS"
+    esac
+}
+
+
+# check to make sure we understand this OS and OSVER; choose PKGMGR & INITsys
+set_pkgmgr() {
+    : ${PKGMGR:=$OS}
+    INITguess=""
+    case $PKGMGR in
+      "debian"|"ubuntu")
+	    PKGMGR=debian
 	    if expr $OSVER \>= 160400 > /dev/null
 	    then
 		    INITguess=systemd
@@ -246,12 +264,10 @@ set_pkgmgr() {
 	    ;;
 
       "raspbian")
-	    warn_unsupported "assume it is debian-based"
 	    PKGMGR=debian
 	    ;;
 
       "redhat")
-	    warn_unsupported
 	    PKGMGR=yum
 	    if expr $OSVER \< 070000 > /dev/null
 	    then
@@ -262,30 +278,20 @@ set_pkgmgr() {
 	    ;;
 
       "darwin")
-	    warn_unsupported
-	    if type brew > /dev/null 2>&1 && [ ! -z "`brew config`" ]; then
-		PKGMGR=brew
-		brew=`which brew`
-		if [ -f $brew ]; then
-		    brewUser=`ls -l $brew | awk '{print $3}'`
-		    # Only use sudo to update brew if the brew binary is owned by root.
-		    # This avoids "Cowardly refusing to 'sudo brew update'"
-		    if [ "$brewUser" = "root" ]; then
-			sudo brew update
-		    else
-			brew update
-		    fi
-		fi
-	    fi
 	    if type port > /dev/null 2>&1 && port installed | grep -q .; then
-		if [ "$PKGMGR" = "brew" ]; then
+		    PKGMGR=macports
+	    fi
+	    if type brew > /dev/null 2>&1 && [ ! -z "`brew config`" ]
+	    then
+		if [ "$PKGMGR" = "macports" ]; then
+		    PKGMGR=brewports
 		    warn "You seem to have both macports and homebrew installed."
 		    warn "They conflict with each other, and you may break all your"
 		    warn "packages if you try to use them at the same time."
-		    warn "Please choose one or the other."
-		    fatal "You will have to deactivate one (or modify this script)"
+		    warn "Please choose one or the other.  Macports seems to work better."
+		    fatal "Set envar PKGMGR to 'brew' or 'macports' to choose."
 		else
-		    PKGMGR=macports
+		    PKGMGR=brew
 		fi
 	    fi
 	    if [ "$PKGMGR" = "darwin" ]; then
@@ -295,16 +301,7 @@ set_pkgmgr() {
 	    ;;
 
       "centos")
-	    warn_unsupported
 	    PKGMGR=yum
-	    ;;
-
-      "freebsd" | "gentoo")
-	    warn_unsupported
-	    ;;
-
-      *)
-	    fatal "Oops, we don't support $OS"
 	    ;;
     esac
 
@@ -322,38 +319,21 @@ set_pkgmgr() {
 		    ;;
 	    esac
     fi
-    test -z "$INITguess" && INITguess="unknown"
 }
 
 
 #################### END OF FUNCTIONS ####################
 
-args=`getopt q $*`
-if [ $? != 0 ]
-then
-    fatal "Usage: $0 [-q]"
-    exit 64
-fi
-set -- $args
-quiet=false
-for i
-do
-    case "$i"
-    in
-	-q)
-	    quiet=true
-	    shift;;
-	--)
-	    shift; break;;
-    esac
-done
-
 configure_defaults
 set_os
-set_pkgmgr
+check_os
+if [ -z "$PKGMGR" ]
+then
+    set_pkgmgr
+fi
 
 # see if we should use our guess
-test -z "$INITSYS" && INITSYS=$INITguess
+test -z "$INITSYS" && INITSYS=${INITguess:-unknown}
 
 if ! $quiet
 then

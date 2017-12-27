@@ -7,23 +7,41 @@
   <title>Writing GDP applications</title>
   <style type="text/css">code{white-space: pre;}</style>
   <style type="text/css">
+div.sourceCode { overflow-x: auto; }
 table.sourceCode, tr.sourceCode, td.lineNumbers, td.sourceCode {
   margin: 0; padding: 0; vertical-align: baseline; border: none; }
 table.sourceCode { width: 100%; line-height: 100%; }
 td.lineNumbers { text-align: right; padding-right: 4px; padding-left: 4px; color: #aaaaaa; border-right: 1px solid #aaaaaa; }
 td.sourceCode { padding-left: 5px; }
-code > span.kw { color: #007020; font-weight: bold; }
-code > span.dt { color: #902000; }
-code > span.dv { color: #40a070; }
-code > span.bn { color: #40a070; }
-code > span.fl { color: #40a070; }
-code > span.ch { color: #4070a0; }
-code > span.st { color: #4070a0; }
-code > span.co { color: #60a0b0; font-style: italic; }
-code > span.ot { color: #007020; }
-code > span.al { color: #ff0000; font-weight: bold; }
-code > span.fu { color: #06287e; }
-code > span.er { color: #ff0000; font-weight: bold; }
+code > span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code > span.dt { color: #902000; } /* DataType */
+code > span.dv { color: #40a070; } /* DecVal */
+code > span.bn { color: #40a070; } /* BaseN */
+code > span.fl { color: #40a070; } /* Float */
+code > span.ch { color: #4070a0; } /* Char */
+code > span.st { color: #4070a0; } /* String */
+code > span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code > span.ot { color: #007020; } /* Other */
+code > span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code > span.fu { color: #06287e; } /* Function */
+code > span.er { color: #ff0000; font-weight: bold; } /* Error */
+code > span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+code > span.cn { color: #880000; } /* Constant */
+code > span.sc { color: #4070a0; } /* SpecialChar */
+code > span.vs { color: #4070a0; } /* VerbatimString */
+code > span.ss { color: #bb6688; } /* SpecialString */
+code > span.im { } /* Import */
+code > span.va { color: #19177c; } /* Variable */
+code > span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code > span.op { color: #666666; } /* Operator */
+code > span.bu { } /* BuiltIn */
+code > span.ex { } /* Extension */
+code > span.pp { color: #bc7a00; } /* Preprocessor */
+code > span.at { color: #7d9029; } /* Attribute */
+code > span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code > span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code > span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
   </style>
   <link rel="stylesheet" href="pandoc.css" type="text/css" />
 </head>
@@ -41,6 +59,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <li><a href="#creating-logs">Creating logs</a></li>
 </ul></li>
 <li><a href="#writing-applications-in-python">Writing applications in Python</a><ul>
+<li><a href="#python-package-installation">Python package installation</a></li>
 <li><a href="#appending-data">Appending data</a></li>
 <li><a href="#reading-data-by-record-number">Reading data by record number</a></li>
 <li><a href="#subscriptions">Subscriptions</a></li>
@@ -52,7 +71,8 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <h1 id="a-typical-application">A typical application</h1>
 <p>The log interface acts as a proxy to interact with sensors and actuators. We describe how one would go about designing a simple application. Imagine an office building with some temperature sensors and some motor controlled window blinds. We would like to design an application that looks at the current temperature and some weather prediction feeds from the cloud to make a smart decision about the window blinds.</p>
 <div class="figure">
-<img src="GDP_application_example.png" alt="An example GDP application" /><p class="caption">An example GDP application</p>
+<img src="GDP_application_example.png" alt="An example GDP application" />
+<p class="caption">An example GDP application</p>
 </div>
 <p>As shown above, in order to do so, the application subscribes to all the relevant logs and writes the actuation values to the actuator log. A gateway working on behalf of the actuator subscribes to this actuation log and controls the motors for the window blinds. Note that instead of two separate logs, a composite log can be created for <code>Sensor 1</code> and <code>Sensor 2</code> in the diagram above, provided that the gateway implements the single-writer semantics.</p>
 <hr />
@@ -79,29 +99,34 @@ git clone repoman@repo.eecs.berkeley.edu:projects/swarmlab/gdp.git</code></pre>
 <hr />
 <h1 id="writing-applications-in-python">Writing applications in Python</h1>
 <p>Even though the GDP library is written in C, we provide a python package <code>gdp</code> that acts as a wrapper around the C-library. This python package enables quick prototyping using an object-oriented interface to GDP. What follows is a quick how-to on writing simple GDP programs in Python. Note that this document is just a starting point and is not intended to be a comprehensive guide to the complete interface. For a more thorough API documentation, refer to <code>/lang/python/README</code>.</p>
+<h2 id="python-package-installation">Python package installation</h2>
+<p>The package <code>gdp</code> should be installed in your system path for python packages. Once you have the required dependencies for compilation installed, something like <code>make install-python</code> from the root of repository should do the trick (note that running with <code>sudo</code> may be required). If, however, you don’t want to install an experimental package in your system path, and would rather keep everything contained to the repository tree, a simple workaround is to create a symlink <code>~/.local/lib/python2.7/site-packages/gdp</code> that points to <code>lang/python/gdp/</code> in the repository tree.</p>
 <h2 id="appending-data">Appending data</h2>
 <p>Let’s start with a simple <code>Hello world</code> program, that writes some data to a pre-existing log and reads it back.</p>
-<p>We need to import the package <code>gdp</code> to begin with. It should be installed in your system path for python packages for this to work, however a simple workaround is to create a symlink <code>~/.local/lib/python2.7/site-packages/gdp</code> that points to <code>lang/python/gdp/</code> in your repository tree.</p>
-<pre class="sourceCode python"><code class="sourceCode python">&gt;&gt;&gt; <span class="ch">import</span> gdp</code></pre>
+<p>We need to import the package <code>gdp</code> to begin with.</p>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="op">&gt;&gt;&gt;</span> <span class="im">import</span> gdp</code></pre></div>
 <p>Once imported, we need to initialize the GDP package by calling <code>gdp_init()</code>. An optional argument to <code>gdp_init()</code> is the address of a GDP-router. If no address provided, a default value of the parameter <code>swarm.gdp.routers</code> is used as configured by EP library. (See README for details).</p>
-<pre class="sourceCode python"><code class="sourceCode python">&gt;&gt;&gt; gdp.gdp_init()</code></pre>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="op">&gt;&gt;&gt;</span> <span class="co"># the following picks a router based on EP library configuration</span>
+<span class="op">&gt;&gt;&gt;</span> gdp.gdp_init()
+<span class="op">&gt;&gt;&gt;</span> <span class="co"># For a specific router, use the following:</span>
+<span class="op">&gt;&gt;&gt;</span> <span class="co"># gdp.gdp_init(&#39;gdp-01.eecs.berkeley.edu:8007&#39;)</span></code></pre></div>
 <p>As mentioned earlier, we support human readable names for logs. The mechanism for translating a human readable name to a 256-bit name is probably going to change in the future, however, it is our hope that it should be a simple change. The Python wrapper uses instances of class <code>gdp.GDP_NAME</code> for a name, which could be initialized using a human readable name.</p>
-<pre class="sourceCode python"><code class="sourceCode python">&gt;&gt;&gt; <span class="co"># Create a GDP_NAME object from a human readable python string</span>
-&gt;&gt;&gt; gcl_name = gdp.GDP_NAME(<span class="st">&quot;edu.berkeley.eecs.mor.01&quot;</span>)</code></pre>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="op">&gt;&gt;&gt;</span> <span class="co"># Create a GDP_NAME object from a human readable python string</span>
+<span class="op">&gt;&gt;&gt;</span> gcl_name <span class="op">=</span> gdp.GDP_NAME(<span class="st">&quot;edu.berkeley.eecs.mor.01&quot;</span>)</code></pre></div>
 <p>Once we have a <code>GDP_NAME</code>, we can use this to open a handle to a log/GCL. A log handle works like a file handle in some ways. We need to tell whether we want to open the GCL in read-only mode (<code>gdp.GDP_MODE_RO</code>), or append-only mode (<code>gdp.GDP_MODE_AO</code>), or read-and-append mode (<code>gdp.GDP_MODE_RA</code>).</p>
-<pre class="sourceCode python"><code class="sourceCode python">&gt;&gt;&gt; <span class="co"># assume that this log already exists.</span>
-&gt;&gt;&gt; gcl_handle = gdp.GDP_GCL(gcl_name, gdp.GDP_MODE_RA)</code></pre>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="op">&gt;&gt;&gt;</span> <span class="co"># assume that this log already exists.</span>
+<span class="op">&gt;&gt;&gt;</span> gcl_handle <span class="op">=</span> gdp.GDP_GCL(gcl_name, gdp.GDP_MODE_RA)</code></pre></div>
 <p>Next, let’s append a few records to the log. The unit of read/write to a log is called a record—data with some automatically generated metadata—represented as a python dictionary. The special key <code>data</code> represents the data we wish to append to the log, and its value should be a python (binary) string.</p>
-<pre class="sourceCode python"><code class="sourceCode python">&gt;&gt;&gt; <span class="kw">for</span> idx in <span class="dt">xrange</span>(<span class="dv">10</span>):
-...   datum = {<span class="st">&quot;data&quot;</span>: <span class="st">&quot;Hello world &quot;</span> + <span class="dt">str</span>(idx)}
-...   gcl_handle.append(datum)</code></pre>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="op">&gt;&gt;&gt;</span> <span class="cf">for</span> idx <span class="kw">in</span> <span class="bu">xrange</span>(<span class="dv">10</span>):
+...   datum <span class="op">=</span> {<span class="st">&quot;data&quot;</span>: <span class="st">&quot;Hello world &quot;</span> <span class="op">+</span> <span class="bu">str</span>(idx)}
+...   gcl_handle.append(datum)</code></pre></div>
 <p>That’s it. Ideally, it should finish without throwing any errors, resulting in 10 records append to the log specified.</p>
 <p>Look at <code>/lang/python/apps/writer_test.py</code> for a full example.</p>
 <h2 id="reading-data-by-record-number">Reading data by record number</h2>
 <p>Next, let’s read some data back and see if it matches what we wrote. Note that we need to tell what record number we want to read, and record numbers start from 1. To read data, we just use <code>read</code> method of the GDP_GCL instance with the record number.</p>
-<pre class="sourceCode python"><code class="sourceCode python">&gt;&gt;&gt; <span class="kw">for</span> idx in <span class="dt">xrange</span>(<span class="dv">1</span>,<span class="dv">11</span>):
-...   datum = gcl_handle.read(idx)
-...   <span class="dt">print</span> datum
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="op">&gt;&gt;&gt;</span> <span class="cf">for</span> idx <span class="kw">in</span> <span class="bu">xrange</span>(<span class="dv">1</span>,<span class="dv">11</span>):
+...   datum <span class="op">=</span> gcl_handle.read(idx)
+...   <span class="bu">print</span> datum
 {<span class="st">&#39;recno&#39;</span>: <span class="dv">1</span>, <span class="st">&#39;data&#39;</span>: <span class="st">&#39;Hello world 0&#39;</span>, <span class="st">&#39;ts&#39;</span>: {<span class="st">&#39;tv_sec&#39;</span>: <span class="dv">1442965633</span>, <span class="st">&#39;tv_accuracy&#39;</span>: <span class="fl">0.5</span>, <span class="st">&#39;tv_nsec&#39;</span>: 424722000L}}
 {<span class="st">&#39;recno&#39;</span>: <span class="dv">2</span>, <span class="st">&#39;data&#39;</span>: <span class="st">&#39;Hello world 1&#39;</span>, <span class="st">&#39;ts&#39;</span>: {<span class="st">&#39;tv_sec&#39;</span>: <span class="dv">1442965633</span>, <span class="st">&#39;tv_accuracy&#39;</span>: <span class="fl">0.5</span>, <span class="st">&#39;tv_nsec&#39;</span>: 425629000L}}
 {<span class="st">&#39;recno&#39;</span>: <span class="dv">3</span>, <span class="st">&#39;data&#39;</span>: <span class="st">&#39;Hello world 2&#39;</span>, <span class="st">&#39;ts&#39;</span>: {<span class="st">&#39;tv_sec&#39;</span>: <span class="dv">1442965633</span>, <span class="st">&#39;tv_accuracy&#39;</span>: <span class="fl">0.5</span>, <span class="st">&#39;tv_nsec&#39;</span>: 426345000L}}
@@ -111,24 +136,24 @@ git clone repoman@repo.eecs.berkeley.edu:projects/swarmlab/gdp.git</code></pre>
 {<span class="st">&#39;recno&#39;</span>: <span class="dv">7</span>, <span class="st">&#39;data&#39;</span>: <span class="st">&#39;Hello world 6&#39;</span>, <span class="st">&#39;ts&#39;</span>: {<span class="st">&#39;tv_sec&#39;</span>: <span class="dv">1442965633</span>, <span class="st">&#39;tv_accuracy&#39;</span>: <span class="fl">0.5</span>, <span class="st">&#39;tv_nsec&#39;</span>: 429484000L}}
 {<span class="st">&#39;recno&#39;</span>: <span class="dv">8</span>, <span class="st">&#39;data&#39;</span>: <span class="st">&#39;Hello world 7&#39;</span>, <span class="st">&#39;ts&#39;</span>: {<span class="st">&#39;tv_sec&#39;</span>: <span class="dv">1442965633</span>, <span class="st">&#39;tv_accuracy&#39;</span>: <span class="fl">0.5</span>, <span class="st">&#39;tv_nsec&#39;</span>: 430200000L}}
 {<span class="st">&#39;recno&#39;</span>: <span class="dv">9</span>, <span class="st">&#39;data&#39;</span>: <span class="st">&#39;Hello world 8&#39;</span>, <span class="st">&#39;ts&#39;</span>: {<span class="st">&#39;tv_sec&#39;</span>: <span class="dv">1442965633</span>, <span class="st">&#39;tv_accuracy&#39;</span>: <span class="fl">0.5</span>, <span class="st">&#39;tv_nsec&#39;</span>: 431135000L}}
-{<span class="st">&#39;recno&#39;</span>: <span class="dv">10</span>, <span class="st">&#39;data&#39;</span>: <span class="st">&#39;Hello world 9&#39;</span>, <span class="st">&#39;ts&#39;</span>: {<span class="st">&#39;tv_sec&#39;</span>: <span class="dv">1442965633</span>, <span class="st">&#39;tv_accuracy&#39;</span>: <span class="fl">0.5</span>, <span class="st">&#39;tv_nsec&#39;</span>: 431962000L}}</code></pre>
+{<span class="st">&#39;recno&#39;</span>: <span class="dv">10</span>, <span class="st">&#39;data&#39;</span>: <span class="st">&#39;Hello world 9&#39;</span>, <span class="st">&#39;ts&#39;</span>: {<span class="st">&#39;tv_sec&#39;</span>: <span class="dv">1442965633</span>, <span class="st">&#39;tv_accuracy&#39;</span>: <span class="fl">0.5</span>, <span class="st">&#39;tv_nsec&#39;</span>: 431962000L}}</code></pre></div>
 <p>So far, we saw how to read and write data by record number. However, most of the times, we are interested in the most recent record. For this, we support negative record numbers, i.e. <code>-1</code> refers to the most recent record, <code>-2</code> refers to the second most recent record, and so on.</p>
 <p>Look at <code>/lang/python/apps/reader_test.py</code> for a full example.</p>
 <h2 id="subscriptions">Subscriptions</h2>
 <p>Next, let’s see how can we subscribe to a log to get new data from a log as it gets appended. For this, we use <code>subscribe</code> method of the <code>gdp.GDP_GCL</code> instance.</p>
-<pre class="sourceCode python"><code class="sourceCode python">&gt;&gt;&gt; <span class="co"># ignore the parameters for the moment</span>
-&gt;&gt;&gt; gcl_handle.subscribe(<span class="dv">0</span>, <span class="dv">0</span>, <span class="ot">None</span>)</code></pre>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="op">&gt;&gt;&gt;</span> <span class="co"># ignore the parameters for the moment</span>
+<span class="op">&gt;&gt;&gt;</span> gcl_handle.subscribe(<span class="dv">0</span>, <span class="dv">0</span>, <span class="va">None</span>)</code></pre></div>
 <p>This subscription returns events, that we need to process in order to get notified of the data as it appears.</p>
-<pre class="sourceCode python"><code class="sourceCode python">&gt;&gt;&gt; <span class="kw">while</span> <span class="ot">True</span>:
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="op">&gt;&gt;&gt;</span> <span class="cf">while</span> <span class="va">True</span>:
 ...   <span class="co"># this blocks until there is a new event</span>
-...   event = gcl_handle.get_next_event(<span class="ot">None</span>)
+...   event <span class="op">=</span> gcl_handle.get_next_event(<span class="va">None</span>)
 ...   <span class="co"># Event is a dictionary itself.</span>
-...   <span class="kw">if</span> event[<span class="st">&quot;type&quot;</span>] == gdp.GDP_EVENT_DATA:
-...     datum = event[<span class="st">&quot;datum&quot;</span>]
-...     <span class="dt">print</span> datum
-...   <span class="kw">else</span>: 
+...   <span class="cf">if</span> event[<span class="st">&quot;type&quot;</span>] <span class="op">==</span> gdp.GDP_EVENT_DATA:
+...     datum <span class="op">=</span> event[<span class="st">&quot;datum&quot;</span>]
+...     <span class="bu">print</span> datum
+...   <span class="cf">else</span>: 
 ...     <span class="co"># we ignore other event types for simplicity</span>
-...     <span class="kw">break</span></code></pre>
+...     <span class="cf">break</span></code></pre></div>
 <p>In the above code, <code>event</code> itself is a dictionary that has <code>datum</code> as the key containing the latest data. In order to see the above code in action, open another python console (while this is running), and append some new data to the log just the way you saw above.</p>
 <p>Look at <code>/lang/python/apps/reader_test_subscribe.py</code> for a full example.</p>
 <h2 id="multiread">Multiread</h2>

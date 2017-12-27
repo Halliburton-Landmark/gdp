@@ -138,7 +138,6 @@ main(int argc, char **argv)
 	int opt;
 	EP_STAT estat;
 	char *gdpd_addr = NULL;
-	char buf[200];
 	bool show_usage = false;
 	bool make_new_key = true;
 	bool quiet = false;
@@ -288,7 +287,6 @@ main(int argc, char **argv)
 
 	if (show_usage || argc > 0)
 		usage();
-
 
 	// initialize the GDP library
 	estat = gdp_init(gdpd_addr);
@@ -632,7 +630,7 @@ main(int argc, char **argv)
 		size_t len;
 		gdp_pname_t pbuf;
 
-		gdp_printable_name(gcliname, pbuf);
+		gdp_printable_name(*gdp_gcl_getname(gcl), pbuf);
 		len = strlen(keyfile) + sizeof pbuf + 6;
 		finalkeyfile = ep_mem_malloc(len);
 		snprintf(finalkeyfile, len, "%s/%s.pem", keyfile, pbuf);
@@ -667,19 +665,34 @@ fail1:
 	// free metadata, if set
 	if (gmd != NULL)
 		gdp_gclmd_free(gmd);
+	// if tempkeyfile did not get consumed (renamed), remove it
+	if (tempkeyfile != NULL)
+	{
+		remove(tempkeyfile);
+		tempkeyfile = NULL;
+	}
 
 fail0:
+	;				// avoid compiler error
+	int exitstat;
+
+	if (EP_STAT_ISOK(estat))
+		exitstat = EX_OK;
+	else if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOROUTE))
+		exitstat = EX_NOHOST;
+	else if (EP_STAT_ISABORT(estat))
+		exitstat = EX_SOFTWARE;
+	else
+		exitstat = EX_UNAVAILABLE;
+
 	// OK status can have values; hide that from the user
 	if (EP_STAT_ISOK(estat))
 		estat = EP_STAT_OK;
-	if (!quiet)
-		fprintf(stderr, "exiting with status %s\n",
-				ep_stat_tostr(estat, buf, sizeof buf));
-	if (EP_STAT_ISOK(estat))
-		return EX_OK;
-	if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOROUTE))
-		return EX_NOHOST;
-	if (EP_STAT_ISABORT(estat))
-		return EX_SOFTWARE;
-	return EX_UNAVAILABLE;
+
+	if (!EP_STAT_ISOK(estat))
+		ep_app_message(estat, "exiting with status");
+	else if (!quiet)
+		fprintf(stderr, "Exiting with status OK\n");
+
+	return exitstat;
 }

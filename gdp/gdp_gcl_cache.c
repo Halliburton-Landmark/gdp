@@ -46,8 +46,7 @@
 #include <errno.h>
 #include <string.h>
 
-static EP_DBG	Dbg = EP_DBG_INIT("gdp.gcl.cache",
-						"GCL cache and reference counting");
+static EP_DBG	Dbg = EP_DBG_INIT("gdp.gcl.cache", "GCL cache");
 
 
 
@@ -125,7 +124,7 @@ _gdp_gcl_cache_add(gdp_gcl_t *gcl, gdp_iomode_t mode)
 	// sanity checks
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
 	EP_ASSERT_ELSE(gdp_name_is_valid(gcl->name), return);
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
 
 	ep_dbg_cprintf(Dbg, 49, "_gdp_gcl_cache_add(%p): adding\n", gcl);
 	if (EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
@@ -147,6 +146,7 @@ _gdp_gcl_cache_add(gdp_gcl_t *gcl, gdp_iomode_t mode)
 		_gdp_gcl_dump(gcl, stderr, GDP_PR_DETAILED, 0);
 		fprintf(stderr, "Existing ");
 		_gdp_gcl_dump(g2, stderr, GDP_PR_DETAILED, 0);
+		// we don't free g2 in case someone else has the pointer
 	}
 
 	// ... and the LRU list
@@ -212,7 +212,7 @@ _gdp_gcl_cache_changename(gdp_gcl_t *gcl, gdp_name_t newname)
 **		_gdp_gcl_decref(&gcl) when it is finished with it.
 **
 **		gcl is returned locked.
-*/
+*/ 
 
 gdp_gcl_t *
 _gdp_gcl_cache_get(gdp_name_t gcl_name, gdp_iomode_t mode)
@@ -274,13 +274,14 @@ void
 _gdp_gcl_cache_drop(gdp_gcl_t *gcl)
 {
 	EP_ASSERT_ELSE(gcl != NULL, return);
-	if (EP_ASSERT_TEST(GDP_GCL_ISGOOD(gcl)))
+	if (!EP_ASSERT(GDP_GCL_ISGOOD(gcl)))
 	{
 		// GCL is in some random state --- we need the name at least
+		// (this may crash)
 		EP_ASSERT_ELSE(gdp_name_is_valid(gcl->name), return);
 	}
 
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
 
 	if (!EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
 	{
@@ -321,7 +322,8 @@ _gdp_gcl_touch(gdp_gcl_t *gcl)
 	struct timeval tv;
 
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, return);
+	if (!EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex))
+		return;
 
 	if (!EP_UT_BITSET(GCLF_INCACHE, gcl->flags))
 	{
@@ -363,6 +365,7 @@ void
 _gdp_gcl_cache_reclaim(time_t maxage)
 {
 	static int headroom = 0;
+	static long maxgcls;				// maximum number of GCLs in one pass
 
 	ep_dbg_cprintf(Dbg, 68, "_gdp_gcl_cache_reclaim(maxage = %ld)\n", maxage);
 
@@ -370,7 +373,7 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 	if (headroom == 0)
 	{
 		headroom = ep_adm_getintparam("swarm.gdp.cache.fd.headroom", 0);
-		if (headroom == 0)
+		if (headroom <= 0)
 		{
 			int maxfds;
 			(void) ep_app_numfds(&maxfds);
@@ -380,11 +383,17 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 		}
 	}
 
+	if (maxgcls <= 0)
+	{
+		maxgcls = ep_adm_getlongparam("swarm.gdp.cache.reclaim.maxgcls", 100000);
+	}
+
 	for (;;)
 	{
 		struct timeval tv;
 		gdp_gcl_t *g1, *g2;
 		time_t mintime;
+		long loopcount = 0;
 
 		gettimeofday(&tv, NULL);
 		mintime = tv.tv_sec - maxage;
@@ -392,12 +401,19 @@ _gdp_gcl_cache_reclaim(time_t maxage)
 		ep_thr_mutex_lock(&GclCacheMutex);
 		for (g1 = LIST_FIRST(&GclsByUse); g1 != NULL; g1 = g2)
 		{
+			if (loopcount++ > maxgcls)
+			{
+				EP_ASSERT_PRINT("_gdp_gcl_cache_reclaim: processed %ld "
+								"GCLS (giving up)",
+							maxgcls);
+				break;
+			}
 			_gdp_gcl_lock(g1);
 			g2 = LIST_NEXT(g1, ulist);
 			if (g1->utime > mintime)
 			{
 				_gdp_gcl_unlock(g1);
-				break;
+				continue;
 			}
 			if (EP_UT_BITSET(GCLF_DROPPING, g1->flags) || g1->refcnt > 0)
 			{
@@ -464,178 +480,6 @@ _gdp_gcl_cache_shutdown(void (*shutdownfunc)(gdp_req_t *))
 		_gdp_req_freeall(&g1->reqs, shutdownfunc);
 		_gdp_gcl_freehandle(g1);
 	}
-}
-
-
-/*
-**  _GDP_GCL_LOCK --- lock a GCL
-*/
-
-void
-_gdp_gcl_lock_trace(
-		gdp_gcl_t *gcl,
-		const char *file,
-		int line,
-		const char *id)
-{
-	//XXX cheat: _ep_thr_mutex_lock is a libep-private interface
-	_ep_thr_mutex_lock(&gcl->mutex, file, line, id);
-	gcl->flags |= GCLF_ISLOCKED;
-}
-
-
-/*
-**  _GDP_GCL_UNLOCK --- unlock a GCL
-*/
-
-void
-_gdp_gcl_unlock_trace(
-		gdp_gcl_t *gcl,
-		const char *file,
-		int line,
-		const char *id)
-{
-	//XXX cheat: _ep_thr_mutex_unlock is a libep-private interface
-	gcl->flags &= ~GCLF_ISLOCKED;
-	_ep_thr_mutex_unlock(&gcl->mutex, file, line, id);
-}
-
-
-/*
-**  Check to make sure a mutex is locked / unlocked.
-*/
-
-static int
-get_lock_type(void)
-{
-	static int locktype;
-	static bool initialized = false;
-
-	if (initialized)
-		return locktype;
-
-	const char *p = ep_adm_getstrparam("libep.thr.mutex.type", "default");
-	if (strcasecmp(p, "normal") == 0)
-		locktype = EP_THR_MUTEX_NORMAL;
-	else if (strcasecmp(p, "errorcheck") == 0)
-		locktype = EP_THR_MUTEX_ERRORCHECK;
-	else if (strcasecmp(p, "recursive") == 0)
-		locktype = EP_THR_MUTEX_RECURSIVE;
-	else
-		locktype = EP_THR_MUTEX_DEFAULT;
-
-	initialized = true;
-	return locktype;
-}
-
-bool
-_gdp_mutex_check_islocked(
-		EP_THR_MUTEX *m,
-		const char *mstr,
-		const char *file,
-		int line)
-{
-	int istat;
-
-	// if we are using recursive locks, this won't tell much
-	if (get_lock_type() == EP_THR_MUTEX_RECURSIVE)
-		return true;
-
-	// trylock should fail if the mutex is already locked
-	istat = ep_thr_mutex_trylock(m);
-	if (istat != 0)
-		return true;
-
-	// oops, must have been unlocked
-	ep_thr_mutex_unlock(m);
-	ep_assert_print(file, line, "mutex %s is not locked", mstr);
-	return false;
-}
-
-
-bool
-_gdp_mutex_check_isunlocked(
-		EP_THR_MUTEX *m,
-		const char *mstr,
-		const char *file,
-		int line)
-{
-	int istat;
-
-	// anything but error checking locks?  tryunlock doesn't work
-	if (get_lock_type() != EP_THR_MUTEX_ERRORCHECK)
-		return true;
-
-	// tryunlock should fail if the mutex is not already locked
-	istat = ep_thr_mutex_tryunlock(m);
-	if (istat == EPERM)
-		return true;
-
-	// oops, must have been locked
-	ep_thr_mutex_lock(m);
-	ep_assert_print(file, line, "mutex %s is already locked", mstr);
-	return false;
-}
-
-
-/*
-**  _GDP_GCL_INCREF --- increment the reference count on a GCL
-**
-**		Must be called with GCL locked.
-*/
-
-void
-_gdp_gcl_incref(gdp_gcl_t *gcl)
-{
-	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
-
-	gcl->refcnt++;
-	_gdp_gcl_touch(gcl);
-	ep_dbg_cprintf(Dbg, 51, "_gdp_gcl_incref(%p): %d\n", gcl, gcl->refcnt);
-}
-
-
-/*
-**  _GDP_GCL_DECREF --- decrement the reference count on a GCL
-**
-**		The GCL must be locked on entry.  Upon return it will
-**		be unlocked (and possibly deallocated if the refcnt has
-**		dropped to zero.
-*/
-
-#undef _gdp_gcl_decref
-
-void
-_gdp_gcl_decref(gdp_gcl_t **gclp)
-{
-	_gdp_gcl_decref_trace(gclp, __FILE__, __LINE__, "gclp");
-}
-
-void
-_gdp_gcl_decref_trace(
-		gdp_gcl_t **gclp,
-		const char *file,
-		int line,
-		const char *id)
-{
-	gdp_gcl_t *gcl = *gclp;
-
-	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return);
-	(void) ep_thr_mutex_assert_islocked(&gcl->mutex, id, file, line);
-
-	if (gcl->refcnt > 0)
-		gcl->refcnt--;
-	else
-		ep_log(GDP_STAT_BAD_REFCNT, "_gdp_gcl_decref: %p: zero refcnt", gcl);
-	*gclp = NULL;
-
-	ep_dbg_cprintf(Dbg, 51, "_gdp_gcl_decref(%p): %d\n",
-			gcl, gcl->refcnt);
-	if (gcl->refcnt == 0 && !EP_UT_BITSET(GCLF_DEFER_FREE, gcl->flags))
-		_gdp_gcl_freehandle(gcl);
-	else if (!EP_UT_BITSET(GCLF_KEEPLOCKED, gcl->flags))
-		_gdp_gcl_unlock_trace(gcl, file, line, id);
 }
 
 

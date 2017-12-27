@@ -59,9 +59,9 @@
 #include <ep/ep.h>
 #include <ep/ep_app.h>
 #include <ep/ep_crypto.h>
-#include <ep/ep_file.h>
-#include <ep/ep_util.h>
-#include <ep/ep_symkey_gen.h>   
+#include <hs/hs_file.h>
+#include <hs/hs_util.h>
+#include <hs/hs_symkey_gen.h>   
 
 
 
@@ -381,7 +381,7 @@ main(int argc, char **argv)
 				goto fail0;
 			}
 			if( t_outlen > 16 ) t_outkey[16] = '\0'; 
-
+	
 
 			// temporary debugging 
 			ep_print_hexstr( stdout, "GenSharedKey=", 16, (uint8_t *)t_outkey );

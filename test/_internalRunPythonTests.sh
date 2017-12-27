@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Run the Python tests.
 # Usage: runPythonTests.sh logName
 #

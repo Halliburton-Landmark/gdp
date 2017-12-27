@@ -18,18 +18,25 @@ info "Installing packages needed by GDP for $OS"
 info "Updating the package database"
 case "$PKGMGR" in
     "brew")
-	brewUser=`ls -l $brew | awk '{print $3}'`
-	# Only use sudo to update brew if the brew binary is owned by root.
-	# This avoids "Cowardly refusing to 'sudo brew update'"
-	if [ "$brewUser" = "root" ]; then
-	    sudo brew update
-	else
-	    brew update
+	brew=`which brew`
+	if [ -f $brew ]; then
+		brewUser=`ls -l $brew | awk '{print $3}'`
+		# Only use sudo to update brew if the brew binary is owned by
+		# root.  This avoids "Cowardly refusing to 'sudo brew update'"
+		if [ "$brewUser" = "root" ]; then
+		    sudo brew update
+		else
+		    brew update
+		fi
 	fi
 	;;
 
     "macports")
 	sudo port selfupdate
+	;;
+
+    "brewports")
+	fatal "You must choose between Homebrew and Macports.  Macports suggested."
 	;;
 esac
 
@@ -50,7 +57,7 @@ case "$OS" in
 	package pandoc
 	if [ -e /etc/systemd/system ]
 	then
-		package systemd-dev
+		package libsystemd-dev
 	fi
 	if ! ls /etc/apt/sources.list.d/mosquitto* > /dev/null 2>&1
 	then
@@ -70,7 +77,13 @@ case "$OS" in
 	package pandoc
 	if [ "$PKGMGR" = "brew" ]
 	then
-		package mosquitto warn "Homebrew doesn't support Avahi."
+		package mosquitto
+
+		warn "Homebrew doesn't install OpenSSL in system directories."
+		info "I'll try to compensate, but it may cause linking problems."
+		info "Macports does not seem to have this problem."
+
+		warn "Homebrew doesn't support Avahi."
 		info "Avahi is used for Zeroconf (automatic client"
 		info "configuration.  Under Darwin, Avahi is difficult"
 		info "to build without editing files.  To build gdp without"

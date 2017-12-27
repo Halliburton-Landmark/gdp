@@ -55,8 +55,8 @@
 #include <ep/ep_app.h>
 #include <ep/ep_dbg.h>
 #include <ep/ep_crypto.h>
-#include <ep/ep_symkey_gen.h>   
-#include <ep/ep_util.h>   
+#include <hs/hs_symkey_gen.h>   
+#include <hs/hs_util.h>   
 
 #include <openssl/evp.h>
 #include <openssl/pem.h>

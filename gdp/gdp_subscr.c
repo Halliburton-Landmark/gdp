@@ -70,9 +70,9 @@ subscr_resub(gdp_req_t *req)
 
 	ep_dbg_cprintf(Dbg, 39, "subscr_resub: refreshing req@%p\n", req);
 	EP_ASSERT_ELSE(req != NULL, return EP_STAT_ASSERT_ABORT);
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex, );
-	EP_ASSERT_ELSE(req->gcl != NULL, );
-	EP_ASSERT_ELSE(req->cpdu != NULL, );
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex);
+	EP_ASSERT_ELSE(req->gcl != NULL, return EP_STAT_ASSERT_ABORT);
+	EP_ASSERT_ELSE(req->cpdu != NULL, return EP_STAT_ASSERT_ABORT);
 
 	req->state = GDP_REQ_ACTIVE;
 	req->cpdu->cmd = GDP_CMD_SUBSCRIBE;
@@ -162,6 +162,18 @@ subscr_poker_thread(void *chan_)
 					_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 				}
 
+				// if no GCL, it can't be a subscription
+				gdp_gcl_t *gcl = req->gcl;
+				_gdp_req_unlock(req);	// GCLs need to be locked before reqs
+				if (gcl == NULL)
+					continue;
+
+				// lock GCL, then req, then validate req
+				if (ep_thr_mutex_trylock(&gcl->mutex) != 0)
+					continue;
+				gcl->flags |= GCLF_ISLOCKED;
+				_gdp_req_lock(req);
+
 				if (!EP_UT_BITSET(GDP_REQ_CLT_SUBSCR, req->flags))
 				{
 					// not a subscription: skip this entry
@@ -184,6 +196,7 @@ subscr_poker_thread(void *chan_)
 
 				// if _gdp_invoke failed, try again at the next poke interval
 				_gdp_req_unlock(req);
+				_gdp_gcl_unlock(gcl);
 			}
 		}
 		while (!EP_STAT_ISOK(estat));
@@ -270,42 +283,5 @@ _gdp_gcl_subscribe(gdp_req_t *req,
 		}
 	}
 
-	return estat;
-}
-
-
-/*
-**  Unsubscribe all requests for a given gcl and destination.
-*/
-
-EP_STAT
-_gdp_gcl_unsubscribe(
-		gdp_gcl_t *gcl,
-		gdp_name_t dest)
-{
-	EP_STAT estat;
-	gdp_req_t *req;
-	gdp_req_t *nextreq;
-
-	do
-	{
-		estat = EP_STAT_OK;
-		for (req = LIST_FIRST(&gcl->reqs); req != NULL; req = nextreq)
-		{
-			estat = _gdp_req_lock(req);
-			EP_STAT_CHECK(estat, break);
-			nextreq = LIST_NEXT(req, gcllist);
-			if (!GDP_NAME_SAME(req->cpdu->dst, dest))
-			{
-				_gdp_req_unlock(req);
-				continue;
-			}
-
-			// remove subscription for this destination
-			EP_ASSERT_INVARIANT(req->gcl == gcl);
-			LIST_REMOVE(req, gcllist);
-			_gdp_req_free(&req);
-		}
-	} while (!EP_STAT_ISOK(estat));
 	return estat;
 }

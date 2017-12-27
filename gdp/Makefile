@@ -29,13 +29,14 @@
 # Version number of library.  All others are derived from here.
 GDP_VERSION_MAJOR=	0
 GDP_VERSION_MINOR=	7
-GDP_VERSION_PATCH=	2
+GDP_VERSION_PATCH=	3
 
 # These are generally changed on make command line
 DESTDIR=
 LOCALROOT=	/usr
 LOCAL1=		/usr/local
 LOCAL2=		/opt/local
+LOCAL3=		/usr/local/opt/openssl
 
 # These generally do not need to be changed
 INSTALLROOT=	${DESTDIR}${LOCALROOT}
@@ -81,6 +82,7 @@ OBJS_MOST=	\
 	gdp_crypto.o \
 	gdp_event.o \
 	gdp_gcl_cache.o \
+	gdp_gcl_mgmt.o \
 	gdp_gcl_ops.o \
 	gdp_gclmd.o \
 	gdp_datum.o \
@@ -91,9 +93,9 @@ OBJS_MOST=	\
 	gdp_stat.o \
 	gdp_subscr.o \
 	gdp_util.o \
-	gdp_devicekey.o \
-	gdp_logdatakey.o \
 	$(OBJS_ZC)
+#	gdp_devicekey.o \
+#	gdp_logdatakey.o \
 # hsmoon changed (add 2 line over OBJS_ZC line) 
 
 OBJS=	\
@@ -107,7 +109,7 @@ PUBHFILES=	\
 	gdp_version.h \
 	gdp_zc_client.h \
 	gdp_zc_server.h \
-	gdp_logdatakey.h \
+#	gdp_logdatakey.h \
 # hsmoon changed (add last 1 line) 
 
 PRIVHFILES=	\
@@ -115,7 +117,7 @@ PRIVHFILES=	\
 	gdp_gclmd.h \
 	gdp_pdu.h \
 	gdp_priv.h \
-	gdp_devicekey.h \
+#	gdp_devicekey.h \
 # hsmoon changed (add last 1 line) 
 
 HFILES=		${PUBHFILES} ${PRIVHFILES}
@@ -130,26 +132,29 @@ PUBALL=		${SCRIPTS} ${MANALL} ${INCALL} ${LIBALL}
 # "make all" targets (may be overlap)
 ALL=		${CLEANALL} ${PUBALL}
 
-LOCAL1=		/usr/local
-LOCAL2=		/opt/local
 INCROOT=	..
 INCSEARCH=	${INCLOCAL} \
 		-I${INCROOT} \
 		-I${LOCAL1}/include \
-		-I${LOCAL2}/include
+		-I${LOCAL2}/include \
+		-I${LOCAL3}/include
 LIBROOT=	${INCROOT}
 LIBCRYPTO=	-lcrypto
 LIBEVENT2=	-levent -levent_pthreads
 LIBAVAHI=	-lavahi-client -lavahi-common
 INCEP=		-I${INCROOT}
 LIBEP=		-lep
+LIBHS=		-lhs
 INCS=		${INCSEARCH} ${INCEP} ${INCEVENT2} ${INCAVAHI}
 LIBSEARCH=	${LIBLOCAL} \
 		-L${LIBROOT}/ep \
+		-L${LIBROOT}/hs \
 		-L${LOCAL1}/lib \
-		-L${LOCAL2}/lib
+		-L${LOCAL2}/lib \
+		-L${LOCAL3}/lib
 LDFLAGS+= 	${LIBSEARCH}
 LDLIBS=		${LIBEP} \
+		${LIBHS} \
 		${LIBEVENT2} \
 		${LIBCRYPTO} \
 		${LIBAVAHI}
@@ -194,13 +199,17 @@ ${LIBNAME}.so.${GDPLIBVER}: ${OBJS}
 ${OBJS}: ${HFILES}
 
 
-gdp_version.o: gdp_version.c ${OBJS_MOST} Makefile gdp_version.h
+gdp_version.o: gdp_version.c ${OBJS_MOST} Makefile gdp_version.h \
+		../git-version.txt
 	${CC} ${CFLAGS} \
 		-D_VERSION_INFO_="\"`sh ../adm/get-version-info.sh`\"" \
 		-c gdp_version.c
 
 gdp_version.h: gdp_version.template gdp_version.sh Makefile
 	sh gdp_version.sh ${GDP_VERSION_MAJOR} ${GDP_VERSION_MINOR} ${GDP_VERSION_PATCH}
+
+../git-version.txt:
+	../adm/get-version-info.sh > /dev/null
 
 #
 #  Administrative stuff

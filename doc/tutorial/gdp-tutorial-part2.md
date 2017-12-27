@@ -100,16 +100,24 @@ just a starting point and is not intended to be a comprehensive guide to the
 complete interface. For a more thorough API documentation, refer to
 `/lang/python/README`.
 
+## Python package installation
+
+The package `gdp` should be installed in your system path for python packages.
+Once you have the required dependencies for compilation installed, something
+like `make install-python` from the root of repository should do the trick (note
+that running with `sudo` may be required). If, however, you don't want to
+install an experimental package in your system path, and would rather keep
+everything contained to the repository tree, a simple workaround is to create a
+symlink `~/.local/lib/python2.7/site-packages/gdp` that points to
+`lang/python/gdp/` in the repository tree. 
+
 ## Appending data
 
 Let's start with a simple `Hello world` program, that writes some data to a
 pre-existing log and reads it back.
 
-We need to import the package `gdp` to begin with. It should be installed in
-your system path for python packages for this to work, however a simple
-workaround is to create a symlink `~/.local/lib/python2.7/site-packages/gdp`
-that points to `lang/python/gdp/` in your repository tree. 
-
+We need to import the package `gdp` to begin with.
+ 
 ```python
 >>> import gdp
 ```
@@ -120,7 +128,10 @@ address provided, a default value of the parameter `swarm.gdp.routers` is used
 as configured by EP library. (See README for details).
 
 ```python
+>>> # the following picks a router based on EP library configuration
 >>> gdp.gdp_init()
+>>> # For a specific router, use the following:
+>>> # gdp.gdp_init('gdp-01.eecs.berkeley.edu:8007')
 ```
 
 As mentioned earlier, we support human readable names for logs. The mechanism

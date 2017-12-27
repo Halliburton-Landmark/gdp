@@ -91,11 +91,11 @@ gcl_open(gdp_name_t gcl_name, gdp_iomode_t iomode, gdp_gcl_t **pgcl)
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// so far, so good...  do the physical open
+	_gdp_gcl_lock(gcl);
 	estat = gcl->x->physimpl->open(gcl);
 	EP_STAT_CHECK(estat, goto fail1);
 
 	// success!
-	_gdp_gcl_lock(gcl);
 	*pgcl = gcl;
 	return estat;
 
@@ -192,24 +192,4 @@ get_open_handle(gdp_req_t *req, gdp_iomode_t iomode)
 	return estat;
 }
 
-
-/*
-**  GCL_RECLAIM_RESOURCES --- find unused GCL resources and reclaim them
-**
-**		This should really also have a maximum number of GCLs to leave
-**		open so we don't run out of file descriptors under high load.
-**
-**		This implementation locks the GclsByUse list during the
-**		entire operation.  That's probably not the best idea.
-*/
-
-void
-gcl_reclaim_resources(void *null)
-{
-	// how long to leave GCLs open before reclaiming (default: 5 minutes)
-	time_t reclaim_age = ep_adm_getlongparam("swarm.gdplogd.reclaim.age",
-								300L);
-	_gdp_gcl_cache_reclaim(reclaim_age);
-	sub_reclaim_resources(_GdpChannel);
-}
 # endif // LOG_CHECK

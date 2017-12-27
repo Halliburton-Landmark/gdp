@@ -34,18 +34,19 @@ GDP_SRC_ROOT=`pwd`
 (cd util && make)
 
 : ${GDPLOGD_LOG:=$GDP_LOG_DIR/gdplogd.log}
+: ${GDP_REST_INSTALL:=false}
 
-if [ ! -x $GDP_ROOT/sbin/gdplogd -o ! -x $GDP_ROOT/sbin/gdp-rest ]
+if [ ! -x $GDP_ROOT/sbin/gdplogd ]
 then
-	warn "It appears GDP server code (gdplogd and gdp-rest) are not yet"
-	warn "installed in $GDP_ROOT/sbin.  These should be installed by"
+	warn "It appears the GDP log server (gdplogd) is not yet"
+	warn "installed in $GDP_ROOT/sbin.  It should be installed by"
 	warn "\"sudo make install\""
 	info "Press <return> to continue, ^C to abort"
 	read nothing
 fi
 
 ## be sure we're running as root
-test `whoami` = "root" || exec sudo $0 "$@"
+test `whoami` = "root" || exec sudo GDP_REST_INSTALL=$GDP_REST_INSTALL $0 "$@"
 
 info "GDP_ROOT=$GDP_ROOT"
 
@@ -141,8 +142,11 @@ cd $GDP_SRC_ROOT
 info "Installing gdplogd wrapper script"
 install -o ${GDP_USER} adm/gdplogd-wrapper.sh $GDP_ROOT/sbin
 
-info "Installing gdp-rest wrapper script"
-install -o ${GDP_USER} adm/gdp-rest-wrapper.sh $GDP_ROOT/sbin
+if $GDP_REST_INSTALL
+then
+	info "Installing gdp-rest wrapper script"
+	install -o ${GDP_USER} adm/gdp-rest-wrapper.sh $GDP_ROOT/sbin
+fi
 
 if [ -d /etc/rsyslog.d ]
 then
@@ -162,14 +166,20 @@ then
 	info "Installing and enabling systemd service files"
 	info "gdplogd.service ..."
 	adm/customize.sh adm/gdplogd.service.template /etc/systemd/system
-	info "gdp-rest.service ..."
-	adm/customize.sh adm/gdp-rest.service.template /etc/systemd/system
+	if $GDP_REST_INSTALL
+	then
+		info "gdp-rest.service ..."
+		adm/customize.sh adm/gdp-rest.service.template /etc/systemd/system
+	fi
 	systemctl daemon-reload
 	systemctl enable gdplogd
-	systemctl enable gdp-rest
-	info "Startup scripts for gdp-rest are installed, but you will"
-	info "need to configure a web server to use the SCGI interface."
-	info "See README-CAAPI.md for advice."
+	if $GDP_REST_INSTALL
+	then
+		systemctl enable gdp-rest
+		warn "Startup scripts for gdp-rest are installed, but you will"
+		warn "need to configure a web server to use the SCGI interface."
+		warn "See README-CAAPI.md for advice."
+	fi
 else
 	warn "No system initialization configured"
 fi

@@ -56,6 +56,8 @@
 #include <scgilib/scgilib.h>
 #include <event2/event.h>
 #include <jansson.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.rest", "RESTful interface to GDP");
 
@@ -64,6 +66,31 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.rest", "RESTful interface to GDP");
 const char		*GclUriPrefix;			// prefix on all REST calls
 EP_HASH			*OpenGclCache;			// cache of open GCLs
 
+gdp_gcl_open_info_t *shared_gcl_open_info;
+
+// most gcl-create parameters are available through gdp-rest
+#define GCL_C_PARAM_SERV_e		0
+#define GCL_C_PARAM_SERV_K		1
+#define GCL_C_PARAM_SERV_MAX	2
+#define GCL_C_PARAM_MAX			(GCL_C_PARAM_SERV_MAX + 7)
+
+const char *exec_gcl_create_param[GCL_C_PARAM_MAX] =
+{
+	/* 2 server controlled: */ "-e", "-K",
+	/* 7 client options:  */ "-C", "-D", "-h", "-k", "-b", "-c", "-s"
+	/* options not supported via RESTful interface: "-q" */
+};
+const char *exec_gcl_create = "/usr/bin/gcl-create";
+
+// WARNING: gdp-rest parses gcl-create text output (which will be kept stable!)
+#define GCL_C_OUT_GCL_NAME      16
+#define GCL_C_OUT_GCL_NAME_END  59
+#define GCL_C_OUT_LOGD_NAME     75
+#define GCL_C_OUT_BUF_SIZE     256 // likely output * 2, rounded up
+// gcl-create text output expectation (which will be kept stable!)
+const char *gcl_c_min_out =
+	"Created new GCL 0123456789012345678901234567890123456789012\n" //60
+	"\ton log server N\n"; // N is a variable length > 0 log server name
 
 /*
 **  LOG_ERROR --- generic error logging routine
@@ -331,6 +358,16 @@ find_query_kv(const char *key, struct qkvpair *qkvs)
 
 
 /*
+**  ERROR400 --- issue a 400 "Bad Request" error
+*/
+
+EP_STAT
+error400(scgi_request *req, const char *detail)
+{
+	return gdp_failure(req, "400", "Bad Request", "s", "detail", detail);
+}
+
+/*
 **  ERROR404 --- issue a 404 "Not Found" error
 */
 
@@ -353,6 +390,15 @@ error405(scgi_request *req, const char *detail)
 			"detail", detail);
 }
 
+/*
+**  ERROR409 --- issue a 409 "Conflict" error
+*/
+
+EP_STAT
+error409(scgi_request *req, const char *detail)
+{
+	return gdp_failure(req, "409", "Conflict", "s",	"detail", detail);
+}
 
 /*
 **  ERROR500 --- issue a 500 "Internal Server Error" error
@@ -383,74 +429,321 @@ error501(scgi_request *req, const char *detail)
 }
 
 
+/*
+**  PROCESS_GCL_CREATE_REQ --- create new GCL via gcl-create, parse stdout msg
+*/
 
-#if 0		// deleted until we have a creation service
+EP_STAT
+process_gcl_create_req(scgi_request *req, const char *gclxname,
+					   json_t *j, json_t *j_meta, size_t options_max)
+{
+	EP_STAT estat = EP_STAT_OK;
+	int opt;
+	const char *options[options_max];
+	size_t j_unprocessed;
+	size_t j_meta_unprocessed;
+	int o_pipe[2];
+	pid_t pid;
+	int status;
+	int exit_code;
+	json_t *j_temp;
+	json_t *j_resp;
+	char *jbuf;
+	char sbuf[SCGI_MAX_OUTBUF_SIZE];
+        int p;
+	
+	// mandatory gclxname json obj already processed by caller to arrive here
+	j_unprocessed = json_object_size(j) - 1;
+
+	// process name in slot zero
+	opt = 0;
+	options[opt++] = exec_gcl_create;
+		
+	// then add server controlled parameters
+	options[opt++] = exec_gcl_create_param[GCL_C_PARAM_SERV_e];
+	options[opt++] = "none";
+	options[opt++] = exec_gcl_create_param[GCL_C_PARAM_SERV_K];
+	options[opt++] = "/etc/gdp/keys";
+
+	// then add client requested options
+	for (p = GCL_C_PARAM_SERV_MAX; p < GCL_C_PARAM_MAX; p++)
+	{
+		// borrowed
+		if ((j_temp = json_object_get(j, exec_gcl_create_param[p])) != NULL)
+		{
+			options[opt++] = exec_gcl_create_param[p];
+			// borrowed
+			options[opt++] = json_string_value(j_temp);
+			if (options[opt - 1] != NULL)
+				j_unprocessed--;
+		}
+	}
+
+	// then add client optional "META" array elements
+	j_meta_unprocessed = json_array_size(j_meta);
+	if (j_meta_unprocessed > 0)
+	{
+		
+		size_t j_meta_i;
+
+		json_array_foreach(j_meta, j_meta_i, j_temp)
+		{
+			if (json_is_string(j_temp))
+			{
+				// borrowed
+				options[opt] = json_string_value(j_temp);
+				if (options[opt] != NULL && strchr(options[opt], '=') != NULL)
+				{
+					opt++;
+					j_meta_unprocessed--;
+				}
+			}
+		}
+		// json key "META" has been processed
+		j_unprocessed--;
+	}
+
+	// then add the external-name if present (implies HTTP PUT)
+	if (gclxname != NULL)
+		options[opt++] = gclxname;
+		
+	// and finally terminate the argv-style options pointer array
+	options[opt++] = NULL;
+
+	// unprocessed client content is treated as an error
+	if (j_unprocessed > 0 || j_meta_unprocessed > 0)
+	{
+		estat = error400(req, "request contains unrecognized json objects");
+		return estat;
+	}
+
+	// prep to capture child's stdout
+	if ((pipe(o_pipe)) == -1)
+	{
+		estat = error500(req, "gdp-rest pipe", errno);
+		return estat;
+	}
+
+	if ((pid = fork()) == -1)
+	{
+		estat = error500(req, "gdp-rest fork", errno);
+		close(o_pipe[STDOUT_FILENO]);
+		close(o_pipe[STDIN_FILENO]);
+		return estat;
+	}
+
+	if (pid == 0)
+	{
+		// child moves child side of pipe to own stdout
+		dup2(o_pipe[STDOUT_FILENO], STDOUT_FILENO);
+		close(o_pipe[STDOUT_FILENO]);
+		// child closes parent side of pipe
+		close(o_pipe[STDIN_FILENO]);
+		// child execv gcl-create
+		execv(exec_gcl_create, (char * const*)options);
+		// child execv launch failed
+		perror("gdp-rest execv failure");
+		exit(EXIT_FAILURE);
+	}
+
+	// parent closes child side of pipe
+	close(o_pipe[STDOUT_FILENO]);
+
+	// wait for child
+	if (waitpid(pid, &status, 0) != pid)
+	{
+		estat = error500(req, "gdp-rest waitpid", errno);
+		close(o_pipe[STDIN_FILENO]);
+		return estat;
+	}
+
+	// check child status for unexpected exits
+	if (! WIFEXITED(status) ||
+		(exit_code = WEXITSTATUS(status)) == EXIT_FAILURE)
+	{
+		estat = gdp_failure(req, "500", "Internal Server Error", "sds",
+							"detail", "gdp-rest execv gcl-create failure",
+							"status", status,
+							"request", req->body);
+		close(o_pipe[STDIN_FILENO]);
+		return estat;
+	}
+	ep_dbg_cprintf(Dbg, 5, "gdp-rest exec gcl-create exited(%d)\n", exit_code);
+	
+	if (exit_code == EX_OK)
+	{
+		ssize_t bytes;
+		char obuf[GCL_C_OUT_BUF_SIZE];
+
+		bytes = read(o_pipe[STDIN_FILENO], obuf, sizeof obuf - 1);
+		if (bytes < 0)
+		{
+			estat = error500(req, "gdp-rest pipe read", errno);
+			close(o_pipe[STDIN_FILENO]);
+			return estat;
+		}
+		obuf[bytes] = '\0';
+		ep_dbg_cprintf(Dbg, 5, "pipe read %ld bytes = {\n%s}\n", bytes, obuf);
+		if (bytes < sizeof gcl_c_min_out)
+		{
+			estat = gdp_failure(req, "500", "Internal Server Error", "ss",
+								"detail", "gdp-rest pipe read bytes",
+								"read", obuf);
+			close(o_pipe[STDIN_FILENO]);
+			return estat;
+		}
+
+		// new
+		if ((j_resp = json_object()) == NULL)
+		{
+			estat = error500(req, "gdp-rest response", ENOMEM);
+			close(o_pipe[STDIN_FILENO]);
+			return estat;
+		}
+
+		// gcl-create EX_OK output is kept stable to permit string extraction
+		obuf[GCL_C_OUT_GCL_NAME_END] = '\0'; // terminate a newline of line 1
+		obuf[bytes - 1] = '\0';	// terminate at newline of line 2
+
+		// new
+		j_temp = json_string(&obuf[GCL_C_OUT_GCL_NAME]);
+		if (j_temp == NULL)
+		{
+			estat = error500(req, "gdp-rest response gcl_name", EIO);
+			json_decref(j_resp);
+			close(o_pipe[STDIN_FILENO]);
+			return estat;
+		}
+		// steal j_temp
+		if ((json_object_set_new_nocheck(j_resp, "gcl_name", j_temp)) == -1)
+		{
+			estat = gdp_failure(req, "500", "Internal Server Error", "ss",
+								"detail", "gdp-rest response",
+								"gcl_name", &obuf[GCL_C_OUT_GCL_NAME]);
+			json_decref(j_temp);
+			json_decref(j_resp);
+			close(o_pipe[STDIN_FILENO]);
+			return estat;
+		}
+		// new
+		j_temp = json_string(&obuf[GCL_C_OUT_LOGD_NAME]);
+		if (j_temp == NULL)
+		{
+			estat = error500(req, "gdp-rest response logd_name", EIO);
+			json_decref(j_resp);
+			close(o_pipe[STDIN_FILENO]);
+			return estat;
+		}
+		// steal j_temp
+		if ((json_object_set_new_nocheck(j_resp, "gdplogd_name", j_temp)) == -1)
+		{
+			estat = gdp_failure(req, "500", "Internal Server Error", "ss",
+								"detail", "gdp-rest response",
+								"gdplogd_name", &obuf[GCL_C_OUT_LOGD_NAME]);
+			json_decref(j_temp);
+			json_decref(j_resp);
+			close(o_pipe[STDIN_FILENO]);
+			return estat;
+		}
+		// malloc
+		if ((jbuf = json_dumps(j_resp, JSON_INDENT(4))) == NULL)
+		{
+			estat = error500(req, "gdp-rest response reformat", EIO);
+			json_decref(j_resp);
+			close(o_pipe[STDIN_FILENO]);
+			return estat;
+		}
+		snprintf(sbuf, sizeof sbuf,
+				 "HTTP/1.1 201 GCL created\r\n"
+				 "Content-Type: application/json\r\n"
+				 "\r\n"
+				 "%s\r\n",
+				 jbuf);
+		write_scgi(req, sbuf);
+		free(jbuf);
+		json_decref(j_resp);
+	}
+	else if ((exit_code == EX_CANTCREAT) &&
+			 (req->request_method == SCGI_METHOD_PUT))
+		estat = error409(req, "external-name already exists on gdplogd server");
+	else if (exit_code == EX_CANTCREAT)
+		estat = error409(req, "generated-name conflict on gdplogd server");
+	else if (exit_code == EX_NOHOST)
+		estat = error400(req, "log server host not found");
+	else if (exit_code == EX_UNAVAILABLE)
+		estat = error400(req, "key length selection insecure, denied");
+	else
+		estat = gdp_failure(req, "500", "Internal Server Error", "sd",
+							"detail", "gcl-create unexpected error",
+							"exit_code", exit_code);
+
+	close(o_pipe[STDIN_FILENO]);
+	return estat;
+}
+
 
 /*
 **  A_NEW_GCL --- create new GCL
 */
 
 EP_STAT
-a_new_gcl(scgi_request *req, const char *name)
+a_new_gcl(scgi_request *req)
 {
-	gdp_gcl_t *gcl;
-	EP_STAT estat;
+	EP_STAT estat = EP_STAT_OK;
+	json_t *j;
+	const char *gclxname;
+	size_t options_max;
+	json_t *j_temp;
+	json_t *j_meta;
+	
+	ep_dbg_cprintf(Dbg, 5, "=== Create new GCL (%s)\n", req->body);
 
-	ep_dbg_cprintf(Dbg, 5, "=== Create new GCL (%s)\n",
-			name == NULL ? "NULL" : name);
-
-	if (name != NULL)
+	// new
+	if ((j = json_loads(req->body, JSON_REJECT_DUPLICATES, NULL)) == NULL)
 	{
-		gdp_name_t gclname;
-
-		gdp_parse_name(name, gclname);
-		estat = gdp_gcl_create(gclname, NULL, &gcl);
+		estat = error400(req, "request body not recognized json format");
+		return estat;
 	}
-	else
+	
+	// mandatory external-name obj, to prevent URL crawl-driven log creation
+	// borrowed
+	if ((j_temp = json_object_get(j, "external-name")) == NULL)
 	{
-		estat = gdp_gcl_create(NULL, NULL, &gcl);
-	}
-	if (EP_STAT_ISOK(estat))
-	{
-		char sbuf[SCGI_MAX_OUTBUF_SIZE];
-		const gdp_name_t *nname;
-		gdp_pname_t nbuf;
-		json_t *j = json_object();
-		char *jbuf;
-
-		// return the name of the GCL
-		nname = gdp_gcl_getname(gcl);
-		gdp_printable_name(*nname, nbuf);
-		json_object_set_nocheck(j, "gcl_name", json_string(nbuf));
-
-		jbuf = json_dumps(j, JSON_INDENT(4));
-
-		snprintf(sbuf, sizeof sbuf,
-				"HTTP/1.1 201 GCL created\r\n"
-				"Content-Type: application/json\r\n"
-				"\r\n"
-				"%s\r\n",
-				jbuf);
-		write_scgi(req, sbuf);
-
-		// clean up
+		estat = error400(req, "mandatory external-name not found");
 		json_decref(j);
-		free(jbuf);
+		return estat;
 	}
-	else if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_CONFLICT))
+	// borrowed
+	gclxname = json_string_value(j_temp);
+
+	// external-name obj value must be NULL for POST, non-NULL for PUT
+	if ((req->request_method == SCGI_METHOD_POST && gclxname != NULL) ||
+		(req->request_method == SCGI_METHOD_PUT && gclxname == NULL))
 	{
-		estat = gdp_failure(req, "409", "Conflict", "s",
-					"reason", "GCL already exists");
+		if (gclxname != NULL)
+			estat = error400(req, "POST external-name must have null value");
+		else
+			estat = error400(req, "PUT external-name must have non-null value");
+		json_decref(j);
+		return estat;
 	}
-	else
+
+	// procname + 2 * (server params + client params) + glxname + terminator
+	options_max = 1 + 2 * (GCL_C_PARAM_SERV_MAX + json_object_size(j)) + 1 + 1;
+
+	// peek at META array now, to size options array, then set aside for later
+	// borrowed
+	if (((j_meta = json_object_get(j, "META")) != NULL) &&
+		json_is_array(j_meta))
 	{
-		estat = error500(req, "cannot create GCL", errno);
+		options_max += json_array_size(j_meta);
 	}
+
+	estat = process_gcl_create_req(req, gclxname, j, j_meta, options_max);
+
+	json_decref(j);
 	return estat;
 }
-
-#endif
-
 
 /*
 **  A_SHOW_GCL --- show information about a GCL
@@ -475,27 +768,12 @@ a_append(scgi_request *req, gdp_name_t gcliname, gdp_datum_t *datum)
 
 	ep_dbg_cprintf(Dbg, 5, "=== Append value to GCL\n");
 
-	//XXX violates the principle that gdp-rest is "just an app"
-	if ((gcl = _gdp_gcl_cache_get(gcliname, GDP_MODE_AO)) == NULL)
-	{
-		estat = gdp_gcl_open(gcliname, GDP_MODE_AO, NULL, &gcl);
-	}
-	if (EP_STAT_ISOK(estat))
-	{
-		estat = gdp_gcl_append(gcl, datum);
-	}
-	if (!EP_STAT_ISOK(estat))
-	{
-		char ebuf[200];
-		gdp_pname_t gclpname;
+	estat = gdp_gcl_open(gcliname, GDP_MODE_AO, shared_gcl_open_info, &gcl);
+	EP_STAT_CHECK(estat, goto fail_open);
 
-		gdp_printable_name(gcliname, gclpname);
-		gdp_failure(req, "420", "Cannot append to GCL", "ss",
-				"GCL", gclpname,
-				"error", ep_stat_tostr(estat, ebuf, sizeof ebuf));
-		return estat;
-	}
-	else
+	estat = gdp_gcl_append(gcl, datum);
+	EP_STAT_CHECK(estat, goto fail_append);
+	
 	{
 		// success: send a response
 		char rbuf[SCGI_MAX_OUTBUF_SIZE];
@@ -503,7 +781,8 @@ a_append(scgi_request *req, gdp_name_t gcliname, gdp_datum_t *datum)
 		char *jbuf;
 		EP_TIME_SPEC ts;
 
-		json_object_set_nocheck(j, "recno", json_integer(gdp_datum_getrecno(datum)));
+		json_object_set_nocheck(j, "recno",
+								json_integer(gdp_datum_getrecno(datum)));
 		gdp_datum_getts(datum, &ts);
 		if (EP_TIME_IS_VALID(&ts))
 		{
@@ -526,6 +805,25 @@ a_append(scgi_request *req, gdp_name_t gcliname, gdp_datum_t *datum)
 		free(jbuf);
 		json_decref(j);
 	}
+
+	// finished
+	gdp_gcl_close(gcl);
+	// caller frees datum
+	return estat;
+	
+ fail_append:
+	gdp_gcl_close(gcl);
+ fail_open:
+	// caller frees datum
+	{
+		char ebuf[200];
+		gdp_pname_t gclpname;
+
+		gdp_printable_name(gcliname, gclpname);
+		gdp_failure(req, "420", "Cannot append to GCL", "ss",
+				"GCL", gclpname,
+				"error", ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
 	return estat;
 }
 
@@ -545,12 +843,12 @@ a_read_datum(scgi_request *req, gdp_name_t gcliname, gdp_recno_t recno)
 	gdp_gcl_t *gcl = NULL;
 	gdp_datum_t *datum = gdp_datum_new();
 
-	estat = gdp_gcl_open(gcliname, GDP_MODE_RO, NULL, &gcl);
-	EP_STAT_CHECK(estat, goto fail0);
+	estat = gdp_gcl_open(gcliname, GDP_MODE_RO, shared_gcl_open_info, &gcl);
+	EP_STAT_CHECK(estat, goto fail_open);
 
 	estat = gdp_gcl_read(gcl, recno, datum);
 	if (!EP_STAT_ISOK(estat))
-		goto fail0;
+		goto fail_read;
 
 	// package up the results and send them back
 	{
@@ -577,7 +875,7 @@ a_read_datum(scgi_request *req, gdp_name_t gcliname, gdp_recno_t recno)
 						"GDP-GCL-Name: %s\r\n"
 						"GDP-Record-Number: %" PRIgdp_recno "\r\n",
 						gclpname,
-						recno);
+						datum->recno);
 			gdp_datum_getts(datum, &ts);
 			if (EP_TIME_IS_VALID(&ts))
 			{
@@ -622,7 +920,10 @@ a_read_datum(scgi_request *req, gdp_name_t gcliname, gdp_recno_t recno)
 	gdp_gcl_close(gcl);
 	return estat;
 
-fail0:
+ fail_read:
+	gdp_gcl_close(gcl);
+ fail_open:
+	gdp_datum_free(datum);
 	{
 		char ebuf[200];
 		gdp_pname_t gclpname;
@@ -632,8 +933,6 @@ fail0:
 				"GCL", gclpname,
 				"reason", ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
-	if (gcl != NULL)
-		gdp_gcl_close(gcl);
 	return estat;
 }
 
@@ -708,15 +1007,15 @@ pfx_gcl(scgi_request *req, char *uri)
 
 	if (*uri == '\0')
 	{
-		// no GCL name included
+		// URI does not include a GCL name, implies GDP scoped operations
 		switch (req->request_method)
 		{
-#if 0		// deleted until we have a creation service
 		case SCGI_METHOD_POST:
+			// fall-through
+		case SCGI_METHOD_PUT:
 			// create a new GCL
-			estat = a_new_gcl(req, NULL);
+			estat = a_new_gcl(req);
 			break;
-#endif
 
 		case SCGI_METHOD_GET:
 			// XXX if no GCL name, should we print all GCLs?
@@ -725,7 +1024,8 @@ pfx_gcl(scgi_request *req, char *uri)
 
 		default:
 			// unknown URI/method
-			estat = error405(req, "only GET or POST supported for unnamed GCL");
+			estat = error405(req,
+							 "only GET, POST, or PUT supported in GDP scope");
 			break;
 		}
 	}
@@ -736,7 +1036,7 @@ pfx_gcl(scgi_request *req, char *uri)
 		// next component is the GCL id (name) in external format
 		gdp_parse_name(uri, gcliname);
 
-		// have a GCL name
+		// URI includes a GCL name, implies GCL scoped operations
 		switch (req->request_method)
 		{
 		case SCGI_METHOD_GET:
@@ -748,22 +1048,16 @@ pfx_gcl(scgi_request *req, char *uri)
 			{
 				gdp_datum_t *datum = gdp_datum_new();
 
-				gdp_buf_write(gdp_datum_getbuf(datum), req->body, req->scgi_content_length);
+				gdp_buf_write(gdp_datum_getbuf(datum), req->body,
+							  req->scgi_content_length);
 				estat = a_append(req, gcliname, datum);
 				gdp_datum_free(datum);
 			}
 			break;
 
-#if 0		// deleted until we have a creation service
-		case SCGI_METHOD_PUT:
-			// create a new named GCL
-			estat = a_new_gcl(req, uri);
-			break;
-#endif
-
 		default:
 			// unknown URI/method
-			estat = error405(req, "only GET, POST, and PUT supported for named GCL");
+			estat = error405(req, "only GET or POST supported in GCL scope");
 		}
 	}
 
@@ -1041,7 +1335,7 @@ main(int argc, char **argv, char **env)
 	bool show_usage = false;
 	extern void run_scgi_protocol(void);
 
-	while ((opt = getopt(argc, argv, "D:G:p:u:")) > 0)
+	while ((opt = getopt(argc, argv, "D:G:p:u:C:")) > 0)
 	{
 		switch (opt)
 		{
@@ -1061,6 +1355,10 @@ main(int argc, char **argv, char **env)
 			GclUriPrefix = optarg;
 			break;
 
+		case 'C':						// (development) gcl-create alternative
+			exec_gcl_create = optarg;
+			break;
+
 		default:
 			show_usage = true;
 			break;
@@ -1072,8 +1370,8 @@ main(int argc, char **argv, char **env)
 	if (show_usage || argc > 0)
 	{
 		fprintf(stderr,
-				"Usage: %s [-D dbgspec] [-G host:port] [-p port] [-u prefix]\n",
-				ep_app_getprogname());
+				"Usage: %s [-D dbgspec] [-G host:port] [-p port] [-u prefix] "
+				"[-C gcl-create]\n", ep_app_getprogname());
 		exit(EX_USAGE);
 	}
 
@@ -1082,6 +1380,7 @@ main(int argc, char **argv, char **env)
 
 	// Initialize the GDP library
 	//		Also initializes the EVENT library and starts the I/O thread
+	// Initialize shared gcl open info with caching enabled
 	{
 		EP_STAT estat = gdp_init(gdpd_addr);
 		char ebuf[100];
@@ -1091,8 +1390,17 @@ main(int argc, char **argv, char **env)
 			ep_app_abort("Cannot initialize gdp library: %s",
 					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		}
-	}
 
+		shared_gcl_open_info = gdp_gcl_open_info_new();
+		estat = gdp_gcl_open_info_set_caching(shared_gcl_open_info, true);
+
+		if (!EP_STAT_ISOK(estat))
+		{
+			ep_app_abort("Cannot initialize gdp gcl cache preference: %s",
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		}
+	}
+		
 	ep_dbg_cprintf(Dbg, 9, "GDP initialized\n");
 
 	// Initialize SCGI library

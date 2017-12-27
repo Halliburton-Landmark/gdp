@@ -316,7 +316,7 @@ cmd_create(gdp_req_t *req)
 	logd_advertise_one(gcl->name, GDP_CMD_ADVERTISE);
 
 	// cache the open GCL Handle for possible future use
-	EP_ASSERT_INSIST(gdp_name_is_valid(gcl->name));
+	EP_ASSERT(gdp_name_is_valid(gcl->name));
 	_gdp_gcl_cache_add(gcl, gcl->iomode);
 
 	// pass any creation info back to the caller
@@ -439,7 +439,7 @@ cmd_close(gdp_req_t *req)
 	}
 
 	// remove any subscriptions
-	_gdp_gcl_unsubscribe(req->gcl, req->cpdu->src);
+	sub_end_all_subscriptions(req->gcl, req->cpdu->src);
 
 	//return number of records
 	req->rpdu->datum->recno = req->gcl->nrecs;
@@ -492,9 +492,11 @@ cmd_read(gdp_req_t *req)
 	estat = req->gcl->x->physimpl->read_by_recno(req->gcl, req->rpdu->datum);
 	ep_thr_mutex_unlock(&req->rpdu->datum->mutex);
 
-	// deliver "record expired" as "not found"
+	// deliver "record expired" as "gone" and "record missing" as "not found"
 	if (EP_STAT_IS_SAME(estat, GDP_STAT_RECORD_EXPIRED))
 		estat = GDP_STAT_NAK_GONE;
+	if (EP_STAT_IS_SAME(estat, GDP_STAT_RECORD_MISSING))
+		estat = GDP_STAT_NAK_NOTFOUND;
 
 fail0:
 	_gdp_gcl_decref(&req->gcl);
@@ -728,6 +730,9 @@ cmd_append(gdp_req_t *req)
 
 		// update the server's view of the number of records
 		req->gcl->nrecs++;
+
+		// the caller might like the timestamp
+		req->rpdu->datum->ts = req->cpdu->datum->ts;
 	}
 
 	if (false)
@@ -799,33 +804,37 @@ post_subscribe(gdp_req_t *req)
 		if (EP_STAT_ISOK(estat))
 		{
 			// OK, the next record exists: send it
-			req->stat = estat = _gdp_pdu_out(req->rpdu, req->chan, NULL);
-
-			// have to clear the old data and signature
-			gdp_buf_reset(req->rpdu->datum->dbuf);
-			if (req->rpdu->datum->sig != NULL)
-				gdp_buf_reset(req->rpdu->datum->sig);
-			req->rpdu->datum->siglen = 0;
-
-			// advance to the next record
-			if (req->numrecs > 0 && --req->numrecs == 0)
-			{
-				// numrecs was positive, now zero, but zero means infinity
-				req->numrecs--;
-			}
-			req->nextrec++;
+			req->rpdu->cmd = GDP_ACK_CONTENT;
 		}
-		else if (!EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOTFOUND))
+		else if (EP_STAT_IS_SAME(estat, GDP_STAT_RECORD_MISSING))
+		{
+			req->rpdu->cmd = GDP_NAK_C_REC_MISSING;
+			estat = EP_STAT_OK;
+		}
+		else
 		{
 			// this is some error that should be logged
 			ep_log(estat, "post_subscribe: bad read");
 			req->numrecs = -1;		// terminate subscription
+			break;
 		}
-		else
+
+		// send the PDU out
+		req->stat = estat = _gdp_pdu_out(req->rpdu, req->chan, NULL);
+
+		// have to clear the old data and signature
+		gdp_buf_reset(req->rpdu->datum->dbuf);
+		if (req->rpdu->datum->sig != NULL)
+			gdp_buf_reset(req->rpdu->datum->sig);
+		req->rpdu->datum->siglen = 0;
+
+		// advance to the next record
+		if (req->numrecs > 0 && --req->numrecs == 0)
 		{
-			// shouldn't happen
-			ep_log(estat, "post_subscribe: read EOF");
+			// numrecs was positive, now zero, but zero means infinity
+			req->numrecs--;
 		}
+		req->nextrec++;
 
 		// if we didn't successfully send a record, terminate
 		EP_STAT_CHECK(estat, break);
@@ -885,7 +894,7 @@ cmd_subscribe(gdp_req_t *req)
 	EP_TIME_SPEC timeout;
 
 	if (req->gcl != NULL)
-		EP_THR_MUTEX_ASSERT_ISLOCKED(&req->gcl->mutex, );
+		EP_THR_MUTEX_ASSERT_ISLOCKED(&req->gcl->mutex);
 
 	req->rpdu->cmd = GDP_ACK_SUCCESS;
 

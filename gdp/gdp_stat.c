@@ -82,6 +82,8 @@ static struct ep_stat_to_string Stats[] =
 	{ GDP_STAT_RECORD_MISSING,			"record missing (look elsewhere)",	},
 	{ GDP_STAT_RECORD_DUPLICATED,		"record duplicated",				},
 	{ GDP_STAT_DATUM_REQUIRED,			"missing required datum",			},
+	{ GDP_STAT_CORRUPT_TIDX,			"corrupt timestamp index",			},
+	{ GDP_STAT_INVOKE_TIMEOUT,			"GDP command timeout",				},
 
 	{ GDP_STAT_NAK_BADREQ,				"400 bad request",					},
 	{ GDP_STAT_NAK_UNAUTH,				"401 unauthorized",					},
@@ -95,6 +97,7 @@ static struct ep_stat_to_string Stats[] =
 	{ GDP_STAT_NAK_PRECONFAILED,		"412 precondition failed",			},
 	{ GDP_STAT_NAK_TOOLARGE,			"413 request entity too large",		},
 	{ GDP_STAT_NAK_UNSUPMEDIA,			"415 unsupported media type",		},
+	{ GDP_STAT_NAK_MISSING_RECORD,		"430 missing record",				},
 	{ GDP_STAT_NAK_DUP_RECORD,			"431 duplicate record",				},
 
 	{ GDP_STAT_NAK_INTERNAL,			"500 internal server error",		},

@@ -131,6 +131,7 @@ do_simpleread(gdp_gcl_t *gcl,
 {
 	EP_STAT estat = EP_STAT_OK;
 	gdp_datum_t *datum = gdp_datum_new();
+	bool first_record = true;
 
 	// change the "infinity" sentinel to make the loop easier
 	if (numrecs == 0)
@@ -154,7 +155,9 @@ do_simpleread(gdp_gcl_t *gcl,
 		estat = ep_time_parse(dtstr, &ts, EP_TIME_USE_LOCALTIME);
 		if (!EP_STAT_ISOK(estat))
 		{
-			fprintf(stderr, "Cannot convert date/time string \"%s\"\n", dtstr);
+			ep_app_message(estat,
+						"Cannot convert date/time string \"%s\"",
+						dtstr);
 			goto done;
 		}
 
@@ -175,13 +178,13 @@ do_simpleread(gdp_gcl_t *gcl,
 			char nbuf[40];
 
 			strerror_r(errno, nbuf, sizeof nbuf);
-			fprintf(stderr, "*** WARNING: buffer reset failed: %s\n",
-					nbuf);
+			ep_app_warn("buffer reset failed: %s", nbuf);
 		}
 
 		// move to next record
 		recno = gdp_datum_getrecno(datum) + 1;
 		estat = gdp_gcl_read(gcl, recno, datum);
+		first_record = false;
 	}
 
 	// print the final value
@@ -190,12 +193,13 @@ do_simpleread(gdp_gcl_t *gcl,
 
 	// end of data is returned as a "not found" error: turn it into a warning
 	//    to avoid scaring the unsuspecting user
-	if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOTFOUND))
+	if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOTFOUND) && !first_record)
 		estat = EP_STAT_END_OF_FILE;
 
 done:
 	gdp_datum_free(datum);
 	return estat;
+
 }
 
 
@@ -219,40 +223,32 @@ print_event(gdp_event_t *gev, bool subscribe)
 
 	  case GDP_EVENT_EOS:
 		// "end of subscription": no more data will be returned
-		fprintf(stderr, "End of %s\n",
-				subscribe ? "Subscription" : "Multiread");
+		if (!Quiet)
+		{
+			ep_app_info("End of %s",
+					subscribe ? "Subscription" : "Multiread");
+		}
 		estat = EP_STAT_END_OF_FILE;
 		break;
 
 	  case GDP_EVENT_SHUTDOWN:
 		// log daemon has shut down, meaning we lose our subscription
-		fprintf(stderr, "%s terminating because of log daemon shutdown\n",
-				subscribe ? "Subscription" : "Multiread");
 		estat = GDP_STAT_DEAD_DAEMON;
+		ep_app_message(estat, "%s terminating because of log daemon shutdown",
+				subscribe ? "Subscription" : "Multiread");
 		break;
 
 	  case GDP_EVENT_CREATED:
-		fprintf(stderr, "Successful append, create, or similar\n");
-		break;
-
-	  case GDP_EVENT_SUCCESS:
-		fprintf(stderr, "Generic success\n");
-		break;
-
-	  case GDP_EVENT_FAILURE:
-		fprintf(stderr, "Generic failure\n");
+		ep_app_info("Successful append, create, or similar");
 		break;
 
 	  default:
-		// should be ignored, but we print it since this is a test program
-		fprintf(stderr, "Unknown event type %d\n", gdp_event_gettype(gev));
-
-		// just in case we get into some crazy loop.....
-		sleep(1);
+		// let the library handle this
+		gdp_event_print(gev, stderr, 1);
 		break;
 	}
 
-	if (!EP_STAT_ISOK(estat))
+	if (EP_STAT_ISFAIL(estat))			// ERROR or higher severity
 	{
 		char ebuf[100];
 		fprintf(stderr, "    STATUS: %s\n",
@@ -299,7 +295,8 @@ do_multiread(gdp_gcl_t *gcl,
 		estat = ep_time_parse(dtstr, &ts, EP_TIME_USE_LOCALTIME);
 		if (!EP_STAT_ISOK(estat))
 		{
-			fprintf(stderr, "Cannot convert date/time string \"%s\"\n", dtstr);
+			ep_app_message(estat, "Cannot convert date/time string \"%s\"",
+						dtstr);
 			return estat;
 		}
 	}
@@ -342,8 +339,13 @@ do_multiread(gdp_gcl_t *gcl,
 	// now start reading the events that will be generated
 	if (!use_callbacks)
 	{
+		uint32_t ndone = 0;
 		for (;;)
 		{
+			// for testing: force early termination and close
+			if (ep_dbg_test(Dbg, 127) && ++ndone >= numrecs)
+				break;
+
 			// get the next incoming event
 			gdp_event_t *gev = gdp_event_next(NULL, 0);
 
@@ -460,12 +462,7 @@ print_metadata(gdp_gcl_t *gcl)
 	return;
 
 fail0:
-	{
-		char ebuf[100];
-
-		fprintf(stderr, "Could not read metadata!\n    %s\n",
-				ep_stat_tostr(estat, ebuf, sizeof ebuf));
-	}
+	ep_app_message(estat, "Could not read metadata!");
 }
 
 void
@@ -500,9 +497,8 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	gdp_gcl_t *gcl;
+	gdp_gcl_t *gcl = NULL;
 	EP_STAT estat;
-	char buf[200];
 	gdp_name_t gclname;
 	int opt;
 	char *gdpd_addr = NULL;
@@ -607,7 +603,7 @@ main(int argc, char **argv)
 
 	if (firstrec > 0 && dtstr != NULL)
 	{
-		fprintf(stderr, "Cannot specify -f and -d\n");
+		ep_app_error("Cannot specify -f and -d");
 		exit(EX_USAGE);
 	}
 
@@ -620,7 +616,7 @@ main(int argc, char **argv)
 		ntypes++;
 	if (ntypes > 1)
 	{
-		fprintf(stderr, "Can only specify one of -a, -m, and -s\n");
+		ep_app_error("Can only specify one of -a, -m, and -s");
 		exit(EX_USAGE);
 	}
 
@@ -633,7 +629,7 @@ main(int argc, char **argv)
 		// open a log file (for timing measurements)
 		LogFile = fopen(log_file_name, "a");
 		if (LogFile == NULL)
-			fprintf(stderr, "Cannot open log file %s: %s\n",
+			ep_app_warn("Cannot open log file %s: %s",
 					log_file_name, strerror(errno));
 		else
 			setlinebuf(LogFile);
@@ -654,7 +650,7 @@ main(int argc, char **argv)
 	estat = gdp_parse_name(argv[0], gclname);
 	if (!EP_STAT_ISOK(estat))
 	{
-		ep_app_fatal("illegal GCL name syntax:\n\t%s", argv[0]);
+		ep_app_message(estat, "illegal GCL name syntax:\n\t%s", argv[0]);
 		exit(EX_USAGE);
 	}
 
@@ -671,11 +667,8 @@ main(int argc, char **argv)
 	estat = gdp_gcl_open(gclname, open_mode, NULL, &gcl);
 	if (!EP_STAT_ISOK(estat))
 	{
-		char sbuf[100];
-
-		ep_app_error("Cannot open GCL:\n    %s",
-				ep_stat_tostr(estat, sbuf, sizeof sbuf));
-		goto fail0;
+		ep_app_message(estat, "Cannot open GCL %s", argv[0]);
+		exit(EX_NOINPUT);
 	}
 
 	// if we are converting a date/time string, set the local timezone
@@ -694,26 +687,40 @@ main(int argc, char **argv)
 	else
 		estat = do_simpleread(gcl, firstrec, dtstr, numrecs);
 
-	// might as well let the GDP know we're going away
-	gdp_gcl_close(gcl);
-
 fail0:
-	if (ep_dbg_test(Dbg, 10))
+	;				// silly compiler grammar
+	int exitstat;
+
+	if (!EP_STAT_ISFAIL(estat))			// WARN or OK
+		exitstat = EX_OK;
+	else if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOROUTE))
+		exitstat = EX_NOINPUT;
+	else if (EP_STAT_ISABORT(estat))
+		exitstat = EX_SOFTWARE;
+	else
+		exitstat = EX_UNAVAILABLE;
+
+	// might as well let the GDP know we're going away
+	if (gcl != NULL)
 	{
-		// cheat here and use internal interface
-		extern void _gdp_req_pr_stats(FILE *);
-		_gdp_req_pr_stats(ep_dbg_getfile());
+		EP_STAT close_stat = gdp_gcl_close(gcl);
+		if (!EP_STAT_ISOK(close_stat))
+			ep_app_message(close_stat, "cannot close GCL");
+	}
+
+	// this sleep is to watch for any extraneous results coming back
+	if (ep_dbg_test(Dbg, 126))
+	{
+		int sleep_time = 40;
+		ep_dbg_printf("Sleeping for %d seconds\n", sleep_time);
+		while (sleep_time-- > 0)
+			ep_time_nanosleep(INT64_C(1000000000));		// one second
 	}
 
 	// might as well let the user know what's going on....
-	if (!Quiet || EP_STAT_ISFAIL(estat))
-		fprintf(stderr, "exiting after %d records with status %s\n",
-				NRead, ep_stat_tostr(estat, buf, sizeof buf));
-	if (EP_STAT_ISOK(estat))
-		return EX_OK;
-	if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOROUTE))
-		return EX_NOINPUT;
-	if (EP_STAT_ISABORT(estat))
-		return EX_SOFTWARE;
-	return EX_UNAVAILABLE;
+	if (EP_STAT_ISFAIL(estat))
+		ep_app_message(estat, "exiting after %d records", NRead);
+	else if (!Quiet)
+		fprintf(stderr, "Exiting after %d records\n", NRead);
+	return exitstat;
 }

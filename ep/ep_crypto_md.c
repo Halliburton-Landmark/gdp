@@ -128,7 +128,10 @@ ep_crypto_md_clone(EP_CRYPTO_MD *oldmd)
 		return _ep_crypto_error("cannot create cloned message digest");
 	int istat = EVP_MD_CTX_copy_ex(md, oldmd);
 	if (istat != 1)
+	{
+		EVP_MD_CTX_destroy(md);
 		return _ep_crypto_error("cannot clone message digest");
+	}
 
 	return md;
 }

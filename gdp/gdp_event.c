@@ -69,10 +69,18 @@ _gdp_event_new(gdp_event_t **gevp)
 {
 	gdp_event_t *gev = NULL;
 
-	ep_thr_mutex_lock(&FreeListMutex);
-	if ((gev = STAILQ_FIRST(&FreeList)) != NULL)
-		STAILQ_REMOVE_HEAD(&FreeList, queue);
-	ep_thr_mutex_unlock(&FreeListMutex);
+	for (;;)
+	{
+		ep_thr_mutex_lock(&FreeListMutex);
+		if ((gev = STAILQ_FIRST(&FreeList)) != NULL)
+			STAILQ_REMOVE_HEAD(&FreeList, queue);
+		ep_thr_mutex_unlock(&FreeListMutex);
+		if (gev == NULL || gev->type == _GDP_EVENT_FREE)
+			break;
+
+		// error: abandon this event
+		EP_ASSERT_PRINT("_gdp_event_new: allocated event %p on free list", gev);
+	}
 	if (gev == NULL)
 	{
 		gev = ep_mem_zalloc(sizeof *gev);
@@ -96,11 +104,16 @@ gdp_event_free(gdp_event_t *gev)
 	EP_ASSERT_POINTER_VALID(gev);
 
 	ep_dbg_cprintf(Dbg, 48, "gdp_event_free(%p)\n", gev);
+	if (gev->type == _GDP_EVENT_FREE)
+	{
+		ep_dbg_cprintf(Dbg, 1, "gdp_event_free(%p): already free\n", gev);
+		return EP_STAT_ASSERT_ABORT;
+	}
 
+	gev->type = _GDP_EVENT_FREE;
 	if (gev->datum != NULL)
 		gdp_datum_free(gev->datum);
 	gev->datum = NULL;
-	gev->type = _GDP_EVENT_FREE;
 	ep_thr_mutex_lock(&FreeListMutex);
 	STAILQ_INSERT_HEAD(&FreeList, gev, queue);
 	ep_thr_mutex_unlock(&FreeListMutex);
@@ -170,7 +183,10 @@ gdp_event_next(gdp_gcl_t *gcl, EP_TIME_SPEC *timeout)
 	}
 
 	if (gev != NULL)
+	{
+		EP_ASSERT(gev->type != _GDP_EVENT_FREE);
 		STAILQ_REMOVE(&ActiveList, gev, gdp_event, queue);
+	}
 fail0:
 	ep_thr_mutex_unlock(&ActiveListMutex);
 
@@ -194,6 +210,11 @@ _gdp_event_trigger(gdp_event_t *gev)
 	ep_dbg_cprintf(Dbg, 48,
 			"_gdp_event_trigger: adding event %p (%d) to %s list\n",
 			gev, gev->type, gev->cb == NULL ? "active" : "callback");
+	if (gev->type == _GDP_EVENT_FREE)
+	{
+		ep_dbg_cprintf(Dbg, 1, "_gdp_event_trigger(%p): event is free\n", gev);
+		return;
+	}
 
 	if (gev->cb == NULL)
 	{
@@ -265,7 +286,8 @@ _gdp_event_thread(void *ctx)
 		EP_ASSERT(gev->type != _GDP_EVENT_FREE);
 
 		// now invoke it
-		(*gev->cb)(gev);
+		if (gev->cb != NULL)
+			(*gev->cb)(gev);
 
 		// don't forget to clean up (unless it's already free)
 		if (gev->type != _GDP_EVENT_FREE)
@@ -343,6 +365,10 @@ _gdp_event_add_from_req(gdp_req_t *req)
 		req->flags &= ~GDP_REQ_PERSIST;
 		break;
 
+	  case GDP_NAK_C_REC_MISSING:
+		evtype = GDP_EVENT_MISSING;
+		break;
+
 	  default:
 		if (req->rpdu->cmd >= GDP_ACK_MIN && req->rpdu->cmd <= GDP_ACK_MAX)
 		{
@@ -401,12 +427,16 @@ _gdp_event_add_from_req(gdp_req_t *req)
 void
 gdp_event_print(const gdp_event_t *gev, FILE *fp, int detail)
 {
+	gdp_recno_t recno = -1;
 	char ebuf[100];
 
 	if (detail > GDP_PR_BASIC + 1)
 		fprintf(fp, "Event type %d, udata %p, stat %s\n",
 				gev->type, gev->udata,
 				ep_stat_tostr(gev->stat, ebuf, sizeof ebuf));
+
+	if (gev->datum != NULL)
+		recno = gev->datum->recno;
 
 	switch (gev->type)
 	{
@@ -443,9 +473,15 @@ gdp_event_print(const gdp_event_t *gev, FILE *fp, int detail)
 					ep_stat_tostr(gev->stat, ebuf, sizeof ebuf));
 		break;
 
+	  case GDP_EVENT_MISSING:
+		fprintf(fp, "    Record %" PRIgdp_recno " missing\n",
+				recno);
+		break;
+
 	  default:
 		if (detail > 0)
-			fprintf(fp, "    Unknown event type %d\n", gev->type);
+			fprintf(fp, "    Unknown event type %d: %s\n",
+					gev->type, ep_stat_tostr(gev->stat, ebuf, sizeof ebuf));
 		break;
 	}
 }

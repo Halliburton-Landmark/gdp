@@ -107,11 +107,19 @@ typedef enum
 
 /*
 **  GCL Metadata keys
+**
+**		Although defined as integers, by convention metadata keys are
+**		four ASCII characters, kind of like a file extension.  By further
+**		convention, those with fewer than four non-zero characters are
+**		system defined and may have semantics built in.  Names that are
+**		four characters are reserved for user applications.  Names with
+**		zero bytes in the middle are probably a bad idea, albeit legal.
 */
 
 #define GDP_GCLMD_XID		0x00584944	// XID (external id)
 #define GDP_GCLMD_PUBKEY	0x00505542	// PUB (public key)
 #define GDP_GCLMD_CTIME		0x0043544D	// CTM (creation time)
+#define GDP_GCLMD_EXPIRE	0x0058544D	// XTM (expiration date/time)
 #define GDP_GCLMD_CID		0x00434944	// CID (creator id)
 #define GDP_GCLMD_SYNTAX	0x0053594E	// SYN (data syntax: json, xml, etc.)
 #define GDP_GCLMD_LOCATION	0x004C4F43	// LOC (location: lat/long)
@@ -136,12 +144,13 @@ typedef struct gdp_event	gdp_event_t;
 
 // event types
 #define _GDP_EVENT_FREE		0	// internal use: event is free
-#define GDP_EVENT_DATA		1	// returned data
-#define GDP_EVENT_EOS		2	// normal end of subscription
-#define GDP_EVENT_SHUTDOWN	3	// subscription terminating because of shutdown
-#define GDP_EVENT_CREATED	4	// successful append, create, or other similar
-#define GDP_EVENT_SUCCESS	5	// generic asynchronous success status
-#define GDP_EVENT_FAILURE	6	// generic asynchronous failure status
+#define GDP_EVENT_DATA		1	// 205 returned data
+#define GDP_EVENT_EOS		2	// 205 normal end of subscription
+#define GDP_EVENT_SHUTDOWN	3	// 515 subscription terminating because of shutdown
+#define GDP_EVENT_CREATED	4	// 201 successful append, create, or similar
+#define GDP_EVENT_SUCCESS	5	// 200 generic asynchronous success status
+#define GDP_EVENT_FAILURE	6	//     generic asynchronous failure status
+#define GDP_EVENT_MISSING	7	// 430 record is missing
 
 extern gdp_event_t		*gdp_event_next(		// get event (caller must free!)
 							gdp_gcl_t *gcl,			// if set wait for this GCL only
@@ -355,6 +364,20 @@ void				gdp_gcl_open_info_free(
 EP_STAT				gdp_gcl_open_info_set_signing_key(
 						gdp_gcl_open_info_t *info,
 						EP_CRYPTO_KEY *skey);
+
+// set the signing callback function
+EP_STAT				gdp_gcl_open_info_set_signkey_cb(
+						gdp_gcl_open_info_t *info,
+						EP_STAT (*signkey_cb)(
+							gdp_name_t gname,
+							void *signkey_udata,
+							EP_CRYPTO_KEY **skey),
+						void *signkey_udata);
+
+// set the caching behavior
+EP_STAT				gdp_gcl_open_info_set_caching(
+						gdp_gcl_open_info_t *info,
+						bool keep_in_cache);
 
 /*
 **  Metadata handling

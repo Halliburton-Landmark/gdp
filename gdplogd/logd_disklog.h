@@ -310,5 +310,6 @@ struct physinfo
 };
 
 #define LOG_TIDX_HIDEFAILURE	0x00000001	// abandon a corrupt tidx database
+#define LOG_POSIX_ERRORS		0x00000002	// send posix errors to syslog
 
 #endif //_GDPLOGD_DISKLOG_H_

@@ -16,10 +16,13 @@ Debian package.  Since you are reading this, you presumably already
 have the source code.  If not, you can get the GDP source distribution
 using one of the following commands:
 
+	git clone git://repo.eecs.berkeley.edu/projects/swarmlab/gdp.git
 	git clone https://repo.eecs.berkeley.edu/git/projects/swarmlab/gdp.git
 	git clone repoman@repo.eecs.berkeley.edu:projects/swarmlab/gdp.git
 
-The second is only available if you have registered your public
+The first form gives you public, read-only access, while the other
+two require that you have an account on the EECS repository.
+The third is only available if you have registered your public
 ssh key with `repo.eecs.berkeley.edu`.
 
 At the moment, compiles work on many platforms, including Debian,

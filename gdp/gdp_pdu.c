@@ -646,7 +646,7 @@ _gdp_pdu_in(gdp_pdu_t *pdu, gdp_chan_t *chan)
 	// the entire PDU is now in ibuf
 
 	// now drain the data we have processed
-	EP_ASSERT_INSIST(_GDP_PDU_FIXEDHDRSZ + pdu->olen <= _GDP_PDU_MAXHDRSZ);
+	EP_ASSERT(_GDP_PDU_FIXEDHDRSZ + pdu->olen <= _GDP_PDU_MAXHDRSZ);
 	sz = gdp_buf_read(ibuf, pbuf, _GDP_PDU_FIXEDHDRSZ + pdu->olen);
 	if (sz < _GDP_PDU_FIXEDHDRSZ + pdu->olen)
 	{

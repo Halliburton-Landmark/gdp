@@ -147,6 +147,8 @@ If the GDP version number in ../../gdp/gdp_version.h changes, the make the follo
 
 4. Run make all_noavahi
 
+Or, see accessors/web/gdp/adm/gdpUpdatePtII.sh in
+the accessors repo.  See https://www.icyphy.org/accessors/svn.html 
 
 Install the npm @terrswarm/gdp package on the npm server.
 ========================================================

@@ -1,0 +1,815 @@
+/* vim: set ai sw=4 sts=4 ts=4 : */
+
+/*
+**  GDP-READER --- read and prints the encrypted records from a GCL
+**
+**		This makes the naive assumption that all data values are ASCII
+**		text.  Ultimately they should all be encrypted, but for now
+**		I wanted to keep the code simple.
+**
+**		Unfortunately it isn't that simple, since it is possible to read
+**		using all the internal mechanisms.  The -c, -m, and -s flags
+**		control which approach is being used.
+**
+**		There are two ways of reading.  The first is to get individual
+**		records in a loop (as implemented in do_simpleread), and the
+**		second is to request a batch of records (as implemented in
+**		do_multiread); these are returned as events that are collected
+**		after the initial command completes or as callbacks that are
+**		invoked in a separate thread.  There are two interfaces for the
+**		event/callback techniques; one only reads existing data, and the
+**		other ("subscriptions") will wait for data to be appended by
+**		another client.
+**
+**	----- BEGIN LICENSE BLOCK -----
+**	Applications for the Global Data Plane
+**	From the Ubiquitous Swarm Lab, 490 Cory Hall, U.C. Berkeley.
+**
+**	Copyright (c) 2015-2017, Regents of the University of California.
+**	All rights reserved.
+**
+**	Permission is hereby granted, without written agreement and without
+**	license or royalty fees, to use, copy, modify, and distribute this
+**	software and its documentation for any purpose, provided that the above
+**	copyright notice and the following two paragraphs appear in all copies
+**	of this software.
+**
+**	IN NO EVENT SHALL REGENTS BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT,
+**	SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST
+**	PROFITS, ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION,
+**	EVEN IF REGENTS HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+**
+**	REGENTS SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT
+**	LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+**	FOR A PARTICULAR PURPOSE. THE SOFTWARE AND ACCOMPANYING DOCUMENTATION,
+**	IF ANY, PROVIDED HEREUNDER IS PROVIDED "AS IS". REGENTS HAS NO
+**	OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS,
+**	OR MODIFICATIONS.
+**	----- END LICENSE BLOCK -----
+*/
+
+/*
+** This function is slightly modified from the existing gdp-reader.c.
+** The modification is about read filter to decrypt the encrypted log record. 
+**
+** modified by Hwa Shin Moon, ETRI (angela.moon@berkeley.edu, hsmoon@etri.re.kr)
+** Last modified at 2016.12.31. 
+*/
+
+
+#include <ep/ep.h>
+#include <ep/ep_dbg.h>
+#include <ep/ep_app.h>
+#include <ep/ep_time.h>
+#include <gdp/gdp.h>
+#include <event2/buffer.h>
+
+#include <unistd.h>
+#include <errno.h>
+#include <errno.h>
+#include <getopt.h>
+#include <string.h>
+#include <sysexits.h>
+
+// hsmoon
+#include "kdc_api.h"
+
+
+static EP_DBG	Dbg = EP_DBG_INIT("gdp-reader", "GDP Reader Application");
+
+#ifndef USE_GETDATE
+# define USE_GETDATE		1
+#endif
+
+
+
+/*
+**  DO_LOG --- log a timestamp (for performance checking).
+*/
+
+FILE	*LogFile = NULL;
+bool	TextData = false;		// set if data should be displayed as text
+bool	PrintSig = false;		// set if signature should be printed
+bool	Quiet = false;			// don't print metadata
+int		NRead = 0;				// number of datums read
+
+
+
+// LATEST KEY INFO 
+static EP_THR_MUTEX			keyMutex;
+static rKey_info			curKey;
+/*
+static struct sym_rkey		curKey;
+static int					cur_seqn = 0;
+static int					pre_seqn = 0;
+static EP_TIME_SPEC			key_time;
+*/
+
+
+void
+do_log(const char *tag)
+{
+	struct timeval tv;
+
+	if (LogFile == NULL)
+		return;
+	gettimeofday(&tv, NULL);
+	fprintf(LogFile, "%s %ld.%06ld\n", tag, tv.tv_sec, (long) tv.tv_usec);
+}
+
+#define LOG(tag)	{ if (LogFile != NULL) do_log(tag); }
+
+/*
+**  PRINTDATUM --- just print out a datum
+*/
+
+void
+printdatum(gdp_datum_t *datum, FILE *fp)
+{
+	uint32_t prflags = 0;
+
+	// logging for simple performance testing
+	LOG("R");
+
+	if (TextData)
+		prflags |= GDP_DATUM_PRTEXT;
+	if (PrintSig)
+		prflags |= GDP_DATUM_PRSIG;
+	if (Quiet)
+		prflags |= GDP_DATUM_PRQUIET;
+	flockfile(fp);
+	if (!Quiet)
+		fprintf(fp, " >>> ");
+	gdp_datum_print(datum, fp, prflags);
+	funlockfile(fp);
+	NRead++;
+}
+
+
+/*
+**  DO_SIMPLEREAD --- read from a GCL using the one-record-at-a-time call
+*/
+
+EP_STAT
+do_simpleread(gdp_gcl_t *gcl,
+		gdp_recno_t firstrec,
+		const char *dtstr,
+		int numrecs)
+{
+	EP_STAT estat = EP_STAT_OK;
+	gdp_datum_t *datum = gdp_datum_new();
+
+	// change the "infinity" sentinel to make the loop easier
+	if (numrecs == 0)
+		numrecs = -1;
+
+	// can't start reading before first record (but negative makes sense)
+	if (firstrec == 0)
+		firstrec = 1;
+
+	// are we reading by record number or by timestamp?
+	if (dtstr == NULL)
+	{
+		// record number
+		estat = gdp_gcl_read(gcl, firstrec, datum);
+	}
+	else
+	{
+		// timestamp
+		EP_TIME_SPEC ts;
+
+		estat = ep_time_parse(dtstr, &ts, EP_TIME_USE_LOCALTIME);
+		if (!EP_STAT_ISOK(estat))
+		{
+			fprintf(stderr, "Cannot convert date/time string \"%s\"\n", dtstr);
+			goto done;
+		}
+
+		estat = gdp_gcl_read_ts(gcl, &ts, datum);
+	}
+
+	// start reading data, one record at a time
+	while (EP_STAT_ISOK(estat) && (numrecs < 0 || --numrecs > 0))
+	{
+		gdp_recno_t recno;
+
+		// print the previous value
+		printdatum(datum, stdout);
+
+		// flush any left over data
+		if (gdp_buf_reset(gdp_datum_getbuf(datum)) < 0)
+		{
+			char nbuf[40];
+
+			strerror_r(errno, nbuf, sizeof nbuf);
+			fprintf(stderr, "*** WARNING: buffer reset failed: %s\n",
+					nbuf);
+		}
+
+		// move to next record
+		recno = gdp_datum_getrecno(datum) + 1;
+		estat = gdp_gcl_read(gcl, recno, datum);
+	}
+
+	// print the final value
+	if (EP_STAT_ISOK(estat))
+		printdatum(datum, stdout);
+
+	// end of data is returned as a "not found" error: turn it into a warning
+	//    to avoid scaring the unsuspecting user
+	if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOTFOUND))
+		estat = EP_STAT_END_OF_FILE;
+
+done:
+	gdp_datum_free(datum);
+	return estat;
+}
+
+
+/*
+**  Multiread and Subscriptions.
+*/
+
+EP_STAT
+print_event(gdp_event_t *gev, bool subscribe)
+{
+	EP_STAT estat = gdp_event_getstat(gev);
+
+	// decode it
+	switch (gdp_event_gettype(gev))
+	{
+	  case GDP_EVENT_DATA:
+		// this event contains a data return
+		LOG("S");
+		printdatum(gdp_event_getdatum(gev), stdout);
+		break;
+
+	  case GDP_EVENT_EOS:
+		// "end of subscription": no more data will be returned
+		fprintf(stderr, "End of %s\n",
+				subscribe ? "Subscription" : "Multiread");
+		estat = EP_STAT_END_OF_FILE;
+		break;
+
+	  case GDP_EVENT_SHUTDOWN:
+		// log daemon has shut down, meaning we lose our subscription
+		fprintf(stderr, "%s terminating because of log daemon shutdown\n",
+				subscribe ? "Subscription" : "Multiread");
+		estat = GDP_STAT_DEAD_DAEMON;
+		break;
+
+	  case GDP_EVENT_CREATED:
+		fprintf(stderr, "Successful append, create, or similar\n");
+		break;
+
+	  case GDP_EVENT_SUCCESS:
+		fprintf(stderr, "Generic success\n");
+		break;
+
+	  case GDP_EVENT_FAILURE:
+		fprintf(stderr, "Generic failure\n");
+		break;
+
+	  default:
+		// should be ignored, but we print it since this is a test program
+		fprintf(stderr, "Unknown event type %d\n", gdp_event_gettype(gev));
+
+		// just in case we get into some crazy loop.....
+		sleep(1);
+		break;
+	}
+
+	if (!EP_STAT_ISOK(estat))
+	{
+		char ebuf[100];
+		fprintf(stderr, "    STATUS: %s\n",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
+	return estat;
+}
+
+
+void
+multiread_cb(gdp_event_t *gev)
+{
+	(void) print_event(gev, false);
+	gdp_event_free(gev);
+}
+
+
+/*
+**  DO_MULTIREAD --- subscribe or multiread
+**
+**		This routine handles calls that return multiple values via the
+**		event interface.  They might include subscriptions.
+*/
+
+EP_STAT
+do_multiread(gdp_gcl_t *gcl,
+		gdp_recno_t firstrec,
+		const char *dtstr,
+		int32_t numrecs,
+		bool subscribe,
+		bool use_callbacks)
+{
+	EP_STAT estat;
+	void (*cbfunc)(gdp_event_t *) = NULL;
+	EP_TIME_SPEC ts;
+
+	if (use_callbacks)
+		cbfunc = multiread_cb;
+
+	// are we reading by record number or by timestamp?
+	if (dtstr != NULL)
+	{
+		// timestamp
+		estat = ep_time_parse(dtstr, &ts, EP_TIME_USE_LOCALTIME);
+		if (!EP_STAT_ISOK(estat))
+		{
+			fprintf(stderr, "Cannot convert date/time string \"%s\"\n", dtstr);
+			return estat;
+		}
+	}
+
+	if (subscribe)
+	{
+		// start up a subscription
+		if (dtstr == NULL)
+			estat = gdp_gcl_subscribe(gcl, firstrec, numrecs, NULL, cbfunc, NULL);
+		else
+			estat = gdp_gcl_subscribe_ts(gcl, &ts, numrecs, NULL, cbfunc, NULL);
+	}
+	else
+	{
+		// make the flags more user-friendly
+		if (firstrec == 0)
+			firstrec = 1;
+
+		// start up a multiread
+		if (dtstr == NULL)
+			estat = gdp_gcl_multiread(gcl, firstrec, numrecs, cbfunc, NULL);
+		else
+			estat = gdp_gcl_multiread_ts(gcl, &ts, numrecs, cbfunc, NULL);
+	}
+
+	// check to make sure the subscribe/multiread succeeded; if not, bail
+	if (!EP_STAT_ISOK(estat))
+	{
+		char ebuf[200];
+
+		ep_app_fatal("Cannot %s:\n\t%s",
+				subscribe ? "subscribe" : "multiread",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
+
+	// this sleep will allow multiple results to appear before we start reading
+	if (ep_dbg_test(Dbg, 100))
+		ep_time_nanosleep(500000000);	//DEBUG: one half second
+
+	// now start reading the events that will be generated
+	if (!use_callbacks)
+	{
+		for (;;)
+		{
+			// get the next incoming event
+			gdp_event_t *gev = gdp_event_next(NULL, 0);
+
+			// print it
+			estat = print_event(gev, subscribe);
+
+			// don't forget to free the event!
+			gdp_event_free(gev);
+
+			EP_STAT_CHECK(estat, break);
+		}
+	}
+	else
+	{
+		// hang for an hour waiting for events
+		sleep(3600);
+	}
+
+	return estat;
+}
+
+
+/*
+**  DO_ASYNC_READ --- read asynchronously
+*/
+
+EP_STAT
+do_async_read(gdp_gcl_t *gcl,
+		gdp_recno_t firstrec,
+		int32_t numrecs,
+		bool use_callbacks)
+{
+	EP_STAT estat = EP_STAT_OK;
+	gdp_event_cbfunc_t cbfunc = NULL;
+
+	if (use_callbacks)
+		cbfunc = multiread_cb;
+
+	// make the flags more user-friendly
+	if (firstrec == 0)
+		firstrec = 1;
+	if (numrecs <= 0)
+		numrecs = gdp_gcl_getnrecs(gcl);
+	if (firstrec < 0)
+	{
+		firstrec += numrecs + 1;
+		numrecs -= firstrec - 1;
+	}
+
+	// issue the multiread commands without reading results
+	gdp_recno_t recno = firstrec;
+	int n = 0;
+	while (EP_STAT_ISOK(estat) && n++ < numrecs)
+	{
+		estat = gdp_gcl_read_async(gcl, recno, cbfunc, NULL);
+		if (!EP_STAT_ISOK(estat))
+		{
+			char ebuf[100];
+			ep_app_error("async_read: gdp_gcl_read_async error:\n\t%s",
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		}
+		else
+		{
+			recno++;
+		}
+	}
+
+	// this sleep will allow multiple results to appear before we start reading
+	if (ep_dbg_test(Dbg, 100))
+		ep_time_nanosleep(500000000);	//DEBUG: one half second
+
+	// now start reading the events that will be generated
+	if (!use_callbacks)
+	{
+		for (n = 0; n < numrecs; n++)
+		{
+			// get the next incoming event
+			gdp_event_t *gev = gdp_event_next(NULL, 0);
+
+			// print it
+			estat = print_event(gev, false);
+
+			// don't forget to free the event!
+			gdp_event_free(gev);
+
+			//EP_STAT_CHECK(estat, break);
+		}
+	}
+	else
+	{
+		// hang for an minute waiting for events
+		sleep(60);
+	}
+
+	return estat;
+}
+
+
+/*
+**  PRINT_METADATA --- get and print the metadata
+*/
+
+void
+print_metadata(gdp_gcl_t *gcl)
+{
+	EP_STAT estat;
+	gdp_gclmd_t *gmd;
+
+	estat = gdp_gcl_getmetadata(gcl, &gmd);
+	EP_STAT_CHECK(estat, goto fail0);
+
+	gdp_gclmd_print(gmd, stdout, 5);
+	gdp_gclmd_free(gmd);
+	return;
+
+fail0:
+	{
+		char ebuf[100];
+
+		fprintf(stderr, "Could not read metadata!\n    %s\n",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
+}
+
+void
+usage(void)
+{
+	fprintf(stderr,
+			"Usage: %s [-a] [-c] [-d datetime] [-D dbgspec] [-f firstrec]\n"
+			"  [-G router_addr] [-m] [-L logfile] [-M] [-n nrecs]\n"
+			"  [-s] [-t] [-v] log_name\n"
+			"    -a  read asynchronously\n"
+			"    -c  use callbacks\n"
+			"    -d  first date/time to read from\n"
+			"    -D  turn on debugging flags\n"
+			"    -f  first record number to read (from 1)\n"
+			"    -G  IP host to contact for gdp_router\n"
+			"    -L  set logging file name (for debugging)\n"
+			"    -m  use multiread\n"
+			"    -M  show log metadata\n"
+			"    -n  set number of records to read (default all)\n"
+			"    -q  be quiet (don't print any metadata)\n"
+			"    -s  subscribe to this log\n"
+			"    -t  print data as text (instead of hexdump)\n"
+			"    -v  print verbose output (include signature)\n",
+			ep_app_getprogname());
+	exit(EX_USAGE);
+}
+
+char							*ks_pname	= NULL;
+gdp_gcl_t						*ksgcl		= NULL;
+gdp_gcl_t						*gcl		= NULL;
+
+void exit_handler( void ) 
+{
+	if( ks_pname!= NULL )	ep_mem_free( ks_pname );
+	if( ksgcl	!= NULL )	kdc_gcl_close( ksgcl, 'S' );
+	if( gcl		!= NULL )	gdp_gcl_close( gcl );
+	if( LogFile	!= NULL )	fclose( LogFile );
+
+	kdc_exit( );
+	free_logkeymodule( ); 
+}
+
+
+/*
+**  MAIN --- the name says it all
+*/
+
+int
+main(int argc, char **argv)
+{
+	int								opt, len;
+	char							buf[200];
+	EP_STAT							estat, estat1;
+
+	gdp_name_t						gclname;
+	gdp_name_t						ks_gcliname;
+
+	bool							async			= false;
+	bool							subscribe		= false;
+	bool							multiread		= false;
+	bool							use_callbacks	= false;
+	bool							show_usage		= false;
+	bool							showmetadata	= false;
+	char							*log_file_name	= NULL;
+
+	char							*gdpd_addr		= NULL;
+	const char						*dtstr			= NULL;
+	gdp_iomode_t					open_mode		= GDP_MODE_RO;
+	int32_t							numrecs			= 0;
+	gdp_recno_t						firstrec		= 0;
+
+
+	setlinebuf(stdout);								//DEBUG
+
+
+	// parse command-line options
+	while ((opt = getopt(argc, argv, "aAcd:D:f:G:L:mMn:qstv")) > 0)
+	{
+		switch (opt)
+		{
+		  case 'A':				// hidden flag for debugging only
+			open_mode = GDP_MODE_RA;
+			break;
+
+		  case 'a':
+			// do asynchronous read
+			async = true;
+			break;
+
+		  case 'c':
+			// use callbacks
+			use_callbacks = true;
+			break;
+
+		  case 'd':
+			dtstr = optarg;
+			break;
+
+		  case 'D':
+			// turn on debugging
+			ep_dbg_set(optarg);
+			break;
+
+		  case 'f':
+			// select the first record
+			firstrec = atol(optarg);
+			break;
+
+		  case 'G':
+			// set the port for connecting to the GDP daemon
+			gdpd_addr = optarg;
+			break;
+
+		  case 'L':
+			log_file_name = optarg;
+			break;
+
+		  case 'm':
+			// turn on multi-read (see also -s)
+			multiread = true;
+			break;
+
+		  case 'M':
+			showmetadata = true;
+			break;
+
+		  case 'n':
+			// select the number of records to be returned
+			numrecs = atol(optarg);
+			break;
+
+		  case 'q':
+			// be quiet (don't print metadata)
+			Quiet = true;
+			break;
+
+		  case 's':
+			// subscribe to this GCL (see also -m)
+			subscribe = true;
+			break;
+
+		  case 't':
+			// print data as text
+			TextData = true;
+			break;
+
+		  case 'v':
+			PrintSig = true;
+			break;
+
+		  default:
+			show_usage = true;
+			break;
+		}
+	}
+	argc -= optind;
+	argv += optind;
+
+	if (firstrec > 0 && dtstr != NULL)
+	{
+		fprintf(stderr, "Cannot specify -f and -d\n");
+		exit(EX_USAGE);
+	}
+
+	int ntypes = 0;
+	if (async)
+		ntypes++;
+	if (multiread)
+		ntypes++;
+	if (subscribe)
+		ntypes++;
+	if (ntypes > 1)
+	{
+		fprintf(stderr, "Can only specify one of -a, -m, and -s\n");
+		exit(EX_USAGE);
+	}
+
+	// we require a GCL name
+	if (show_usage || argc <= 0)
+		usage();
+
+	if (log_file_name != NULL)
+	{
+		// open a log file (for timing measurements)
+		LogFile = fopen(log_file_name, "a");
+		if (LogFile == NULL)
+			fprintf(stderr, "Cannot open log file %s: %s\n",
+					log_file_name, strerror(errno));
+		else
+			setlinebuf(LogFile);
+	}
+
+	// initialize the GDP library
+	estat = gdp_init(gdpd_addr);
+	if (!EP_STAT_ISOK(estat))
+	{
+		ep_app_error("GDP Initialization failed");
+		goto fail0;
+	}
+	kdc_init( );
+	ep_thr_mutex_init(		&keyMutex, EP_THR_MUTEX_DEFAULT );
+	ep_thr_mutex_setorder(	&keyMutex, KDS_MUTEX_LORDER_SKEY ); 
+
+
+	// allow thread to settle to avoid interspersed debug output
+	ep_time_nanosleep(INT64_C(100000000));		// 100 msec
+
+
+	// parse the name (either base64-encoded or symbolic)
+	len		= strlen( argv[0] ); 
+	ks_pname = ep_mem_malloc( len + 4 );
+	sprintf( ks_pname, "KS_%s", argv[0] );
+	ks_pname[len+3] = '\0'; 
+
+	ep_dbg_printf( "[INFO] GCL handle for %s, %s \n", 
+							argv[0], ks_pname );
+
+	estat	= gdp_parse_name(argv[0], gclname);
+	estat1	= gdp_parse_name( ks_pname, ks_gcliname);
+
+
+	if (!EP_STAT_ISOK(estat) || !EP_STAT_ISOK(estat1) )
+	{
+		ep_app_fatal("illegal GCL name syntax:\n\t%s : %s", 
+						argv[0], ks_pname);
+		ep_mem_free( ks_pname );
+		exit(EX_USAGE);
+	}
+
+
+	atexit(&exit_handler);
+
+
+	//
+	// Interaction with KSD 
+	//
+	estat = kdc_gcl_open( ks_gcliname, GDP_MODE_RO, &ksgcl, 'S' );
+	EP_STAT_CHECK(estat, goto fail0);
+	curKey.ks_gcl = ksgcl;
+
+	// read the latest key 
+	ep_thr_mutex_lock( &keyMutex );
+	estat = kdc_get_latestKey( ksgcl, &(curKey.rKey), &(curKey.cur_seqn), 
+									&(curKey.pre_seqn), &(curKey.key_time) );
+	ep_thr_mutex_unlock( &keyMutex );
+	EP_STAT_CHECK(estat, goto fail0);
+
+	// if necessary, read key with synchronous call. 
+
+
+	// convert it to printable format and tell the user what we are doing
+	if (!Quiet)
+	{
+		gdp_pname_t gclpname;
+
+		gdp_printable_name(gclname, gclpname);
+		fprintf(stderr, "Reading GCL %s\n", gclpname);
+	}
+
+	// open the GCL; arguably this shouldn't be necessary
+	estat = gdp_gcl_open(gclname, open_mode, NULL, &gcl);
+	if (!EP_STAT_ISOK(estat))
+	{
+		char sbuf[100];
+
+		ep_app_error("Cannot open GCL:\n    %s",
+				ep_stat_tostr(estat, sbuf, sizeof sbuf));
+		goto fail0;
+	}
+
+	// hsmoon : add filter
+	sapnd_dt			keyInfo;
+	keyInfo.mode		= 'I';
+	keyInfo.curSession	= NULL;
+	keyInfo.a_data		= &curKey;
+
+	gdp_gcl_set_read_filter( gcl, read_filter_for_kdc, 
+								(void *)&keyInfo );
+
+	// if we are converting a date/time string, set the local timezone
+	if (dtstr != NULL)
+		tzset();
+
+	if (showmetadata)
+		print_metadata(gcl);
+
+	// arrange to do the reading via one of the helper routines
+	if (async)
+		estat = do_async_read(gcl, firstrec, numrecs, use_callbacks);
+	else if (subscribe || multiread || use_callbacks)
+		estat = do_multiread(gcl, firstrec, dtstr, numrecs,
+						subscribe, use_callbacks);
+	else
+		estat = do_simpleread(gcl, firstrec, dtstr, numrecs);
+
+
+	// might as well let the GDP know we're going away
+	gdp_gcl_close(gcl);
+
+fail0:
+	if (ep_dbg_test(Dbg, 10))
+	{
+		// cheat here and use internal interface
+		extern void _gdp_req_pr_stats(FILE *);
+		_gdp_req_pr_stats(ep_dbg_getfile());
+	}
+
+	// might as well let the user know what's going on....
+	if (!Quiet || EP_STAT_ISFAIL(estat))
+		fprintf(stderr, "exiting after %d records with status %s\n",
+				NRead, ep_stat_tostr(estat, buf, sizeof buf));
+	if (EP_STAT_ISOK(estat))
+		return EX_OK;
+	if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOROUTE))
+		return EX_NOINPUT;
+	if (EP_STAT_ISABORT(estat))
+		return EX_SOFTWARE;
+	return EX_UNAVAILABLE;
+
+}

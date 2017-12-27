@@ -110,10 +110,6 @@ GDPALL=		adm/start-* \
 		apps/gdp-writer \
 		gdplogd/gdplogd \
 
-init-gdp:
-	sudo -u gdp adm/init-gdp.sh
-	sudo -u gdp cp ${GDPALL} ${GDPROOT}/bin/.
-
 CSRCS=		ep/*.[ch] \
 		gdp/*.[ch] \
 		gdplogd/*.[ch] \

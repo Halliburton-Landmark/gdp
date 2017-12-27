@@ -144,7 +144,10 @@ main(int argc, char **argv)
 
 	// initialize GDP connection
 	estat = gdp_init(NULL);
-	ep_app_info("gdp_init: %s", ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	if (EP_STAT_ISOK(estat))
+		ep_app_info("gdp_init: OK");
+	else
+		ep_app_fatal("gdp_init: %s", ep_stat_tostr(estat, ebuf, sizeof ebuf));
 
 	// let threads settle (avoid interleaved debug output)
 	ep_time_nanosleep(INT64_C(100000000));
@@ -152,18 +155,28 @@ main(int argc, char **argv)
 	// parse the name of the log to be appended to
 	gdp_name_t gclname;
 	estat = gdp_parse_name(log_xname, gclname);
-	ep_app_info("gdp_parse_name(%s): %s", log_xname,
-			ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	if (EP_STAT_ISOK(estat))
+		ep_app_info("gdp_parse_name(%s): OK", log_xname);
+	else
+		ep_app_fatal("gdp_parse_name(%s): %s", log_xname,
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 
 	// parse the name of the server to receive the append
 	gdp_name_t svrname;
 	estat = gdp_parse_name(svr_xname, svrname);
-	ep_app_info("gdp_parse_name(%s): %s", svr_xname,
-			ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	if (EP_STAT_ISOK(estat))
+		ep_app_info("gdp_parse_name(%s): OK", svr_xname);
+	else
+		ep_app_fatal("gdp_parse_name(%s): %s", svr_xname,
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 
 	// open the log (note: doesn't use svrname)
 	estat = gdp_gcl_open(gclname, GDP_MODE_RA, NULL, &gcl);
-	ep_app_info("gdp_gcl_open: %s", ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	if (EP_STAT_ISOK(estat))
+		ep_app_info("gdp_gcl_open: OK");
+	else
+		ep_app_fatal("gdp_gcl_open: %s",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 
 	// create datum(s) and send them to the explicit server
 	recno = gdp_gcl_getnrecs(gcl);
@@ -173,8 +186,11 @@ main(int argc, char **argv)
 		gdp_datum_t *datum = create_datum(++recno);
 		estat = do_fwd_append(gcl, datum, svrname, NULL);
 		nresults++;
-		ep_app_info("do_fwd_append (%d): %s",
-				nresults, ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		if (EP_STAT_ISOK(estat))
+			ep_app_info("do_fwd_append (%d): OK", nresults);
+		else
+			ep_app_fatal("do_fwd_append (%d): %s", nresults,
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 
 	// this sleep will allow multiple results to appear before we start reading

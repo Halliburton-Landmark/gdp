@@ -105,9 +105,9 @@ typedef struct _ep_stat
 #define EP_STAT_MAX_MODULES	((1U << _EP_STAT_MODBITS) - 1)
 #define EP_STAT_MAX_DETAIL	((1U << _EP_STAT_DETBITS) - 1)
 
-#define _EP_STAT_MODSHIFT	_EP_STAT_DETBITS
-#define _EP_STAT_REGSHIFT	(_EP_STAT_MODSHIFT + _EP_STAT_MODBITS)
-#define _EP_STAT_SEVSHIFT	(_EP_STAT_REGSHIFT + _EP_STAT_REGBITS)
+#define _EP_STAT_MODSHIFT	_EP_STAT_DETBITS  // 10 
+#define _EP_STAT_REGSHIFT	(_EP_STAT_MODSHIFT + _EP_STAT_MODBITS) // 18
+#define _EP_STAT_SEVSHIFT	(_EP_STAT_REGSHIFT + _EP_STAT_REGBITS) // 29 
 
 #define EP_STAT_SEV_OK		(0)	// everything OK (also 1, 2, and 3)
 #define EP_STAT_SEV_WARN	(4)	// warning or temp error, may work later

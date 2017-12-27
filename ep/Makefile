@@ -37,6 +37,7 @@ DESTDIR=
 LOCALROOT=	/usr
 LOCAL1=		/usr/local
 LOCAL2=		/opt/local
+LOCAL3=		/usr/local/opt/openssl
 
 # These generally do not need to be changed
 INSTALLROOT=	${DESTDIR}${LOCALROOT}
@@ -89,10 +90,6 @@ OBJS_MOST=	\
 	ep_thr_pool.o \
 	ep_time.o \
 	ep_xlate.o \
-	ep_file.o \
-	ep_symkey_gen.o \
-	ep_util.o \
-# hsmoon changed  (add 3 last objects)
 
 OBJS=	\
 	${OBJS_MOST} \
@@ -158,10 +155,6 @@ HFILES=	\
 	ep_time.h \
 	ep_xlate.h \
 	ep_version.h \
-	ep_util.h \
-	ep_file.h \
-	ep_symkey_gen.h \
-# hsmoon changed  (add 3 last header files)
 
 HFILES_NOTYET=	\
 	ep_cdefs.h \
@@ -202,10 +195,12 @@ INCROOT=	..
 INCSEARCH=	${INCLOCAL} \
 		-I${INCROOT} \
 		-I${LOCAL1}/include \
-		-I${LOCAL2}/include
+		-I${LOCAL2}/include \
+		-I${LOCAL3}/include
 LIBSEARCH=	${LIBLOCAL} \
 		-L${LOCAL1}/lib \
-		-L${LOCAL2}/lib
+		-L${LOCAL2}/lib \
+		-L${LOCAL3}/lib
 INCS=		${INCSEARCH}
 CFLAGS+=	${COPTS} ${INCS} -I${CURDIR} -I.. -fPIC
 RM=		rm

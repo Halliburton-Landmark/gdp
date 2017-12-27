@@ -126,7 +126,11 @@ _gdp_req_new(int cmd,
 
 	// if assertion fails, may be working with an unallocated GCL
 	if (gcl != NULL)
-		EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl), return EP_STAT_ASSERT_ABORT);
+	{
+		if (!EP_ASSERT(GDP_GCL_ISGOOD(gcl)) ||
+				!EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex))
+			return EP_STAT_ASSERT_ABORT;
+	}
 
 	// simplify the simple case
 	if (chan == NULL)
@@ -143,9 +147,9 @@ _gdp_req_new(int cmd,
 	// sanity: make sure "free" request isn't on a live list
 	if (req != NULL)
 	{
-		if (EP_ASSERT_TEST(req->state == GDP_REQ_FREE) ||
-			EP_ASSERT_TEST(!EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags)) ||
-			EP_ASSERT_TEST(!EP_UT_BITSET(GDP_REQ_ON_CHAN_LIST, req->flags)))
+		if (!EP_ASSERT(req->state == GDP_REQ_FREE) ||
+			!EP_ASSERT(!EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags)) ||
+			!EP_ASSERT(!EP_UT_BITSET(GDP_REQ_ON_CHAN_LIST, req->flags)))
 		{
 			// just abandon the bogus request on free list
 			req = NULL;
@@ -208,7 +212,7 @@ _gdp_req_new(int cmd,
 		pdu->cmd = cmd;
 		if (gcl != NULL)
 		{
-			_gdp_gcl_lock(gcl);
+			EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
 			memcpy(pdu->dst, gcl->name, sizeof pdu->dst);
 		}
 		if ((gcl == NULL || !EP_UT_BITSET(GDP_REQ_PERSIST, flags)) &&
@@ -222,8 +226,6 @@ _gdp_req_new(int cmd,
 			// allocate a new unique request id
 			pdu->rid = _gdp_rid_new(gcl, chan);
 		}
-		if (gcl != NULL)
-			_gdp_gcl_unlock(gcl);
 	}
 
 	// success
@@ -258,7 +260,7 @@ _gdp_req_free(gdp_req_t **reqp)
 	ep_dbg_cprintf(Dbg, 48, "_gdp_req_free(%p)  state=%d, gcl=%p\n",
 			req, req->state, req->gcl);
 
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex, );
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex);
 	if (req->state == GDP_REQ_FREE)
 	{
 		// req was freed after a reference was taken
@@ -278,12 +280,16 @@ _gdp_req_free(gdp_req_t **reqp)
 	if (EP_UT_BITSET(GDP_REQ_ON_GCL_LIST, req->flags))
 	{
 		EP_ASSERT_ELSE(req->gcl != NULL, return);
-		EP_THR_MUTEX_ASSERT_ISLOCKED(&req->gcl->mutex, );
+		EP_THR_MUTEX_ASSERT_ISLOCKED(&req->gcl->mutex);
 		LIST_REMOVE(req, gcllist);
 		req->flags &= ~GDP_REQ_ON_GCL_LIST;
 	}
-	req->gcl = NULL;
 
+	// dereference the gcl
+	// (refcnt may be zero if called from _gdp_gcl_freehandle)
+	req->gcl = NULL;			//XXX temp to repair build while fixing bug
+	if (req->gcl != NULL && req->gcl->refcnt > 0)
+		_gdp_gcl_decref(&req->gcl);
 
 	// remove any pending events from the request
 	{
@@ -299,15 +305,10 @@ _gdp_req_free(gdp_req_t **reqp)
 		_gdp_pdu_free(req->cpdu);
 	req->rpdu = req->cpdu = NULL;
 
-	// dereference the gcl
-	// (refcnt may be zero if called from _gdp_gcl_freehandle)
-	if (req->gcl != NULL && req->gcl->refcnt > 0)
-	{
-		_gdp_gcl_decref(&req->gcl);
-	}
-
 	req->state = GDP_REQ_FREE;
 	req->flags = 0;
+	req->md = NULL;
+	req->udata = NULL;
 
 	// add the empty request to the free list
 	ep_thr_mutex_lock(&ReqFreeListMutex);
@@ -383,7 +384,7 @@ _gdp_req_lock(gdp_req_t *req)
 	ep_thr_mutex_lock(&req->mutex);
 
 	// if this request was being freed, the reference might be dead now
-	if (EP_ASSERT_TEST(req->state != GDP_REQ_FREE))
+	if (!EP_ASSERT(req->state != GDP_REQ_FREE))
 	{
 		// oops, unlock it and return failure
 		if (ep_dbg_test(Dbg, 1))
@@ -440,7 +441,7 @@ _gdp_req_send(gdp_req_t *req)
 	{
 		// link the request to the GCL
 		ep_dbg_cprintf(Dbg, 49, "_gdp_req_send(%p) gcl=%p\n", req, gcl);
-		EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
+		EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
 		LIST_INSERT_HEAD(&gcl->reqs, req, gcllist);
 		req->flags |= GDP_REQ_ON_GCL_LIST;
 
@@ -487,7 +488,7 @@ _gdp_req_unsend(gdp_req_t *req)
 		ep_dbg_cprintf(Dbg, 4, "_gdp_req_unsend: req %p not on GCL list\n",
 				req);
 	}
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
 	LIST_REMOVE(req, gcllist);
 	req->flags &= ~GDP_REQ_ON_GCL_LIST;
 
@@ -522,7 +523,7 @@ _gdp_req_find(gdp_gcl_t *gcl, gdp_rid_t rid)
 			gcl, rid);
 	EP_ASSERT_ELSE(GDP_GCL_ISGOOD(gcl),
 					return NULL);
-	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex, );
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&gcl->mutex);
 
 	for (;;)
 	{

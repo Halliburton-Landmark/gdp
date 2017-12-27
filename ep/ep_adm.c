@@ -79,6 +79,7 @@ read_param_file(char *path)
 		char *p;
 		char *np;		// pointer to name
 		char *vp;		// pointer to value
+		char *op;		// old value pointer
 
 		p = lbuf;
 		if (*p == '#')
@@ -102,9 +103,12 @@ read_param_file(char *path)
 		vp = p;
 		p += strcspn(p, "\n");
 		*p = '\0';
+		vp = ep_mem_strdup(vp);
 
 		// store it into the hash table
-		ep_hash_insert(ParamHash, strlen(np), np, ep_mem_strdup(vp));
+		op = ep_hash_insert(ParamHash, strlen(np), np, vp);
+		if (op != NULL)
+			ep_mem_free(op);
 	}
 
 	fclose(fp);

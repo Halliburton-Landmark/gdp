@@ -332,7 +332,7 @@ ep_mem_istrdup(
 	l = strlen(s);
 	if (slen >= 0 && l > slen)
 		l = slen;
-	EP_ASSERT_REQUIRE(l + 1 > l);
+	EP_ASSERT(l + 1 > l);
 	p = ep_mem_ialloc(l + 1, NULL, flags, file, line);
 	if (p != NULL)
 	{

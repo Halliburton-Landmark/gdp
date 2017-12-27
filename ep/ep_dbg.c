@@ -291,6 +291,8 @@ ep_dbg_setfile(
 		}
 		setlinebuf(EpDebugFileP);
 	}
+
+	FlushDebugFile = EpDebugFileP == stderr;
 }
 
 

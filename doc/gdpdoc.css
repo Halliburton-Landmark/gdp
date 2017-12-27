@@ -11,8 +11,8 @@ html {
 
 body {
   color: #444;
-  font-family: Georgia, Palatino, 'Palatino Linotype', Times, 'Times New Roman', serif;
-  font-size: 12px;
+  font-family: Helvetica, Georgia, Palatino, 'Palatino Linotype', Times, 'Times New Roman', serif;
+  font-size: 11pt;
   line-height: 1.2;
   padding: 1em;
   margin: auto;
@@ -129,9 +129,13 @@ pre, code, kbd, samp {
 }
 
 pre {
+  background: #eee;
   white-space: pre;
   white-space: pre-wrap;
   word-wrap: break-word;
+  border: 1px solid #999;
+  padding-right: 1em;
+  page-break-inside: avoid;
 }
 
 b, strong {
@@ -245,19 +249,28 @@ table td {
   vertical-align: top;
 }
 
+.title {
+  text-align: center;
+}
+
 .author {
   font-size: 1.2em;
   text-align: center;
 }
 
+.date {
+  font-size: 0.8em;
+  text-align: center;
+}
+
 @media only screen and (min-width: 480px) {
   body {
-    font-size: 14px;
+    font-size: 13px;
   }
 }
 @media only screen and (min-width: 768px) {
   body {
-    font-size: 16px;
+    font-size: 15px;
   }
 }
 @media print {
@@ -269,7 +282,7 @@ table td {
   }
 
   body {
-    font-size: 12pt;
+    font-size: 11pt;
     max-width: 100%;
   }
 

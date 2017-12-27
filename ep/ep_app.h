@@ -50,6 +50,7 @@ extern void EP_TYPE_PRINTFLIKE(1, 2)
 				EP_ATTR_NORETURN;
 extern void EP_TYPE_PRINTFLIKE(2, 3)
 			ep_app_message(EP_STAT estat, const char *fmt, ...);
+extern void		ep_app_messagev(EP_STAT estat, const char *fmt, va_list av);
 
 extern const char	*ep_app_getprogname(void);
 

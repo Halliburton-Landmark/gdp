@@ -180,6 +180,38 @@ write_record(gdp_datum_t *datum, gdp_gcl_t *gcl)
 }
 
 
+EP_STAT
+signkey_cb(
+		gdp_name_t gname,
+		void *udata,
+		EP_CRYPTO_KEY **skeyp)
+{
+	FILE *fp;
+	EP_CRYPTO_KEY *skey;
+	const char *signing_key_file = udata;
+
+	ep_dbg_cprintf(Dbg, 1, "signkey_cb(%s)\n", signing_key_file);
+
+	fp = fopen(signing_key_file, "r");
+	if (fp == NULL)
+	{
+		ep_app_error("cannot open signing key file %s", signing_key_file);
+		return ep_stat_from_errno(errno);
+	}
+
+	skey = ep_crypto_key_read_fp(fp, signing_key_file,
+			EP_CRYPTO_KEYFORM_PEM, EP_CRYPTO_F_SECRET);
+	if (skey == NULL)
+	{
+		ep_app_error("cannot read signing key file %s", signing_key_file);
+		return ep_stat_from_errno(errno);
+	}
+
+	*skeyp = skey;
+	return EP_STAT_OK;
+}
+
+
 void
 usage(void)
 {
@@ -267,7 +299,7 @@ main(int argc, char **argv)
 		// open a log file (for timing measurements)
 		LogFile = fopen(log_file_name, "a");
 		if (LogFile == NULL)
-			fprintf(stderr, "Cannot open log file %s: %s\n",
+			ep_app_error("Cannot open log file %s: %s",
 					log_file_name, strerror(errno));
 		else
 			setlinebuf(LogFile);
@@ -289,6 +321,9 @@ main(int argc, char **argv)
 
 	if (signing_key_file != NULL)
 	{
+		gdp_gcl_open_info_set_signkey_cb(info, signkey_cb, signing_key_file);
+
+#if 0	// old code: keep as an example of gdp_gcl_open_info_set_signing_key
 		FILE *fp;
 		EP_CRYPTO_KEY *skey;
 
@@ -309,6 +344,7 @@ main(int argc, char **argv)
 
 		estat = gdp_gcl_open_info_set_signing_key(info, skey);
 		EP_STAT_CHECK(estat, goto fail1);
+#endif
 	}
 
 	// open a GCL with the provided name
@@ -391,6 +427,18 @@ fail1:
 		gdp_gcl_open_info_free(info);
 
 fail0:
+	;			// avoid compiler error
+	int exitstat;
+
+	if (EP_STAT_ISOK(estat))
+		exitstat = EX_OK;
+	else if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOROUTE))
+		exitstat = EX_CANTCREAT;
+	else if (EP_STAT_ISABORT(estat))
+		exitstat = EX_SOFTWARE;
+	else
+		exitstat = EX_UNAVAILABLE;
+
 	if (ep_dbg_test(Dbg, 10))
 	{
 		// cheat here and use internal interface
@@ -401,19 +449,9 @@ fail0:
 	// OK status can have values; hide that from the user
 	if (EP_STAT_ISOK(estat))
 		estat = EP_STAT_OK;
-	if (!Quiet || !EP_STAT_ISOK(estat))
-	{
-		char buf[200];
-
-		fprintf(stderr, "%s: exiting with status %s\n",
-				ep_app_getprogname(),
-				ep_stat_tostr(estat, buf, sizeof buf));
-	}
-	if (EP_STAT_ISOK(estat))
-		return EX_OK;
-	if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOROUTE))
-		return EX_CANTCREAT;
-	if (EP_STAT_ISABORT(estat))
-		return EX_SOFTWARE;
-	return EX_UNAVAILABLE;
+	if (!EP_STAT_ISOK(estat))
+		ep_app_message(estat, "exiting with status");
+	else if (!Quiet)
+		fprintf(stderr, "Exiting with status OK\n");
+	return exitstat;
 }

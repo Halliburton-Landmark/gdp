@@ -14,7 +14,7 @@
     <h1> GDP Protocol Version 3<br>
     </h1>
     <h4>Eric Allman, Ubiquitous Swarm Lab, U.C. Berkeley<br>
-      Draft Document Version 0.31, 2016-08-25<br>
+      Draft Document Version 0.32, 2017-04-14<br>
     </h4>
     <br>
     <p>Note: this document uses the term "Protocol Data Unit" (PDU) instead of
@@ -856,259 +856,298 @@
           </td>
         </tr>
         <tr>
-          <td valign="top">ACK_SUCCESS<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">ACK_SUCCESS<br>
           </td>
-          <td valign="top">128<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">128<br>
           </td>
-          <td valign="top">&ndash;/&ndash;<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">&ndash;/&ndash;<br>
           </td>
-          <td valign="top">Generic operation succeeded.&nbsp; The payload
-            depends on the command being acknowledged.<br>
-          </td>
-        </tr>
-        <tr>
-          <td valign="top">ACK_CREATED<br>
-          </td>
-          <td valign="top">129<br>
-          </td>
-          <td valign="top">2.01/201<br>
-          </td>
-          <td valign="top">New resource created.&nbsp; If the resource is a log
-            record (e.g., in response to CMD_PUBLISH) a record number and
-            timestamp will be included in the header.&nbsp; The payload is
-            empty.<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">Generic
+            operation succeeded.&nbsp; The payload depends on the command being
+            acknowledged.<br>
           </td>
         </tr>
         <tr>
-          <td valign="top">ACK_DELETED<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">ACK_CREATED<br>
           </td>
-          <td valign="top">130<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">129<br>
           </td>
-          <td valign="top">2.02/204<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">2.01/201<br>
           </td>
-          <td valign="top">Resource deleted.&nbsp; The payload is empty. </td>
-        </tr>
-        <tr>
-          <td valign="top">ACK_VALID<br>
-          </td>
-          <td valign="top">131<br>
-          </td>
-          <td valign="top">2.03/304<br>
-          </td>
-          <td valign="top"><i>Not currently used.</i><br>
+          <td style="vertical-align: top; background-color: white;" valign="top">New
+            resource created.&nbsp; If the resource is a log record (e.g., in
+            response to CMD_PUBLISH) a record number and timestamp will be
+            included in the header.&nbsp; The payload is empty.<br>
           </td>
         </tr>
         <tr>
-          <td valign="top">ACK_CHANGED<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">ACK_DELETED<br>
           </td>
-          <td valign="top">132<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">130<br>
           </td>
-          <td valign="top">2.04/204<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">2.02/204<br>
           </td>
-          <td valign="top">Resource changed.&nbsp; The payload is empty. </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">Resource
+            deleted.&nbsp; The payload is empty. </td>
         </tr>
         <tr>
-          <td valign="top">ACK_CONTENT<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">ACK_VALID<br>
           </td>
-          <td valign="top">133<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">131<br>
           </td>
-          <td valign="top">2.05/200<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">2.03/304<br>
           </td>
-          <td valign="top">Content returned.&nbsp; A record number and timestamp
-            may be included depending on the data (for example, it is included
-            for log records but omitted for log metadata).&nbsp; The payload
-            contains the content and the signature.<br>
-          </td>
-        </tr>
-        <tr>
-          <td valign="top">NAK_C_BADREQ<br>
-          </td>
-          <td valign="top">192<br>
-          </td>
-          <td valign="top">4.00/400<br>
-          </td>
-          <td valign="top">Invalid request.&nbsp; The payload is empty.<br>
+          <td style="vertical-align: top; background-color: white;" valign="top"><i>Not
+              currently used.</i><br>
           </td>
         </tr>
         <tr>
-          <td valign="top">NAK_C_UNAUTH<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">ACK_CHANGED<br>
           </td>
-          <td valign="top">193<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">132<br>
           </td>
-          <td valign="top">4.01/&ndash;<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">2.04/204<br>
           </td>
-          <td valign="top"><i>Not currently used.</i><br>
+          <td style="vertical-align: top; background-color: white;" valign="top">Resource
+            changed.&nbsp; The payload is empty. </td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; background-color: white;" valign="top">ACK_CONTENT<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">133<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">2.05/200<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">Content
+            returned.&nbsp; A record number and timestamp may be included
+            depending on the data (for example, it is included for log records
+            but omitted for log metadata).&nbsp; The payload contains the
+            content and the signature.<br>
           </td>
         </tr>
         <tr>
-          <td valign="top">NAK_C_BADOPT<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">NAK_C_BADREQ<br>
           </td>
-          <td valign="top">194<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">192<br>
           </td>
-          <td valign="top">4.02/&ndash;<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">4.00/400<br>
           </td>
-          <td valign="top">A bad option value was supplied, e.g., a negative
-            record count in a subscribe.<br>
-          </td>
-        </tr>
-        <tr>
-          <td valign="top">NAK_C_FORBIDDEN<br>
-          </td>
-          <td valign="top">195<br>
-          </td>
-          <td valign="top">4.03/403<br>
-          </td>
-          <td valign="top"><i>Not currently used.</i> </td>
-        </tr>
-        <tr>
-          <td valign="top">NAK_C_NOTFOUND<br>
-          </td>
-          <td valign="top">196<br>
-          </td>
-          <td valign="top">4.04/404<br>
-          </td>
-          <td valign="top"><br>
+          <td style="vertical-align: top; background-color: white;" valign="top">Invalid
+            request.&nbsp; The payload is empty.<br>
           </td>
         </tr>
         <tr>
-          <td valign="top">NAK_C_METHNOTALLOWED<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">NAK_C_UNAUTH<br>
           </td>
-          <td valign="top">197<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">193<br>
           </td>
-          <td valign="top">4.05/405<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">4.01/&ndash;<br>
           </td>
-          <td valign="top"><i>Not currently used.</i> </td>
-        </tr>
-        <tr>
-          <td valign="top">NAK_C_NOTACCEPTABLE<br>
-          </td>
-          <td valign="top">198<br>
-          </td>
-          <td valign="top">4.06/406<br>
-          </td>
-          <td valign="top"><i>Not currently used.</i> </td>
-        </tr>
-        <tr>
-          <td valign="top">NAK_C_CONFLICT<br>
-          </td>
-          <td valign="top">201<br>
-          </td>
-          <td valign="top">&ndash;/409<br>
-          </td>
-          <td valign="top"><i>Not currently used.</i> </td>
-        </tr>
-        <tr>
-          <td valign="top">NAK_C_PRECONFAILED<br>
-          </td>
-          <td valign="top">204<br>
-          </td>
-          <td valign="top">4.12/412<br>
-          </td>
-          <td valign="top"><i>Not currently used.</i> </td>
-        </tr>
-        <tr>
-          <td valign="top">NAK_C_TOOLARGE<br>
-          </td>
-          <td valign="top">205<br>
-          </td>
-          <td valign="top">4.13/413<br>
-          </td>
-          <td valign="top"><i>Not currently used.</i> </td>
-        </tr>
-        <tr>
-          <td valign="top">NAK_C_UNSUPMEDIA<br>
-          </td>
-          <td valign="top">207<br>
-          </td>
-          <td valign="top">4.15/415<br>
-          </td>
-          <td valign="top"><i>Not currently used.</i> </td>
-        </tr>
-        <tr>
-          <td valign="top">NAK_S_INTERNAL<br>
-          </td>
-          <td valign="top">224<br>
-          </td>
-          <td valign="top">5.00/500<br>
-          </td>
-          <td valign="top">Internal server error.<br>
+          <td style="vertical-align: top; background-color: white;" valign="top"><i>Not
+              currently used.</i><br>
           </td>
         </tr>
         <tr>
-          <td valign="top">NAK_S_NOTIMPL<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">NAK_C_BADOPT<br>
           </td>
-          <td valign="top">225<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">194<br>
           </td>
-          <td valign="top">5.01/501<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">4.02/&ndash;<br>
           </td>
-          <td valign="top">Indicates that the GDP doesn't implement the
-            requested function; for example, unrecognized command codes get this
-            response.<br>
-          </td>
-        </tr>
-        <tr>
-          <td valign="top">NAK_S_BADGATEWAY<br>
-          </td>
-          <td valign="top">226<br>
-          </td>
-          <td valign="top">5.02/502<br>
-          </td>
-          <td valign="top"><i>Not currently used.</i> </td>
-        </tr>
-        <tr>
-          <td valign="top">NAK_S_SVCUNAVAIL<br>
-          </td>
-          <td valign="top">227<br>
-          </td>
-          <td valign="top">5.03/503<br>
-          </td>
-          <td valign="top"><i>Not currently used.</i> </td>
-        </tr>
-        <tr>
-          <td valign="top">NAK_S_GWTIMEOUT<br>
-          </td>
-          <td valign="top">228<br>
-          </td>
-          <td valign="top">5.04/504<br>
-          </td>
-          <td valign="top"><i>Not currently used.</i> </td>
-        </tr>
-        <tr>
-          <td valign="top">NAK_S_PROXYNOTSUP<br>
-          </td>
-          <td valign="top">229<br>
-          </td>
-          <td valign="top">5.05/&ndash;<br>
-          </td>
-          <td valign="top"><i>Not currently used.</i> </td>
-        </tr>
-        <tr>
-          <td>NAK_S_REPLICATE_FAIL</td>
-          <td>238</td>
-          <td>&mdash;</td>
-          <td>Server was not able to write a sufficient number of replicas.</td>
-        </tr>
-        <tr>
-          <td valign="top">NAK_S_EXITING<br>
-          </td>
-          <td valign="top">239<br>
-          </td>
-          <td valign="top">&ndash;<br>
-          </td>
-          <td valign="top">Log server is exiting (subscriptions will be
-            terminated).<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">A
+            bad option value was supplied, e.g., a negative record count in a
+            subscribe.<br>
           </td>
         </tr>
         <tr>
-          <td valign="top">NAK_R_NOROUTE<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">NAK_C_FORBIDDEN<br>
           </td>
-          <td valign="top">240<br>
+          <td style="vertical-align: top; background-color: white;" valign="top">195<br>
           </td>
-          <td valign="top"><br>
+          <td style="vertical-align: top; background-color: white;" valign="top">4.03/403<br>
           </td>
-          <td valign="top">Generated by the routing layer to indicate that it
-            couldn't find an advertisement for the requested destination.&nbsp;
-            The source address in the PDU is the unroutable address.&nbsp; <i>[[Should
+          <td style="vertical-align: top; background-color: white;" valign="top"><i>Not
+              currently used.</i> </td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; background-color: white;" valign="top">NAK_C_NOTFOUND<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">196<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">4.04/404<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top"><br>
+          </td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; background-color: white;" valign="top">NAK_C_METHNOTALLOWED<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">197<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">4.05/405<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top"><i>Not
+              currently used.</i> </td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; background-color: white;" valign="top">NAK_C_NOTACCEPTABLE<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">198<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">4.06/406<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top"><i>Not
+              currently used.</i> </td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; background-color: white;" valign="top">NAK_C_CONFLICT<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">201<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">&ndash;/409<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top"><i>Not
+              currently used.</i> </td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; background-color: white;" valign="top">NAK_C_PRECONFAILED<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">204<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">4.12/412<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top"><i>Not
+              currently used.</i> </td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; background-color: white;" valign="top">NAK_C_TOOLARGE<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">205<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">4.13/413<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top"><i>Not
+              currently used.</i> </td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; background-color: white;" valign="top">NAK_C_UNSUPMEDIA<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">207<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">4.15/415<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top"><i>Not
+              currently used.</i> </td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; background-color: white;">NAK_C_MISSING_RECORD</td>
+          <td style="vertical-align: top; background-color: white;">222</td>
+          <td style="vertical-align: top; background-color: white;"><br>
+          </td>
+          <td style="vertical-align: top; background-color: white;">A request
+            was made for a record that is not available.&nbsp; This implies that
+            there are higher numbered records possibly available.</td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; background-color: white;">NAK_C_REC_DUP</td>
+          <td style="vertical-align: top; background-color: white;">223</td>
+          <td style="vertical-align: top; background-color: white;"><br>
+          </td>
+          <td style="vertical-align: top; background-color: white;">There are multiple
+            versions of the same record number.</td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; background-color: white;" valign="top">NAK_S_INTERNAL<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">224<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">5.00/500<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">Internal
+            server error.<br>
+          </td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; background-color: white;" valign="top">NAK_S_NOTIMPL<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">225<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">5.01/501<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">Indicates
+            that the GDP doesn't implement the requested function; for example,
+            unrecognized command codes get this response.<br>
+          </td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; background-color: white;" valign="top">NAK_S_BADGATEWAY<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">226<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">5.02/502<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top"><i>Not
+              currently used.</i> </td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; background-color: white;" valign="top">NAK_S_SVCUNAVAIL<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">227<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">5.03/503<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top"><i>Not
+              currently used.</i> </td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; background-color: white;" valign="top">NAK_S_GWTIMEOUT<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">228<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">5.04/504<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top"><i>Not
+              currently used.</i> </td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; background-color: white;" valign="top">NAK_S_PROXYNOTSUP<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">229<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">5.05/&ndash;<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top"><i>Not
+              currently used.</i> </td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; background-color: white;">NAK_S_REPLICATE_FAIL</td>
+          <td style="vertical-align: top; background-color: white;">238</td>
+          <td style="vertical-align: top; background-color: white;">&mdash;</td>
+          <td style="vertical-align: top; background-color: white;">Server was
+            not able to write a sufficient number of replicas.</td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; background-color: white;" valign="top">NAK_S_EXITING<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">239<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">&ndash;<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">Log
+            server is exiting (subscriptions will be terminated).<br>
+          </td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; background-color: white;" valign="top">NAK_R_NOROUTE<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">240<br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top"><br>
+          </td>
+          <td style="vertical-align: top; background-color: white;" valign="top">Generated
+            by the routing layer to indicate that it couldn't find an
+            advertisement for the requested destination.&nbsp; The source
+            address in the PDU is the unroutable address.&nbsp; <i>[[Should
               this use the routing layer address as the source and put the
               unroutable address in the data?]]</i><br>
           </td>
