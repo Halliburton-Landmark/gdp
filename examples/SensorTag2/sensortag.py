@@ -1,1 +1,0 @@
-SensorTag2/sensortag.py
