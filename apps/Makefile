@@ -36,6 +36,9 @@ BINALL=		gcl-create \
 		encdec_symkey \
 		create_symkey \
 		$(BINALL_ZC) \
+#		gdp-reader-dec \
+#		gdp-writer-enc \
+# hsmoon changed (add 4 lines over BINALL_ZC) 
 
 SBINALL_ZC= 	gdp-zcpublish
 SBINALL=	gdp-rest \
