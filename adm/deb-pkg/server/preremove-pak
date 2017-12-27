@@ -1,8 +1,0 @@
-#!/bin/sh
-
-set -e
-
-echo "Stopping the service"
-service gdplogd stop            || true
-
-exit 0
