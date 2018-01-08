@@ -733,6 +733,8 @@ main(int argc, char **argv)
 	EP_STAT_CHECK(estat, goto fail0);
 	curKey.ks_gcl = ksgcl;
 
+	printf("after open\n" );
+
 	// read the latest key 
 	ep_thr_mutex_lock( &keyMutex );
 	estat = kdc_get_latestKey( ksgcl, &(curKey.rKey), &(curKey.cur_seqn), 

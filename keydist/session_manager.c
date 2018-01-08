@@ -47,6 +47,7 @@
 #include <openssl/rand.h>
 
 #include <gdp/gdp.h>
+#include <ep/ep_app.h>
 #include <ep/ep_dbg.h>
 #include <hs/hs_errno.h>
 #include <hs/gcl_helper.h>
@@ -57,7 +58,7 @@
 
 
 
-#define	KS_SKEY_FILE	"/home/hsmoon/GDP/certtest/ec/registration/rs_ecc.key"
+//#define KS_SKEY_FIL	"/home/hsmoon/GDP/certtest/ec/registration/rs_ecc.key"
 #define	RS_CERT_FILE	"/home/hsmoon/GDP/certtest/ec/registration/rs_ecc.pem"
 #define MY_AC_FILE		"/home/hsmoon/etc/my_ac.tk"
 
@@ -69,7 +70,6 @@ EVP_PKEY			*rs_pubkey = NULL;
 EVP_PKEY			*my_seckey = NULL;
 struct ac_token		*my_token  = NULL;
 
-// check_start
 // 
 // Internal Functions 
 // 
@@ -118,20 +118,33 @@ fail0:
 	return NULL;
 }
 
+
+// hsmoon_start
+/*
+** Free memory for session data structure 
+*/
 void free_session( void *dVal )
 {
 	gdp_session		*curSession = NULL;
+
 
 	curSession = (gdp_session *)dVal;
 
 	if( curSession == NULL ) return ;
 
-	gdp_gclmd_free( curSession->ac_info );
-	ep_crypto_cipher_free( curSession->sc_ctx );
+	if( curSession->ac_info != NULL ) 
+		gdp_gclmd_free( curSession->ac_info );
+
+	if( curSession->sc_ctx != NULL ) 
+		ep_crypto_cipher_free( curSession->sc_ctx );
 
 	ep_mem_free( curSession );
 }
 
+
+/*
+** Free memory for session & session related data 
+*/
 void free_session_apnddata( gdp_gcl_t *gcl )
 {
 	if( gcl == NULL )				return ;
@@ -148,6 +161,7 @@ void free_session_apnddata( gdp_gcl_t *gcl )
 		ep_mem_free( aData ); 
 	}
 }
+// hsmoon_end
 
 
 int calculate_sessionkey( gdp_session *inSession )   
@@ -428,17 +442,35 @@ int insert_mytoken( gdp_buf_t *dbuf )
 	return write_token_tobuf( my_token, dbuf );
 }
 
-//LATER: param for my secret key & token : if NULL, use default define value
-// Load Cert / skey file 
+
+// hsmoon_start
+/*
+** This init function loads and manages the following info 
+**	1. the certificate of registration service 
+**	2. the secret key of running service or device 
+**	3. the access token of running service or device 
+**		the access token is published through registration process 
+*/
 int init_session_manager(  )
 {
 	FILE			*t_fp		= NULL;
-	const char			*name		= NULL;
 	X509			*rs_cert	= NULL;
+	char			argname[100];
+	const char		*name		= NULL;
+	const char		*progname	= NULL;
 
 
 
-	// open the cert file of device  	
+	progname = ep_app_getprogname();
+/*
+	if( progname != NULL ) printf("Prog Name: %s \n", progname );
+	else printf("Prog Name: NULL \n");
+*/
+
+
+	//
+	// 1. Load the certificate of registration & key distribution service 
+	// 
 	name = ep_adm_getstrparam("swarm.gdp.regi.cert", RS_CERT_FILE );
 	rs_cert = ep_x509_cert_read_file( name );
 	if( rs_cert == NULL ) {
@@ -456,8 +488,35 @@ int init_session_manager(  )
 	}
 	X509_free( rs_cert );
 
-	// LATER: NULL (KS: FOR testing on KDS ) 
-	name = ep_adm_getstrparam("swarm.gdp.device.secret", KS_SKEY_FILE );
+
+
+	//
+	// 2. Load the secret key of running system or device
+	// 
+
+	// 2.1 check whether this program is service or not 
+	//		If service, use the another param info for the service 
+	snprintf( argname, sizeof argname, "swarm.%s.secret", 
+									progname==NULL?"null":progname );
+	name = ep_adm_getstrparam( argname, NULL );
+
+	if( name == NULL ) {
+		// 2.2 In the device case, 
+		//		For test, we need to run multiple devices on one machine 
+		//		To do this, we use the following parameter. 	
+		name = ep_adm_getstrparam("swarm.gdp.device.name", NULL );
+
+		if( name != NULL ) {
+			snprintf( argname, sizeof argname, "swarm.gdp.%s.secret", name );
+			name = ep_adm_getstrparam( argname, NULL );
+		}
+
+		if( name == NULL ) {
+			name = ep_adm_getstrparam("swarm.gdp.device.secret", NULL );
+		}
+
+	}
+
 	t_fp = fopen( name, "rb");
 	if( t_fp == NULL ) {
 		ep_dbg_printf("Cannot read secret key in session manager \n"); 
@@ -471,9 +530,13 @@ int init_session_manager(  )
 		return EX_FAILURE;
 	}
 	fclose( t_fp );
+// hsmoon_end
 
 
-	// LATER: NULL (RS: for testing on KDS ) 
+	//
+	// 3. Load the secret key of running system or device
+	// 
+
 	name = ep_adm_getstrparam("swarm.gdp.device.mytoken", MY_AC_FILE );
 	t_fp	= fopen( name, "rb" );
 	if( t_fp == NULL ) {
@@ -775,7 +838,6 @@ fail0:
 	return NULL;
 
 }
-// check_end
 
 
 int check_reqdbuf_onsession( gdp_pdu_t *cpdu, gdp_session *curSession ) 
@@ -1246,7 +1308,6 @@ fail0:
 }
 
 
-// check_start
 // data is stored in rpdu->datum... 
 int update_smsg_onsession( gdp_pdu_t *pdu, gdp_session *curSession, 
 								char mode, bool isSync ) 
@@ -1260,6 +1321,8 @@ int update_smsg_onsession( gdp_pdu_t *pdu, gdp_session *curSession,
 	uint8_t			*encBuf = NULL;
 
 
+	if( my_seckey == NULL ) return EX_FAILURE;
+
 	if( pdu==NULL ) return EX_NOINPUT;
 	if( mode == 'I' ) return EX_OK; 
 
@@ -1272,6 +1335,7 @@ int update_smsg_onsession( gdp_pdu_t *pdu, gdp_session *curSession,
 		// CASE: first request / first response on session failure. 
 		// Not encrypted data... 
 		// MAC: signed by device private key if necessary. 
+
 		if( curSession->flag & SENT_AUTH ) {
 			EP_CRYPTO_MD			*md = NULL;
 			uint8_t					sbuf[EP_CRYPTO_MAX_SIG]; 
@@ -1285,7 +1349,11 @@ int update_smsg_onsession( gdp_pdu_t *pdu, gdp_session *curSession,
 						gdp_buf_getptr( pdu->datum->dbuf, oriLen ), oriLen );
 			estat = ep_crypto_sign_final( md, sbuf, &siglen ); 
 
+
 			if( EP_STAT_ISOK( estat ) ) {
+				if( pdu->datum->sig == NULL ) {
+					pdu->datum->sig = gdp_buf_new();
+				}
 				gdp_buf_write( pdu->datum->sig, sbuf, siglen );
 				pdu->datum->siglen = siglen;
 				pdu->datum->sigmdalg = EP_CRYPTO_MD_SHA256;
@@ -1532,7 +1600,6 @@ tfail0:
 	return exit_status;
 }
 */
-// check_end 
 
 struct ac_token* check_actoken( gdp_buf_t *inBuf ) 
 {

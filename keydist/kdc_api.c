@@ -297,7 +297,7 @@ EP_STAT kdc_gcl_open( gdp_name_t ks_name, gdp_iomode_t io_mode,
 	// lock this operation to keep the GCL cache consistent
 	ep_thr_mutex_lock(&OpenMutex);
 
-	
+
 	// See if we already have this open 
 	gcl = _gdp_gcl_cache_get( ks_name, io_mode );
 	if( gcl != NULL ) {
@@ -318,6 +318,7 @@ EP_STAT kdc_gcl_open( gdp_name_t ks_name, gdp_iomode_t io_mode,
 		estat = _kdc_gcl_open( gcl, cmd, s_mode, _GdpChannel, 
 											GDP_REQ_ALLOC_RID );
 		EP_THR_MUTEX_ASSERT_ISLOCKED( &gcl->mutex );
+
 	}
 
 	if( EP_STAT_ISOK( estat ) ) *pgcl = gcl;

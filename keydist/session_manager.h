@@ -52,10 +52,6 @@
 #define		INIT_SE			0x01
 #define		SENT_AUTH		0x02
 
-#define		EP_STAT_SE_
-
-
-
 
 typedef struct gdp_session_info {
 	EP_THR_MUTEX		mutex;

@@ -390,15 +390,6 @@ int main(int argc, char **argv)
 	}
 	ep_dbg_cprintf(Dbg, 8, "Signature strictness = 0x%x\n",
 			GdpSignatureStrictness);
-
-	// check for some options
-#if _GDPLOGD_FORGIVING
-	GdplogdForgive.allow_log_gaps =
-		ep_adm_getboolparam("swarm.gdplogd.sequencing.allowgaps", true);
-	GdplogdForgive.allow_log_dups =
-		ep_adm_getboolparam("swarm.gdplogd.sequencing.allowdups", true);
-#endif
-// end ref 2 
 */
 
 

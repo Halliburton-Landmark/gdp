@@ -168,8 +168,10 @@ fail1:
 	return estat;
 }
 
-
-
+// hsmoon_start
+/*
+** Free the data memory for gcl & session info 	
+*/
 void _kdc_gcl_freehandle( gdp_gcl_t *gcl, bool isFull )
 {
 	if( gcl->apndfpriv != NULL ) {
@@ -178,6 +180,8 @@ void _kdc_gcl_freehandle( gdp_gcl_t *gcl, bool isFull )
 
 	if( isFull ) _gdp_gcl_freehandle( gcl );
 }
+// hsmoon_end 
+
 
 /*
 **	_KDC_GCL_OPEN --- open a GCL for requesting decryption key
@@ -208,9 +212,14 @@ _kdc_gcl_open(gdp_gcl_t *gcl,
 	estat = _gdp_req_new(cmd, gcl, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
+//	printf(" after request new \n " );
+
 	// fill the datum on session 
 	curSession	= request_session( req, mode ); 
+//	printf(" after request session \n " );
 	exit_status	= update_smsg_onsession( req->cpdu, curSession, mode, true );
+//	printf(" after update smsg on session \n " );
+
 	if( exit_status != EX_OK ) {
 		ep_dbg_printf("[ERROR-S] Fail to handle smsg on session in _kdc_open\n"
 						"%d: %s\n", 

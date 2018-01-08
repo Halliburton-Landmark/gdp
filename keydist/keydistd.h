@@ -54,13 +54,6 @@
 
 #include "ksd_data_manager.h"
 
-/*
-
-#include <gdp/gdp_stat.h>
-
-#include <unistd.h>
-#include <sys/queue.h>
-*/
 
 // how strongly we enforce signatures
 uint32_t	GdpSignatureStrictness;		// how strongly we enforce signatures
@@ -69,29 +62,6 @@ uint32_t	GdpSignatureStrictness;		// how strongly we enforce signatures
 #define GDP_SIG_REQUIRED	0x02		// sig must exist if pub key exists
 #define GDP_SIG_PUBKEYREQ	0x04		// public key must exist
 
-
-
-/*
-**  Private GCL definitions for gdplogd only
-**
-**		The gcl field is because the LIST macros don't understand
-**		having the links in a substructure (i.e., I can't link a
-**		gdp_gcl_xtra to a gdp_gcl).
-*/
-/*
-typedef struct physinfo	gcl_physinfo_t;
-struct gdp_gcl_xtra
-{
-	// declarations relating to semantics
-	gdp_gcl_t				*gcl;			// enclosing GCL
-	uint16_t				n_md_entries;	// number of metadata entries
-	uint16_t				log_type;		// from log header
-
-	// physical implementation declarations
-	struct gcl_phys_impl	*physimpl;		// physical implementation
-	gcl_physinfo_t			*physinfo;		// info needed by physical module
-};
-*/
 
 /*
 **  Definitions for the kds-specific GCL handling
