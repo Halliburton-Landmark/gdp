@@ -81,6 +81,9 @@ typedef char				gdp_pname_t[GDP_GCL_PNAME_LEN + 1];
 typedef int64_t				gdp_recno_t;
 #define PRIgdp_recno		PRId64
 
+// a hash key
+typedef EP_CRYPTO_KEY		gdp_hash_t;
+
 /*
 **	I/O modes
 **
@@ -233,46 +236,78 @@ extern EP_STAT gdp_gcl_append_async(
 					gdp_event_cbfunc_t,		// callback function
 					void *udata);
 
-// read from a readable GCL based on record number
-extern EP_STAT	gdp_gcl_read(
+// synchronous read based on record number
+extern EP_STAT gdp_gcl_read_by_recno(
 					gdp_gcl_t *gcl,			// readable GCL handle
-					gdp_recno_t recno,		// GCL record number
-					gdp_datum_t *datum);	// pointer to result message
+					gdp_recno_t recno,		// record number
+					gdp_datum_t *datum);	// pointer to result
 
-// read asynchronously from a GCL based on record number
-extern EP_STAT	gdp_gcl_read_async(
+// async read based on record number
+extern EP_STAT gdp_gcl_read_by_recno_async(
 					gdp_gcl_t *gcl,			// readable GCL handle
-					gdp_recno_t recno,		// GCL record number
+					gdp_recno_t recno,		// starting record number
+					int32_t nrecs,			// number of records to read
 					gdp_event_cbfunc_t cbfunc,	// callback function
 					void *cbarg);			// argument to cbfunc
 
-// read from a readable GCL based on timestamp
-extern EP_STAT	gdp_gcl_read_ts(
+// synchronous read based on timestamp
+extern EP_STAT gdp_gcl_read_by_ts(
 					gdp_gcl_t *gcl,			// readable GCL handle
-					EP_TIME_SPEC *ts,		// minimum timestamp
-					gdp_datum_t *datum);	// pointer to result message
+					EP_TIME_SPEC *ts,		// timestamp
+					gdp_datum_t *datum);	// pointer to result
 
-// subscribe to a readable GCL
-//	If you don't specific cbfunc, events are generated instead
-typedef gdp_event_cbfunc_t	gdp_gcl_sub_cbfunc_t;	// back compat
-
-extern EP_STAT	gdp_gcl_subscribe(
+// async read based on timestamp
+extern EP_STAT gdp_gcl_read_by_ts_async(
 					gdp_gcl_t *gcl,			// readable GCL handle
-					gdp_recno_t start,		// first record to retrieve
-					int32_t numrecs,		// number of records to retrieve
+					EP_TIME_SPEC *ts,		// starting record number
+					int32_t nrecs,			// number of records to read
+					gdp_event_cbfunc_t cbfunc,	// callback function
+					void *cbarg);			// argument to cbfunc
+
+// synchronous read based on hash
+extern EP_STAT gdp_gcl_read_by_hash(
+					gdp_gcl_t *gcl,			// readable GCL handle
+					gdp_hash_t *hash,		// hash of desired record
+					gdp_datum_t *datum);	// pointer to result
+
+// async read based on timestamp
+extern EP_STAT gdp_gcl_read_by_hash_async(
+					gdp_gcl_t *gcl,			// readable GCL handle
+					gdp_hash_t *hash,		// starting record hash
+					int32_t nrecs,			// number of records to read
+					gdp_event_cbfunc_t cbfunc,	// callback function
+					void *cbarg);			// argument to cbfunc
+
+// subscribe based on record number
+extern EP_STAT	gdp_gcl_subscribe_by_recno(
+					gdp_gcl_t *gcl,			// readable GCL handle
+					gdp_recno_t start,		// starting record number
+					int32_t nrecs,			// number of records to retrieve
 					EP_TIME_SPEC *timeout,	// timeout
 					gdp_event_cbfunc_t cbfunc,
 											// callback function for next datum
 					void *cbarg);			// argument passed to callback
 
-extern EP_STAT	gdp_gcl_subscribe_ts(
+// subscribe based on timestamp
+extern EP_STAT	gdp_gcl_subscribe_by_ts(
 					gdp_gcl_t *gcl,			// readable GCL handle
-					EP_TIME_SPEC *start,	// first record to retrieve
-					int32_t numrecs,		// number of records to retrieve
+					EP_TIME_SPEC *ts,		// starting timestamp
+					int32_t nrecs,			// number of records to retrieve
 					EP_TIME_SPEC *timeout,	// timeout
 					gdp_event_cbfunc_t cbfunc,
 											// callback function for next datum
 					void *cbarg);			// argument passed to callback
+
+// subscribe based on hash
+extern EP_STAT	gdp_gcl_subscribe_by_hash(
+					gdp_gcl_t *gcl,			// readable GCL handle
+					gdp_hash_t *hash,		// starting record hash
+					int32_t nrecs,			// number of records to retrieve
+					EP_TIME_SPEC *timeout,	// timeout
+					gdp_event_cbfunc_t cbfunc,
+											// callback function for next datum
+					void *cbarg);			// argument passed to callback
+
 
 // unsubscribe from a GCL
 extern EP_STAT	gdp_gcl_unsubscribe(
@@ -280,25 +315,6 @@ extern EP_STAT	gdp_gcl_unsubscribe(
 					gdp_event_cbfunc_t cbfunc,
 											// callback func (to make unique)
 					void *cbarg);			// callback arg (to make unique)
-
-// read multiple records (no subscriptions)
-extern EP_STAT	gdp_gcl_multiread(
-					gdp_gcl_t *gcl,			// readable GCL handle
-					gdp_recno_t start,		// first record to retrieve
-					int32_t numrecs,		// number of records to retrieve
-					gdp_event_cbfunc_t cbfunc,
-											// callback function for next datum
-					void *cbarg);			// argument passed to callback
-
-// read multiple records starting from timestamp (no subscriptions)
-extern EP_STAT	gdp_gcl_multiread_ts(
-					gdp_gcl_t *gcl,			// readable GCL handle
-					EP_TIME_SPEC *start,	// first record to retrieve
-					int32_t numrecs,		// number of records to retrieve
-					gdp_event_cbfunc_t cbfunc,
-											// callback function for next datum
-					void *cbarg);			// argument passed to callback
-
 // read metadata
 extern EP_STAT	gdp_gcl_getmetadata(
 					gdp_gcl_t *gcl,			// GCL handle
@@ -357,6 +373,55 @@ EP_STAT			gdp_parse_name(
 // get the number of records in the log
 extern gdp_recno_t	gdp_gcl_getnrecs(
 					const gdp_gcl_t *gcl);	// open GCL handle
+
+/*
+**  Following are for back compatibility
+*/
+
+typedef gdp_event_cbfunc_t	gdp_gcl_sub_cbfunc_t;	// back compat
+
+// read from a readable GCL based on record number
+#define gdp_gcl_read		gdp_gcl_read_by_recno
+
+// read from a readable GCL based on timestamp
+#define gdp_gcl_read_ts			gdp_gcl_read_by_ts
+
+// read asynchronously from a GCL based on record number
+extern EP_STAT gdp_gcl_read_async(
+					gdp_gcl_t *gcl,			// readable GCL handle
+					gdp_recno_t recno,		// starting record number
+					gdp_event_cbfunc_t cbfunc,	// callback function
+					void *cbarg);			// argument to cbfunc
+
+// subscribe to a readable GCL
+#define gdp_gcl_subscribe		gdp_gcl_subscribe_by_recno
+
+// subscribe by timestamp
+#define gdp_gcl_subscribe_ts	gdp_gcl_subscribe_by_ts
+extern EP_STAT	gdp_gcl_subscribe_ts(
+					gdp_gcl_t *gcl,			// readable GCL handle
+					EP_TIME_SPEC *start,	// first record to retrieve
+					int32_t nrecs,			// number of records to retrieve
+					EP_TIME_SPEC *timeout,	// timeout
+					gdp_event_cbfunc_t cbfunc,
+											// callback function for next datum
+					void *cbarg);			// argument passed to callback
+
+// read multiple records (no subscriptions)
+#if 0	//XXX OBSOLETE (???)
+extern EP_STAT	gdp_gcl_multiread(
+					gdp_gcl_t *gcl,			// readable GCL handle
+					gdp_recno_t start,		// first record to retrieve
+					int32_t nrecs,			// number of records to retrieve
+					gdp_event_cbfunc_t cbfunc,
+											// callback function for next datum
+					void *cbarg);			// argument passed to callback
+#endif //XXX
+#define gdp_gcl_multiread		gdp_gcl_read_by_recno_async	// BACK COMPAT
+
+// read multiple records starting from timestamp (no subscriptions)
+#define gdp_gcl_multiread_ts	gdp_gcl_read_by_ts_async
+
 
 
 /*

@@ -80,9 +80,10 @@ _gdp_gob_create(gdp_name_t gobname,
 				uint32_t reqflags,
 				gdp_gob_t **pgob)
 {
+	EP_STAT estat = EP_STAT_OK;
 	gdp_req_t *req = NULL;
 	gdp_gob_t *gob = NULL;
-	EP_STAT estat = EP_STAT_OK;
+	gdp_msg_t *msg;
 
 	errno = 0;				// avoid spurious messages
 
@@ -105,11 +106,26 @@ _gdp_gob_create(gdp_name_t gobname,
 	estat = _gdp_req_new(GDP_CMD_CREATE, gob, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
+	msg = req->cpdu->msg;
+	EP_ASSERT_ELSE(msg != NULL, return EP_STAT_ASSERT_ABORT);
+	EP_ASSERT_ELSE(msg->body != NULL, return EP_STAT_ASSERT_ABORT);
+	GdpBody__CommandCreate *payload = msg->body->cmd_create;
+	EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
+
 	// send the name of the log to be created in the payload
-	gdp_buf_write(req->cpdu->datum->dbuf, gobname, sizeof (gdp_name_t));
+	payload->logname.len = sizeof (gdp_name_t);
+	payload->logname.data = ep_mem_zalloc(sizeof (gdp_name_t));
+	memcpy(payload->logname.data, gobname, sizeof (gdp_name_t));
 
 	// add the metadata to the output stream
-	_gdp_gclmd_serialize(gmd, req->cpdu->datum->dbuf);
+	{
+		uint8_t *mdbuf;
+		size_t mdlen;
+		mdlen = _gdp_gclmd_serialize(gmd, &mdbuf);
+		payload->metadata.len = mdlen;
+		payload->metadata.data = mdbuf;
+		payload->has_metadata = true;
+	}
 
 	// send command and wait for results
 	estat = _gdp_invoke(req);
@@ -239,13 +255,11 @@ find_secret_key(gdp_gob_t *gob,
 
 	// re-serialize the metadata and include it
 	{
-		gdp_buf_t *mdbuf = gdp_buf_new();
-		_gdp_gclmd_serialize(gob->gclmd, mdbuf);
-		size_t mdbuflen = gdp_buf_getlength(mdbuf);
-		ep_crypto_sign_update(gob->digest, gdp_buf_getptr(mdbuf, mdbuflen),
-						mdbuflen);
-		//gdp_buf_drain(mdbuf, mdbuflen);
-		gdp_buf_free(mdbuf);
+		uint8_t *mdbuf;
+		size_t mdlen;
+		mdlen = _gdp_gclmd_serialize(gob->gclmd, &mdbuf);
+		ep_crypto_sign_update(gob->digest, mdbuf, mdlen);
+		ep_mem_free(mdbuf);
 	}
 
 	// the GOB hash structure now has the fixed part of the hash
@@ -266,6 +280,7 @@ _gdp_gob_open(gdp_gob_t *gob,
 {
 	EP_STAT estat = EP_STAT_OK;
 	gdp_req_t *req = NULL;
+	gdp_msg_t *msg;
 
 	EP_ASSERT_ELSE(GDP_GOB_ISGOOD(gob),
 					return EP_STAT_ASSERT_ABORT);
@@ -277,15 +292,41 @@ _gdp_gob_open(gdp_gob_t *gob,
 	reqflags |= GDP_REQ_ROUTEFAIL;			// don't retry on router errors
 	estat = _gdp_req_new(cmd, gob, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
+
+	msg = req->cpdu->msg;
+	EP_ASSERT_ELSE(msg != NULL, return EP_STAT_ASSERT_ABORT);
+	EP_ASSERT_ELSE(msg->body != NULL, return EP_STAT_ASSERT_ABORT);
+	GdpBody__CommandOpen *payload = msg->body->cmd_open;
+	EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
+
+	// nothing actually sent in the payload
+
 	estat = _gdp_invoke(req);
 	EP_STAT_CHECK(estat, goto fail0);
-	// success
+	msg = req->rpdu->msg;
+	EP_ASSERT(msg != NULL);
+	EP_ASSERT(msg->body != NULL);
+	if (msg->body->command_body_case !=
+			GDP_BODY__COMMAND_BODY_ACK_SUCCESS)
+	{
+		ep_dbg_cprintf(Dbg, 1,
+				"_gdp_gob_open: unexpected response type %d (expected %d)\n",
+				msg->body->command_body_case,
+				GDP_BODY__COMMAND_BODY_ACK_SUCCESS);
+		//estat = ???;
+	}
+	else
+	{
+		// success
+		GdpBody__AckSuccess *payload = msg->body->ack_success;
 
-	// save the number of records
-	gob->nrecs = req->rpdu->datum->recno;
+		// save the number of records
+		gob->nrecs = payload->recno;
 
-	// read in the metadata to internal format
-	gob->gclmd = _gdp_gclmd_deserialize(req->rpdu->datum->dbuf);
+		// read in the metadata to internal format
+		gob->gclmd = _gdp_gclmd_deserialize(payload->metadata.data,
+										payload->metadata.len);
+	}
 
 	// if we're not going to write, we don't need a secret key
 	if (cmd == GDP_CMD_OPEN_AO || cmd == GDP_CMD_OPEN_RA)
@@ -403,6 +444,7 @@ append_common(gdp_gob_t *gob,
 {
 	EP_STAT estat = GDP_STAT_BAD_IOMODE;
 	gdp_req_t *req;
+	gdp_msg_t *msg;
 
 	errno = 0;				// avoid spurious messages
 
@@ -417,8 +459,12 @@ append_common(gdp_gob_t *gob,
 	EP_STAT_CHECK(estat, goto fail0);
 	req = *reqp;
 
-	// if the assertion fails, we may be using an already freed datum
-	EP_ASSERT_ELSE(datum->inuse, return EP_STAT_ASSERT_ABORT);
+	// set up the message content
+	msg = req->cpdu->msg;
+	EP_ASSERT_ELSE(msg != NULL, return EP_STAT_ASSERT_ABORT);
+	EP_ASSERT_ELSE(msg->body != NULL, return EP_STAT_ASSERT_ABORT);
+	GdpBody__CommandAppend *payload = msg->body->cmd_append;
+	EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
 
 	// set up for signing (req->md will be updated with data part)
 	req->md = gob->digest;
@@ -430,9 +476,12 @@ append_common(gdp_gob_t *gob,
 	// If the append fails, we'll be out of sync and all hell breaks loose.
 	gob->nrecs++;
 
-	// caller owns datum
-	//XXX why not just take the reference?
-	gdp_datum_copy(req->cpdu->datum, datum);
+	// add the datum to the output payload
+	{
+		payload->datum = ep_mem_zalloc(sizeof *payload->datum);
+		gdp_datum__init(payload->datum);
+		_gdp_datum_to_pb(datum, payload->datum);
+	}
 
 fail0:
 	return estat;
@@ -461,12 +510,7 @@ _gdp_gob_append(gdp_gob_t *gob,
 	estat = _gdp_invoke(req);
 	EP_STAT_CHECK(estat, goto fail1);
 
-	// collect results
-	gob->nrecs = datum->recno;
-	gdp_buf_reset(datum->dbuf);
-	if (datum->sig != NULL)
-		gdp_buf_reset(datum->sig);
-	gdp_datum_copy(datum, req->rpdu->datum);
+	// collect results (currently no results of interest)
 
 fail1:
 	_gdp_req_free(&req);
@@ -499,7 +543,6 @@ _gdp_gob_append_async(
 {
 	EP_STAT estat;
 	gdp_req_t *req = NULL;
-	int i;
 
 	// deliver results asynchronously
 	reqflags |= GDP_REQ_ASYNCIO;
@@ -510,11 +553,6 @@ _gdp_gob_append_async(
 	_gdp_event_setcb(req, cbfunc, cbarg);
 
 	estat = _gdp_req_send(req);
-
-	// synchronous calls clear the data in the datum, so be consistent
-	i = gdp_buf_drain(req->cpdu->datum->dbuf, SIZE_MAX);
-	if (i < 0 && ep_dbg_test(Dbg, 1))
-		ep_dbg_printf("_gdp_gob_append_async: gdp_buf_drain failure\n");
 
 	gdp_buf_reset(datum->dbuf);
 	if (datum->sig != NULL)
@@ -543,23 +581,27 @@ fail0:
 
 
 /*
-**  _GDP_GOB_READ --- read a record from a GOB
+**  _GDP_GOB_READ_BY_RECNO --- read a record from a GOB by record number
 **
 **		Parameters:
 **			gob --- the gob from which to read
-**			datum --- the data buffer (to avoid dynamic memory)
+**			recno --- the starting record number
+**			nrecs --- the number of records to read
 **			chan --- the data channel used to contact the remote
 **			reqflags --- flags for the request
+**			datum --- the data buffer (to avoid dynamic memory)
 **
 **		This might be read by recno or read by timestamp based on
 **		the command.  In any case the cmd is the defining factor.
 */
 
 EP_STAT
-_gdp_gob_read(gdp_gob_t *gob,
-			gdp_datum_t *datum,
+_gdp_gob_read_by_recno(gdp_gob_t *gob,
+			gdp_recno_t recno,
+			uint32_t nrecs,
 			gdp_chan_t *chan,
-			uint32_t reqflags)
+			uint32_t reqflags,
+			gdp_datum_t *datum)
 {
 	EP_STAT estat = GDP_STAT_BAD_IOMODE;
 	gdp_req_t *req;
@@ -574,14 +616,35 @@ _gdp_gob_read(gdp_gob_t *gob,
 	EP_ASSERT_ELSE(datum->inuse, return EP_STAT_ASSERT_ABORT);
 
 	// create and send a new request
-	estat = _gdp_req_new(GDP_CMD_READ, gob, chan, NULL, reqflags, &req);
+	estat = _gdp_req_new(GDP_CMD_READ_BY_RECNO, gob, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
-	gdp_datum_copy(req->cpdu->datum, datum);
-	estat = _gdp_invoke(req);
 
-	// ok, done!  pass the datum contents to the caller and free the request
-	if (EP_STAT_ISOK(estat))
-		gdp_datum_copy(datum, req->rpdu->datum);
+	// create the command payload
+	{
+		gdp_msg_t *msg = req->cpdu->msg;
+		EP_ASSERT_ELSE(msg != NULL, return EP_STAT_ASSERT_ABORT);
+		EP_ASSERT_ELSE(msg->body != NULL, return EP_STAT_ASSERT_ABORT);
+		GdpBody__CommandReadByRecno *payload = msg->body->cmd_read_by_recno;
+		EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
+		payload->recno = recno;
+	}
+
+	estat = _gdp_invoke(req);
+	EP_STAT_CHECK(estat, goto fail1);
+
+	// parse the response payload
+	{
+		gdp_msg_t *msg = req->rpdu->msg;
+		EP_ASSERT_ELSE(msg != NULL, return EP_STAT_ASSERT_ABORT);
+		EP_ASSERT_ELSE(msg->body != NULL, return EP_STAT_ASSERT_ABORT);
+		GdpBody__AckContent *payload = msg->body->ack_content;
+		EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
+
+		// ok, done!  pass the datum contents to the caller and free the request
+		_gdp_datum_from_pb(datum, payload->datum);
+	}
+
+fail1:
 	_gdp_req_free(&req);
 fail0:
 	return estat;
@@ -589,11 +652,12 @@ fail0:
 
 
 /*
-**  _GDP_GOB_READ_ASYNC --- asynchronously read a record from a GOB
+**  _GDP_GOB_READ_BY_RECNO_ASYNC --- asynchronously read a record from a GOB
 **
 **		Parameters:
 **			gob --- the gob from which to read
 **			recno --- the record number to read
+**			nrecs --- the number of records to read
 **			cbfunc --- the callback function (NULL => deliver as events)
 **			cbarg --- user argument to cbfunc
 **			chan --- the data channel used to contact the remote
@@ -603,14 +667,17 @@ fail0:
 */
 
 EP_STAT
-_gdp_gob_read_async(gdp_gob_t *gob,
+_gdp_gob_read_by_recno_async(
+			gdp_gob_t *gob,
 			gdp_recno_t recno,
+			uint32_t nrecs,
 			gdp_event_cbfunc_t cbfunc,
 			void *cbarg,
 			gdp_chan_t *chan)
 {
 	EP_STAT estat;
 	gdp_req_t *req;
+	gdp_msg_t *msg;
 
 	errno = 0;				// avoid spurious messages
 
@@ -619,11 +686,21 @@ _gdp_gob_read_async(gdp_gob_t *gob,
 		return GDP_STAT_GCL_NOT_OPEN;
 
 	// create a new READ request (don't need a special command)
-	estat = _gdp_req_new(GDP_CMD_READ, gob, chan, NULL, GDP_REQ_ASYNCIO, &req);
+	estat = _gdp_req_new(GDP_CMD_READ_BY_RECNO, gob, chan,
+						NULL, GDP_REQ_ASYNCIO, &req);
 	EP_STAT_CHECK(estat, return estat);
+
+	msg = req->cpdu->msg;
+	EP_ASSERT_ELSE(msg != NULL, return EP_STAT_ASSERT_ABORT);
+	EP_ASSERT_ELSE(msg->body != NULL, return EP_STAT_ASSERT_ABORT);
+	GdpBody__CommandReadByRecno *payload = msg->body->cmd_read_by_recno;
+	EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
+	payload->recno = recno;
+	payload->nrecs = nrecs;
+
+	// arrange for responses to appear as events or callbacks
 	_gdp_event_setcb(req, cbfunc, cbarg);
 
-	req->cpdu->datum->recno = recno;
 	estat = _gdp_req_send(req);
 
 	if (EP_STAT_ISOK(estat))
@@ -653,6 +730,7 @@ _gdp_gob_getmetadata(gdp_gob_t *gob,
 {
 	EP_STAT estat;
 	gdp_req_t *req;
+	gdp_msg_t *msg;
 
 	if (!GDP_GOB_ISGOOD(gob))
 		return GDP_STAT_GCL_NOT_OPEN;
@@ -664,7 +742,29 @@ _gdp_gob_getmetadata(gdp_gob_t *gob,
 	estat = _gdp_invoke(req);
 	EP_STAT_CHECK(estat, goto fail1);
 
-	*gmdp = _gdp_gclmd_deserialize(req->rpdu->datum->dbuf);
+	msg = req->rpdu->msg;
+	EP_ASSERT(msg != NULL);
+	EP_ASSERT(msg->body != NULL);
+	if (msg->body->command_body_case !=
+			GDP_BODY__COMMAND_BODY_ACK_SUCCESS)
+	{
+		ep_dbg_cprintf(Dbg, 1,
+				"_gdp_gob_open: unexpected response type %d (expected %d)\n",
+				msg->body->command_body_case,
+				GDP_BODY__COMMAND_BODY_ACK_SUCCESS);
+		//estat = ???;
+	}
+	else
+	{
+		// success
+		GdpBody__AckSuccess *payload = msg->body->ack_success;
+
+		// read in the metadata to internal format
+		gob->gclmd = _gdp_gclmd_deserialize(payload->metadata.data,
+										payload->metadata.len);
+	}
+
+	*gmdp = gob->gclmd;
 
 fail1:
 	_gdp_req_free(&req);
@@ -703,6 +803,7 @@ fail0:
 **  Client side implementations for commands used internally only.
 ***********************************************************************/
 
+#if 0	//XXX this should probably be done at Layer 4
 /*
 **  _GDP_GOB_FWD_APPEND --- forward APPEND command
 **
@@ -803,3 +904,5 @@ fail0:
 	}
 	return estat;
 }
+
+#endif

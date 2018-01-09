@@ -94,14 +94,16 @@ LIBJANSSON=	-L${LOCAL1}/lib -L${LOCAL2}/lib -ljansson
 INCEVENT2=
 LIBEVENT2=	-levent -levent_pthreads -pthread
 LIBCRYPTO=	-lcrypto
+LIBPROTO_C=	-lprotobuf-c
 LIBAVAHI=	-lavahi-client -lavahi-common
 LIBADD=		`sh ../adm/add-libs.sh`
 LDLIBS=		${LIBGDP} \
 		${LIBEP} \
-		${LIBJANSSON}  \
 		${LIBEVENT2}  \
 		${LIBCRYPTO}  \
+		${LIBPROTO_C} \
 		${LIBAVAHI} \
+		${LIBJANSSON}  \
 		${LIBADD}
 LDFLAGS+=	t_common_support.o \
 		${LIBSEARCH} \

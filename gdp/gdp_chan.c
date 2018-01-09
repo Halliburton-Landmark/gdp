@@ -37,6 +37,7 @@
 #include "gdp_zc_client.h"
 
 #include <ep/ep_dbg.h>
+#include <ep/ep_hexdump.h>
 #include <ep/ep_log.h>
 #include <ep/ep_prflags.h>
 #include <ep/ep_string.h>
@@ -50,10 +51,11 @@
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.chan", "GDP channel processing");
 
 
-#if PROTOCOL_V4
-#define GDP_CHAN_PROTO_VERSION	4			// protocol version number in PDU
+// protocol version number in layer 4 (transport) PDU
+#if PROTOCOL_L4_V3
+#define GDP_CHAN_PROTO_VERSION	3
 #else
-#define GDP_CHAN_PROTO_VERSION	3			// protocol version number in PDU
+#define GDP_CHAN_PROTO_VERSION	4
 #endif
 
 static struct event_base	*EventBase;
@@ -74,10 +76,11 @@ struct gdp_chan
 	gdp_chan_x_t			*cdata;			// arbitrary user data
 
 	// callbacks
-	gdp_cursor_recv_cb_t	*recv_cb;		// receive callback
+	gdp_chan_recv_cb_t		*recv_cb;		// receive callback
 	gdp_chan_send_cb_t		*send_cb;		// send callback
-	gdp_chan_advert_func_t	*advert_cb;		// advertising function
 	gdp_chan_ioevent_cb_t	*ioevent_cb;	// close/error/eof callback
+	gdp_chan_router_cb_t	*router_cb;		// router event callback
+	gdp_chan_advert_func_t	*advert_cb;		// advertising function
 };
 
 /* Channel states */
@@ -88,24 +91,11 @@ struct gdp_chan
 #define GDP_CHAN_CLOSING		4		// channel is closing
 
 
-/*
-**  Cursor internal structure
-*/
-
-struct gdp_cursor
-{
-	SLIST_ENTRY(gdp_cursor) next;		// linked list pointer
-	gdp_chan_t			*chan;			// associated channel
-	uint32_t			payload_size;	// total payload length
-	gdp_name_t			src;			// source name for this cursor
-	gdp_name_t			dst;			// destination name for this cursor
-	gdp_buf_t			*ibuf;			// input buffer
-	gdp_cursor_x_t		*udata;			// arbitrary user defined data
-	EP_STAT				estat;			// status of last operation
-};
-
-
-#if PROTOCOL_V4
+#if PROTOCOL_L4_V3
+// Running over a Version 3 Transport Layer
+// PDU layout shown in gdp_pdu.h
+#define MIN_HEADER_LENGTH	(1+1+1+1+32+32+4+1+1+1+1+4)
+#else
 /*
 **  On-the-Wire PDU Format
 **
@@ -145,10 +135,7 @@ struct gdp_cursor
 #define GDP_PDUF_FLOWID		0x40	// uses FlowID instead of dst/src
 
 #define MIN_HEADER_LENGTH	(1 + 1 + 1 + 1 + 4 + 32 + 32)
-#else
-// PDU layout shown in gdp_pdu.h
-#define MIN_HEADER_LENGTH	(1+1+1+1+32+32+4+1+1+1+1+4)
-#endif
+#endif	// PROTOCOL_L4_V3
 #define MAX_HEADER_LENGTH	(255 * 4)
 
 static uint8_t	RoutingLayerAddr[32] =
@@ -177,47 +164,6 @@ _gdp_chan_init(
 
 
 /*
-**  Create and destroy cursors
-*/
-
-// free list (to speed up allocation and avoid memory fragmentation)
-static SLIST_HEAD(cursor_list, gdp_cursor)
-						CursorFreeList = SLIST_HEAD_INITIALIZER(CursorFreeList);
-static EP_THR_MUTEX		CursorFreeListMutex		EP_THR_MUTEX_INITIALIZER;
-
-static gdp_cursor_t *
-cursor_new(gdp_chan_t *chan, gdp_buf_t *ibuf)
-{
-	gdp_cursor_t *cursor;
-
-	ep_thr_mutex_lock(&CursorFreeListMutex);
-	cursor = SLIST_FIRST(&CursorFreeList);
-	if (cursor != NULL)
-		SLIST_REMOVE_HEAD(&CursorFreeList, next);
-	ep_thr_mutex_unlock(&CursorFreeListMutex);
-
-	if (cursor == NULL)
-	{
-		cursor = ep_mem_zalloc(sizeof *cursor);
-	}
-
-	cursor->chan = chan;
-	cursor->ibuf = ibuf;		// reference, not copy
-
-	return cursor;
-}
-
-static void
-cursor_free(gdp_cursor_t *cursor)
-{
-	cursor->ibuf = NULL;					// owned by channel
-	cursor->estat = EP_STAT_OK;
-	cursor->udata = NULL;
-	SLIST_INSERT_HEAD(&CursorFreeList, cursor, next);
-}
-
-
-/*
 **  Lock and Unlock a channel
 */
 
@@ -236,14 +182,26 @@ _gdp_chan_unlock(gdp_chan_t *chan)
 
 /*
 **  Read and decode fixed PDU header
+**		On return, the header has been consumed from the input but
+**			the complete payload is still in the input buffer.
+**			The payload length is returned through plenp.
+**		Returns GDP_STAT_KEEP_READING and leaves the header in the
+**			input buffer if the entire payload is not yet in memory.
+**		Returns GDP_STAT_NAK_NOROUTE if the router cannot find a
+**			path to the destination.
 */
 
 static EP_STAT
-read_header(gdp_cursor_t *cursor)
+read_header(gdp_chan_t *chan,
+		gdp_buf_t *ibuf,
+		gdp_name_t *src,
+		gdp_name_t *dst,
+		size_t *plenp)
 {
-	gdp_buf_t *ibuf = GDP_BUF_FROM_EVBUFFER(
-								bufferevent_get_input(cursor->chan->bev));
 	uint8_t *pbp = gdp_buf_getptr(ibuf, MIN_HEADER_LENGTH);
+	int b;
+	size_t hdr_len;
+	size_t payload_len = 0;
 	EP_STAT estat = EP_STAT_OK;
 
 	if (pbp == NULL)
@@ -254,51 +212,85 @@ read_header(gdp_cursor_t *cursor)
 		goto done;
 	}
 
-# if PROTOCOL_V4
-	int b;
-	int hdr_len;
 	GET8(b);				// PDU version number
+#if PROTOCOL_L4_V3
+	if (b != 2 && b != 3)
+#else
 	if (b != GDP_CHAN_PROTO_VERSION)
+#endif
 	{
 		ep_dbg_cprintf(Dbg, 1, "wrong protocol version %d (%d expected)\n",
 				b, GDP_CHAN_PROTO_VERSION);
 		estat = GDP_STAT_PDU_VERSION_MISMATCH;
+
+		// for lack of anything better, flush the entire input buffer
+		gdp_buf_drain(ibuf, gdp_buf_getlength(ibuf));
 		goto done;
 	}
-
-	GET8(b);				// time to live
-	GET8(b);				// type of service
+	GET8(b);				// time to live (ignored by non-routing layer)
+#if PROTOCOL_L4_V3
+	int rnak;
+	GET8(b);					// reserved (ignored)
+	GET8(rnak);					// command (ignored except for router naks)
+	memcpy(dst, pbp, sizeof (gdp_name_t));	// destination
+	pbp += sizeof (gdp_name_t);
+	memcpy(src, pbp, sizeof (gdp_name_t));	// source
+	pbp += sizeof (gdp_name_t);
+	GET32(b);					// rid (ignored)
+	GET16(b);					// signature size and type (ignored)
+	GET8(b);					// option length / 4
+	hdr_len = MIN_HEADER_LENGTH + (b * 4);
+	GET8(b);					// flags (ignored)
+	GET32(payload_len);			// data length
+#else
 	GET8(hdr_len);			// header length / 4
-	if (hdr_len < 0)
+	hdr_len *= 4;
+	if (hdr_len < MIN_HEADER_LENGTH)
 	{
+		ep_dbg_cprintf(Dbg, 1,
+				"read_header: short header, need %d got %zd\n",
+				MIN_HEADER_LENGTH, hdr_len);
 		estat = GDP_STAT_PDU_CORRUPT;
 		goto done;
 	}
-	hdr_len *= 4;
+	GET8(b);				// type of service (ignored)
 
 	// if we don't yet have the whole header, wait until we do
 	if (gdp_buf_getlength(ibuf) < hdr_len)
 		return GDP_STAT_KEEP_READING;
 
-	GET32(cursor->payload_size);
-	memcpy(cursor->src, pbp, sizeof cursor->src);
-	pbp += sizeof cursor->src;
-	memcpy(cursor->dst, pbp, sizeof cursor->dst);
-	pbp += sizeof cursor->dst;
+	GET32(payload_len);
+	memcpy(src, pbp, sizeof (gdp_name_t));
+	pbp += sizeof (gdp_name_t);
+	memcpy(dst, pbp, sizeof (gdp_name_t));
+	pbp += sizeof (gdp_name_t);
+#endif	// PROTOCOL_L4_V3
 
-	// XXX hack: only return entire PDU
-	if (gdp_buf_getlength(ibuf) < hdr_len + cursor->payload_size)
-		return GDP_STAT_KEEP_READING;
+	// XXX check for rational payload_len here? XXX
 
-	// consume entire header
+	// make sure entire PDU is in memory
+	if (gdp_buf_getlength(ibuf) < hdr_len + payload_len)
+	{
+		estat = GDP_STAT_KEEP_READING;
+		goto done;
+	}
+
+	// consume the header, but leave the payload
 	gdp_buf_drain(ibuf, hdr_len);
-# endif
+#if PROTOCOL_L4_V3
+	if (rnak == GDP_NAK_R_NOROUTE)
+		estat = GDP_STAT_NAK_NOROUTE;
+	else
+#endif
+		estat = EP_STAT_FROM_INT(payload_len);
 
-done: {
+done:
+	{
 		char ebuf[100];
 		ep_dbg_cprintf(Dbg, 32, "read_header: %s\n",
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
+	*plenp = payload_len;
 	return estat;
 }
 
@@ -323,36 +315,62 @@ chan_read_cb(struct bufferevent *bev, void *ctx)
 	EP_STAT estat;
 	gdp_buf_t *ibuf = GDP_BUF_FROM_EVBUFFER(bufferevent_get_input(bev));
 	gdp_chan_t *chan = ctx;
+	gdp_name_t src, dst;
 
 	ep_dbg_cprintf(Dbg, 50, "chan_read_cb: fd %d, %zd bytes\n",
 			bufferevent_getfd(bev), gdp_buf_getlength(ibuf));
 
 	EP_ASSERT(bev == chan->bev);
 
-	// we store the header data in a cursor
-	gdp_cursor_t *cursor = cursor_new(chan, ibuf);
-
-	while (gdp_buf_getlength(ibuf) > MIN_HEADER_LENGTH)
+	while (gdp_buf_getlength(ibuf) >= MIN_HEADER_LENGTH)
 	{
 		// get the transport layer header
-		estat = read_header(cursor);
+		size_t payload_len;
+		estat = read_header(chan, ibuf, &src, &dst, &payload_len);
 
+		// if we don't have enough input, wait for more (we'll be called again)
+		if (EP_STAT_IS_SAME(estat, GDP_STAT_KEEP_READING))
+			break;
+
+#if PROTOCOL_L4_V3
+		if (!EP_STAT_ISOK(estat))
+		{
+			// deliver routing error to upper level
+			ep_dbg_cprintf(Dbg, 27, "chan_read_cb: sending to router_cb %p\n",
+						chan->router_cb);
+			if (chan->router_cb != NULL)
+			{
+				estat = (*chan->router_cb)(chan, src, dst, payload_len, estat);
+			}
+			else
+			{
+				ep_dbg_cprintf(Dbg, 1, "chan_read_cb: NULL router_cb\n");
+				estat = GDP_STAT_NOT_IMPLEMENTED;
+				gdp_buf_drain(ibuf, payload_len);
+			}
+		}
+#endif
 		// pass it to the L5 callback
 		// note that if the callback is not set, the PDU is thrown away
 		if (EP_STAT_ISOK(estat))
 		{
 			if (chan->recv_cb != NULL)
-				estat = (*chan->recv_cb)(cursor, 0);
+			{
+				// call upper level processing
+				estat = (*chan->recv_cb)(chan, src, dst, ibuf, payload_len);
+			}
 			else
+			{
+				// discard input
 				ep_dbg_cprintf(Dbg, 1, "chan_read_cb: NULL recv_cb\n");
+				estat = GDP_STAT_NOT_IMPLEMENTED;
+				gdp_buf_drain(ibuf, payload_len);
+			}
 		}
 		char ebuf[100];
 		ep_dbg_cprintf(Dbg, 32, "chan_read_cb: %s\n",
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
-		EP_STAT_CHECK(estat, break);
 	}
-
-	cursor_free(cursor);
 }
 
 
@@ -362,12 +380,12 @@ chan_read_cb(struct bufferevent *bev, void *ctx)
 
 static EP_PRFLAGS_DESC	EventWhatFlags[] =
 {
-	{ BEV_EVENT_READING,	BEV_EVENT_READING,		"BEV_EVENT_READING"		},
-	{ BEV_EVENT_WRITING,	BEV_EVENT_WRITING,		"BEV_EVENT_WRITING"		},
-	{ BEV_EVENT_EOF,		BEV_EVENT_EOF,			"BEV_EVENT_EOF"			},
-	{ BEV_EVENT_ERROR,		BEV_EVENT_ERROR,		"BEV_EVENT_ERROR"		},
-	{ BEV_EVENT_TIMEOUT,	BEV_EVENT_TIMEOUT,		"BEV_EVENT_TIMEOUT"		},
-	{ BEV_EVENT_CONNECTED,	BEV_EVENT_CONNECTED,	"BEV_EVENT_CONNECTED"	},
+	{ BEV_EVENT_READING,	BEV_EVENT_READING,		"READING"			},
+	{ BEV_EVENT_WRITING,	BEV_EVENT_WRITING,		"WRITING"			},
+	{ BEV_EVENT_EOF,		BEV_EVENT_EOF,			"EOF"				},
+	{ BEV_EVENT_ERROR,		BEV_EVENT_ERROR,		"ERROR"				},
+	{ BEV_EVENT_TIMEOUT,	BEV_EVENT_TIMEOUT,		"TIMEOUT"			},
+	{ BEV_EVENT_CONNECTED,	BEV_EVENT_CONNECTED,	"CONNECTED"			},
 	{ 0, 0, NULL }
 };
 
@@ -724,9 +742,10 @@ EP_STAT
 _gdp_chan_open(
 		const char *router_addr,
 		void *qos,
-		gdp_cursor_recv_cb_t *recv_cb,
+		gdp_chan_recv_cb_t *recv_cb,
 		gdp_chan_send_cb_t *send_cb,
 		gdp_chan_ioevent_cb_t *ioevent_cb,
+		gdp_chan_router_cb_t *router_cb,
 		gdp_chan_advert_func_t *advert_func,
 		gdp_chan_x_t *cdata,
 		gdp_chan_t **pchan)
@@ -743,9 +762,10 @@ _gdp_chan_open(
 	ep_thr_cond_init(&chan->cond);
 	chan->state = GDP_CHAN_CONNECTING;
 	chan->recv_cb = recv_cb;
-	//chan->send_cb = send_cb;
-	chan->advert_cb = advert_func;
+	chan->send_cb = send_cb;			//XXX unused at this time
 	chan->ioevent_cb = ioevent_cb;
+	chan->router_cb = router_cb;
+	chan->advert_cb = advert_func;
 	chan->cdata = cdata;
 	if (router_addr != NULL)
 		chan->router_addr = ep_mem_strdup(router_addr);
@@ -756,6 +776,7 @@ _gdp_chan_open(
 					BEV_OPT_CLOSE_ON_FREE | BEV_OPT_THREADSAFE |
 					BEV_OPT_DEFER_CALLBACKS | BEV_OPT_UNLOCK_CALLBACKS);
 	bufferevent_setcb(chan->bev, chan_read_cb, NULL, chan_event_cb, chan);
+	bufferevent_setwatermark(chan->bev, EV_READ, MIN_HEADER_LENGTH, 0);
 	bufferevent_enable(chan->bev, EV_READ | EV_WRITE);
 	*pchan = chan;
 
@@ -812,29 +833,78 @@ send_helper(gdp_chan_t *chan,
 	EP_STAT estat = EP_STAT_OK;
 	int i;
 
-# if PROTOCOL_V4
+	if (ep_dbg_test(Dbg, 51))
+	{
+		gdp_pname_t src_printable;
+		gdp_pname_t dst_printable;
+		ep_dbg_printf("send_helper:\n\tsrc %s\n\tdst %s\n\tpayload %p ",
+				gdp_printable_name(src, src_printable),
+				gdp_printable_name(dst, dst_printable),
+				payload);
+		if (payload == NULL)
+			ep_dbg_printf("(no payload)\n");
+		else
+		{
+			size_t paylen = gdp_buf_getlength(payload);
+			ep_dbg_printf("len %zd\n", paylen);
+			ep_hexdump(gdp_buf_getptr(payload, paylen), paylen,
+					ep_dbg_getfile(), EP_HEXDUMP_ASCII, 0);
+		}
+	}
+
+#if PROTOCOL_L4_V3
+	// build the V3 header in memory
+	char pb[MAX_HEADER_LENGTH];
+	char *pbp = pb;
+	size_t payload_len = gdp_buf_getlength(payload);
+
+	PUT8(GDP_CHAN_PROTO_VERSION);		// version number (3)
+	PUT8(GDP_TTL_DEFAULT);				// time to live
+	PUT8(0);							// reserved
+	PUT8(tos);							// command (overloaded)
+	memcpy(pbp, dst, sizeof (gdp_name_t));	// dst
+	pbp += sizeof (gdp_name_t);
+	memcpy(pbp, src, sizeof (gdp_name_t));	// src
+	pbp += sizeof (gdp_name_t);
+	PUT32(0);							// request ID (unused)
+	PUT16(0);							// signature length and MD algorithm
+	PUT8(0);							// optionals length
+	PUT8(0);							// flags
+	PUT32(payload_len);					// SDU payload length
+#else
 	// build the header in memory
 	char pb[MAX_HEADER_LENGTH];
 	char *pbp = pb;
+	size_t payload_len = gdp_buf_getlength(payload);
+
 	tos &= ~GDP_PDUF_FLOWID;			// flowid not yet supported
 	PUT8(GDP_CHAN_PROTO_VERSION);		// version number
 	PUT8(18);							// header length (= 72 / 4)
-	PUT8(15);							// time to live
+	PUT8(GDP_TTL_DEFAULT);				// time to live
 	PUT8(tos);							// flags / type of service
-	PUT32(gdp_buf_getlength(payload));
+	PUT32(payload_len);
 	memcpy(pbp, dst, sizeof (gdp_name_t));
 	pbp += sizeof (gdp_name_t);
 	memcpy(pbp, src, sizeof (gdp_name_t));
 	pbp += sizeof (gdp_name_t);
+#endif
 
-	// now write it to the socket
+	// now write header to the socket
+	if (ep_dbg_test(Dbg, 33))
+	{
+		ep_dbg_printf("send_helper: sending %zd octets:\n",
+					payload_len + (pbp - pb));
+		ep_hexdump(pb, pbp - pb, ep_dbg_getfile(), 0, 0);
+		ep_hexdump(gdp_buf_getptr(payload, payload_len), payload_len,
+				ep_dbg_getfile(), EP_HEXDUMP_ASCII, pbp - pb);
+	}
+
 	i = bufferevent_write(chan->bev, pb, pbp - pb);
 	if (i < 0)
 	{
 		estat = GDP_STAT_PDU_WRITE_FAIL;
 		goto fail0;
 	}
-# endif
 
 	// and the payload
 	i = bufferevent_write_buffer(chan->bev, payload);
@@ -855,6 +925,13 @@ _gdp_chan_send(gdp_chan_t *chan,
 			gdp_name_t dst,
 			gdp_buf_t *payload)
 {
+	if (ep_dbg_test(Dbg, 32))
+	{
+		size_t l = evbuffer_get_length(payload);
+		uint8_t *p = evbuffer_pullup(payload, l);
+		ep_dbg_printf("_gdp_chan_send: sending PDU:\n");
+		ep_hexdump(p, l, ep_dbg_getfile(), EP_HEXDUMP_ASCII, 0);
+	}
 	return send_helper(chan, target, src, dst, payload, 0);
 }
 
@@ -872,28 +949,23 @@ _gdp_chan_advertise(
 			void *adata)
 {
 	EP_STAT estat = EP_STAT_OK;
-	gdp_req_t *req;
-	uint32_t reqflags = 0;
 	gdp_pname_t pname;
 
-	ep_dbg_cprintf(Dbg, 39, "_gdp_chan_advertise(%s):",
+	ep_dbg_cprintf(Dbg, 39, "_gdp_chan_advertise(%s):\n",
 			gdp_printable_name(gname, pname));
 
-	// create a new request and point it at the routing layer
-	estat = _gdp_req_new(GDP_CMD_ADVERTISE, NULL, chan, NULL, reqflags, &req);
-	EP_STAT_CHECK(estat, goto fail0);
-	memcpy(req->cpdu->dst, RoutingLayerAddr, sizeof req->cpdu->dst);
+#if PROTOCOL_L4_V3
+	gdp_buf_t *payload = gdp_buf_new();
 
 	// might batch several adverts into one PDU
-	gdp_buf_write(req->cpdu->datum->dbuf, gname, sizeof (gdp_name_t));
+	gdp_buf_write(payload, gname, sizeof (gdp_name_t));
 
-	// send the request
-	estat = _gdp_req_send(req);
+	estat = send_helper(chan, NULL, _GdpMyRoutingName, RoutingLayerAddr,
+						payload, GDP_CMD_ADVERTISE);
+#else
+# error Implement _gdp_chan_advertise!
+#endif
 
-	// there is no reply
-	_gdp_req_free(&req);
-
-fail0:
 	if (ep_dbg_test(Dbg, 21))
 	{
 		char ebuf[100];
@@ -928,63 +1000,6 @@ gdp_chan_x_t *
 _gdp_chan_get_cdata(gdp_chan_t *chan)
 {
 	return chan->cdata;
-}
-
-
-/*
-**  Get/Set functions for cursors.
-*/
-
-gdp_chan_t *
-_gdp_cursor_get_chan(gdp_cursor_t *cursor)
-{
-	return cursor->chan;
-}
-
-
-gdp_buf_t *
-_gdp_cursor_get_buf(gdp_cursor_t *cursor)
-{
-	return cursor->ibuf;
-}
-
-
-void
-_gdp_cursor_get_endpoints(
-				gdp_cursor_t *cursor,
-				gdp_name_t *src,
-				gdp_name_t *dst)
-{
-	memcpy(*src, cursor->src, sizeof *src);
-	memcpy(*dst, cursor->dst, sizeof *dst);
-}
-
-
-size_t
-_gdp_cursor_get_payload_size(gdp_cursor_t *cursor)
-{
-	return cursor->payload_size;
-}
-
-
-EP_STAT
-_gdp_cursor_get_estat(gdp_cursor_t *cursor)
-{
-	return cursor->estat;
-}
-
-
-void
-_gdp_cursor_set_udata(gdp_cursor_t *cursor, gdp_cursor_x_t *udata)
-{
-	cursor->udata = udata;
-}
-
-
-gdp_cursor_x_t *
-_gdp_cursor_get_udata(gdp_cursor_t *cursor)
-{
-	return cursor->udata;
 }
 
 

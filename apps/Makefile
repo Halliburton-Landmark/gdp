@@ -107,16 +107,18 @@ LIBEP=		-lep
 LIBJANSSON=	-ljansson
 LIBEVENT2=	-levent -levent_pthreads -pthread
 LIBCRYPTO=	-lcrypto
+LIBPROTO_C=	-lprotobuf-c
 LIBAVAHI=	-lavahi-client -lavahi-common
 LIBADD=		`sh ../adm/add-libs.sh`
 INCS=		${INCSEARCH} ${INCGDP} ${INCEP}
 LDFLAGS+=	${LIBSEARCH}
 LDLIBS=		${LIBGDP} \
 		${LIBEP} \
-		${LIBJANSSON} \
 		${LIBEVENT2} \
 		${LIBCRYPTO} \
+		${LIBPROTO_C} \
 		${LIBAVAHI} \
+		${LIBJANSSON} \
 		${LIBADD}
 PG=
 WALL=		-Wall
@@ -136,8 +138,8 @@ all_noavahi:
 
 gdp-log-check.o: ../gdplogd/logd_disklog.c ../gdplogd/logd_gcl.c
 
-gdp-rest:	gdp-rest.o ../scgilib/scgilib.o
-	${CC} -o $@ ${LDFLAGS} gdp-rest.o ${LDLIBS} ../scgilib/scgilib.o
+gdp-rest:	gdp-rest.c ../scgilib/scgilib.o
+	${CC} ${INCS} -o $@ ${LDFLAGS} gdp-rest.c ${LDLIBS} ../scgilib/scgilib.o
 
 ${CLEANALL}:	${LIBROOT}/gdp/libgdp.a ${LIBROOT}/ep/libep.a
 

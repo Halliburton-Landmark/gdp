@@ -42,6 +42,8 @@
 
 #include <event2/buffer.h>
 
+#include "gdp.pb-c.h"
+
 #if EP_OSCF_USE_VALGRIND
 # include <valgrind/helgrind.h>
 #else
@@ -49,10 +51,11 @@
 #endif
 
 typedef struct gdp_chan		gdp_chan_t;
-typedef struct gdp_cursor	gdp_cursor_t;
 typedef struct gdp_req		gdp_req_t;
 typedef struct gdp_gob		gdp_gob_t;
 typedef struct gdp_gin		gdp_gin_t;
+typedef GdpMessage			gdp_msg_t;
+typedef GdpCommandCode		gdp_cmd_t;
 typedef struct event_base	event_base_t;
 STAILQ_HEAD(gev_list, gdp_event);
 
@@ -87,6 +90,12 @@ extern bool			_GdpLibInitialized;	// are we initialized?
 	if (true)
 #endif
 
+// helper to do sanity checks
+#define GDP_MSG_CHECK(pdu, recovery)										\
+			EP_ASSERT_ELSE(pdu != NULL, recovery);							\
+			EP_ASSERT_ELSE(pdu->msg != NULL, recovery);						\
+			EP_ASSERT_ELSE(pdu->msg->body != NULL, recovery);
+
 #include "gdp_pdu.h"
 
 // declare the type of the gdp_req linked list (used multiple places)
@@ -117,23 +126,31 @@ struct gdp_datum
 {
 	EP_THR_MUTEX		mutex;			// locking mutex (mostly for dbuf)
 	struct gdp_datum	*next;			// next in free list
+	bool				inuse:1;		// the datum is in use (for debugging)
 	gdp_recno_t			recno;			// the record number
 	EP_TIME_SPEC		ts;				// commit timestamp
 	gdp_buf_t			*dbuf;			// data buffer
 	gdp_buf_t			*sig;			// signature (may be NULL)
 	short				sigmdalg;		// message digest algorithm
-	short				siglen;			// signature length
-	bool				inuse:1;		// the datum is in use (for debugging)
+	short				siglen;			// signature length;
 };
 
 #define GDP_DATUM_ISGOOD(datum)											\
 				((datum) != NULL &&										\
-				 (datum)->dbuf != NULL &&								\
+				 (datum)->dbuf != NULL &&									\
 				 (datum)->inuse)
 
 void			_gdp_datum_dump(		// dump data record (for debugging)
 						const gdp_datum_t *datum,	// message to print
 						FILE *fp);					// file to print it to
+
+void			_gdp_datum_to_pb(		// convert datum to protobuf form
+						const gdp_datum_t *datum,
+						GdpDatum *pb);
+
+void			_gdp_datum_from_pb(		// convert protobuf form to datum
+						gdp_datum_t *datum,
+						const GdpDatum *pb);
 
 gdp_datum_t		*gdp_datum_dup(		// duplicate a datum
 						const gdp_datum_t *datum);
@@ -152,11 +169,13 @@ gdp_datum_t		*gdp_datum_dup(		// duplicate a datum
 **		Read and append filters are also considered "external".
 **		It is not used at all by gdplogd.  It is called a
 **		gdp_gcl_t in the public API for historic reasons.
+**		Mostly implemented in gdp_api.c.
 **
 **		The gdp_gob is the internal representation.  This is what
 **		is in the cache.  It has the request list representing
 **		server-side subscriptions.  It is used both by the
-**		GDP library and by gdplogd.
+**		GDP library and by gdplogd.  Mostly implemented in
+**		gdp_gob_ops.c.
 */
 
 SLIST_HEAD(gcl_head, gdp_gcl);
@@ -211,19 +230,162 @@ struct gdp_gob
 #define GCLF_KEEPLOCKED		0x0020		// don't unlock in _gdp_gcl_decref
 #define GCLF_PENDING		0x0040		// not yet fully open
 
+
+/*
+**  GOB functions
+*/
+
 #define GDP_GOB_ISGOOD(gob)												\
 				((gob) != NULL &&										\
 				 EP_UT_BITSET(GCLF_INUSE, (gob)->flags))
-#define GDP_GIN_ISGOOD(gin)												\
-				((gin) != NULL &&										\
-				 EP_UT_BITSET(GCLF_INUSE, (gin)->flags) &&				\
-				 GDP_GOB_ISGOOD((gin)->gob))
 #define GDP_GOB_ASSERT_ISLOCKED(gob)									\
 			(															\
 				EP_ASSERT(GDP_GOB_ISGOOD(gob)) &&						\
 				EP_ASSERT(EP_UT_BITSET(GCLF_ISLOCKED, (gob)->flags)) &&	\
 				EP_THR_MUTEX_ASSERT_ISLOCKED(&(gob)->mutex)				\
 			)
+
+
+EP_STAT			_gdp_gob_new(				// create new in-mem handle
+						gdp_name_t name,
+						gdp_gob_t **gobhp);
+
+void			_gdp_gob_free(				// free in-memory handle
+						gdp_gob_t **gob);		// GOB to free
+
+#define _gdp_gob_lock(g)		_gdp_gob_lock_trace(g, __FILE__, __LINE__, #g)
+#define _gdp_gob_unlock(g)		_gdp_gob_unlock_trace(g, __FILE__, __LINE__, #g)
+#define _gdp_gob_decref(g, k)	_gdp_gob_decref_trace(g, k, __FILE__, __LINE__, #g)
+
+void			_gdp_gob_lock_trace(		// lock the GCL mutex
+						gdp_gob_t *gob,
+						const char *file,
+						int line,
+						const char *id);
+
+void			_gdp_gob_unlock_trace(		// unlock the GCL mutex
+						gdp_gob_t *gob,
+						const char *file,
+						int line,
+						const char *id);
+
+void			_gdp_gob_incref(			// increase reference count
+						gdp_gob_t *gob);
+
+void			_gdp_gob_decref_trace(		// decrease reference count (trace)
+						gdp_gob_t **gobp,
+						bool keeplocked,
+						const char *file,
+						int line,
+						const char *id);
+
+EP_STAT			_gdp_gob_newname(			// create new name based on metadata
+						gdp_gob_t *gob);
+
+void			_gdp_gob_dump(				// dump for debugging
+						const gdp_gob_t *gob,	// GOB to print
+						FILE *fp,				// where to print it
+						int detail,				// how much to print
+						int indent);			// unused at this time
+
+EP_STAT			_gdp_gob_create(			// create a new GDP object
+						gdp_name_t gobname,
+						gdp_name_t logdname,
+						gdp_gclmd_t *gmd,
+						gdp_chan_t *chan,
+						uint32_t reqflags,
+						gdp_gob_t **pgob);
+
+EP_STAT			_gdp_gob_open(				// open a GCL
+						gdp_gob_t *gob,
+						int cmd,
+						gdp_gcl_open_info_t *open_info,
+						gdp_chan_t *chan,
+						uint32_t reqflags);
+
+EP_STAT			_gdp_gob_close(				// close a GCL (handle)
+						gdp_gob_t *gob,
+						gdp_chan_t *chan,
+						uint32_t reqflags);
+
+EP_STAT			_gdp_gob_delete(			// delete and close a GCL (handle)
+						gdp_gob_t *gob,
+						gdp_chan_t *chan,
+						uint32_t reqflags);
+
+EP_STAT			_gdp_gob_read_by_recno(			// read GCL record based on datum
+						gdp_gob_t *gob,
+						gdp_recno_t recno,
+						uint32_t nrecs,
+						gdp_chan_t *chan,
+						uint32_t reqflags,
+						gdp_datum_t *datum);
+
+EP_STAT			_gdp_gob_read_by_recno_async(	// read asynchronously
+						gdp_gob_t *gob,
+						gdp_recno_t recno,
+						uint32_t nrecs,
+						gdp_event_cbfunc_t cbfunc,
+						void *cbarg,
+						gdp_chan_t *chan);
+
+EP_STAT			_gdp_gob_append(			// append a record (gdpd shared)
+						gdp_gob_t *gob,
+						gdp_datum_t *datum,
+						gdp_chan_t *chan,
+						uint32_t reqflags);
+
+EP_STAT			_gdp_gob_append_async(		// append asynchronously
+						gdp_gob_t *gob,
+						gdp_datum_t *datum,
+						gdp_event_cbfunc_t cbfunc,
+						void *cbarg,
+						gdp_chan_t *chan,
+						uint32_t reqflags);
+
+EP_STAT			_gdp_gcl_subscribe(			// subscribe to data
+						gdp_gin_t *gin,
+						int cmd,
+						gdp_recno_t start,
+						int32_t numrecs,
+						EP_TIME_SPEC *timeout,
+						gdp_event_cbfunc_t cbfunc,
+						void *cbarg);
+
+EP_STAT			_gdp_gcl_unsubscribe(		// delete subscriptions
+						gdp_gin_t *gin,
+						gdp_event_cbfunc_t cbfunc,
+						void *cbarg,
+						uint32_t reqflags);
+
+EP_STAT			_gdp_gob_getmetadata(		// retrieve metadata
+						gdp_gob_t *gob,
+						gdp_gclmd_t **gmdp,
+						gdp_chan_t *chan,
+						uint32_t reqflags);
+
+EP_STAT			_gdp_gob_newsegment(		// create a new physical segment
+						gdp_gob_t *gob,
+						gdp_chan_t *chan,
+						uint32_t reqflags);
+
+EP_STAT			_gdp_gob_fwd_append(		// forward APPEND (replication)
+						gdp_gob_t *gob,
+						gdp_datum_t *datum,
+						gdp_name_t to_server,
+						gdp_event_cbfunc_t cbfunc,
+						void *cbarg,
+						gdp_chan_t *chan,
+						uint32_t reqflags);
+
+/*
+**  GIN functions
+*/
+
+#define GDP_GIN_ISGOOD(gin)												\
+				((gin) != NULL &&										\
+				 EP_UT_BITSET(GCLF_INUSE, (gin)->flags) &&				\
+				 GDP_GOB_ISGOOD((gin)->gob))
 #define GDP_GIN_ASSERT_ISLOCKED(gin)									\
 			(															\
 				EP_ASSERT(GDP_GIN_ISGOOD(gin)) &&						\
@@ -248,6 +410,21 @@ struct gdp_gob
 						return NULL;									\
 			} while (false)
 
+#define _gdp_gin_lock(g)		_gdp_gin_lock_trace(g, __FILE__, __LINE__, #g)
+#define _gdp_gin_unlock(g)		_gdp_gin_unlock_trace(g, __FILE__, __LINE__, #g)
+
+void			_gdp_gin_lock_trace(		// lock the GIN mutex
+						gdp_gin_t *gin,
+						const char *file,
+						int line,
+						const char *id);
+
+
+void			_gdp_gin_unlock_trace(		// unlock the GIN mutex
+						gdp_gin_t *gin,
+						const char *file,
+						int line,
+						const char *id);
 
 
 /*
@@ -299,158 +476,9 @@ void			_gdp_gob_touch(				// move to front of LRU list
 void			_gdp_gob_cache_foreach(		// run over all cached GCLs
 						void (*f)(gdp_gob_t *));
 
-#define _gdp_gob_lock(g)		_gdp_gob_lock_trace(g, __FILE__, __LINE__, #g)
-#define _gdp_gob_unlock(g)		_gdp_gob_unlock_trace(g, __FILE__, __LINE__, #g)
-#define _gdp_gob_decref(g, k)	_gdp_gob_decref_trace(g, k, __FILE__, __LINE__, #g)
-
-void			_gdp_gob_lock_trace(		// lock the GCL mutex
-						gdp_gob_t *gob,
-						const char *file,
-						int line,
-						const char *id);
-
-void			_gdp_gob_unlock_trace(		// unlock the GCL mutex
-						gdp_gob_t *gob,
-						const char *file,
-						int line,
-						const char *id);
-
-void			_gdp_gob_incref(			// increase reference count
-						gdp_gob_t *gob);
-
-void			_gdp_gob_decref_trace(		// decrease reference count (trace)
-						gdp_gob_t **gobp,
-						bool keeplocked,
-						const char *file,
-						int line,
-						const char *id);
-
-#define _gdp_gin_lock(g)		_gdp_gin_lock_trace(g, __FILE__, __LINE__, #g)
-#define _gdp_gin_unlock(g)		_gdp_gin_unlock_trace(g, __FILE__, __LINE__, #g)
-
-void			_gdp_gin_lock_trace(		// lock the GCL mutex
-						gdp_gin_t *gin,
-						const char *file,
-						int line,
-						const char *id);
-
-
-void			_gdp_gin_unlock_trace(		// unlock the GCL mutex
-						gdp_gin_t *gin,
-						const char *file,
-						int line,
-						const char *id);
-
 void			_gdp_gob_pr_stats(			// print (debug) GOB statistics
 						FILE *fp);
 
-/*
-**  Other GCL handling.  These are shared between client access
-**  and the GDP daemon.
-**
-**  Implemented in gdp/gdp_gob_ops.c.
-*/
-
-EP_STAT			_gdp_gob_new(				// create new in-mem handle
-						gdp_name_t name,
-						gdp_gob_t **gobhp);
-
-void			_gdp_gob_free(				// free in-memory handle
-						gdp_gob_t **gob);		// GOB to free
-
-EP_STAT			_gdp_gob_newname(			// create new name based on metadata
-						gdp_gob_t *gob);
-
-void			_gdp_gob_dump(				// dump for debugging
-						const gdp_gob_t *gob,	// GOB to print
-						FILE *fp,				// where to print it
-						int detail,				// how much to print
-						int indent);			// unused at this time
-
-EP_STAT			_gdp_gob_create(			// create a new GDP object
-						gdp_name_t gobname,
-						gdp_name_t logdname,
-						gdp_gclmd_t *gmd,
-						gdp_chan_t *chan,
-						uint32_t reqflags,
-						gdp_gob_t **pgob);
-
-EP_STAT			_gdp_gob_open(				// open a GCL
-						gdp_gob_t *gob,
-						int cmd,
-						gdp_gcl_open_info_t *open_info,
-						gdp_chan_t *chan,
-						uint32_t reqflags);
-
-EP_STAT			_gdp_gob_close(				// close a GCL (handle)
-						gdp_gob_t *gob,
-						gdp_chan_t *chan,
-						uint32_t reqflags);
-
-EP_STAT			_gdp_gob_delete(			// delete and close a GCL (handle)
-						gdp_gob_t *gob,
-						gdp_chan_t *chan,
-						uint32_t reqflags);
-
-EP_STAT			_gdp_gob_read(				// read GCL record based on datum
-						gdp_gob_t *gob,
-						gdp_datum_t *datum,
-						gdp_chan_t *chan,
-						uint32_t reqflags);
-
-EP_STAT			_gdp_gob_read_async(		// read asynchronously
-						gdp_gob_t *gob,
-						gdp_recno_t recno,
-						gdp_event_cbfunc_t cbfunc,
-						void *cbarg,
-						gdp_chan_t *chan);
-
-EP_STAT			_gdp_gob_append(			// append a record (gdpd shared)
-						gdp_gob_t *gob,
-						gdp_datum_t *datum,
-						gdp_chan_t *chan,
-						uint32_t reqflags);
-
-EP_STAT			_gdp_gob_append_async(		// append asynchronously
-						gdp_gob_t *gob,
-						gdp_datum_t *datum,
-						gdp_event_cbfunc_t cbfunc,
-						void *cbarg,
-						gdp_chan_t *chan,
-						uint32_t reqflags);
-
-EP_STAT			_gdp_gcl_subscribe(			// subscribe to data
-						gdp_req_t *req,
-						int32_t numrecs,
-						EP_TIME_SPEC *timeout,
-						gdp_event_cbfunc_t cbfunc,
-						void *cbarg);
-
-EP_STAT			_gdp_gcl_unsubscribe(		// delete subscriptions
-						gdp_gin_t *gin,
-						gdp_event_cbfunc_t cbfunc,
-						void *cbarg,
-						uint32_t reqflags);
-
-EP_STAT			_gdp_gob_getmetadata(		// retrieve metadata
-						gdp_gob_t *gob,
-						gdp_gclmd_t **gmdp,
-						gdp_chan_t *chan,
-						uint32_t reqflags);
-
-EP_STAT			_gdp_gob_newsegment(		// create a new physical segment
-						gdp_gob_t *gob,
-						gdp_chan_t *chan,
-						uint32_t reqflags);
-
-EP_STAT			_gdp_gob_fwd_append(		// forward APPEND (replication)
-						gdp_gob_t *gob,
-						gdp_datum_t *datum,
-						gdp_name_t to_server,
-						gdp_event_cbfunc_t cbfunc,
-						void *cbarg,
-						gdp_chan_t *chan,
-						uint32_t reqflags);
 
 /*
 **  GCL Open Information
@@ -668,12 +696,23 @@ struct gdp_chan_x
 
 // functions used internally related to channel I/O
 EP_STAT			_gdp_io_recv(
-						gdp_cursor_t *cursor,
-						uint32_t flags);
+						gdp_chan_t *chan,
+						gdp_name_t src,
+						gdp_name_t dst,
+						gdp_buf_t *payload_buf,
+						size_t payload_len);
 
 EP_STAT			_gdp_io_event(
 						gdp_chan_t *chan,
 						uint32_t flags);
+
+// router control information
+EP_STAT			_gdp_router_event(
+						gdp_chan_t *chan,
+						gdp_name_t src,
+						gdp_name_t dst,
+						size_t payload_len,
+						EP_STAT estat);
 
 // I/O event handling
 struct event_loop_info
@@ -683,6 +722,25 @@ struct event_loop_info
 
 void			*_gdp_run_event_loop(
 						void *eli_);
+
+
+/*
+**  Protobuf message handling.  These are only for the unpacked
+**  (in memory, unserialized) version; the rest is hidden in
+**  gdp_pdu.[ch].
+*/
+
+gdp_msg_t		*_gdp_msg_new(				// create new message
+					gdp_cmd_t cmd,
+					gdp_rid_t rid,
+					gdp_seqno_t seqno);
+
+void			_gdp_msg_free(				// free a message
+					gdp_msg_t **pmsg);
+
+void			_gdp_msg_dump(				// print a message for debugging
+					const gdp_msg_t *msg,
+					FILE *fp);
 
 
 /*
@@ -749,6 +807,10 @@ void			_gdp_reclaim_resources_init(
 						void (*f)(int, short, void *));
 
 void			_gdp_dump_state(int plev);
+
+int				_gdp_acknak_from_estat(		// produce acknak code from status
+						EP_STAT estat,			// status to evaluate
+						int def);				// use this if nothing better...
 
 /*
 **  Cryptography support

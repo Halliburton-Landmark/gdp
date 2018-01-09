@@ -32,6 +32,7 @@
 #include "gdp_chan.h"
 #include "gdp_event.h"
 #include "gdp_priv.h"
+#include "gdp.pb-c.h"
 
 #include <ep/ep.h>
 #include <ep/ep_app.h>
@@ -65,16 +66,22 @@ subscr_resub(gdp_req_t *req)
 	EP_ASSERT_ELSE(req->cpdu != NULL, return EP_STAT_ASSERT_ABORT);
 
 	req->state = GDP_REQ_ACTIVE;
-	req->cpdu->cmd = GDP_CMD_SUBSCRIBE;
+
+	// payload should already be set up
 	memcpy(req->cpdu->dst, req->gob->name, sizeof req->cpdu->dst);
 	memcpy(req->cpdu->src, _GdpMyRoutingName, sizeof req->cpdu->src);
-	//XXX it seems like this should be in a known state
-	if (req->cpdu->datum == NULL)
-		req->cpdu->datum = gdp_datum_new();
-	else if (req->cpdu->datum->dbuf != NULL)
-		gdp_buf_reset(req->cpdu->datum->dbuf);
-	req->cpdu->datum->recno = req->gob->nrecs + 1;
-	gdp_buf_put_uint32(req->cpdu->datum->dbuf, req->numrecs);
+	{
+		GDP_MSG_CHECK(req->cpdu, return EP_STAT_ASSERT_ABORT);
+		gdp_msg_t *msg = req->cpdu->msg;
+		EP_ASSERT_ELSE(msg->cmd == GDP_CMD_SUBSCRIBE_BY_RECNO,
+						return EP_STAT_ASSERT_ABORT);
+		GdpBody__CommandSubscribeByRecno *payload =
+						msg->body->cmd_subscribe_by_recno;
+		payload->has_start = true;
+		payload->start = req->gob->nrecs + 1;
+		payload->has_nrecs = true;
+		payload->nrecs = req->numrecs;
+	}
 
 	estat = _gdp_invoke(req);
 
@@ -91,9 +98,8 @@ subscr_resub(gdp_req_t *req)
 	// req->rpdu might be NULL if _gdp_invoke failed
 	if (req->rpdu != NULL)
 	{
-		if (req->rpdu->datum != NULL)
-			gdp_datum_free(req->rpdu->datum);
-		req->rpdu->datum = NULL;
+		gdp_message__free_unpacked(req->rpdu->msg, NULL);
+		req->rpdu->msg = NULL;
 	}
 
 	return estat;
@@ -195,28 +201,61 @@ subscr_poker_thread(void *unused)
 
 
 /*
-**	_GDP_GCL_SUBSCRIBE --- subscribe to a GCL
+**	_GDP_GCL_SUBSCRIBE_BY_RECNO --- subscribe to a GCL
 **
 **		This also implements multiread.
 */
 
 EP_STAT
-_gdp_gcl_subscribe(gdp_req_t *req,
+_gdp_gcl_subscribe(gdp_gin_t *gin,
+		int cmd,
+		gdp_recno_t start,
 		int32_t numrecs,
 		EP_TIME_SPEC *timeout,
 		gdp_event_cbfunc_t cbfunc,
 		void *cbarg)
 {
 	EP_STAT estat = EP_STAT_OK;
+	gdp_req_t *req;
+
+	// create the subscribe request
+	estat = _gdp_req_new(cmd, gin->gob, _GdpChannel, NULL,
+			GDP_REQ_PERSIST | GDP_REQ_CLT_SUBSCR | GDP_REQ_ALLOC_RID,
+			&req);
+	EP_STAT_CHECK(estat, goto fail0);
+
+	// add start and stop parameters to PDU
+	req->gin = gin;
+
+	EP_ASSERT_ELSE(req != NULL, return EP_STAT_ASSERT_ABORT);
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex);
+	EP_ASSERT_ELSE(req->gin != NULL, return EP_STAT_ASSERT_ABORT);
+	EP_ASSERT_ELSE(req->cpdu != NULL, return EP_STAT_ASSERT_ABORT);
 
 	errno = 0;				// avoid spurious messages
 
-	EP_ASSERT_POINTER_VALID(req);
+	memcpy(req->cpdu->dst, req->gob->name, sizeof req->cpdu->dst);
+	memcpy(req->cpdu->src, _GdpMyRoutingName, sizeof req->cpdu->src);
+	{
+		gdp_msg_t *msg = req->cpdu->msg;
+		EP_ASSERT_ELSE(msg != NULL, return EP_STAT_ASSERT_ABORT);
+		EP_ASSERT_ELSE(msg->body != NULL, return EP_STAT_ASSERT_ABORT);
+		GdpBody__CommandSubscribeByRecno *payload =
+						msg->body->cmd_subscribe_by_recno;
+		if (start != GDP_PDU_NO_RECNO)
+		{
+			payload->has_start = true;
+			payload->start = start;
+		}
+		if (numrecs > 0)
+		{
+			payload->has_nrecs = true;
+			payload->nrecs = numrecs;
+		}
+	}
 
 	// arrange for responses to appear as events or callbacks
 	_gdp_event_setcb(req, cbfunc, cbarg);
-
-	gdp_buf_put_uint32(req->cpdu->datum->dbuf, req->numrecs);
 
 	// issue the subscription --- no data returned
 	estat = _gdp_invoke(req);
@@ -234,17 +273,14 @@ _gdp_gcl_subscribe(gdp_req_t *req,
 		// now waiting for other events; go ahead and unlock
 		req->state = GDP_REQ_IDLE;
 		if (req->rpdu != NULL)
-			_gdp_pdu_free(req->rpdu);
-		req->rpdu = NULL;
-		if (req->cpdu->datum != NULL)
-			gdp_buf_reset(req->cpdu->datum->dbuf);
+			_gdp_pdu_free(&req->rpdu);
 		ep_thr_cond_signal(&req->cond);
 		_gdp_req_unlock(req);
 
 		// the req is still on the channel list
 
-		// start a subscription poker thread if needed
-		if (req->cpdu->cmd == GDP_CMD_SUBSCRIBE)
+		// start a subscription poker thread if needed (not for multiread)
+		if (cmd == GDP_CMD_SUBSCRIBE_BY_RECNO)
 		{
 			long poke = ep_adm_getlongparam("swarm.gdp.subscr.pokeintvl", 60L);
 			bool spawnthread = false;
@@ -269,9 +305,9 @@ _gdp_gcl_subscribe(gdp_req_t *req,
 		}
 	}
 
+fail0:
 	return estat;
 }
-
 
 EP_STAT
 _gdp_gcl_unsubscribe(gdp_gin_t *gin,
@@ -293,6 +329,8 @@ _gdp_gcl_unsubscribe(gdp_gin_t *gin,
 						reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
+	GDP_MSG_CHECK(req->cpdu, return EP_STAT_ASSERT_ABORT);
+
 	for (sub = LIST_FIRST(&gin->gob->reqs); sub != NULL; sub = next_sub)
 	{
 		_gdp_req_lock(sub);
@@ -310,12 +348,15 @@ _gdp_gcl_unsubscribe(gdp_gin_t *gin,
 			continue;
 		}
 
+		GDP_MSG_CHECK(sub->cpdu, continue);
 		ep_dbg_cprintf(Dbg, 1, "... deleting rid %" PRIgdp_rid "\n",
-					sub->cpdu->rid);
-		req->cpdu->rid = sub->cpdu->rid;
+					sub->cpdu->msg->rid);
+		req->cpdu->msg->rid = sub->cpdu->msg->rid;
 
 		estat = _gdp_invoke(req);
 		EP_STAT_CHECK(estat, continue);
+
+		GDP_MSG_CHECK(req->rpdu, return EP_STAT_ASSERT_ABORT);
 
 		_gdp_req_free(&sub);
 	}

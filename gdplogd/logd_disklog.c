@@ -1768,8 +1768,8 @@ tidx_put(gdp_gob_t *gob, int64_t sec, int32_t nsec, gdp_recno_t recno)
 	}
 
 	// if this is severe, we want to abandon the database
-	// XXX is ISSFAIL the correct heuristic?
-	if (EP_STAT_ISSFAIL(estat) &&
+	// XXX is ISSEVERE the correct heuristic?
+	if (EP_STAT_ISSEVERE(estat) &&
 			EP_UT_BITSET(LOG_TIDX_HIDEFAILURE, phys->flags))
 	{
 		// give up on this index entirely
@@ -2143,14 +2143,16 @@ disk_read_by_recno(gdp_gob_t *gob,
 	{
 		// record does not yet exist
 		estat = GDP_STAT_NAK_NOTFOUND;
-		ep_dbg_cprintf(Dbg, 44, "EOF\n");
+		ep_dbg_cprintf(Dbg, 44, "EOF (%" PRIgdp_recno " > %" PRIgdp_recno "\n",
+					datum->recno, phys->max_recno);
 		goto fail0;
 	}
 	if (datum->recno < phys->min_recno)
 	{
 		// record is no longer available
 		estat = GDP_STAT_RECORD_EXPIRED;
-		ep_dbg_cprintf(Dbg, 44, "expired\n");
+		ep_dbg_cprintf(Dbg, 44, "expired (%" PRIgdp_recno " < %" PRIgdp_recno "\n",
+					datum->recno, phys->min_recno);
 		goto fail0;
 	}
 

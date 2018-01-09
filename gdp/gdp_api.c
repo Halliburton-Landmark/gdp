@@ -74,7 +74,6 @@ static EP_THR_MUTEX		OpenMutex		EP_THR_MUTEX_INITIALIZER;
 **  Simplify debugging
 */
 
-
 static void
 prstat(EP_STAT estat, const gdp_gin_t *gin, const char *where)
 {
@@ -446,6 +445,9 @@ gdp_parse_name(const char *ext, gdp_name_t name)
 **		Unfortunately, since SHA-256 is believed to be surjective
 **		(that is, all values are possible), there is a slight
 **		risk of a collision.
+**
+**		Arguably this should also check for `_GdpMyRoutingName`
+**		and `RoutingLayerAddr`.
 */
 
 bool
@@ -541,8 +543,9 @@ gdp_init(const char *router_addr)
 						&_gdp_io_recv,			// receive callback
 						NULL,					// send callback
 						&_gdp_io_event,			// close/error/eof callback
+						&_gdp_router_event,		// router event callback
 						&_gdp_advertise_me,		// advertise callback
-						chanx,					// udata
+						chanx,					// user channel data
 						&_GdpChannel);			// output: new channel
 	EP_STAT_CHECK(estat, goto fail0);
 
@@ -772,6 +775,7 @@ gdp_gcl_append(gdp_gcl_t *gin, gdp_datum_t *datum)
 		estat = gin->apndfilter(datum, gin->apndfpriv);
 	if (EP_STAT_ISOK(estat))
 		estat = _gdp_gob_append(gin->gob, datum, _GdpChannel, 0);
+	gdp_datum_reset(datum);
 	unlock_gin_and_gob(gin, "gdp_gcl_append");
 	prstat(estat, gin, "gdp_gcl_append");
 	return estat;
@@ -801,11 +805,9 @@ gdp_gcl_append_async(gdp_gcl_t *gin,
 
 
 /*
-**	GDP_GCL_READ --- read a message from a GCL based on recno
+**	GDP_GCL_READ_BY_RECNO --- read a message from a GCL based on recno
 **
 **	The data is returned through the passed-in datum.
-**
-**	Should be named gdp_gcl_read_by_recno.
 **
 **		Parameters:
 **			gin --- the gcl instance from which to read
@@ -814,31 +816,31 @@ gdp_gcl_append_async(gdp_gcl_t *gin,
 */
 
 EP_STAT
-gdp_gcl_read(gdp_gcl_t *gin,
+gdp_gcl_read_by_recno(gdp_gcl_t *gin,
 			gdp_recno_t recno,
 			gdp_datum_t *datum)
 {
 	EP_STAT estat;
 
-	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_read\n");
+	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_read_by_recno\n");
 	EP_ASSERT_POINTER_VALID(datum);
 	gdp_datum_reset(datum);
-	datum->recno = recno;
 
-	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_read");
+	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_read_by_recno");
 	EP_STAT_CHECK(estat, return estat);
 	//XXX somehow have to convey gin->readfilter to _gdp_gob_read
 	//XXX is there any reason not to just do it here?
 	//XXX Answer: read_async and subscriptions
-	estat = _gdp_gob_read(gin->gob, datum, _GdpChannel, 0);
-	unlock_gin_and_gob(gin, "gdp_gcl_read");
-	prstat(estat, gin, "gdp_gcl_read");
+	estat = _gdp_gob_read_by_recno(gin->gob, recno, 0,
+							_GdpChannel, 0, datum);
+	unlock_gin_and_gob(gin, "gdp_gcl_read_by_recno");
+	prstat(estat, gin, "gdp_gcl_read_by_recno");
 	return estat;
 }
 
 
 /*
-**	GDP_GCL_READ_TS --- read a message from a GCL based on timestamp
+**	GDP_GCL_READ_BY_TS --- read a message from a GCL based on timestamp
 **
 **	The data is returned through the passed-in datum.
 **
@@ -851,39 +853,83 @@ gdp_gcl_read(gdp_gcl_t *gin,
 */
 
 EP_STAT
-gdp_gcl_read_ts(gdp_gcl_t *gin,
+gdp_gcl_read_by_ts(gdp_gcl_t *gin,
 			EP_TIME_SPEC *ts,
 			gdp_datum_t *datum)
 {
 	EP_STAT estat;
 
-	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_read_ts\n");
+	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_read_by_ts\n");
 	EP_ASSERT_POINTER_VALID(datum);
-	memcpy(&datum->ts, ts, sizeof datum->ts);
-	datum->recno = GDP_PDU_NO_RECNO;
+#if 0 //TODO
+	memcpy(&datum->d->ts, ts, sizeof datum->d->ts);
+	datum->d->recno = GDP_PDU_NO_RECNO;
 
-	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_read_ts");
+	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_read_by_ts");
 	EP_STAT_CHECK(estat, return estat);
 	//XXX somehow have to convey gin->readfilter to _gdp_gob_read
 	//XXX is there any reason not to just do it here?
 	//XXX Answer: read_async and subscriptions
 	estat = _gdp_gob_read(gin->gob, datum, _GdpChannel, 0);
-	unlock_gin_and_gob(gin, "gdp_gcl_read_ts");
-	prstat(estat, gin, "gdp_gcl_read_ts");
+	unlock_gin_and_gob(gin, "gdp_gcl_read_by_ts");
+	prstat(estat, gin, "gdp_gcl_read_by_ts");
+#else //TODO
+	estat = GDP_STAT_NOT_IMPLEMENTED;
+#endif //TODO
 	return estat;
 }
 
 
 /*
-**  GDP_GCL_READ_ASYNC --- read asynchronously
+**	GDP_GCL_READ_BY_HASH --- read a message from a GCL based on record hash
 **
-**  Data and status are delivered as events.  Each call to this routine
-**  returns exactly one event, either data or an error.
+**	The data is returned through the passed-in datum.
+**
+**		Parameters:
+**			gin --- the gcl instance from which to read
+**			hash --- the starting record hash
+**			nrecs --- the number of records to read
+**			datum --- the message header (to avoid dynamic memory)
+*/
+
+#if 0 //TODO
+EP_STAT
+gdp_gcl_read_by_hash(gdp_gcl_t *gin,
+			ep_hash_t *hash,
+			gdp_datum_t *datum)
+{
+	EP_STAT estat;
+
+	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_read_by_hash\n");
+	EP_ASSERT_POINTER_VALID(datum);
+	memcpy(&datum->d->ts, ts, sizeof datum->d->ts);
+	datum->d->recno = GDP_PDU_NO_RECNO;
+
+	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_read_by_hash");
+	EP_STAT_CHECK(estat, return estat);
+	//XXX somehow have to convey gin->readfilter to _gdp_gob_read
+	//XXX is there any reason not to just do it here?
+	//XXX Answer: read_async and subscriptions
+	estat = _gdp_gob_read(gin->gob, datum, _GdpChannel, 0);
+	unlock_gin_and_gob(gin, "gdp_gcl_read_by_hash");
+	prstat(estat, gin, "gdp_gcl_read_by_hash");
+	return estat;
+}
+#endif //TODO
+
+
+/*
+**  GDP_GCL_READ_BY_xxx_ASYNC --- read asynchronously
+**
+**  Data and status are delivered as events.  These subsume the
+**  old multiread command.
 */
 
 EP_STAT
-gdp_gcl_read_async(gdp_gcl_t *gin,
+gdp_gcl_read_by_recno_async(
+			gdp_gcl_t *gin,
 			gdp_recno_t recno,
+			int32_t nrecs,
 			gdp_event_cbfunc_t cbfunc,
 			void *cbarg)
 {
@@ -892,20 +938,58 @@ gdp_gcl_read_async(gdp_gcl_t *gin,
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_read_async\n");
 	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_read_async");
 	EP_STAT_CHECK(estat, return estat);
-	estat = _gdp_gob_read_async(gin->gob, recno, cbfunc, cbarg, _GdpChannel);
+	estat = _gdp_gob_read_by_recno_async(gin->gob, recno, nrecs,
+							cbfunc, cbarg, _GdpChannel);
 	unlock_gin_and_gob(gin, "gdp_gcl_read_async");
 	prstat(estat, gin, "gdp_gcl_read_async");
 	return estat;
 }
 
 
+EP_STAT
+gdp_gcl_read_by_ts_async(
+			gdp_gcl_t *gin,
+			EP_TIME_SPEC *ts,
+			int32_t nrecs,
+			gdp_event_cbfunc_t cbfunc,
+			void *cbarg)
+{
+	return GDP_STAT_NOT_IMPLEMENTED;
+}
+
+
+EP_STAT
+gdp_gcl_read_by_hash_async(
+			gdp_gcl_t *gin,
+			gdp_hash_t *hash,
+			int32_t nrecs,
+			gdp_event_cbfunc_t cbfunc,
+			void *cbarg)
+{
+	return GDP_STAT_NOT_IMPLEMENTED;
+}
+
+
+// back compat
+EP_STAT
+gdp_gcl_read_async(
+			gdp_gcl_t *gin,
+			gdp_recno_t recno,
+			gdp_event_cbfunc_t cbfunc,
+			void *cbarg)
+{
+	return gdp_gcl_read_by_recno_async(gin, recno, 0, cbfunc, cbarg);
+}
+
+
+
 
 /*
-**	GDP_GCL_SUBSCRIBE --- subscribe to a GCL starting from a record number
+**	GDP_GCL_SUBSCRIBE_BY_RECNO --- subscribe starting from a record number
 */
 
 EP_STAT
-gdp_gcl_subscribe(gdp_gcl_t *gin,
+gdp_gcl_subscribe_by_recno(gdp_gcl_t *gin,
 		gdp_recno_t start,
 		int32_t numrecs,
 		EP_TIME_SPEC *timeout,
@@ -913,38 +997,26 @@ gdp_gcl_subscribe(gdp_gcl_t *gin,
 		void *cbarg)
 {
 	EP_STAT estat;
-	gdp_req_t *req;
 
-	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_subscribe\n");
-	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_subscribe");
+	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_subscribe_by_recno\n");
+	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_subscribe_by_recno");
 	EP_STAT_CHECK(estat, return estat);
 
-	// create the subscribe request
-	estat = _gdp_req_new(GDP_CMD_SUBSCRIBE, gin->gob, _GdpChannel, NULL,
-			GDP_REQ_PERSIST | GDP_REQ_CLT_SUBSCR | GDP_REQ_ALLOC_RID,
-			&req);
-	EP_STAT_CHECK(estat, goto fail0);
+	estat = _gdp_gcl_subscribe(gin, GDP_CMD_SUBSCRIBE_BY_RECNO, start, numrecs,
+							timeout, cbfunc, cbarg);
 
-	// add start and stop parameters to PDU
-	req->gin = gin;
-	req->cpdu->datum->recno = start;
-	req->numrecs = numrecs;
-
-	// now do the hard work
-	estat = _gdp_gcl_subscribe(req, numrecs, timeout, cbfunc, cbarg);
-fail0:
-	unlock_gin_and_gob(gin, "gdp_gcl_subscribe");
-	prstat(estat, gin, "gdp_gcl_subscribe");
+	unlock_gin_and_gob(gin, "gdp_gcl_subscribe_by_recno");
+	prstat(estat, gin, "gdp_gcl_subscribe_by_recno");
 	return estat;
 }
 
 
 /*
-**	GDP_GCL_SUBSCRIBE_TS --- subscribe to a GCL starting from a timestamp
+**	GDP_GCL_SUBSCRIBE_BY_TS --- subscribe to a GCL starting from a timestamp
 */
 
 EP_STAT
-gdp_gcl_subscribe_ts(gdp_gcl_t *gin,
+gdp_gcl_subscribe_by_ts(gdp_gcl_t *gin,
 		EP_TIME_SPEC *start,
 		int32_t numrecs,
 		EP_TIME_SPEC *timeout,
@@ -952,28 +1024,32 @@ gdp_gcl_subscribe_ts(gdp_gcl_t *gin,
 		void *cbarg)
 {
 	EP_STAT estat;
-	gdp_req_t *req;
 
-	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_subscribe_ts\n");
-	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_subscribe_ts");
+	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_subscribe_by_ts\n");
+#if 0 //TODO
+	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_subscribe_by_ts");
 	EP_STAT_CHECK(estat, return estat);
 
 	// create the subscribe request
-	estat = _gdp_req_new(GDP_CMD_SUBSCRIBE, gin->gob, _GdpChannel, NULL,
+	gdp_req_t *req;
+	estat = _gdp_req_new(GDP_CMD_SUBSCRIBE_BY_TS, gin->gob, _GdpChannel, NULL,
 			GDP_REQ_PERSIST | GDP_REQ_CLT_SUBSCR | GDP_REQ_ALLOC_RID,
 			&req);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// add start and stop parameters to PDU
 	req->gin = gin;
-	memcpy(&req->cpdu->datum->ts, start, sizeof req->cpdu->datum->ts);
+	memcpy(&req->cpdu->m->b->datum->d->ts, start, sizeof req->cpdu->m->b->datum->d->ts);
 	req->numrecs = numrecs;
 
 	// now do the hard work
 	estat = _gdp_gcl_subscribe(req, numrecs, timeout, cbfunc, cbarg);
 fail0:
-	unlock_gin_and_gob(gin, "gdp_gcl_subscribe_ts");
-	prstat(estat, gin, "gdp_gcl_subscribe_ts");
+	unlock_gin_and_gob(gin, "gdp_gcl_subscribe_by_ts");
+#else	//TODO
+	estat = GDP_STAT_NOT_IMPLEMENTED;
+#endif	//TODO
+	prstat(estat, gin, "gdp_gcl_subscribe_by_ts");
 	return estat;
 }
 
@@ -1002,6 +1078,7 @@ gdp_gcl_unsubscribe(gdp_gcl_t *gin,
 
 
 
+#if 0 //XXX no longer relevant
 /*
 **	GDP_GCL_MULTIREAD --- read multiple records from a GCL using recno start
 **
@@ -1024,23 +1101,16 @@ gdp_gcl_multiread(gdp_gcl_t *gin,
 	// create the multiread request
 	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_multiread");
 	EP_STAT_CHECK(estat, return estat);
-	estat = _gdp_req_new(GDP_CMD_MULTIREAD, gin->gob, _GdpChannel, NULL,
-			GDP_REQ_PERSIST | GDP_REQ_CLT_SUBSCR | GDP_REQ_ALLOC_RID,
-			&req);
-	EP_STAT_CHECK(estat, goto fail0);
-
-	// add start and stop parameters to PDU
-	req->gin = gin;
-	req->cpdu->datum->recno = start;
-	req->numrecs = numrecs;
 
 	// now do the hard work
-	estat = _gdp_gcl_subscribe(req, numrecs, NULL, cbfunc, cbarg);
+	estat = _gdp_gcl_subscribe(gin, GDP_CMD_MULTIREAD, start, numrecs,
+							NULL, cbfunc, cbarg);
 fail0:
 	unlock_gin_and_gob(gin, "gdp_gcl_multiread");
 	prstat(estat, gin, "gdp_gcl_multiread");
 	return estat;
 }
+#endif //XXX
 
 
 /*
@@ -1050,6 +1120,7 @@ fail0:
 **		interface or callbacks.
 */
 
+#if 0 //TODO
 EP_STAT
 gdp_gcl_multiread_ts(gdp_gcl_t *gin,
 		EP_TIME_SPEC *start,
@@ -1072,7 +1143,7 @@ gdp_gcl_multiread_ts(gdp_gcl_t *gin,
 
 	// add start and stop parameters to PDU
 	req->gin = gin;
-	memcpy(&req->cpdu->datum->ts, start, sizeof req->cpdu->datum->ts);
+	memcpy(&req->cpdu->datum->d->ts, start, sizeof req->cpdu->datum->d->ts);
 	req->numrecs = numrecs;
 
 	// now do the hard work
@@ -1082,6 +1153,7 @@ fail0:
 	prstat(estat, gin, "gdp_gcl_multiread_ts");
 	return estat;
 }
+#endif //TODO
 
 
 /*

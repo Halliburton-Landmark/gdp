@@ -135,7 +135,9 @@ gdp_datum_free(gdp_datum_t *datum)
 /*
 **  Reset a datum
 **
-**		This is what you would get if you freed it and reallocated.
+**		This resets the data and signature buffers, but leaves the
+**		timestamp and recno since the caller might like to see the
+**		updated values.
 */
 
 void
@@ -148,8 +150,8 @@ gdp_datum_reset(gdp_datum_t *datum)
 	datum->siglen = datum->sigmdalg = 0;
 	if (datum->sig != NULL)
 		gdp_buf_reset(datum->sig);
-	datum->recno = GDP_PDU_NO_RECNO;
-	EP_TIME_INVALIDATE(&datum->ts);
+//	datum->recno = GDP_PDU_NO_RECNO;
+//	EP_TIME_INVALIDATE(&datum->ts);
 }
 
 
@@ -333,4 +335,57 @@ _gdp_datum_dump(const gdp_datum_t *datum,
 	if (fp == NULL)
 		fp = ep_dbg_getfile();
 	gdp_datum_print(datum, fp, GDP_DATUM_PRDEBUG);
+}
+
+
+void
+_gdp_datum_to_pb(const gdp_datum_t *datum, GdpDatum *pb)
+{
+	pb->recno = datum->recno;
+	if (EP_TIME_IS_VALID(&datum->ts))
+	{
+		if (pb->ts == NULL)
+		{
+			pb->ts = ep_mem_zalloc(sizeof *pb->ts);
+			gdp_timestamp__init(pb->ts);
+		}
+		pb->ts->sec = datum->ts.tv_sec;
+		pb->ts->nsec = datum->ts.tv_nsec;
+		pb->ts->accuracy = datum->ts.tv_accuracy;
+	}
+	if (datum->dbuf != NULL && gdp_buf_getlength(datum->dbuf) > 0)
+	{
+		size_t l = gdp_buf_getlength(datum->dbuf);
+		pb->data.data = ep_mem_malloc(l);
+		memcpy(pb->data.data, gdp_buf_getptr(datum->dbuf, l), l);
+		pb->data.len = l;
+	}
+
+	//TODO: GdpSignature sig;
+	//TODO: GdpHash hash;
+}
+
+
+void
+_gdp_datum_from_pb(gdp_datum_t *datum, const GdpDatum *pb)
+{
+	// recno
+	datum->recno = pb->recno;
+
+	// timestamp
+	if (pb->ts != NULL)
+	{
+		datum->ts.tv_sec = pb->ts->sec;
+		datum->ts.tv_nsec = pb->ts->nsec;
+		datum->ts.tv_accuracy = pb->ts->accuracy;
+	}
+	else
+	{
+		EP_TIME_INVALIDATE(&datum->ts);
+	}
+
+	// data
+	if (datum->dbuf == NULL)
+		datum->dbuf = gdp_buf_new();
+	gdp_buf_write(datum->dbuf, pb->data.data, pb->data.len);
 }

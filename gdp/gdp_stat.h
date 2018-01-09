@@ -185,12 +185,6 @@ extern void		_gdp_stat_init(void);
 
 
 /*
-**  Back compatibility
-*/
-
-#define GDP_STAT_NOT_OPEN			GDP_STAT_GCL_NOT_OPEN
-
-/*
 **  Create EP_STAT from protocol command codes for acks and naks
 */
 

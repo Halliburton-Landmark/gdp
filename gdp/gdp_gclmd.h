@@ -72,12 +72,13 @@ struct gdp_gclmd
 
 // serialize an internal data structure to a network buffer
 size_t			_gdp_gclmd_serialize(
-					gdp_gclmd_t *gmd,
-					struct evbuffer *evb);
+					gdp_gclmd_t *gmd,			// metadata to serialize
+					uint8_t **obufp);			// dynamically allocated output
 
 // deserialize a network buffer to an internal data structure
 gdp_gclmd_t		*_gdp_gclmd_deserialize(
-					struct evbuffer *evb);
+					uint8_t *smd,				// serialized metadata
+					size_t smd_len);			// length of smd
 
 // bulk load data into a metadata structure using existing names & lengths
 void			_gdp_gclmd_adddata(

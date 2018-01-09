@@ -1,0 +1,263 @@
+/* vim: set ai sw=4 sts=4 ts=4 :*/
+
+/*
+**  These represent messages that approximately correspond to
+**  Layer 5 (Session Layer) in the OSI model.
+*/
+
+// Corresponds to gdp_pdu_t.
+message GdpMessage
+{
+	required GdpCommandCode	cmd = 1;		// command or ack/nak
+	optional uint32			rid = 2;		// request distinguisher
+	optional uint32			seqno = 3;		// sequence number
+	optional GdpBody		body = 10;		// command payload
+	optional GdpTrailer		trailer = 15;	// trailer (sig/hash)
+}
+
+enum GdpCommandCode
+{
+	// 0-63		Blind commands (no response)
+	CMD_NONE =					0;			// no command (can use as keepalive)
+	CMD_ADVERTISE =				1;			// XXX move to L4?
+	CMD_WITHDRAW =				2;			// XXX move to L4?
+
+	// 64-127	Acknowledged commands
+	CMD_PING =					64;
+	CMD_HELLO =					65;
+	CMD_CREATE =				66;
+	CMD_OPEN_AO =				67;
+	CMD_OPEN_RO =				68;
+	CMD_OPEN_RA =				69;
+	CMD_CLOSE =					70;
+	CMD_APPEND =				71;
+	CMD_READ_BY_RECNO =			72;
+	CMD_READ_BY_TS =			73;
+	CMD_READ_BY_HASH =			74;
+	CMD_SUBSCRIBE_BY_RECNO =	75;
+	CMD_SUBSCRIBE_BY_TS =		76;
+	CMD_SUBSCRIBE_BY_HASH =		77;
+	CMD_UNSUBSCRIBE =			78;
+	CMD_GETMETADATA =			79;
+	CMD_NEWSEGMENT =			80;
+	CMD_DELETE =				81;
+//	CMD_FWD_APPEND =			127;		//XXX probably moved to L4
+
+	// 128-191	Positive Acks
+	ACK_SUCCESS =				128;		// HTTP 200
+	ACK_CREATED =				129;		// HTTP 201
+	ACK_DELETED =				130;		// HTTP 202
+	ACK_VALID =					131;		// HTTP 203
+	ACK_CHANGED =				132;		// HTTP 204
+	ACK_CONTENT =				133;		// no direct HTTP equivalent
+
+	// 192-233	Negative acks, client side (CoAP, HTTP 400-431)
+	NAK_C_BADREQ =				192;		// HTTP 400
+	NAK_C_UNAUTH =				193;		// HTTP 401
+	NAK_C_BADOPT =				194;		// HTTP 402
+	NAK_C_FORBIDDEN =			195;		// HTTP 403
+	NAK_C_NOTFOUND =			196;		// HTTP 404
+	NAK_C_METHNOTALLOWED =		197;		// HTTP 405
+	NAK_C_CONFLICT =			201;		// HTTP 409
+	NAK_C_GONE =				202;		// HTTP 410
+	NAK_C_PRECONFAILED =		204;		// HTTP 412
+	NAK_C_TOOLARGE =			205;		// HTTP 413
+	NAK_C_UNSUPMEDIA =			207;		// HTTP 415
+	NAK_C_REC_MISSING =			222;		// no HTTP equiv
+	NAK_C_REC_DUP =				223;		// no HTTP equiv
+
+	// 224-239	Negative acks, server side (CoAP, HTTP 500-515)
+	NAK_S_INTERNAL =			224;		// HTTP 500
+	NAK_S_NOTIMPL =				225;		// HTTP 501
+	NAK_S_BADGATEWAY =			226;		// HTTP 502
+	NAK_S_SVCUNAVAIL =			227;		// HTTP 503
+	NAK_S_GWTIMEOUT =			228;		// HTTP 504
+	NAK_S_PROXYNOTSUP =			229;		// HTTP 505
+	NAK_S_LOSTSUB =				239;		// no HTTP equiv
+
+	// 240-254	Negative acks, routing layer
+	NAK_R_NOROUTE =				240;		// no HTTP equiv	XXX remove?
+
+	// 255		Reserved
+}
+
+
+message GdpHash
+{
+	required bytes			hash = 1;		// hash value
+}
+
+// Corresponds to gdp_datum_t.
+message GdpDatum
+{
+	required uint64			recno = 1;			// record number
+	optional GdpTimestamp	ts = 2;				// timestamp
+	required bytes			data = 3;			// actual content
+	optional GdpSignature	sig = 4;			// signature
+	optional GdpHash		hash = 5;			// hash of previous record
+}
+
+/*
+**	Log metadata must be independently serialized (i.e., not using
+**	protobufs) since it has to stand on its own when creating a log.
+**  We could serialize it as a protobuf, but for now the code is
+**  already written.  Thus, it's just listed as "bytes" for the type.
+*/
+
+message GdpBody
+{
+	message CommandAdvertise
+	{
+		required bytes			adname = 1;			// name to advertise
+	}
+
+	message CommandCreate
+	{
+		required bytes			logname = 1;		// name of new log
+		optional bytes			metadata = 2;		// log metadata
+	}
+
+	message CommandOpen
+	{
+	}
+
+	message CommandClose
+	{
+	}
+
+	message CommandAppend
+	{
+		required GdpDatum		datum = 1;			// data to append
+	}
+
+	message CommandReadByRecno
+	{
+		required uint64			recno = 1;			// record number
+		optional int32			nrecs = 2;			// number of records
+	}
+
+	message CommandReadByTs
+	{
+		required GdpTimestamp	timestamp = 1;		// timestamp
+		optional int32			nrecs = 2;			// number of records
+	}
+
+	message CommandReadByHash
+	{
+		required GdpHash		hash = 1;			// hash value
+		optional int32			nrecs = 2;			// number of records
+	}
+
+	message CommandSubscribeByRecno
+	{
+		optional uint64			start = 1;			// starting record number
+		optional uint64			nrecs = 2;			// number of records
+		optional GdpTimestamp	timeout = 3;		// timeout
+	}
+
+	message CommandSubscribeByTs
+	{
+		required GdpTimestamp	timestamp = 1;		// timestamp
+		optional int32			nrecs = 2;			// number of records
+		optional GdpTimestamp	timeout = 3;		// timeout
+	}
+
+	message CommandSubscribeByHash
+	{
+		required GdpHash		hash = 1;			// hash value
+		optional int32			nrecs = 2;			// number of records
+		optional GdpTimestamp	timeout = 3;		// timeout
+	}
+
+	message CommandUnsubscribe
+	{
+	}
+
+	message CommandGetMetadata
+	{
+	}
+
+	message CommandNewSegment
+	{
+	}
+
+	message CommandDelete
+	{
+	}
+
+	message AckSuccess
+	{
+		optional uint64			recno = 1;
+		optional GdpTimestamp	ts = 2;
+		optional bytes			hash = 3;
+		optional bytes			metadata = 4;
+	}
+
+	message AckChanged
+	{
+		required uint64			recno = 1;
+	};
+
+	message AckContent
+	{
+		required GdpDatum		datum = 1;			// returned data
+	}
+
+	message NakGeneric
+	{
+		optional uint32			ep_stat = 1;
+		optional string			description = 2;
+		optional uint64			recno = 3;
+	}
+
+	message NakConflict
+	{
+		optional uint32			ep_stat = 1;
+		optional string			description = 2;
+		optional uint64			recno = 3;
+	}
+
+	oneof command_body
+	{
+		CommandCreate			cmd_create				= 66;
+		CommandOpen				cmd_open				= 67;
+		CommandClose			cmd_close				= 70;
+		CommandAppend			cmd_append				= 71;
+		CommandReadByRecno		cmd_read_by_recno		= 72;
+		CommandReadByTs			cmd_read_by_ts			= 73;
+		CommandReadByHash		cmd_read_by_hash		= 74;
+		CommandSubscribeByRecno	cmd_subscribe_by_recno	= 75;
+		CommandSubscribeByTs	cmd_subscribe_by_ts		= 76;
+		CommandSubscribeByHash	cmd_subscribe_by_hash	= 77;
+		CommandUnsubscribe		cmd_unsubscribe			= 78;
+		CommandGetMetadata		cmd_get_metadata		= 79;
+		CommandNewSegment		cmd_new_segment			= 80;
+		CommandDelete			cmd_delete				= 81;
+
+		AckSuccess				ack_success				= 128;
+		AckChanged				ack_changed				= 132;
+		AckContent				ack_content				= 133;
+
+		NakGeneric				nak						= 192;
+		NakConflict				nak_conflict			= 201;
+	}
+}
+
+
+message GdpTimestamp
+{
+	required int64			sec = 1 [default = -9223372036854775807];
+	optional uint32			nsec = 2;
+	optional float			accuracy = 3;
+}
+
+message GdpTrailer
+{
+	optional GdpSignature	sig = 1;
+}
+
+message GdpSignature
+{
+	required uint32			sig_type = 1;
+	required bytes			sig = 2;
+}

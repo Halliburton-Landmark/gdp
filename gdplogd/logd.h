@@ -136,9 +136,8 @@ extern void		logd_advertise_one(
 						int cmd);
 
 extern void		sub_send_message_notification(
-						gdp_req_t *req,
-						gdp_datum_t *datum,
-						int cmd);
+						gdp_req_t *pubreq,
+						gdp_req_t *req);
 
 /*
 **  Physical Implementation --- these are the routines that implement the

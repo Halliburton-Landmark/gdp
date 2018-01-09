@@ -52,6 +52,7 @@ case "$OS" in
 	package uuid-dev
 	package lighttpd
 	package libjansson-dev
+	package protobuf-c-compiler
 	package libavahi-common-dev
 	package libavahi-client-dev
 	package avahi-daemon
@@ -75,6 +76,7 @@ case "$OS" in
 	package openssl
 	package lighttpd
 	package jansson
+	package protobuf-c
 	if [ "$PKGMGR" = "brew" ]
 	then
 		package mosquitto
@@ -101,6 +103,7 @@ case "$OS" in
 	package openssl
 	package lighttpd
 	package jansson
+	package protobuf-c
 	package avahi
 	package mosquitto
 	package hs-pandoc

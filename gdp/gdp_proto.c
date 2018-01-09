@@ -74,21 +74,22 @@ _gdp_invoke(gdp_req_t *req)
 	const char *cmdname;
 
 	EP_ASSERT_POINTER_VALID(req);
+	GDP_MSG_CHECK(req->cpdu, return EP_STAT_ASSERT_ABORT);
 	if (req->gob != NULL)
 		GDP_GOB_ASSERT_ISLOCKED(req->gob);
-	cmdname = _gdp_proto_cmd_name(req->cpdu->cmd);
+	cmdname = _gdp_proto_cmd_name(req->cpdu->msg->cmd);
 	if (ep_dbg_test(Dbg, 10))
 	{
 		ep_dbg_printf("\n>>> _gdp_invoke(req=%p rid=%" PRIgdp_rid "): %s (%d), gob@%p\n",
 				req,
-				req->cpdu->rid,
+				req->cpdu->msg->rid,
 				cmdname,
-				req->cpdu->cmd,
+				req->cpdu->msg->cmd,
 				req->gob);
 		if (ep_dbg_test(Dbg, 11))
 		{
 			ep_dbg_printf("\t");
-			_gdp_datum_dump(req->cpdu->datum, ep_dbg_getfile());
+			_gdp_pdu_dump(req->cpdu, ep_dbg_getfile());
 		}
 	}
 	EP_ASSERT_ELSE(req->state == GDP_REQ_ACTIVE, return EP_STAT_ASSERT_ABORT);
@@ -111,7 +112,7 @@ _gdp_invoke(gdp_req_t *req)
 
 		ep_dbg_cprintf(Dbg, 36,
 				"_gdp_invoke: sending %d, retries=%d\n",
-				req->cpdu->cmd, retries);
+				req->cpdu->msg->cmd, retries);
 
 		estat = _gdp_req_send(req);
 		EP_STAT_CHECK(estat, continue);
@@ -208,7 +209,7 @@ _gdp_invoke(gdp_req_t *req)
 
 		flockfile(ep_dbg_getfile());
 		ep_dbg_printf("<<< _gdp_invoke(%p rid=%" PRIgdp_rid ") %s: %s\n",
-				req, req->cpdu->rid, cmdname,
+				req, req->cpdu->msg->rid, cmdname,
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		if (ep_dbg_test(Dbg, 22))
 		{
@@ -265,77 +266,26 @@ acknak(gdp_req_t *req, const char *where, bool reuse_pdu)
 		goto fail0;
 	}
 
+	GDP_MSG_CHECK(req->rpdu, return EP_STAT_ASSERT_ABORT);
+
 	ep_dbg_cprintf(Dbg, 20, "%s: received %s for %s\n", where,
-			req->rpdu == NULL ? "???" : _gdp_proto_cmd_name(req->rpdu->cmd),
-			req->cpdu == NULL ? "???" : _gdp_proto_cmd_name(req->cpdu->cmd));
+			req->rpdu == NULL ? "???" : _gdp_proto_cmd_name(req->rpdu->msg->cmd),
+			req->cpdu == NULL ? "???" : _gdp_proto_cmd_name(req->cpdu->msg->cmd));
 
 	// we want to re-use caller's datum for (e.g.) read commands
-	if (req->rpdu == NULL)
-	{
-		emsg = "acknak: req->rpdu == NULL";
-	}
-	else if (req->rpdu == req->cpdu)
+	if (req->rpdu == req->cpdu)
 	{
 		emsg = "acknak: req->rpdu == req->cpdu";
 	}
 	else
 	{
-		estat = DispatchTable[req->rpdu->cmd].estat;
-		if (req->cpdu->datum != NULL && reuse_pdu)
-		{
-			if (ep_dbg_test(Dbg, 43))
-			{
-				ep_dbg_printf("%s: reusing old datum for req %p\n   ",
-						where, req);
-				_gdp_datum_dump(req->cpdu->datum, ep_dbg_getfile());
-			}
-
-			// save the dbuf that the user may already hold a pointer to
-			gdp_buf_t *user_dbuf = req->cpdu->datum->dbuf;
-
-			// move the contents of the response dbuf into the user dbuf
-			gdp_buf_reset(user_dbuf);
-			gdp_buf_move(user_dbuf, req->rpdu->datum->dbuf, -1);
-
-			// we can now discard the response dbuf entirely and replace it
-			gdp_buf_free(req->rpdu->datum->dbuf);
-			req->rpdu->datum->dbuf = user_dbuf;
-
-			// same for signature
-			gdp_buf_t *user_sig = req->cpdu->datum->sig;
-			if (user_sig != NULL)
-			{
-				gdp_buf_reset(user_sig);
-				if (req->rpdu->datum->sig != NULL)
-					gdp_buf_move(user_sig, req->rpdu->datum->sig, -1);
-			}
-			if (req->rpdu->datum->sig != NULL)
-				gdp_buf_free(req->rpdu->datum->sig);
-			req->rpdu->datum->sig = user_sig;
-			req->rpdu->datum->siglen = user_sig == NULL
-								? 0
-								: gdp_buf_getlength(user_sig);
-
-			// copy the contents of the response datum over the user datum
-			// (this has the pointer to user dbuf with response contents)
-			memcpy(req->cpdu->datum, req->rpdu->datum, sizeof *req->cpdu->datum);
-
-			// user datum now complete; can remove the response datum
-			req->rpdu->datum->dbuf = NULL;		// but not the user dbuf!
-			req->rpdu->datum->sig = NULL;		// or the signature!
-			gdp_datum_free(req->rpdu->datum);
-
-			// point the new PDU at the old datum
-			req->rpdu->datum = req->cpdu->datum;
-			req->cpdu->datum = NULL;
-			EP_ASSERT(req->rpdu->datum->inuse);
-		}
+		estat = DispatchTable[req->rpdu->msg->cmd].estat;
 	}
 
 fail0:
 	if (!EP_STAT_ISOK(estat))
 	{
-		if (EP_STAT_ISSFAIL(estat))
+		if (EP_STAT_ISSEVERE(estat))
 		{
 			ep_log(estat, "%s: %s",
 					where,
@@ -371,15 +321,7 @@ ack(gdp_req_t *req, const char *where)
 	estat = acknak(req, where, true);
 	EP_STAT_CHECK(estat, return estat);
 
-	if (req->rpdu->datum == NULL)
-	{
-		ep_log(estat, "ack: null datum");
-		estat = EP_STAT_OK;
-	}
-	else
-	{
-		estat = GDP_STAT_FROM_ACK(req->rpdu->cmd);
-	}
+	estat = GDP_STAT_FROM_ACK(req->rpdu->msg->cmd);
 	return estat;
 }
 
@@ -422,9 +364,13 @@ ack_data_changed(gdp_req_t *req)
 	estat = ack_success(req);
 	EP_STAT_CHECK(estat, return estat);
 
+	EP_ASSERT_ELSE(req->rpdu->msg->body->command_body_case ==
+						GDP_BODY__COMMAND_BODY_ACK_CHANGED,
+				return EP_STAT_ASSERT_ABORT);
+
 	// keep track of number of records (in case we lose sync)
-	if (req->gob != NULL && req->rpdu->datum != NULL)
-		req->gob->nrecs = req->rpdu->datum->recno;
+	if (req->gob != NULL)
+		req->gob->nrecs = req->rpdu->msg->body->ack_changed->recno;
 
 	return estat;
 }
@@ -436,23 +382,29 @@ ack_data_content(gdp_req_t *req)
 	EP_STAT estat;
 
 	EP_ASSERT_ELSE(req->gob != NULL, return EP_STAT_ASSERT_ABORT);
-	EP_ASSERT_ELSE(req->rpdu != NULL, return EP_STAT_ASSERT_ABORT);
-	EP_ASSERT_ELSE(req->rpdu->datum != NULL, return EP_STAT_ASSERT_ABORT);
+	GDP_MSG_CHECK(req->rpdu, return EP_STAT_ASSERT_ABORT);
 
 	estat = ack_success(req);
 	EP_STAT_CHECK(estat, return estat);
 
+	EP_ASSERT_ELSE(req->rpdu->msg->body->command_body_case ==
+						GDP_BODY__COMMAND_BODY_ACK_CONTENT,
+				return EP_STAT_ASSERT_ABORT);
+
 	// hack to try to "self heal" in case we get out of sync
-	if (req->gob->nrecs < req->rpdu->datum->recno)
-		req->gob->nrecs = req->rpdu->datum->recno;
+	GdpBody__AckContent *payload = req->rpdu->msg->body->ack_content;
+	if (req->gob->nrecs < payload->datum->recno)
+		req->gob->nrecs = payload->datum->recno;
 
 	// keep track of how many more records we expect
 	if (req->numrecs > 0)
 		req->numrecs--;
 
+#if 0 //TODO: IMPLEMENT ME
 	// do read filtering if requested
 	if (req->gin != NULL && req->gin->readfilter != NULL)
 		estat = req->gin->readfilter(req->rpdu->datum, req->gin->readfpriv);
+#endif //TODO
 
 	return estat;
 }
@@ -499,9 +451,15 @@ nak_conflict(gdp_req_t *req)
 {
 	EP_STAT estat = nak_client(req);
 
+	EP_STAT_CHECK(estat, return estat);
+	GDP_MSG_CHECK(req->rpdu, return EP_STAT_ASSERT_ABORT);
+	EP_ASSERT_ELSE(req->rpdu->msg->body->command_body_case ==
+						GDP_BODY__COMMAND_BODY_NAK_CONFLICT,
+				return EP_STAT_ASSERT_ABORT);
+
 	// adjust nrecs to match the server's view
-	if (req->gob != NULL && req->rpdu->datum != NULL)
-		req->gob->nrecs = req->rpdu->datum->recno;
+	if (req->gob != NULL)
+		req->gob->nrecs = req->rpdu->msg->body->nak_conflict->recno;
 
 	return estat;
 }
@@ -585,19 +543,19 @@ static dispatch_ent_t	DispatchTable[256] =
 	{ NULL,				"CMD_CREATE",			GDP_STAT_ACK_SUCCESS		},	// 66
 	{ NULL,				"CMD_OPEN_AO",			GDP_STAT_ACK_SUCCESS		},	// 67
 	{ NULL,				"CMD_OPEN_RO",			GDP_STAT_ACK_SUCCESS		},	// 68
-	{ NULL,				"CMD_CLOSE",			GDP_STAT_ACK_SUCCESS		},	// 69
-	{ NULL,				"CMD_READ",				GDP_STAT_ACK_SUCCESS		},	// 70
+	{ NULL,				"CMD_OPEN_RA",			GDP_STAT_ACK_SUCCESS		},	// 69
+	{ NULL,				"CMD_CLOSE",			GDP_STAT_ACK_SUCCESS		},	// 70
 	{ NULL,				"CMD_APPEND",			GDP_STAT_ACK_SUCCESS		},	// 71
-	{ NULL,				"CMD_SUBSCRIBE",		GDP_STAT_ACK_SUCCESS		},	// 72
-	{ NULL,				"CMD_MULTIREAD",		GDP_STAT_ACK_SUCCESS		},	// 73
-	{ NULL,				"CMD_GETMETADATA",		GDP_STAT_ACK_SUCCESS		},	// 74
-	{ NULL,				"CMD_OPEN_RA",			GDP_STAT_ACK_SUCCESS		},	// 75
-	{ NULL,				"CMD_NEWSEGMENT",		GDP_STAT_ACK_SUCCESS		},	// 76
-	{ NULL,				"CMD_FWD_APPEND",		GDP_STAT_ACK_SUCCESS		},	// 77
+	{ NULL,				"CMD_READ_BY_RECNO",	GDP_STAT_ACK_SUCCESS		},	// 72
+	{ NULL,				"CMD_READ_BY_TS",		GDP_STAT_ACK_SUCCESS		},	// 73
+	{ NULL,				"CMD_READ_BY_HASH",		GDP_STAT_ACK_SUCCESS		},	// 74
+	{ NULL,				"CMD_SUBSCRIBE_BY_RECNO", GDP_STAT_ACK_SUCCESS		},	// 75
+	{ NULL,				"CMD_SUBSCRIBE_BY_TS",	GDP_STAT_ACK_SUCCESS		},	// 76
+	{ NULL,				"CMD_SUBSCRIBE_BY_HASH", GDP_STAT_ACK_SUCCESS		},	// 77
 	{ NULL,				"CMD_UNSUBSCRIBE",		GDP_STAT_ACK_SUCCESS		},	// 78
-	{ NULL,				"CMD_DELETE",			GDP_STAT_ACK_SUCCESS		},	// 79
-	NOENT,				// 80
-	NOENT,				// 81
+	{ NULL,				"CMD_GETMETADATA",		GDP_STAT_ACK_SUCCESS		},	// 79
+	{ NULL,				"CMD_NEWSEGMENT",		GDP_STAT_ACK_SUCCESS		},	// 80
+	{ NULL,				"CMD_DELETE",			GDP_STAT_ACK_SUCCESS		},	// 81
 	NOENT,				// 82
 	NOENT,				// 83
 	NOENT,				// 84
@@ -643,7 +601,7 @@ static dispatch_ent_t	DispatchTable[256] =
 	NOENT,				// 124
 	NOENT,				// 125
 	NOENT,				// 126
-	NOENT,				// 127
+	{ NULL,				"CMD_FWD_APPEND",		GDP_STAT_ACK_SUCCESS		},	// 127
 	{ ack_success,		"ACK_SUCCESS",			GDP_STAT_ACK_SUCCESS		},	// 128
 	{ ack_success,		"ACK_DATA_CREATED",		GDP_STAT_ACK_CREATED		},	// 129
 	{ ack_success,		"ACK_DATA_DEL",			GDP_STAT_ACK_DELETED		},	// 130
@@ -785,9 +743,9 @@ static dispatch_ent_t	DispatchTable[256] =
 const char *
 _gdp_proto_cmd_name(uint8_t cmd)
 {
-	dispatch_ent_t *d = &DispatchTable[cmd];
+	dispatch_ent_t *d;
 
-	if (d->name != NULL)
+	if (cmd >= 0 && cmd <= 255 && (d = &DispatchTable[cmd])->name != NULL)
 	{
 		return d->name;
 	}
@@ -871,10 +829,7 @@ _gdp_req_dispatch(gdp_req_t *req, int cmd)
 				ep_dbg_printf(" [gob->refcnt %d]", req->gob->refcnt);
 		ep_dbg_printf("\n");
 		if (ep_dbg_test(Dbg, 51))
-		{
-			ep_dbg_printf("    ");
-			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
-		}
+			_gdp_req_dump(req, NULL, GDP_PR_BASIC, 0);
 		funlockfile(ep_dbg_getfile());
 	}
 
@@ -903,10 +858,7 @@ _gdp_req_dispatch(gdp_req_t *req, int cmd)
 			ep_dbg_printf(" [gob->refcnt %d]", req->gob->refcnt);
 		ep_dbg_printf(": %s\n", ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		if (ep_dbg_test(Dbg, 70))
-		{
-			ep_dbg_printf("    ");
-			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
-		}
+			_gdp_req_dump(req, NULL, GDP_PR_BASIC, 0);
 		funlockfile(ep_dbg_getfile());
 	}
 

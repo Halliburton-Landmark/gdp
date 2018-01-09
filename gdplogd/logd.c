@@ -119,7 +119,30 @@ shutdown_req(gdp_req_t *req)
 	}
 
 	if (EP_UT_BITSET(GDP_REQ_SRV_SUBSCR, req->flags))
-		sub_send_message_notification(req, NULL, GDP_NAK_S_LOSTSUB);
+	{
+		gdp_req_t *pubreq = NULL;
+
+		EP_STAT estat = _gdp_req_new(
+								GDP_NAK_S_LOSTSUB,
+								req->gob,
+								_GdpChannel,
+								NULL,
+								0,
+								&pubreq);
+		if (EP_STAT_ISOK(estat))
+		{
+			sub_send_message_notification(pubreq, req);
+		}
+		else
+		{
+			char ebuf[80];
+			ep_dbg_cprintf(Dbg, 1,
+						"shutdown_req: cannot send notification: %s\n",
+						ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		}
+		if (pubreq != NULL)
+			_gdp_req_free(&pubreq);
+	}
 }
 
 void
@@ -390,8 +413,9 @@ main(int argc, char **argv)
 						&_gdp_io_recv,			// receive callback
 						NULL,					// send callback
 						&_gdp_io_event,			// close/error/eof callback
+						&_gdp_router_event,		// router event callback
 						&logd_advertise_all,	// advertise callback
-						chanx,					// cdata
+						chanx,					// user channel data
 						&_GdpChannel);			// output: new channel
 	EP_STAT_CHECK(estat, goto fail0);
 

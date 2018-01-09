@@ -87,6 +87,7 @@ INCEP=		-I${INCROOT}
 LIBEP=		-lep
 LIBEVENT2=	-levent -levent_pthreads -pthread
 LIBCRYPTO=	-lcrypto
+LIBPROTO_C=	-lprotobuf-c
 LIBAVAHI=	-lavahi-client -lavahi-common
 LIBADD=		`sh ../adm/add-libs.sh gdplogd`
 INCS=		${INCSEARCH} ${INCGDP} ${INCEP}
@@ -95,6 +96,7 @@ LDLIBS=		${LIBGDP} \
 		${LIBEP} \
 		${LIBEVENT2} \
 		${LIBCRYPTO} \
+		${LIBPROTO_C} \
 		${LIBAVAHI} \
 		${LIBADD}
 CC=		cc

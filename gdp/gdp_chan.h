@@ -50,6 +50,18 @@
 #include "gdp.h"
 #include "gdp_priv.h"
 
+#ifndef PROTOCOL_L4_V3
+// send v4 session traffic over v3 transport layer
+# define PROTOCOL_L4_V3			1
+#endif
+
+#if PROTOCOL_L4_V3
+# define GDP_PORT_DEFAULT		8007	// default IP port
+#else
+# define GDP_PORT_DEFAULT		8009	// default IP port
+#endif
+#define GDP_TTL_DEFAULT			15		// hops left
+
 
 /*
 **  Prototypes for type declarations.  These are for the most part
@@ -59,8 +71,6 @@
 
 //typedef struct gdp_chan		gdp_chan_t;			// defined in gdp_priv.h
 typedef struct gdp_chan_x		gdp_chan_x_t;		// for chan private "udata"
-//typedef struct gdp_cursor		gdp_cursor_t;		// defined in gdp_priv.h
-typedef struct gdp_cursor_x		gdp_cursor_x_t;		// for cursor priv "udata"
 typedef struct gdp_target		gdp_target_t;		//XXX as yet undefined
 typedef struct gdp_adcert		gdp_adcert_t;		// advertising cert
 
@@ -84,14 +94,12 @@ typedef EP_STAT		gdp_chan_advert_cr_t(
 							void *adata);
 
 // called when data is received
-typedef EP_STAT		gdp_cursor_recv_cb_t(
-							gdp_cursor_t *cursor,
-							uint32_t flags);
-
-// cursor_recv_cb flags:
-#define GDP_CURSOR_PARTIAL		0x00000001		// more data will arrive later
-#define GDP_CURSOR_CONTINUATION	0x00000002		// second & subsequent calls
-#define GDP_CURSOR_READ_ERROR	0x00000004		// read failed (see estat)
+typedef EP_STAT		gdp_chan_recv_cb_t(
+							gdp_chan_t *chan,
+							gdp_name_t src,
+							gdp_name_t dst,
+							gdp_buf_t *payload,
+							size_t payload_len);
 
 // called when data can be sent (unused at this time; will probably change)
 typedef EP_STAT		gdp_chan_send_cb_t(
@@ -102,6 +110,14 @@ typedef EP_STAT		gdp_chan_send_cb_t(
 typedef EP_STAT		gdp_chan_ioevent_cb_t(
 							gdp_chan_t *chan,
 							uint32_t flags);
+
+// called on router events, e.g., NOROUTE
+typedef EP_STAT		gdp_chan_router_cb_t(
+							gdp_chan_t *chan,
+							gdp_name_t src,
+							gdp_name_t dst,
+							size_t payload_len,
+							EP_STAT estat);
 
 // gdp_chan_ioevent_cb flags:
 #define GDP_IOEVENT_USER_CLOSE	0					// user close
@@ -121,9 +137,10 @@ EP_STAT			_gdp_chan_init(				// initialize channel subsystem
 EP_STAT			_gdp_chan_open(				// open channel to routing layer
 						const char *gdpd_addr,
 						void *qos,
-						gdp_cursor_recv_cb_t *recv_cb,
+						gdp_chan_recv_cb_t *recv_cb,
 						gdp_chan_send_cb_t *send_cb,
 						gdp_chan_ioevent_cb_t *ioevent_cb,
+						gdp_chan_router_cb_t *router_cb,
 						gdp_chan_advert_func_t *advert_func,
 						gdp_chan_x_t *cdata,
 						gdp_chan_t **pchan);
@@ -161,35 +178,6 @@ void			_gdp_chan_unlock(			// unlock the channel
 
 void			_gdp_chan_drain_input(		// drain all input from channel
 						gdp_chan_t *chan);
-
-
-/*
-**  Cursor operations.
-*/
-
-gdp_chan_t		*_gdp_cursor_get_chan(		// get channel for cursor
-						gdp_cursor_t *cursor);
-
-gdp_buf_t		*_gdp_cursor_get_buf(		// get input buffer for cursor
-						gdp_cursor_t *cursor);
-
-void			_gdp_cursor_get_endpoints(	// return src & dst
-						gdp_cursor_t *cursor,
-						gdp_name_t *src,
-						gdp_name_t *dst);
-
-size_t			_gdp_cursor_get_payload_size(	// return total len of payload
-						gdp_cursor_t *cursor);
-
-EP_STAT			_gdp_cursor_get_estat(		// get status of last input op
-						gdp_cursor_t *cursor);
-
-void			_gdp_cursor_set_udata(		// set cursor user data
-						gdp_cursor_t *cursor,
-						gdp_cursor_x_t *udata);
-
-gdp_cursor_x_t	*_gdp_cursor_get_udata(		// get cursor user data
-						gdp_cursor_t *cursor);
 
 
 /*

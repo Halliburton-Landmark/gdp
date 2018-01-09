@@ -33,6 +33,7 @@
 #include "gdp.h"
 #include "gdp_priv.h"
 #include "gdp_gclmd.h"
+#include "gdp_chan.h"		// only for GET16 et al
 
 #include <ep/ep_dbg.h>
 #include <ep/ep_hexdump.h>
@@ -249,35 +250,36 @@ fail0:
 
 
 /*
-**  _GDP_GCLMD_SERIALIZE --- serialize metadata list into network order
+**  _GDP_GCLMD_SERIALIZE --- serialize metadata list
 */
 
 size_t
-_gdp_gclmd_serialize(gdp_gclmd_t *gmd, gdp_buf_t *evb)
+_gdp_gclmd_serialize(gdp_gclmd_t *gmd, uint8_t **obufp)
 {
 	int i;
 	size_t slen = 0;
+	uint8_t *obuf = NULL;
+	uint8_t *pbp;
 
 	if (gmd == NULL)
-		return 0;
+		goto done;
+
+	// compute size of the serialized output
+	slen = 2;							// nused: number of entries
+	slen += 8 * gmd->nused;				// md_id and md_len: entry pointers
+	for (i = 0; i < gmd->nused; i++)
+		slen += gmd->mds[i].md_len;		// data
+
+	pbp = obuf = ep_mem_malloc(slen);
 
 	// write the number of entries
-	{
-		uint16_t t16 = htons(gmd->nused);
-		gdp_buf_write(evb, &t16, sizeof t16);
-		slen += sizeof t16;
-	}
+	PUT16(gmd->nused);
 
 	// for each metadata item, write the header
 	for (i = 0; i < gmd->nused; i++)
 	{
-		uint32_t t32;
-
-		t32 = htonl(gmd->mds[i].md_id);
-		gdp_buf_write(evb, &t32, sizeof t32);
-		t32 = htonl(gmd->mds[i].md_len);
-		gdp_buf_write(evb, &t32, sizeof t32);
-		slen = 2 * sizeof t32;
+		PUT32(gmd->mds[i].md_id);
+		PUT32(gmd->mds[i].md_len);
 	}
 
 	// now write out all the data
@@ -285,10 +287,12 @@ _gdp_gclmd_serialize(gdp_gclmd_t *gmd, gdp_buf_t *evb)
 	{
 		if (gmd->mds[i].md_len > 0)
 		{
-			gdp_buf_write(evb, gmd->mds[i].md_data, gmd->mds[i].md_len);
-			slen += gmd->mds[i].md_len;
+			memcpy(pbp, gmd->mds[i].md_data, gmd->mds[i].md_len);
+			pbp += gmd->mds[i].md_len;
 		}
 	}
+done:
+	*obufp = obuf;
 	return slen;
 }
 
@@ -300,67 +304,74 @@ _gdp_gclmd_serialize(gdp_gclmd_t *gmd, gdp_buf_t *evb)
 **		of metadata headers (contains the id and data length),
 **		and finally the metadata itself.  This order is so that it's
 **		easy to read it in without having to reallocate space.
+**
+**		Parameters:
+**			smd --- serialized metadata
+**			smd_len --- ength of smd
 */
 
 gdp_gclmd_t *
-_gdp_gclmd_deserialize(gdp_buf_t *evb)
+_gdp_gclmd_deserialize(uint8_t *smd, size_t smd_len)
 {
-	int nmd = 0;		// number of metadata entries
-	int tlen = 0;		// total data length
-	gdp_gclmd_t *gmd;
-	int i;
+	int nmd;				// number of metadata entries
+	uint8_t *pbp = smd;
 
 	// get the number of metadata entries
-	{
-		uint16_t t16;
-
-		if (gdp_buf_getlength(evb) < sizeof t16)
-			return NULL;
-		gdp_buf_read(evb, &t16, sizeof t16);
-		nmd = ntohs(t16);
-		if (nmd == 0)
-			return NULL;
-	}
+	if (smd_len < 2)
+		return NULL;
+	GET16(nmd);
+	if (nmd == 0)
+		return NULL;
 
 	// make sure we have at least all the headers
-	if (gdp_buf_getlength(evb) < (2 * sizeof (uint32_t)))
+	if ((smd_len - 2) < (2 * sizeof (uint32_t)))
 		return NULL;
 
 	// allocate and populate the header
-	gmd = ep_mem_zalloc(sizeof *gmd);
+	gdp_gclmd_t *gmd = ep_mem_zalloc(sizeof *gmd);
 	gmd->flags = GCLMDF_READONLY;
 	gmd->nalloc = gmd->nused = nmd;
 
 	// allocate and read in the metadata headers
+	size_t tlen = 0;		// total data length
 	gmd->mds = ep_mem_malloc(nmd * sizeof *gmd->mds);
-	for (i = 0; i < nmd; i++)
 	{
-		uint32_t t32;
+		int i;
+		for (i = 0; i < nmd; i++)
+		{
+			uint32_t t32;
 
-		gdp_buf_read(evb, &t32, sizeof t32);
-		gmd->mds[i].md_id = ntohl(t32);
-		gdp_buf_read(evb, &t32, sizeof t32);
-		tlen += gmd->mds[i].md_len = ntohl(t32);
-		gmd->mds[i].md_flags = 0;
+			GET32(t32);
+			gmd->mds[i].md_id = t32;
+			GET32(t32);
+			tlen += gmd->mds[i].md_len = t32;
+			gmd->mds[i].md_flags = 0;
+		}
 	}
 
 	// and now for the data....
-	gmd->databuf = ep_mem_malloc(tlen);
-	if (gdp_buf_read(evb, gmd->databuf, tlen) != tlen)
+	size_t data_left = smd_len - (pbp - smd);
+	if (data_left != tlen)
 	{
 		// bad news
-		ep_mem_free(gmd->databuf);
+		ep_dbg_cprintf(Dbg, 1, "_gdp_gclmd_deserialize: have %zd, want %zd\n",
+					data_left, tlen);
 		ep_mem_free(gmd->mds);
 		ep_mem_free(gmd);
 		return NULL;
 	}
+	gmd->databuf = ep_mem_malloc(tlen);
+	memcpy(gmd->databuf, pbp, tlen);
 
 	// we can now insert the pointers into the data
-	void *dbuf = gmd->databuf;
-	for (i = 0; i < nmd; i++)
 	{
-		gmd->mds[i].md_data = dbuf;
-		dbuf += gmd->mds[i].md_len;
+		void *dbuf = gmd->databuf;
+		int i;
+		for (i = 0; i < nmd; i++)
+		{
+			gmd->mds[i].md_data = dbuf;
+			dbuf += gmd->mds[i].md_len;
+		}
 	}
 
 	if (ep_dbg_test(Dbg, 24))

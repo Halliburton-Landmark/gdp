@@ -37,12 +37,9 @@
 #include <event2/buffer.h>
 #include "gdp_priv.h"
 
-#define GDP_PORT_DEFAULT		8007	// default IP port
-
 #define GDP_PROTO_CUR_VERSION	3		// current protocol version
 #define GDP_PROTO_MIN_VERSION	2		// min version we can accept
 
-#define GDP_TTL_DEFAULT			15		// hops left
 
 
 
@@ -81,55 +78,23 @@
 **			"seq" since this is a lower-level concept that is
 **			subsumed by TCP.
 **
-#if PROTOCOL_V4
-**		The intended structure of a PDU is shown below.  This does not show
-**		the source and destination address, which are passed in from
-**		the layer below --- that is, if this is a "Layer 5" or "Session
-**		Layer" protocol, then "Layer 4" or "Transport Layer" deals
-**		with the addressing.
-**			1	0	protocol version
-**			1	1	command or ack/nak
-**			4	2	request id
-**			2	6	signature length & digest algorithm
-**			1	8	optionals length (in 32 bit words)
-**			1	9	flags (indicate presence/lack of optional fields)
-**			4	10	length of data portion  [[We may reduce this to 16 bits]]
-**			[8	__	record number (optional)]
-**			[8	__	sequence number (optional)]
-**			[16	__	commit timestamp (optional)]
-**			V	__	additional optional data
-**			V	__	data (length indicated above)
-**			V	__	signature (length indicated above)
+**		Since we're using ProtoBufs most of the complication is there.
+**		The gdp_pdu struct is now a Layer 5 ("Session Layer") concept
+**		and now only contains in-core administrative stuff and the
+**		src/dst info, which is inherited from Layer 4 ("Transport
+**		Layer").  All the juicy stuff is in the message itself.
 **
-#else // PROTOCOL_V3
-**		Note that the above is for the future.  At the moment this
-**		implements the old (protocol version 3) scheme, which merges
-**		layers 4 and 5:
-**			1	0	protocol version and format (3)
-**			1	1	time to live (in hops)
-**			1	2	reserved
-**			1	3	command or ack/nak
-**			32	4	destination address
-**			32	36	source address
-**			4	68	request id
-**			2	72	signature length & digest algorithm
-**			1	74	optionals length (in 32 bit words)
-**			1	75	flags (indicate presence/lack of optional fields)
-**			4	76	length of data portion
-**			[8	__	record number (optional)]
-**			[8	__	sequence number (optional)]
-**			[16	__	commit timestamp (optional)]
-**			V	__	additional optional data
-**			V	__	data (length indicated above)
-**			V	__	signature (length indicated above)
-#endif
-**
-**		The structure shown below is the in-memory version and does
-**		not correspond 1::1 to the on-wire format.
+**		When sending a ProtoBuf messages you can do static memory
+**		allocation, but when receiving you have no choice: the
+**		result is malloced.  For that reason the message itself
+**		appears both as part of this structure and as a pointer.
+**		When sending, the pointer will point at the structure.
+**		When receiving, the pointer will be malloced and must
+**		be explicitly freed.
 */
 
-typedef uint64_t		gdp_seqno_t;	// protocol sequence number
-#define	PRIgdp_seqno	PRId64
+typedef uint32_t		gdp_seqno_t;	// protocol sequence number
+#define	PRIgdp_seqno	PRId32
 
 typedef uint32_t		gdp_rid_t;		// request id (uniquifies request)
 #define PRIgdp_rid		PRIu32
@@ -138,64 +103,29 @@ typedef uint32_t		gdp_rid_t;		// request id (uniquifies request)
 typedef struct gdp_pdu
 {
 	// metadata
-	TAILQ_ENTRY(gdp_pdu)	list;		// work list
-	gdp_chan_t				*chan;		// I/O channel for this PDU entry
-	bool					inuse:1;	// indicates that this is allocated
+	TAILQ_ENTRY(gdp_pdu)	list;		// free list
+	uint32_t				flags;
+	gdp_chan_t				*chan;		// only used in _gdp_pdu_process
 
-# if PROTOCOL_V4
-	// copied from lower layer
+	// copied from L4 (lower layer)
 	gdp_name_t				dst;		// destination address
 	gdp_name_t				src;		// source address
 
-	// PDU data
-	uint8_t					ver;		//  0 protocol version and format
-	uint8_t					cmd;		//  1 command or ack/nak
-	gdp_rid_t				rid;		//  2 request id (or GDP_PDU_NO_RID)
-	uint8_t					olen;		//  8 optionals length (in 32-bit words)
-	uint8_t					flags;		//  9 see below
-	gdp_seqno_t				seqno;		// ?? sequence number (XXX used?)
-# else // PROTOCOL_V3
-	// PDU data
-	uint8_t					ver;		//  0 protocol version and format
-	uint8_t					ttl;		//  1 time to live
-	uint8_t					rsvd1;		//  2 reserved
-	uint8_t					cmd;		//  3 command or ack/nak
-	gdp_name_t				dst;		//  4 destination address
-	gdp_name_t				src;		// 36 source address
-	gdp_rid_t				rid;		// 68 req id (GDP_PDU_NO_RID => none)
-	uint8_t					olen;		// 74 optionals length (in 32-bit words)
-	uint8_t					flags;		// 75 see below
-	gdp_seqno_t				seqno;		// ?? sequence number (XXX used?)
-# endif
-
-	// data length, recno, timestamp, signature, and data are in the datum
-	gdp_datum_t				*datum;		// pointer to data record
+	// Layer 5 info
+	GdpMessage				*msg;		// on-the-wire message (not NULL)
 } gdp_pdu_t;
 
+// flag bits
+#define GDP_PDU_INUSE		0x00000001	// PDU is allocated and in use
 
-/***** values for gdp_pdu_t flags field *****/
-#define GDP_PDU_HAS_RECNO	0x02		// has a recno field
-#define GDP_PDU_HAS_SEQNO	0x04		// has a seqno field
-#define GDP_PDU_HAS_TS		0x08		// has a timestamp field
 
 /***** dummy values for other fields *****/
 #define GDP_PDU_NO_RID		UINT32_C(0)		// no request id
-#define GDP_PDU_NO_RECNO	UINT64_C(-1)	// no record number
-//#define GDP_PDU_NO_RECNO	INT64_MIN		// wish I had used this
+#define GDP_PDU_NO_RECNO	INT64_C(0)		// no record number
+#define GDP_PDU_NO_SEQNO	UINT64_C(0)		// no sequence number
+#define GDP_PDU_ANY_RID		UINT32_MAX		// any request id
 
 /***** manifest constants *****/
-
-// size of fixed size part of header
-# if PROTOCOL_V4
-// (ver, cmd, rid, siglen, olen, flags, dlen)
-#define _GDP_PDU_FIXEDHDRSZ		(1+1+4+2+1+1+4)
-# else // PROTOCOL_V3
-// (ver, ttl, rsvd, cmd, dst, src, rid, sigalg, siglen, olen, flags, dlen)
-#define _GDP_PDU_FIXEDHDRSZ		(1+1+1+1+32+32+4+1+1+1+1+4)
-# endif
-
-//* maximum size of options portion
-#define _GDP_PDU_MAXOPTSZ		(255 * 4)
 
 // maximum size of an on-wire header (excluding data and signature)
 #define _GDP_PDU_MAXHDRSZ		(_GDP_PDU_FIXEDHDRSZ + _GDP_PDU_MAXOPTSZ)
@@ -206,6 +136,10 @@ typedef struct gdp_pdu
 // functions to determine characteristics of command/ack/nak
 #define GDP_CMD_NEEDS_ACK(c)	(((c) & 0xc0) == 0x40)	// expect ACK/NAK
 #define GDP_CMD_IS_COMMAND(c)	(((c) & 0x80) != 0x80)	// is a command
+#define GDP_CMD_IS_ACK(c)		(((c) & 0xc0) == 0x80)	// is a positive ack
+#define GDP_CMD_IS_NAK(c)		(((c) & 0xc0) == 0xc0)	// is a negative nak
+#define GDP_CMD_IS_C_NAK(c)		(((c) & 0xe0) == 0xc0)	// is a client side nak
+#define GDP_CMD_IS_S_NAK(c)		(((c) & 0xe0) == 0xe0)	// is a server side nak
 
 
 /*
@@ -216,95 +150,105 @@ typedef struct gdp_pdu
 **		here.
 */
 
-#define _GDP_ACK_FROM_CODE(c)	(_GDP_CCODE_##c - 200 + GDP_ACK_MIN)
-#define _GDP_NAK_C_FROM_CODE(c)	(_GDP_CCODE_##c - 400 + GDP_NAK_C_MIN)
-#define _GDP_NAK_S_FROM_CODE(c)	(_GDP_CCODE_##c - 500 + GDP_NAK_S_MIN)
-#define _GDP_NAK_R_FROM_CODE(c)	(_GDP_CCODE_##c - 600 + GDP_NAK_R_MIN)
+
+/*
+**  Short names for ugly Protobuf names.
+**  See gdp.proto for numeric values.
+*/
 
 //		0-63			Blind commands
-#define GDP_CMD_KEEPALIVE		0			// used for keepalives
-#define GDP_CMD_ADVERTISE		1			// advertise known GCLs
-#define GDP_CMD_WITHDRAW		2			// withdraw advertisment
-#define GDP_CMD_ROUTER_META		3			// reserved for router-router msgs
+#define GDP_CMD_KEEPALIVE			GDP_COMMAND_CODE__CMD_KEEPALIVE
+#define GDP_CMD_ADVERTISE			GDP_COMMAND_CODE__CMD_ADVERTISE
+#define GDP_CMD_WITHDRAW			GDP_COMMAND_CODE__CMD_WITHDRAW
+#define GDP_CMD_ROUTER_META			GDP_COMMAND_CODE__CMD_ROUTER_META
+
 //		64-127			Acknowledged commands
-#define GDP_CMD_PING			64			// test connection/subscription
-#define GDP_CMD_HELLO			65			// initial startup/handshake
-#define GDP_CMD_CREATE			66			// create a GCL
-#define GDP_CMD_OPEN_AO			67			// open a GCL for append-only
-#define GDP_CMD_OPEN_RO			68			// open a GCL for read-only
-#define GDP_CMD_CLOSE			69			// close a GCL
-#define GDP_CMD_READ			70			// read a given record by index
-#define GDP_CMD_APPEND			71			// append a record
-#define GDP_CMD_SUBSCRIBE		72			// subscribe to a GCL
-#define GDP_CMD_MULTIREAD		73			// read more than one records
-#define GDP_CMD_GETMETADATA		74			// fetch metadata
-#define GDP_CMD_OPEN_RA			75			// open a GCL for read or append
-#define GDP_CMD_NEWSEGMENT		76			// create a new segment for a log
-#define GDP_CMD_FWD_APPEND		77			// forward (replicate) APPEND
-#define GDP_CMD_UNSUBSCRIBE		78			// delete all subscriptions
-#define GDP_CMD_DELETE			79			// delete a GCL
+#define GDP_CMD_PING				GDP_COMMAND_CODE__CMD_PING
+#define GDP_CMD_HELLO				GDP_COMMAND_CODE__CMD_HELLO
+#define GDP_CMD_CREATE				GDP_COMMAND_CODE__CMD_CREATE
+#define GDP_CMD_OPEN_AO				GDP_COMMAND_CODE__CMD_OPEN_AO
+#define GDP_CMD_OPEN_RO				GDP_COMMAND_CODE__CMD_OPEN_RO
+#define GDP_CMD_OPEN_RA				GDP_COMMAND_CODE__CMD_OPEN_RA
+#define GDP_CMD_CLOSE				GDP_COMMAND_CODE__CMD_CLOSE
+#define GDP_CMD_APPEND				GDP_COMMAND_CODE__CMD_APPEND
+#define GDP_CMD_READ_BY_RECNO		GDP_COMMAND_CODE__CMD_READ_BY_RECNO
+#define GDP_CMD_READ_BY_TS			GDP_COMMAND_CODE__CMD_READ_BY_TS
+#define GDP_CMD_READ_BY_HASH		GDP_COMMAND_CODE__CMD_READ_BY_HASH
+#define GDP_CMD_SUBSCRIBE_BY_RECNO	GDP_COMMAND_CODE__CMD_SUBSCRIBE_BY_RECNO
+#define GDP_CMD_SUBSCRIBE_BY_TS		GDP_COMMAND_CODE__CMD_SUBSCRIBE_BY_TS
+#define GDP_CMD_SUBSCRIBE_BY_HASH	GDP_COMMAND_CODE__CMD_SUBSCRIBE_BY_HASH
+#define GDP_CMD_UNSUBSCRIBE			GDP_COMMAND_CODE__CMD_UNSUBSCRIBE
+#define GDP_CMD_GETMETADATA			GDP_COMMAND_CODE__CMD_GETMETADATA
+#define GDP_CMD_NEWSEGMENT			GDP_COMMAND_CODE__CMD_NEWSEGMENT
+#define GDP_CMD_DELETE				GDP_COMMAND_CODE__CMD_DELETE
+#define GDP_CMD_FWD_APPEND			GDP_COMMAND_CODE__CMD_FWD_APPEND
+
 //		128-191			Positive acks (HTTP 200-263)
 #define GDP_ACK_MIN			128			// minimum ack code
-#define GDP_ACK_SUCCESS			_GDP_ACK_FROM_CODE(SUCCESS)				// 128
-#define GDP_ACK_CREATED			_GDP_ACK_FROM_CODE(CREATED)				// 129
-#define GDP_ACK_DELETED			_GDP_ACK_FROM_CODE(DELETED)				// 130
-#define GDP_ACK_VALID			_GDP_ACK_FROM_CODE(VALID)				// 131
-#define GDP_ACK_CHANGED			_GDP_ACK_FROM_CODE(CHANGED)				// 132
-#define GDP_ACK_CONTENT			_GDP_ACK_FROM_CODE(CONTENT)				// 133
+#define GDP_ACK_SUCCESS				GDP_COMMAND_CODE__ACK_SUCCESS
+#define GDP_ACK_CREATED				GDP_COMMAND_CODE__ACK_CREATED
+#define GDP_ACK_DELETED				GDP_COMMAND_CODE__ACK_DELETED
+#define GDP_ACK_VALID				GDP_COMMAND_CODE__ACK_VALID
+#define GDP_ACK_CHANGED				GDP_COMMAND_CODE__ACK_CHANGED
+#define GDP_ACK_CONTENT				GDP_COMMAND_CODE__ACK_CONTENT
 #define GDP_ACK_MAX			191			// maximum ack code
+
 //		192-223			Negative acks, client side (CoAP, HTTP 400-431)
 #define GDP_NAK_C_MIN		192			// minimum client-side nak code
-#define GDP_NAK_C_BADREQ		_GDP_NAK_C_FROM_CODE(BADREQ)			// 192
-#define GDP_NAK_C_UNAUTH		_GDP_NAK_C_FROM_CODE(UNAUTH)			// 193
-#define GDP_NAK_C_BADOPT		_GDP_NAK_C_FROM_CODE(BADOPT)			// 194
-#define GDP_NAK_C_FORBIDDEN		_GDP_NAK_C_FROM_CODE(FORBIDDEN)			// 195
-#define GDP_NAK_C_NOTFOUND		_GDP_NAK_C_FROM_CODE(NOTFOUND)			// 196
-#define GDP_NAK_C_METHNOTALLOWED _GDP_NAK_C_FROM_CODE(METHNOTALLOWED)	// 197
-#define GDP_NAK_C_NOTACCEPTABLE _GDP_NAK_C_FROM_CODE(NOTACCEPTABLE)		// 198
-#define GDP_NAK_C_CONFLICT		_GDP_NAK_C_FROM_CODE(CONFLICT)			// 201
-#define GDP_NAK_C_GONE			_GDP_NAK_C_FROM_CODE(GONE)				// 202
-#define GDP_NAK_C_PRECONFAILED	_GDP_NAK_C_FROM_CODE(PRECONFAILED)		// 204
-#define GDP_NAK_C_TOOLARGE		_GDP_NAK_C_FROM_CODE(TOOLARGE)			// 205
-#define GDP_NAK_C_UNSUPMEDIA	_GDP_NAK_C_FROM_CODE(UNSUPMEDIA)		// 207
-#define GDP_NAK_C_REC_MISSING	_GDP_NAK_C_FROM_CODE(REC_MISSING)		// 222
-#define GDP_NAK_C_REC_DUP		_GDP_NAK_C_FROM_CODE(REC_DUP)			// 223
+#define GDP_NAK_C_BADREQ			GDP_COMMAND_CODE__NAK_C_BADREQ
+#define GDP_NAK_C_UNAUTH			GDP_COMMAND_CODE__NAK_C_UNAUTH
+#define GDP_NAK_C_BADOPT			GDP_COMMAND_CODE__NAK_C_BADOPT
+#define GDP_NAK_C_FORBIDDEN			GDP_COMMAND_CODE__NAK_C_FORBIDDEN
+#define GDP_NAK_C_NOTFOUND			GDP_COMMAND_CODE__NAK_C_NOTFOUND
+#define GDP_NAK_C_METHNOTALLOWED	GDP_COMMAND_CODE__NAK_C_METHNOTALLOWED
+#define GDP_NAK_C_NOTACCEPTABLE		GDP_COMMAND_CODE__NAK_C_NOTACCEPTABLE
+#define GDP_NAK_C_CONFLICT			GDP_COMMAND_CODE__NAK_C_CONFLICT
+#define GDP_NAK_C_GONE				GDP_COMMAND_CODE__NAK_C_GONE
+#define GDP_NAK_C_PRECONFAILED		GDP_COMMAND_CODE__NAK_C_PRECONFAILED
+#define GDP_NAK_C_TOOLARGE			GDP_COMMAND_CODE__NAK_C_TOOLARGE
+#define GDP_NAK_C_UNSUPMEDIA		GDP_COMMAND_CODE__NAK_C_UNSUPMEDIA
+#define GDP_NAK_C_REC_MISSING		GDP_COMMAND_CODE__NAK_C_REC_MISSING
+#define GDP_NAK_C_REC_DUP			GDP_COMMAND_CODE__NAK_C_REC_DUP
 #define GDP_NAK_C_MAX		223			// maximum client-side nak code
+
 //		224-239			Negative acks, server side (CoAP, HTTP 500-515)
 #define GDP_NAK_S_MIN		224			// minimum server-side nak code
-#define GDP_NAK_S_INTERNAL		_GDP_NAK_S_FROM_CODE(INTERNAL)			// 224
-#define GDP_NAK_S_NOTIMPL		_GDP_NAK_S_FROM_CODE(NOTIMPL)			// 225
-#define GDP_NAK_S_BADGATEWAY	_GDP_NAK_S_FROM_CODE(BADGATEWAY)		// 226
-#define GDP_NAK_S_SVCUNAVAIL	_GDP_NAK_S_FROM_CODE(SVCUNAVAIL)		// 227
-#define GDP_NAK_S_GWTIMEOUT		_GDP_NAK_S_FROM_CODE(GWTIMEOUT)			// 228
-#define GDP_NAK_S_PROXYNOTSUP	_GDP_NAK_S_FROM_CODE(PROXYNOTSUP)		// 229
-
-#define GDP_NAK_S_REPLICATE_FAIL _GDP_NAK_S_FROM_CODE(REPLICATE_FAIL)	// 238
-#define GDP_NAK_S_LOSTSUB		_GDP_NAK_S_FROM_CODE(LOST_SUBSCR)		// 239
+#define GDP_NAK_S_INTERNAL			GDP_COMMAND_CODE__NAK_S_INTERNAL
+#define GDP_NAK_S_NOTIMPL			GDP_COMMAND_CODE__NAK_S_NOTIMPL
+#define GDP_NAK_S_BADGATEWAY		GDP_COMMAND_CODE__NAK_S_BADGATEWAY
+#define GDP_NAK_S_SVCUNAVAIL		GDP_COMMAND_CODE__NAK_S_SVCUNAVAIL
+#define GDP_NAK_S_GWTIMEOUT			GDP_COMMAND_CODE__NAK_S_GWTIMEOUT
+#define GDP_NAK_S_PROXYNOTSUP		GDP_COMMAND_CODE__NAK_S_PROXYNOTSUP
+#define GDP_NAK_S_REPLICATE_FAIL	GDP_COMMAND_CODE__NAK_S_REPLICATE_FAIL
+#define GDP_NAK_S_LOSTSUB			GDP_COMMAND_CODE__NAK_S_LOSTSUB
 #define GDP_NAK_S_MAX		239			// maximum server-side nak code
+
 //		240-254			Negative acks, routing layer
 #define GDP_NAK_R_MIN		240			// minimum routing layer nak code
-#define GDP_NAK_R_NOROUTE		_GDP_NAK_R_FROM_CODE(NOROUTE)			// 240
+#define GDP_NAK_R_NOROUTE			GDP_COMMAND_CODE__NAK_R_NOROUTE
 #define GDP_NAK_R_MAX		254			// maximum routing layer nak code
+
 //		255				Reserved
 
 
-gdp_pdu_t	*_gdp_pdu_new(void);		// allocate a new PDU
+gdp_pdu_t	*_gdp_pdu_new(			// allocate a new PDU
+				GdpMessage *msg,		// the initial message (may be NULL)
+				gdp_name_t src,			// source address
+				gdp_name_t dst);		// destination address
 
-void		_gdp_pdu_free(gdp_pdu_t *);	// free a PDU
+void		_gdp_pdu_free(			// free a PDU
+				gdp_pdu_t **);
 
-EP_STAT		_gdp_pdu_out(				// send a PDU to a network buffer
+EP_STAT		_gdp_pdu_out(			// send a PDU to a network buffer
 				gdp_pdu_t *,			// the PDU information
 				gdp_chan_t *,			// the network channel
 				EP_CRYPTO_MD *);		// the crypto context for signing
 
-void		_gdp_pdu_out_hard(			// send a PDU to a network buffer
-				gdp_pdu_t *,			// the PDU information
-				gdp_chan_t *,			// the network channel
-				EP_CRYPTO_MD *);		// the crypto context for signing
-
-EP_STAT		_gdp_pdu_in(				// read a PDU from a network buffer
+EP_STAT		_gdp_pdu_in(			// read a PDU from a network buffer
 				gdp_pdu_t *,			// the buffer to store the result
-				gdp_cursor_t *);		// the input cursor
+				gdp_buf_t *pbuf,		// the payload (input) buffer
+				size_t plen,			// the payload length
+				gdp_chan_t *);			// the input channel
 
 void		_gdp_pdu_dump(
 				const gdp_pdu_t *pdu,

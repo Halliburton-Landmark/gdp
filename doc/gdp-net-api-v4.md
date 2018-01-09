@@ -1,7 +1,7 @@
 % What I Want to See in a Network API
   for the GDP
 % Eric Allman
-% 2017-07-19
+% 2017-12-13
 
 ***This is a proposal, not a specification***
 
@@ -157,10 +157,6 @@ but can be defined arbitrarily by "your side":
 
 * `gdp_chan_t` contains the state of the channel itself.  It is
   opaque to "my side" of the API.
-* `gdp_cursor_t` provides a handle to a streaming interface to a
-  payload while the client is receiving.  Internally ("your side")
-  it is fair game for other use, in particular, it may be useful
-  on the sending side.  It is opaque to "my side" of the API.
 * `gdp_adcert_t` is whatever information is needed to advertise
   a GDPname.  This is _for further study_.
 * `gdp_adchallenge_t` is data associated with a challenge/response
@@ -177,9 +173,6 @@ my needs:
   `struct gdp_chan_x`, which I must define if I want to dereference
   that structure.  It is normally referred to as `cdata` in the
   descriptions below.
-* `gdp_cursor_x_t` is the cursor equivalent of `gdp_chan_x_t`.
-  It is normally referred to as `udata` in the descriptions
-  below.
 * `gdp_advert_x_t` is my data structure used to pass information
   vis-a-vis advertising.  It is normally referred to as `adata`
   in the descriptions below.
@@ -221,9 +214,11 @@ channel when I start up.
 #### \_gdp\_chan\_open (constructor)
 
 ~~~
-	typedef EP_STAT gdp_cursor_recv_cb_t(
-			gdp_cursor_t *cursor,
-			uint32_t recv_flags);
+	typedef EP_STAT gdp_chan_recv_cb_t(
+			gdp_chan_t *chan,
+			gdp_name_t *src,
+			gdp_name_t *dst,
+			gdp_buf_t *payload);
 	typedef EP_STAT gdp_chan_send_cb_t(
 			gdp_chan_t *chan,
 			gdp_buf_t *payload);
@@ -237,7 +232,7 @@ channel when I start up.
 	EP_STAT _gdp_chan_open(
 			const char *addrspec,
 			gdp_chan_qos_t *qos,
-			gdp_cursor_recv_cb_t *cursor_recv_cb,
+			gdp_chan_recv_cb_t *chan_recv_cb,
 			gdp_chan_send_cb_t *chan_send_cb,
 			gdp_chan_ioevent_cb_t *chan_ioevent_cb,
 			gdp_chan_advert_func_t *advert_func,
@@ -263,10 +258,9 @@ The callbacks are described below.
 The `cdata` parameter is saved and is available to callbacks on this
 channel.  It is opaque on the network side.
 
-**`cursor_recv_cb`**:  When a new PDU is ready to read on the
-associated channel (as encapsulated into `cursor`), call
-`cursor_recv_cb`.  Details are described under "Receiving
-Messages" below.
+**`chan_recv_cb`**:  When a new PDU is ready to read on the
+associated channel, call `chan_recv_cb`.  Details are described under
+"Receiving Messages" below.
 
 **`chan_send_cb`**:  The intent is that this will be called when
 the network is able to accept more data.  It is not used at this
@@ -453,123 +447,11 @@ This will certainly need support to set up a multicast channel,
 probably with "new", "join", "leave", and "free" style interface.
 
 
-### Receiving Messages (cursor operations)
+### Receiving Messages
 
-Message data is returned via a cursor, not a channel.  This
-allows long messages to be returned in "chunks".  When data is
-available for reading, the network layer ("you") will invoke
-`cursor_recv_cb` with the cursor and flags:
-
-| Name				| Meaning				|
-|-------------------------------|---------------------------------------|
-| `GDP_CURSOR_PARTIAL`		| Partial data; continuation expected	|
-| `GDP_CURSOR_CONTINUATION`	| This data is continuation data	|
-| `GDP_CURSOR_READ_ERROR`	| A read error occurred (see below)	|
-
-I then do whatever processing is needed on that data.  It is not
-required that the entire message be read before the callback is
-invoked.  However, if the callback returns without consuming
-data and new data arrives, it will be appended to the existing
-data buffer.
-
-You must ensure that data read from a cursor is presented in the
-same order it was written with no duplicates or dropouts.
-There is no such "in order" guarantee between different payloads.
-If there is a read error on a partially delivered message, this
-callback will be invoked one more time with the `GDP_CURSOR_READ_ERROR`
-flag set.  Error detail may be exposed via `_gdp_cursor_get_estat`.
-
-I promise to never call the following functions or reference a cursor
-except from within `cursor_recv_cb`.
-You must ensure that no data is added
-to the associated buffer (returned by `_gdp_cursor_get_buf`) while
-that callback is running.  [The routines `gdp_buf_lock` and
-`gdp_buf_unlock` may be helpful in multithreaded environments.]
-
-#### \_gdp\_cursor\_get\_buf (cursor::get\_buf)
-
-~~~
-	gdp_buf_t *_gdp_cursor_get_buf(
-			gdp_cursor_t *cursor);
-~~~
-
-Returns the (read-only) data buffer associated with the cursor.
-This can only be called within a `cursor_recv_cb` callback, and the
-resulting buffer must not be used outside of that callback.
-If the callback does not consume the buffer data before returning,
-any new data for that cursor will be appended to the buffer and
-the callback will be invoked again.
-
-The buffer returned uses the existing interface as described in
-"GDP Programmatic API", including the ability to get the amount
-of the available data, read data in various ways, and peek at data.
-
-#### \_gdp\_cursor\_get\_payload\_size (cursor::get\_payload\_size)
-
-~~~
-	size_t _gdp_cursor_get_payload_size(
-			gdp_cursor_t *cursor);
-~~~
-
-Returns the size of the complete payload.  Note that this is may be
-greater than the amount of the payload in the current cursor buffer.
-
-#### \_gdp\_cursor\_get\_chan (cursor::get_chan)
-
-~~~
-	gdp_chan_t *_gdp_cursor_get_chan(
-			gdp_cursor_t *cursor);
-~~~
-
-Returns the channel associated with `cursor`.
-
-#### \_gdp\_cursor\_get\_endpoints (cursor::get\_endpoints)
-
-~~~
-	EP_STAT _gdp_cursor_get_endpoints(
-			gdp_cursor_t *cursor,
-			gdp_name_t *src,
-			gdp_name_t *dst);
-~~~
-
-Returns the endpoints of the given `cursor` into `src` and `dst`.
-These will be the same as passed to `gdp_recv_cb`.
-
-#### \_gdp\_cursor\_get\_estat (cursor::get\_estat)
-
-~~~
-	EP_STAT _gdp_cursor_get_estat(
-			gdp_cursor_t *cursor);
-~~~
-
-Returns the error status associated with the last input on the
-`cursor`.  Normally of interest if `GDP_CURSOR_READ_ERROR` is set
-in the flags.
-
-#### \_gdp\_cursor\_set\_udata (cursor::set\_udata)
-
-~~~
-	void _gdp_cursor_set_udata(
-			gdp_cursor_t *cursor,
-			gdp_cursor_x_t *udata);
-~~~
-
-Sets a user-defined field in the cursor to `udata`.  The lifetime of
-that data is limited to one message.  It may be used for carrying
-state between partial messages.
-
-It is the responsibility of the caller to clean up this data (e.g.
-free any allocated memory) before the cursor is destroyed.
-
-#### \_gdp\_cursor\_get\_udata (cursor::get\_udata)
-
-~~~
-	gdp_cursor_x_t *_gdp_cursor_get_udata(
-			gdp_cursor_t *cursor);
-~~~
-
-Returns the user-defined field set by `_gdp_cursor_set_udata`.
-If no user data has been set, returns NULL.
+Messages are delivered using the `gdp_chan_recv_cb` parameter
+to `_gdp_chan_open`.  When a complete message is ready for delivery,
+this is function is called.
 
 
 ### Utilities
@@ -587,8 +469,7 @@ If no user data has been set, returns NULL.
 
 Lock or unlock a `chan`.  This is a mutex lock.
 
-> [[Can this be done implicitly?  What in particular is it for?
-Should there be an equivalent for cursors?]]
+> [[Can this be done implicitly?  What in particular is it for?]]
 
 
 ## Status Codes

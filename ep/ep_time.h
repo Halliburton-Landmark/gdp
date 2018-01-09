@@ -45,7 +45,9 @@ typedef struct
 } EP_TIME_SPEC;
 #pragma pack(pop)
 
-#define EP_TIME_NOTIME		(INT64_MIN)
+// doesn't use INT64_MIN because protobuf chokes on that as default
+// this is INT64_MIN + 1
+#define EP_TIME_NOTIME		(-9223372036854775807LL)
 
 // return current time
 extern EP_STAT	ep_time_now(EP_TIME_SPEC *tv);

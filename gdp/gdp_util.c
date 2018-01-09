@@ -57,10 +57,10 @@ _gdp_newname(gdp_name_t gname, gdp_gclmd_t *gmd)
 	}
 	else
 	{
-		gdp_buf_t *gbuf = gdp_buf_new();
-		size_t glen = _gdp_gclmd_serialize(gmd, gbuf);
+		uint8_t *mdbuf;
+		size_t mdlen = _gdp_gclmd_serialize(gmd, &mdbuf);
 
-		ep_crypto_md_sha256(gdp_buf_getptr(gbuf, glen), glen, gname);
-		gdp_buf_free(gbuf);
+		ep_crypto_md_sha256(mdbuf, mdlen, gname);
+		ep_mem_free(mdbuf);
 	}
 }

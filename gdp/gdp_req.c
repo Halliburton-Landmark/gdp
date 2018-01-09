@@ -178,26 +178,41 @@ _gdp_req_new(int cmd,
 	{
 		// This is the common case
 		// gdp_pdu_proc_cmd is the only case where PDU already exists
-		pdu = _gdp_pdu_new();
-		ep_dbg_cprintf(Dbg, 11, "_gdp_req_new: allocated new pdu @ %p\n",
-					pdu);
-		pdu->cmd = cmd;
+
+		gdp_rid_t rid;
+		gdp_seqno_t seqno;
+		gdp_name_t dst;
+
 		if (gob != NULL)
 		{
 			GDP_GOB_ASSERT_ISLOCKED(gob);
-			memcpy(pdu->dst, gob->name, sizeof pdu->dst);
+			memcpy(dst, gob->name, sizeof dst);
 		}
+		else
+		{
+			ep_dbg_cprintf(Dbg, 1, "_gdp_req_new: no destination address\n");
+			memset(dst, 0, sizeof dst);
+		}
+
 		if ((gob == NULL || !EP_UT_BITSET(GDP_REQ_PERSIST, flags)) &&
 				!EP_UT_BITSET(GDP_REQ_ALLOC_RID, flags))
 		{
 			// just use constant zero; any value would be fine
-			pdu->rid = GDP_PDU_NO_RID;
+			rid = GDP_PDU_NO_RID;
 		}
 		else
 		{
 			// allocate a new unique request id
-			pdu->rid = _gdp_rid_new(gob, chan);
+			rid = _gdp_rid_new(gob, chan);
 		}
+
+		seqno = GDP_PDU_NO_SEQNO;		// for now...
+
+		gdp_msg_t *msg = _gdp_msg_new(cmd, rid, seqno);
+		pdu = _gdp_pdu_new(msg, _GdpMyRoutingName, dst);
+
+		ep_dbg_cprintf(Dbg, 11, "_gdp_req_new: allocated new pdu @ %p\n",
+					pdu);
 	}
 	if (GDP_CMD_IS_COMMAND(cmd))
 		req->cpdu = pdu;
@@ -233,7 +248,7 @@ fail0:
 	// success
 	*reqp = req;
 	ep_dbg_cprintf(Dbg, 48, "_gdp_req_new(gob=%p, cmd=%s) => %p (rid=%d)\n",
-			req->gob, _gdp_proto_cmd_name(cmd), req, pdu->rid);
+			req->gob, _gdp_proto_cmd_name(cmd), req, pdu->msg->rid);
 	return estat;
 }
 
@@ -299,10 +314,9 @@ _gdp_req_free(gdp_req_t **reqp)
 
 	// free the associated PDU(s)
 	if (req->rpdu != NULL && req->rpdu != req->cpdu)
-		_gdp_pdu_free(req->rpdu);
+		_gdp_pdu_free(&req->rpdu);
 	if (req->cpdu != NULL)
-		_gdp_pdu_free(req->cpdu);
-	req->rpdu = req->cpdu = NULL;
+		_gdp_pdu_free(&req->cpdu);
 
 	if (req->gob != NULL)
 		_gdp_gob_decref(&req->gob, true);
@@ -553,7 +567,8 @@ _gdp_req_find(gdp_gob_t *gob, gdp_rid_t rid)
 				estat = _gdp_req_lock(req);
 				EP_STAT_CHECK(estat, break);
 				nextreq = LIST_NEXT(req, goblist);
-				if (req->cpdu->rid == rid)
+				if (req->cpdu != NULL && req->cpdu->msg != NULL &&
+						(rid == GDP_PDU_ANY_RID || req->cpdu->msg->rid == rid))
 					break;
 				_gdp_req_unlock(req);
 			}
@@ -675,6 +690,9 @@ _gdp_req_pr_stats(FILE *fp)
 **
 **		Very simplistic for now.  RIDs really only need to be unique
 **		within a given GOB/channel tuple.
+**
+**		Assumes that GDP_PDU_ANY_RID == UINT32_MAX; otherwise the
+**		domain of MaxRid is reduced.
 */
 
 static gdp_rid_t	MaxRid = 0;
@@ -682,12 +700,13 @@ static gdp_rid_t	MaxRid = 0;
 gdp_rid_t
 _gdp_rid_new(gdp_gob_t *gob, gdp_chan_t *chan)
 {
-	if (MaxRid == UINT32_MAX)
+	if (++MaxRid == GDP_PDU_ANY_RID)
 	{
 		// overflow!!!  at least log something
 		ep_log(EP_STAT_SEVERE, "Request ID overflow");
+		MaxRid = 100;			// XXX wild guess; should check for rids in use
 	}
-	return ++MaxRid;
+	return MaxRid;
 }
 
 char *

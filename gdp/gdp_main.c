@@ -79,8 +79,8 @@ init_error(const char *datum, const char *where)
 }
 
 
-static int
-acknak_from_estat(EP_STAT estat, int def)
+int
+_gdp_acknak_from_estat(EP_STAT estat, int def)
 {
 	int resp = def;
 
@@ -118,7 +118,7 @@ acknak_from_estat(EP_STAT estat, int def)
 	{
 		char ebuf[100];
 
-		ep_dbg_printf("acknak_from_estat: %s -> %s\n",
+		ep_dbg_printf("_gdp_acknak_from_estat: %s -> %s\n",
 				ep_stat_tostr(estat, ebuf, sizeof ebuf),
 				_gdp_proto_cmd_name(resp));
 	}
@@ -139,19 +139,22 @@ static void
 process_cmd(void *cpdu_)
 {
 	gdp_pdu_t *cpdu = cpdu_;
-	int cmd = cpdu->cmd;
+	int cmd;
 	EP_STAT estat;
 	gdp_gob_t *gob = NULL;
 	gdp_req_t *req = NULL;
 	int resp;
 
-	// create has too many special cases, so we single thread it
-	if (cmd == GDP_CMD_CREATE)
-		ep_thr_mutex_lock(&GclCreateMutex);
+	GDP_MSG_CHECK(cpdu, return);
+	cmd = cpdu->msg->cmd;
 
 	ep_dbg_cprintf(Dbg, 40,
 			"process_cmd(%s, thread %" EP_THR_PRItid ")\n",
 			_gdp_proto_cmd_name(cmd), ep_thr_gettid());
+
+	// create has too many special cases, so we single thread it
+	if (cmd == GDP_CMD_CREATE)
+		ep_thr_mutex_lock(&GclCreateMutex);
 
 	estat = _gdp_gob_cache_get(cpdu->dst, GGCF_NOCREATE, &gob);
 	if (gob != NULL)
@@ -169,18 +172,6 @@ process_cmd(void *cpdu_)
 
 	ep_dbg_cprintf(Dbg, 40, "process_cmd >>> req=%p\n", req);
 
-	// if command will need an ack, allocate space for that PDU
-	if (GDP_CMD_NEEDS_ACK(cmd))
-		req->rpdu = _gdp_pdu_new();
-
-	// swap source and destination for command response
-	if (req->rpdu != NULL)
-	{
-		memcpy(req->rpdu->src, req->cpdu->dst, sizeof req->rpdu->src);
-		memcpy(req->rpdu->dst, req->cpdu->src, sizeof req->rpdu->dst);
-		req->rpdu->rid = req->cpdu->rid;
-	}
-
 	// do the per-command processing
 	estat = _gdp_req_dispatch(req, cmd);
 	if (ep_dbg_test(Dbg, 59))
@@ -191,9 +182,11 @@ process_cmd(void *cpdu_)
 
 	// make sure request or GOB haven't gotten fubared
 	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex);
+	GDP_MSG_CHECK(req->rpdu, goto fail1);
 
 	// special case: if we have deleted a GOB, it will have disappeared now
-	if (req->gob == NULL && gob != NULL && req->cpdu->cmd == GDP_CMD_DELETE)
+	if (req->gob == NULL && gob != NULL &&
+			req->cpdu->msg->cmd == GDP_CMD_DELETE)
 	{
 		_gdp_gob_unlock(gob);
 		gob = NULL;
@@ -220,7 +213,7 @@ process_cmd(void *cpdu_)
 
 	// figure out potential response code
 	// we compute even if unused so we can log server errors
-	resp = acknak_from_estat(estat, req->rpdu->cmd);
+	resp = _gdp_acknak_from_estat(estat, req->rpdu->msg->cmd);
 
 	if (resp >= GDP_NAK_S_MIN && resp <= GDP_NAK_S_MAX)
 	{
@@ -228,34 +221,10 @@ process_cmd(void *cpdu_)
 				_gdp_proto_cmd_name(cmd));
 	}
 
-	// do sanity checks on signature
-	if (req->rpdu->datum != NULL)
-	{
-		gdp_datum_t *datum = req->rpdu->datum;
-		int siglen = 0;
-
-		ep_thr_mutex_lock(&req->rpdu->datum->mutex);
-		if (datum->sig != NULL)
-			siglen = gdp_buf_getlength(datum->sig);
-		if (siglen != datum->siglen)
-		{
-			ep_dbg_cprintf(Dbg, 1, "process_cmd(%s): datum->siglen = %d, actual = %d\n",
-					_gdp_proto_cmd_name(cmd),
-					datum->siglen, siglen);
-			datum->siglen = siglen;
-		}
-	}
-
 	// send response PDU if appropriate
-	if (req->rpdu != NULL)
-	{
-		ep_dbg_cprintf(Dbg, 47,
-				"process_cmd: sending %zd bytes\n",
-				gdp_buf_getlength(req->rpdu->datum->dbuf));
-		req->rpdu->cmd = resp;
-		req->stat = _gdp_pdu_out(req->rpdu, req->chan, NULL);
-		//XXX anything to do with estat here?
-	}
+	req->rpdu->msg->cmd = resp;
+	req->stat = _gdp_pdu_out(req->rpdu, req->chan, NULL);
+	//XXX anything to do with estat here?
 
 	EP_ASSERT(gob == req->gob);
 	if (gob != NULL)
@@ -275,9 +244,8 @@ process_cmd(void *cpdu_)
 		EP_ASSERT(gob == req->gob);
 	}
 
+fail1:
 	// free up resources
-	if (req->rpdu->datum != NULL)
-		ep_thr_mutex_unlock(&req->rpdu->datum->mutex);
 	if (EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
 		_gdp_req_unlock(req);
 	else
@@ -294,7 +262,7 @@ process_cmd(void *cpdu_)
 fail0:
 		ep_log(estat, "process_cmd: cannot allocate request; dropping PDU");
 		if (cpdu != NULL)
-			_gdp_pdu_free(cpdu);
+			_gdp_pdu_free(&cpdu);
 	}
 
 	if (cmd == GDP_CMD_CREATE)
@@ -336,7 +304,8 @@ find_req_in_channel_list(
 	LIST_FOREACH(req, &chanx->reqs, chanlist)
 	{
 		if (req->cpdu != NULL &&
-				req->cpdu->rid == rpdu->rid &&
+				(rpdu->msg->rid == GDP_PDU_ANY_RID ||
+				 req->cpdu->msg->rid == rpdu->msg->rid) &&
 				GDP_NAME_SAME(req->cpdu->src, rpdu->dst) &&
 				GDP_NAME_SAME(req->cpdu->dst, rpdu->src))
 			break;
@@ -392,7 +361,7 @@ process_resp(void *rpdu_)
 {
 	gdp_pdu_t *rpdu = rpdu_;
 	gdp_chan_t *chan = _GdpChannel;
-	int cmd = rpdu->cmd;
+	int cmd = rpdu->msg->cmd;
 	EP_STAT estat;
 	gdp_gob_t *gob = NULL;
 	gdp_req_t *req = NULL;
@@ -424,18 +393,18 @@ process_resp(void *rpdu_)
 		if (!EP_STAT_ISOK(estat) || req == NULL)
 		{
 			if (ep_dbg_test(DbgProcResp,
-						rpdu->cmd == GDP_NAK_R_NOROUTE ? 19 : 1))
+						rpdu->msg->cmd == GDP_NAK_R_NOROUTE ? 19 : 1))
 			{
 				gdp_pname_t pname;
 				ep_dbg_printf("process_resp: discarding %d (%s) PDU"
 							" for unknown GOB\n",
-							rpdu->cmd, _gdp_proto_cmd_name(rpdu->cmd));
+							rpdu->msg->cmd, _gdp_proto_cmd_name(rpdu->msg->cmd));
 				if (ep_dbg_test(DbgProcResp, 24))
 					_gdp_pdu_dump(rpdu, ep_dbg_getfile());
 				else
 					ep_dbg_printf("    %s\n", gdp_printable_name(rpdu->src, pname));
 			}
-			_gdp_pdu_free(rpdu);
+			_gdp_pdu_free(&rpdu);
 			return;
 		}
 
@@ -469,8 +438,8 @@ process_resp(void *rpdu_)
 		// find the corresponding request
 		ep_dbg_cprintf(DbgProcResp, 23,
 				"process_resp: searching gob %p for rid %" PRIgdp_rid "\n",
-				gob, rpdu->rid);
-		req = _gdp_req_find(gob, rpdu->rid);
+				gob, rpdu->msg->rid);
+		req = _gdp_req_find(gob, rpdu->msg->rid);
 		if (ep_dbg_test(DbgProcResp, 51))
 		{
 			ep_dbg_printf("... found ");
@@ -488,7 +457,7 @@ process_resp(void *rpdu_)
 				_gdp_gob_dump(gob, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
 			}
 			_gdp_gob_decref(&gob, false);
-			_gdp_pdu_free(rpdu);
+			_gdp_pdu_free(&rpdu);
 			return;
 		}
 		else if (!EP_ASSERT(req->state != GDP_REQ_FREE))
@@ -498,7 +467,7 @@ process_resp(void *rpdu_)
 				ep_dbg_printf("process_resp: trying to use free ");
 				_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
 			}
-			_gdp_pdu_free(rpdu);
+			_gdp_pdu_free(&rpdu);
 			return;
 		}
 		else if (rpdu == req->rpdu)
@@ -507,7 +476,7 @@ process_resp(void *rpdu_)
 			if (ep_dbg_test(DbgProcResp, 1))
 			{
 				ep_dbg_printf("process_resp(%d): rpdu == req->rpdu\n",
-							rpdu->cmd);
+							rpdu->msg->cmd);
 				_gdp_pdu_dump(rpdu, ep_dbg_getfile());
 			}
 		}
@@ -520,14 +489,14 @@ process_resp(void *rpdu_)
 	{
 		ep_dbg_cprintf(DbgProcResp, 1,
 				"process_resp(%d): no corresponding command PDU\n",
-				rpdu->cmd);
-		ocmd = rpdu->cmd;
+				rpdu->msg->cmd);
+		ocmd = rpdu->msg->cmd;
 		//XXX return here?  with req->pdu == NULL, _gdp_req_dispatch
 		//XXX will probably die
 	}
 	else
 	{
-		ocmd = req->cpdu->cmd;
+		ocmd = req->cpdu->msg->cmd;
 	}
 
 	// save the response PDU for further processing
@@ -539,7 +508,7 @@ process_resp(void *rpdu_)
 			ep_dbg_printf("process_resp: req->rpdu already set\n    ");
 			_gdp_pdu_dump(req->rpdu, ep_dbg_getfile());
 		}
-		_gdp_pdu_free(req->rpdu);
+		_gdp_pdu_free(&req->rpdu);
 	}
 	req->rpdu = rpdu;
 
@@ -565,7 +534,7 @@ process_resp(void *rpdu_)
 
 	// figure out potential response code
 	// we compute even if unused so we can log server errors
-	resp = acknak_from_estat(estat, req->rpdu->cmd);
+	resp = _gdp_acknak_from_estat(estat, req->rpdu->msg->cmd);
 
 	if (ep_dbg_test(DbgProcResp,
 				(resp >= GDP_NAK_S_MIN && resp <= GDP_NAK_S_MAX) ? 1 : 44))
@@ -588,8 +557,7 @@ process_resp(void *rpdu_)
 		estat = _gdp_event_add_from_req(req);
 
 		// since this is asynchronous we can release the PDU
-		_gdp_pdu_free(req->rpdu);
-		req->rpdu = NULL;
+		_gdp_pdu_free(&req->rpdu);
 	}
 	else if (req->state == GDP_REQ_WAITING)
 	{
@@ -613,7 +581,7 @@ process_resp(void *rpdu_)
 		// avoids having to wait on condition variables
 		ep_thr_yield();
 	}
-	else if (req->rpdu->cmd == GDP_NAK_R_NOROUTE)
+	else if (req->rpdu->msg->cmd == GDP_NAK_R_NOROUTE)
 	{
 		// since this is common and expected, don't sully output
 		ep_dbg_cprintf(DbgProcResp, 19,
@@ -659,8 +627,10 @@ process_resp(void *rpdu_)
 void
 _gdp_pdu_process(gdp_pdu_t *pdu, gdp_chan_t *chan)
 {
-	// cmd: dispatch in thread; ack: dispatch directly
-	if (GDP_CMD_IS_COMMAND(pdu->cmd))
+	// use "cheat" field in pdu to pass chan up
+	pdu->chan = chan;
+
+	if (GDP_CMD_IS_COMMAND(pdu->msg->cmd))
 	{
 		if (_GdpRunCmdInThread)
 			ep_thr_pool_run(&process_cmd, pdu);
@@ -1138,27 +1108,20 @@ _gdp_evloop_init(void)
 
 EP_STAT
 _gdp_io_recv(
-		gdp_cursor_t *cursor,
-		uint32_t flags)
+		gdp_chan_t *chan,
+		gdp_name_t src,
+		gdp_name_t dst,
+		gdp_buf_t *payload_buf,
+		size_t payload_len)
 {
-	gdp_buf_t *ibuf;
-	size_t payload_len;
 	EP_STAT estat;
 
-	if (EP_UT_BITSET(GDP_CURSOR_PARTIAL, flags))
-		return EP_STAT_OK;			// need entire payload
-
-	ibuf = _gdp_cursor_get_buf(cursor);
-	payload_len = _gdp_cursor_get_payload_size(cursor);
-	EP_ASSERT_ELSE(gdp_buf_getlength(ibuf) >= payload_len, return EP_STAT_OK);
-
-	gdp_pdu_t *pdu = _gdp_pdu_new();
-	_gdp_cursor_get_endpoints(cursor, &pdu->src, &pdu->dst);
-	//pdu->payload_len = payload_len;
-	estat = _gdp_pdu_in(pdu, cursor);
+	gdp_pdu_t *pdu = _gdp_pdu_new(NULL, src, dst);
+	estat = _gdp_pdu_in(pdu, payload_buf, payload_len, chan);
 	EP_STAT_CHECK(estat, goto fail0);
 
-	_gdp_pdu_process(pdu, _gdp_cursor_get_chan(cursor));
+	_gdp_pdu_process(pdu, chan);
+	// _gdp_pdu_process frees pdu, possibly in a thread
 
 fail0:
 	{
@@ -1172,7 +1135,49 @@ fail0:
 
 
 /*
-**  Data Event callback
+**  Router Event callback
+**
+**		Called when the router has something to signal to the higher level.
+*/
+
+EP_STAT
+_gdp_router_event(
+		gdp_chan_t *chan,
+		gdp_name_t src,
+		gdp_name_t dst,
+		size_t payload_len,
+		EP_STAT estat)
+{
+	// fake up a PDU for the router event
+	int cmd = 0;;
+
+	if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOROUTE))
+		cmd = GDP_NAK_R_NOROUTE;
+	else
+		goto fail0;
+
+	//XXX wildcard seqno?
+	GdpMessage *msg = _gdp_msg_new(cmd, GDP_PDU_ANY_RID, GDP_PDU_NO_SEQNO);
+	gdp_pdu_t *pdu = _gdp_pdu_new(msg, src, dst);
+
+	if (msg->cmd != 0)
+		_gdp_pdu_process(pdu, chan);
+	else
+		_gdp_pdu_free(&pdu);
+
+fail0:
+	{
+		char ebuf[100];
+		ep_dbg_printf("_gdp_router_event: %s\n",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
+	return estat;
+}
+
+
+
+/*
+**  Data I/O Event callback
 **
 **		Typically connects, disconnects, and errors
 **

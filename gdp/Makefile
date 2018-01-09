@@ -87,12 +87,14 @@ OBJS_MOST=	\
 	gdp_gob_mgmt.o \
 	gdp_gob_ops.o \
 	gdp_main.o \
+	gdp_msg.o \
 	gdp_pdu.o \
 	gdp_proto.o \
 	gdp_req.o \
 	gdp_stat.o \
 	gdp_subscr.o \
 	gdp_util.o \
+	gdp.pb-c.o \
 	$(OBJS_ZC)
 
 OBJS=	\
@@ -113,6 +115,7 @@ PRIVHFILES=	\
 	gdp_gclmd.h \
 	gdp_pdu.h \
 	gdp_priv.h \
+	gdp.pb-c.h \
 
 HFILES=		${PUBHFILES} ${PRIVHFILES}
 
@@ -133,8 +136,9 @@ INCSEARCH=	${INCLOCAL} \
 		-I${LOCAL2}/include \
 		-I${LOCAL3}/include
 LIBROOT=	${INCROOT}
-LIBCRYPTO=	-lcrypto
 LIBEVENT2=	-levent -levent_pthreads
+LIBCRYPTO=	-lcrypto
+LIBPROTO_C=	-lprotobuf-c
 LIBAVAHI=	-lavahi-client -lavahi-common
 INCEP=		-I${INCROOT}
 LIBEP=		-lep
@@ -148,6 +152,7 @@ LDFLAGS+= 	${LIBSEARCH}
 LDLIBS=		${LIBEP} \
 		${LIBEVENT2} \
 		${LIBCRYPTO} \
+		${LIBPROTO_C} \
 		${LIBAVAHI}
 CC=		cc
 PG=
@@ -164,6 +169,7 @@ CP=		cp
 RM=		rm
 MKDIR=		mkdir -p
 RANLIB=		ranlib
+PROTOC_C=	protoc-c
 SHARED=		-shared ${CRYPTOLFLAGS}
 #SHARED=		-shared ${CRYPTOLFLAGS} -Wl,-soname,$@
 INSTALLFLAGS=
@@ -190,6 +196,9 @@ ${LIBNAME}.so.${GDPLIBVER}: ${OBJS}
 
 ${OBJS}: ${HFILES}
 
+
+gdp.pb-c.c gdp.pb-c.h: gdp.proto
+	${PROTOC_C} --c_out=. gdp.proto
 
 gdp_version.o: gdp_version.c ${OBJS_MOST} Makefile gdp_version.h \
 		../git-version.txt

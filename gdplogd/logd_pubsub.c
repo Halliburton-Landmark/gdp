@@ -53,12 +53,13 @@ extern EP_HASH	*_OpenGOBCache;		// associative cache
 */
 
 void
-sub_send_message_notification(gdp_req_t *req, gdp_datum_t *datum, int cmd)
+sub_send_message_notification(gdp_req_t *pubreq, gdp_req_t *req)
 {
 	EP_STAT estat;
+	gdp_pdu_t *savepdu;
+	int cmd = pubreq->rpdu->msg->cmd;
 
-	req->rpdu->cmd = cmd;
-	req->rpdu->datum = datum;
+	GDP_MSG_CHECK(req->rpdu, return);
 
 	if (ep_dbg_test(Dbg, 33))
 	{
@@ -66,13 +67,16 @@ sub_send_message_notification(gdp_req_t *req, gdp_datum_t *datum, int cmd)
 		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
+	savepdu = req->rpdu;
+	req->rpdu = pubreq->rpdu;
 	estat = _gdp_pdu_out(req->rpdu, req->chan, NULL);
+	req->rpdu = savepdu;
+
 	if (!EP_STAT_ISOK(estat))
 	{
 		ep_dbg_cprintf(Dbg, 1,
 				"sub_send_message_notification: couldn't write PDU!\n");
 	}
-	req->rpdu->datum = NULL;				// we just borrowed the datum
 
 	// XXX: This won't really work in case of holes.
 	req->nextrec++;
@@ -143,7 +147,7 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 		}
 		else if (!ep_time_before(&req->act_ts, &sub_timeout))
 		{
-			sub_send_message_notification(req, pubreq->cpdu->datum, cmd);
+			sub_send_message_notification(pubreq, req);
 		}
 		else
 		{
@@ -197,7 +201,7 @@ sub_end_subscription(gdp_req_t *req)
 	}
 
 	// send an "end of subscription" event
-	req->rpdu->cmd = GDP_ACK_DELETED;
+	req->rpdu->msg->cmd = GDP_ACK_DELETED;
 
 	if (ep_dbg_test(Dbg, 39))
 	{
@@ -244,7 +248,7 @@ sub_end_all_subscriptions(
 			EP_STAT_CHECK(estat, break);
 			nextreq = LIST_NEXT(req, goblist);
 			if (!GDP_NAME_SAME(req->rpdu->dst, dest) ||
-					(rid != GDP_PDU_NO_RID && rid != req->rpdu->rid) ||
+					(rid != GDP_PDU_NO_RID && rid != req->rpdu->msg->rid) ||
 					!EP_ASSERT(req->gob == gob))
 			{
 				_gdp_req_unlock(req);
