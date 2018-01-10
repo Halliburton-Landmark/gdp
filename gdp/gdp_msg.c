@@ -208,7 +208,7 @@ print_pb_ts(const GdpTimestamp *ts, FILE *fp)
 		fprintf(fp, "(none)");
 		return;
 	}
-	fprintf(fp, "%lld", ts->sec);
+	fprintf(fp, "%" PRIu64, ts->sec);
 }
 
 
