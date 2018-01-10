@@ -1030,6 +1030,12 @@ post_subscribe(gdp_req_t *req)
 **			subscription will actually return records 22-31.
 **
 **		XXX	Does not implement timeouts.
+**
+**		XXX This assumes different commands based on the initial
+**			starting "query" (recno, timestamp, hash).  Another
+**			possible approach would be a single command that would
+**			send at most one of those values.  Error conditions
+**			galore, but fewer commands to handle.
 */
 
 EP_STAT
@@ -1063,9 +1069,17 @@ cmd_subscribe_by_recno(gdp_req_t *req)
 
 	// get the additional parameters: number of records and timeout
 	req->numrecs = payload->nrecs;
-	timeout.tv_sec = payload->timeout->sec;
-	timeout.tv_nsec = payload->timeout->nsec;
-	timeout.tv_accuracy = payload->timeout->accuracy;
+	//XXX following should only be in cmd_subscribe_by_ts
+	if (payload->timeout != NULL)
+	{
+		timeout.tv_sec = payload->timeout->sec;
+		timeout.tv_nsec = payload->timeout->nsec;
+		timeout.tv_accuracy = payload->timeout->accuracy;
+	}
+	else
+	{
+		EP_TIME_INVALIDATE(&timeout);
+	}
 
 	if (ep_dbg_test(Dbg, 14))
 	{
@@ -1076,7 +1090,9 @@ cmd_subscribe_by_recno(gdp_req_t *req)
 
 	if (req->numrecs < 0)
 	{
-		return GDP_STAT_NAK_BADOPT;
+		return gdpd_nak_resp(req, GDP_NAK_C_BADOPT,
+							"cmd_subscribe: numrecs cannot be negative",
+							GDP_STAT_NAK_BADOPT);
 	}
 
 	// get our starting point, which may be relative to the end
@@ -1163,6 +1179,12 @@ cmd_subscribe_by_recno(gdp_req_t *req)
 	// we don't drop the GOB reference until the subscription is satisified
 
 fail0:
+	if (EP_STAT_ISOK(estat) && req->rpdu == NULL)
+	{
+		gdpd_ack_resp(req, GDP_ACK_SUCCESS);
+		// ... if we want to fill in some info later....
+		//GdpBody__AckSuccess *resp = req->rpdu->msg->body->ack_success;
+	}
 	return estat;
 }
 

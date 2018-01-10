@@ -56,21 +56,26 @@ void
 sub_send_message_notification(gdp_req_t *pubreq, gdp_req_t *req)
 {
 	EP_STAT estat;
-	gdp_pdu_t *savepdu;
-	int cmd = pubreq->rpdu->msg->cmd;
-
-	GDP_MSG_CHECK(req->rpdu, return);
 
 	if (ep_dbg_test(Dbg, 33))
 	{
-		ep_dbg_printf("sub_send_message_notification(%d): ", cmd);
+		ep_dbg_printf("sub_send_message_notification: ");
 		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
-	savepdu = req->rpdu;
-	req->rpdu = pubreq->rpdu;
-	estat = _gdp_pdu_out(req->rpdu, req->chan, NULL);
-	req->rpdu = savepdu;
+	gdp_msg_t *msg = _gdp_msg_new(GDP_ACK_CONTENT,
+							req->cpdu->msg->rid, req->cpdu->msg->seqno);
+	GdpDatum *pubdatum = pubreq->cpdu->msg->body->cmd_append->datum;
+	GdpDatum *subdatum = msg->body->ack_content->datum;
+
+	// cheat here: two pointers to one memory area
+	msg->body->ack_content->datum = pubdatum;
+
+	gdp_pdu_t *pdu = _gdp_pdu_new(msg, req->cpdu->dst, req->cpdu->src);
+	estat = _gdp_pdu_out(pdu, req->chan, NULL);
+
+	// undo the cheat so we don't double-free
+	msg->body->ack_content->datum = subdatum;
 
 	if (!EP_STAT_ISOK(estat))
 	{
@@ -81,7 +86,7 @@ sub_send_message_notification(gdp_req_t *pubreq, gdp_req_t *req)
 	// XXX: This won't really work in case of holes.
 	req->nextrec++;
 
-	if (cmd == GDP_ACK_CONTENT && req->numrecs > 0 && --req->numrecs <= 0)
+	if (req->numrecs > 0 && --req->numrecs <= 0)
 		sub_end_subscription(req);
 }
 
@@ -109,6 +114,7 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 		_gdp_req_dump(pubreq, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
+	// set up for subscription timeout
 	{
 		EP_TIME_SPEC sub_delta;
 		long timeout = ep_adm_getlongparam("swarm.gdplogd.subscr.timeout", 0);
