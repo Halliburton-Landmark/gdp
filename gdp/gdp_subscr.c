@@ -75,8 +75,8 @@ subscr_resub(gdp_req_t *req)
 		gdp_msg_t *msg = req->cpdu->msg;
 		EP_ASSERT_ELSE(msg->cmd == GDP_CMD_SUBSCRIBE_BY_RECNO,
 						return EP_STAT_ASSERT_ABORT);
-		GdpBody__CommandSubscribeByRecno *payload =
-						msg->body->cmd_subscribe_by_recno;
+		GdpMessage__CmdSubscribeByRecno *payload =
+						msg->cmd_subscribe_by_recno;
 		payload->has_start = true;
 		payload->start = req->gob->nrecs + 1;
 		payload->has_nrecs = true;
@@ -239,9 +239,8 @@ _gdp_gcl_subscribe(gdp_gin_t *gin,
 	{
 		gdp_msg_t *msg = req->cpdu->msg;
 		EP_ASSERT_ELSE(msg != NULL, return EP_STAT_ASSERT_ABORT);
-		EP_ASSERT_ELSE(msg->body != NULL, return EP_STAT_ASSERT_ABORT);
-		GdpBody__CommandSubscribeByRecno *payload =
-						msg->body->cmd_subscribe_by_recno;
+		GdpMessage__CmdSubscribeByRecno *payload =
+						msg->cmd_subscribe_by_recno;
 		if (start != GDP_PDU_NO_RECNO)
 		{
 			payload->has_start = true;

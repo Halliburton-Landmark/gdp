@@ -65,17 +65,17 @@ sub_send_message_notification(gdp_req_t *pubreq, gdp_req_t *req)
 
 	gdp_msg_t *msg = _gdp_msg_new(GDP_ACK_CONTENT,
 							req->cpdu->msg->rid, req->cpdu->msg->seqno);
-	GdpDatum *pubdatum = pubreq->cpdu->msg->body->cmd_append->datum;
-	GdpDatum *subdatum = msg->body->ack_content->datum;
+	GdpDatum *pubdatum = pubreq->cpdu->msg->cmd_append->datum;
+	GdpDatum *subdatum = msg->ack_content->datum;
 
 	// cheat here: two pointers to one memory area
-	msg->body->ack_content->datum = pubdatum;
+	msg->ack_content->datum = pubdatum;
 
 	gdp_pdu_t *pdu = _gdp_pdu_new(msg, req->cpdu->dst, req->cpdu->src);
 	estat = _gdp_pdu_out(pdu, req->chan, NULL);
 
 	// undo the cheat so we don't double-free
-	msg->body->ack_content->datum = subdatum;
+	msg->ack_content->datum = subdatum;
 
 	if (!EP_STAT_ISOK(estat))
 	{

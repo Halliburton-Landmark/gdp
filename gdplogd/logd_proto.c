@@ -32,6 +32,7 @@
 #include "logd_admin.h"
 #include "logd_pubsub.h"
 
+#include <gdp/gdp_chan.h>		// for PUT64
 #include <gdp/gdp_gclmd.h>
 #include <gdp/gdp_priv.h>
 
@@ -43,21 +44,20 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.proto", "GDP Log Daemon protocol");
 			{																\
 				if (!EP_ASSERT(req != NULL) ||								\
 						!EP_ASSERT(req->cpdu != NULL) ||					\
-						!EP_ASSERT(req->cpdu->msg != NULL) ||				\
-						!EP_ASSERT(req->cpdu->msg->body != NULL))			\
+						!EP_ASSERT(req->cpdu->msg != NULL))					\
 					return EP_STAT_ASSERT_ABORT;							\
-				GdpBody *body = req->cpdu->msg->body;						\
-				if (body->command_body_case !=								\
-						GDP_BODY__COMMAND_BODY_ ## bodycase)				\
+				GdpMessage *msg = req->cpdu->msg;							\
+				if (msg->body_case !=										\
+						GDP_MESSAGE__BODY_ ## bodycase)						\
 				{															\
 					ep_dbg_cprintf(Dbg, 1,									\
 							"%s: wrong payload type %d (expected %d)\n",	\
 							#where,											\
-							body->command_body_case,						\
-							GDP_BODY__COMMAND_BODY_ ## bodycase);			\
+							msg->body_case,									\
+							GDP_MESSAGE__BODY_ ## bodycase);				\
 					return GDP_STAT_PROTOCOL_FAIL;							\
 				}															\
-				payload = body->where;										\
+				payload = msg->where;										\
 			}
 
 /*
@@ -104,7 +104,7 @@ gdpd_nak_resp(gdp_req_t *req,
 				text_message);
 	msg = _gdp_msg_new(nak_type, req->cpdu->msg->rid, req->cpdu->msg->seqno);
 	req->rpdu = _gdp_pdu_new(msg, req->cpdu->dst, req->cpdu->src);
-	GdpBody__NakGeneric *nak = msg->body->nak;
+	GdpMessage__NakGeneric *nak = msg->nak;
 	nak->ep_stat = EP_STAT_TO_INT(estat);
 	nak->description = ep_mem_strdup(text_message);
 
@@ -273,7 +273,7 @@ cmd_create(gdp_req_t *req)
 						GDP_STAT_NAK_CONFLICT);
 	}
 
-	GdpBody__CommandCreate *payload;
+	GdpMessage__CmdCreate *payload;
 	GET_PAYLOAD(req, cmd_create, CMD_CREATE);
 
 	if (payload->logname.len != sizeof gobname ||
@@ -390,7 +390,7 @@ cmd_open(gdp_req_t *req)
 
 	// set up the response
 	gdpd_ack_resp(req, GDP_ACK_SUCCESS);
-	GdpBody__AckSuccess *resp = req->rpdu->msg->body->ack_success;
+	GdpMessage__AckSuccess *resp = req->rpdu->msg->ack_success;
 
 	gob = req->gob;
 	gob->flags |= GCLF_DEFER_FREE;
@@ -450,7 +450,7 @@ cmd_close(gdp_req_t *req)
 
 	// set up the response
 	gdpd_ack_resp(req, GDP_ACK_SUCCESS);
-	GdpBody__AckSuccess *resp = req->rpdu->msg->body->ack_success;
+	GdpMessage__AckSuccess *resp = req->rpdu->msg->ack_success;
 
 	//return number of records
 	resp->recno = req->gob->nrecs;
@@ -506,7 +506,7 @@ cmd_delete(gdp_req_t *req)
 
 	// set up the response
 	gdpd_ack_resp(req, GDP_ACK_DELETED);
-	GdpBody__AckSuccess *resp = req->rpdu->msg->body->ack_success;
+	GdpMessage__AckSuccess *resp = req->rpdu->msg->ack_success;
 
 	// return number of records
 	resp->recno = req->gob->nrecs;
@@ -554,7 +554,7 @@ cmd_read_helper(gdp_req_t *req)
 	if (EP_STAT_ISOK(estat))
 	{
 		gdpd_ack_resp(req, GDP_ACK_CONTENT);
-		GdpBody__AckContent *resp = req->rpdu->msg->body->ack_content;
+		GdpMessage__AckContent *resp = req->rpdu->msg->ack_content;
 		_gdp_datum_to_pb(datum, resp->datum);
 	}
 	else
@@ -585,7 +585,7 @@ cmd_read_by_recno(gdp_req_t *req)
 							"cmd_read_by_recno: GOB open failure", estat);
 	}
 
-	GdpBody__CommandReadByRecno *payload;
+	GdpMessage__CmdReadByRecno *payload;
 	GET_PAYLOAD(req, cmd_read_by_recno, CMD_READ_BY_RECNO);
 
 	estat = get_starting_point_by_recno(req, payload->recno);
@@ -607,7 +607,7 @@ cmd_read_by_ts(gdp_req_t *req)
 							"cmd_read_by_ts: GOB open failure", estat);
 	}
 
-	GdpBody__CommandReadByTs *payload;
+	GdpMessage__CmdReadByTs *payload;
 	GET_PAYLOAD(req, cmd_read_by_ts, CMD_READ_BY_TS);
 
 	estat = get_starting_point_by_ts(req, payload->timestamp);
@@ -695,18 +695,6 @@ nopubkey:
 **		This will have side effects if there are subscriptions pending.
 */
 
-#define PUT64(v) \
-		{ \
-			*pbp++ = ((v) >> 56) & 0xff; \
-			*pbp++ = ((v) >> 48) & 0xff; \
-			*pbp++ = ((v) >> 40) & 0xff; \
-			*pbp++ = ((v) >> 32) & 0xff; \
-			*pbp++ = ((v) >> 24) & 0xff; \
-			*pbp++ = ((v) >> 16) & 0xff; \
-			*pbp++ = ((v) >> 8) & 0xff; \
-			*pbp++ = ((v) & 0xff); \
-		}
-
 EP_STAT
 cmd_append(gdp_req_t *req)
 {
@@ -719,7 +707,7 @@ cmd_append(gdp_req_t *req)
 							"cmd_append: GOB not open", estat);
 	}
 
-	GdpBody__CommandAppend *payload;
+	GdpMessage__CmdAppend *payload;
 	GET_PAYLOAD(req, cmd_append, CMD_APPEND);
 
 	CMD_TRACE(req->cpdu->msg->cmd, "%s %" PRIgdp_recno,
@@ -734,8 +722,6 @@ cmd_append(gdp_req_t *req)
 		goto fail0;
 	}
 
-	// validate sequence number and signature
-	// only path to datum is via this req, so we don't have to lock it
 	if (payload->datum->recno != req->gob->nrecs + 1)
 	{
 		bool random_order_ok = GdplogdForgive.allow_log_gaps &&
@@ -781,6 +767,8 @@ cmd_append(gdp_req_t *req)
 		}
 	}
 
+	// validate sequence number and signature
+	// only path to datum is via this req, so we don't have to lock it
 	if (req->gob->digest == NULL)
 	{
 		estat = init_sig_digest(req->gob);
@@ -798,7 +786,7 @@ cmd_append(gdp_req_t *req)
 		}
 		ep_dbg_cprintf(Dbg, 51, "cmd_append: no public key (warn)\n");
 	}
-	else if (payload->datum->sig == NULL)
+	else if (req->cpdu->msg->sig == NULL)
 	{
 		// error (maybe): signature required
 		if (EP_UT_BITSET(GDP_SIG_REQUIRED, GdpSignatureStrictness))
@@ -816,12 +804,14 @@ cmd_append(gdp_req_t *req)
 		size_t len;
 		EP_CRYPTO_MD *md = ep_crypto_md_clone(req->gob->digest);
 
+		recnobuf[0] = req->cpdu->msg->cmd;
+		ep_crypto_vrfy_update(md, &recnobuf[0], 1);
 		PUT64(payload->datum->recno);
 		ep_crypto_vrfy_update(md, &recnobuf, sizeof recnobuf);
 		len = payload->datum->data.len;
 		ep_crypto_vrfy_update(md, payload->datum->data.data, len);
-		len = payload->datum->sig->sig.len;
-		estat = ep_crypto_vrfy_final(md, payload->datum->sig->sig.data, len);
+		len = req->cpdu->msg->sig->sig.len;
+		estat = ep_crypto_vrfy_final(md, req->cpdu->msg->sig->sig.data, len);
 		ep_crypto_md_free(md);
 		if (!EP_STAT_ISOK(estat))
 		{
@@ -876,7 +866,7 @@ cmd_append(gdp_req_t *req)
 		req->gob->nrecs++;
 
 		gdpd_ack_resp(req, GDP_ACK_SUCCESS);
-		GdpBody__AckSuccess *resp = req->rpdu->msg->body->ack_success;
+		GdpMessage__AckSuccess *resp = req->rpdu->msg->ack_success;
 		resp->recno = req->gob->nrecs;
 		resp->ts = payload->datum->ts;
 		payload->datum->ts = NULL;		// avoid double free
@@ -894,7 +884,7 @@ fail1:
 		estat = gdpd_nak_resp(req, GDP_NAK_C_FORBIDDEN,
 						"cmd_append: XXX forbidden",
 						GDP_STAT_NAK_FORBIDDEN);
-		req->rpdu->msg->body->nak->recno = req->gob->nrecs;
+		req->rpdu->msg->nak->recno = req->gob->nrecs;
 	}
 
 fail0:
@@ -945,7 +935,7 @@ post_subscribe(gdp_req_t *req)
 		{
 			// OK, the next record exists: send it
 			gdpd_ack_resp(req, GDP_ACK_CONTENT);
-			GdpBody__AckContent *resp = req->rpdu->msg->body->ack_content;
+			GdpMessage__AckContent *resp = req->rpdu->msg->ack_content;
 			_gdp_datum_to_pb(datum, resp->datum);
 		}
 		else if (EP_STAT_IS_SAME(estat, GDP_STAT_RECORD_MISSING))
@@ -1048,7 +1038,7 @@ cmd_subscribe_by_recno(gdp_req_t *req)
 	if (req->gob != NULL)
 		GDP_GOB_ASSERT_ISLOCKED(req->gob);
 
-	GdpBody__CommandSubscribeByRecno *payload;
+	GdpMessage__CmdSubscribeByRecno *payload;
 	GET_PAYLOAD(req, cmd_subscribe_by_recno, CMD_SUBSCRIBE_BY_RECNO);
 
 	// find the GOB handle
@@ -1183,7 +1173,7 @@ fail0:
 	{
 		gdpd_ack_resp(req, GDP_ACK_SUCCESS);
 		// ... if we want to fill in some info later....
-		//GdpBody__AckSuccess *resp = req->rpdu->msg->body->ack_success;
+		//GdpMessage__AckSuccess *resp = req->rpdu->msg->ack_success;
 	}
 	return estat;
 }
@@ -1323,7 +1313,7 @@ cmd_getmetadata(gdp_req_t *req)
 		uint8_t *mdbuf;
 		size_t mdlen = _gdp_gclmd_serialize(gmd, &mdbuf);
 		gdpd_ack_resp(req, GDP_ACK_SUCCESS);
-		GdpBody__AckSuccess *resp = req->rpdu->msg->body->ack_success;
+		GdpMessage__AckSuccess *resp = req->rpdu->msg->ack_success;
 		resp->metadata.data = mdbuf;
 		resp->metadata.len = mdlen;
 	}

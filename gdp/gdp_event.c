@@ -450,7 +450,7 @@ _gdp_event_add_from_req(gdp_req_t *req)
 	gev->datum = gdp_datum_new();
 	if (req->rpdu->msg->cmd == GDP_ACK_CONTENT)
 	{
-		_gdp_datum_from_pb(gev->datum, req->rpdu->msg->body->ack_content->datum);
+		_gdp_datum_from_pb(gev->datum, req->rpdu->msg->ack_content->datum);
 	}
 
 	// schedule the event for delivery
@@ -476,7 +476,7 @@ _gdp_event_add_from_req(gdp_req_t *req)
 */
 
 void
-gdp_event_print(const gdp_event_t *gev, FILE *fp, int detail)
+gdp_event_print(const gdp_event_t *gev, FILE *fp, int detail, int indent)
 {
 	gdp_recno_t recno = -1;
 	char ebuf[100];
@@ -489,49 +489,50 @@ gdp_event_print(const gdp_event_t *gev, FILE *fp, int detail)
 	if (gev->datum != NULL)
 		recno = gev->datum->recno;
 
+	fprintf(fp, "%s", _gdp_pr_indent(indent));
+
 	switch (gev->type)
 	{
 	  case GDP_EVENT_DATA:
-		fprintf(fp, "    ");
 		gdp_datum_print(gev->datum, fp, GDP_DATUM_PRTEXT);
 		break;
 
 	  case GDP_EVENT_CREATED:
-		fprintf(fp, "    Data created\n");
+		fprintf(fp, "Data created\n");
 		break;
 
 	  case GDP_EVENT_EOS:
-		fprintf(fp, "    End of data\n");
+		fprintf(fp, "End of data\n");
 		break;
 
 	  case GDP_EVENT_SHUTDOWN:
-		fprintf(fp, "    Log daemon shutdown\n");
+		fprintf(fp, "Log daemon shutdown\n");
 		break;
 
 	  case GDP_EVENT_SUCCESS:
 		if (detail > GDP_PR_BASIC + 1)
-			fprintf(fp, "    Generic success\n");
+			fprintf(fp, "Generic success\n");
 		else
-			fprintf(fp, "    Success: %s\n",
+			fprintf(fp, "Success: %s\n",
 					ep_stat_tostr(gev->stat, ebuf, sizeof ebuf));
 		break;
 
 	  case GDP_EVENT_FAILURE:
 		if (detail > GDP_PR_BASIC + 1)
-			fprintf(fp, "    Generic failure\n");
+			fprintf(fp, "Generic failure\n");
 		else
-			fprintf(fp, "    Failure: %s\n",
+			fprintf(fp, "Failure: %s\n",
 					ep_stat_tostr(gev->stat, ebuf, sizeof ebuf));
 		break;
 
 	  case GDP_EVENT_MISSING:
-		fprintf(fp, "    Record %" PRIgdp_recno " missing\n",
+		fprintf(fp, "Record %" PRIgdp_recno " missing\n",
 				recno);
 		break;
 
 	  default:
 		if (detail > 0)
-			fprintf(fp, "    Unknown event type %d: %s\n",
+			fprintf(fp, "Unknown event type %d: %s\n",
 					gev->type, ep_stat_tostr(gev->stat, ebuf, sizeof ebuf));
 		break;
 	}

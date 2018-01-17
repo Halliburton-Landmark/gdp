@@ -64,3 +64,27 @@ _gdp_newname(gdp_name_t gname, gdp_gclmd_t *gmd)
 		ep_mem_free(mdbuf);
 	}
 }
+
+
+/*
+**  _GDP_PR_INDENT --- output indent string for debug output
+*/
+
+#define INDENT_MAX		6			// max depth of indentation
+#define INDENT_PER		4			// spaces per indent level
+
+const char *
+_gdp_pr_indent(int indent)
+{
+	static char spaces[INDENT_MAX * INDENT_PER + 1];
+
+	// initialize the array with just spaces
+	if (spaces[0] == 0)
+		snprintf(spaces, sizeof spaces, "%*s", INDENT_MAX * INDENT_PER, "");
+
+	if (indent < 0)
+		indent = 0;
+	if (indent > INDENT_MAX)
+		indent = INDENT_MAX;
+	return &spaces[(INDENT_MAX - indent) * INDENT_PER];
+}

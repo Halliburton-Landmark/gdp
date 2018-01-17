@@ -251,8 +251,9 @@ _gdp_gob_dump(
 
 		if (detail >= GDP_PR_BASIC)
 		{
-			fprintf(fp, "\trefcnt = %d, reqs = %p, nrecs = %" PRIgdp_recno
+			fprintf(fp, "%srefcnt = %d, reqs = %p, nrecs = %" PRIgdp_recno
 					"\n\tflags = ",
+					_gdp_pr_indent(indent),
 					gob->refcnt, LIST_FIRST(&gob->reqs),
 					gob->nrecs);
 			ep_prflags(gob->flags, _GdpGobFlags, fp);
@@ -262,11 +263,13 @@ _gdp_gob_dump(
 				char tbuf[40];
 				struct tm tm;
 
-				fprintf(fp, "\tfreefunc = %p, gclmd = %p, digest = %p\n",
+				fprintf(fp, "%sfreefunc = %p, gclmd = %p, digest = %p\n",
+						_gdp_pr_indent(indent),
 						gob->freefunc, gob->gclmd, gob->digest);
 				gmtime_r(&gob->utime, &tm);
 				strftime(tbuf, sizeof tbuf, "%Y-%m-%d %H:%M:%S", &tm);
-				fprintf(fp, "\tutime = %s, x = %p\n", tbuf, gob->x);
+				fprintf(fp, "%sutime = %s, x = %p\n",
+						_gdp_pr_indent(indent), tbuf, gob->x);
 			}
 		}
 	}

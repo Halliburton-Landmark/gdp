@@ -58,7 +58,6 @@ gdp_msg_t *
 _gdp_msg_new(gdp_cmd_t cmd, gdp_rid_t rid, gdp_seqno_t seqno)
 {
 	gdp_msg_t *msg;
-	GdpBody *body;
 
 	ep_dbg_cprintf(Dbg, 24,
 				"_gdp_msg_new: cmd %s (%d), rid %" PRIgdp_rid
@@ -79,111 +78,107 @@ _gdp_msg_new(gdp_cmd_t cmd, gdp_rid_t rid, gdp_seqno_t seqno)
 		msg->has_seqno = true;
 		msg->seqno = seqno;
 	}
-	msg->body = body = ep_mem_zalloc(sizeof *msg->body);
-	gdp_body__init(body);
-	msg->trailer = ep_mem_zalloc(sizeof *msg->trailer);
-	gdp_trailer__init(msg->trailer);
 
 	// initialize command body based on command type
 	switch (cmd)
 	{
 	case GDP_CMD_CREATE:
-		body->command_body_case = GDP_BODY__COMMAND_BODY_CMD_CREATE;
-		body->cmd_create = ep_mem_zalloc(sizeof *body->cmd_create);
-		gdp_body__command_create__init(body->cmd_create);
+		msg->body_case = GDP_MESSAGE__BODY_CMD_CREATE;
+		msg->cmd_create = ep_mem_zalloc(sizeof *msg->cmd_create);
+		gdp_message__cmd_create__init(msg->cmd_create);
 		break;
 
 	case GDP_CMD_OPEN_AO:
 	case GDP_CMD_OPEN_RO:
 	case GDP_CMD_OPEN_RA:
-		body->command_body_case = GDP_BODY__COMMAND_BODY_CMD_OPEN;
-		body->cmd_open = ep_mem_zalloc(sizeof *body->cmd_open);
-		gdp_body__command_open__init(body->cmd_open);
+		msg->body_case = GDP_MESSAGE__BODY_CMD_OPEN;
+		msg->cmd_open = ep_mem_zalloc(sizeof *msg->cmd_open);
+		gdp_message__cmd_open__init(msg->cmd_open);
 		break;
 
 	case GDP_CMD_APPEND:
-		body->command_body_case = GDP_BODY__COMMAND_BODY_CMD_APPEND;
-		body->cmd_append = ep_mem_zalloc(sizeof *body->cmd_append);
-		gdp_body__command_append__init(body->cmd_append);
+		msg->body_case = GDP_MESSAGE__BODY_CMD_APPEND;
+		msg->cmd_append = ep_mem_zalloc(sizeof *msg->cmd_append);
+		gdp_message__cmd_append__init(msg->cmd_append);
 		break;
 
 	case GDP_CMD_READ_BY_RECNO:
-		body->command_body_case =
-						GDP_BODY__COMMAND_BODY_CMD_READ_BY_RECNO;
-		body->cmd_read_by_recno = ep_mem_zalloc(sizeof *body->cmd_read_by_recno);
-		gdp_body__command_read_by_recno__init(body->cmd_read_by_recno);
+		msg->body_case =
+						GDP_MESSAGE__BODY_CMD_READ_BY_RECNO;
+		msg->cmd_read_by_recno = ep_mem_zalloc(sizeof *msg->cmd_read_by_recno);
+		gdp_message__cmd_read_by_recno__init(msg->cmd_read_by_recno);
 		break;
 
 	case GDP_CMD_READ_BY_TS:
-		body->command_body_case =
-						GDP_BODY__COMMAND_BODY_CMD_READ_BY_TS;
-		body->cmd_read_by_ts = ep_mem_zalloc(sizeof *body->cmd_read_by_ts);
-		gdp_body__command_read_by_ts__init(body->cmd_read_by_ts);
+		msg->body_case =
+						GDP_MESSAGE__BODY_CMD_READ_BY_TS;
+		msg->cmd_read_by_ts = ep_mem_zalloc(sizeof *msg->cmd_read_by_ts);
+		gdp_message__cmd_read_by_ts__init(msg->cmd_read_by_ts);
 		break;
 
 	case GDP_CMD_READ_BY_HASH:
-		body->command_body_case =
-						GDP_BODY__COMMAND_BODY_CMD_READ_BY_HASH;
-		body->cmd_read_by_hash = ep_mem_zalloc(sizeof *body->cmd_read_by_hash);
-		gdp_body__command_read_by_hash__init(body->cmd_read_by_hash);
+		msg->body_case =
+						GDP_MESSAGE__BODY_CMD_READ_BY_HASH;
+		msg->cmd_read_by_hash = ep_mem_zalloc(sizeof *msg->cmd_read_by_hash);
+		gdp_message__cmd_read_by_hash__init(msg->cmd_read_by_hash);
 		break;
 
 	case GDP_CMD_SUBSCRIBE_BY_RECNO:
-		body->command_body_case =
-						GDP_BODY__COMMAND_BODY_CMD_SUBSCRIBE_BY_RECNO;
-		body->cmd_subscribe_by_recno =
-						ep_mem_zalloc(sizeof *body->cmd_subscribe_by_recno);
-		gdp_body__command_subscribe_by_recno__init(
-						body->cmd_subscribe_by_recno);
+		msg->body_case =
+						GDP_MESSAGE__BODY_CMD_SUBSCRIBE_BY_RECNO;
+		msg->cmd_subscribe_by_recno =
+						ep_mem_zalloc(sizeof *msg->cmd_subscribe_by_recno);
+		gdp_message__cmd_subscribe_by_recno__init(
+						msg->cmd_subscribe_by_recno);
 		break;
 
 	case GDP_CMD_SUBSCRIBE_BY_TS:
-		body->command_body_case =
-						GDP_BODY__COMMAND_BODY_CMD_SUBSCRIBE_BY_TS;
-		body->cmd_subscribe_by_ts =
-						ep_mem_zalloc(sizeof *body->cmd_subscribe_by_ts);
-		gdp_body__command_subscribe_by_ts__init(
-						body->cmd_subscribe_by_ts);
+		msg->body_case =
+						GDP_MESSAGE__BODY_CMD_SUBSCRIBE_BY_TS;
+		msg->cmd_subscribe_by_ts =
+						ep_mem_zalloc(sizeof *msg->cmd_subscribe_by_ts);
+		gdp_message__cmd_subscribe_by_ts__init(
+						msg->cmd_subscribe_by_ts);
 		break;
 
 	case GDP_CMD_SUBSCRIBE_BY_HASH:
-		body->command_body_case =
-						GDP_BODY__COMMAND_BODY_CMD_SUBSCRIBE_BY_HASH;
-		body->cmd_subscribe_by_hash =
-						ep_mem_zalloc(sizeof *body->cmd_subscribe_by_hash);
-		gdp_body__command_subscribe_by_hash__init(
-						body->cmd_subscribe_by_hash);
+		msg->body_case =
+						GDP_MESSAGE__BODY_CMD_SUBSCRIBE_BY_HASH;
+		msg->cmd_subscribe_by_hash =
+						ep_mem_zalloc(sizeof *msg->cmd_subscribe_by_hash);
+		gdp_message__cmd_subscribe_by_hash__init(
+						msg->cmd_subscribe_by_hash);
 		break;
 
 	case GDP_ACK_SUCCESS:
-		body->command_body_case = GDP_BODY__COMMAND_BODY_ACK_SUCCESS;
-		body->ack_success = ep_mem_zalloc(sizeof *body->ack_success);
-		gdp_body__ack_success__init(body->ack_success);
+		msg->body_case = GDP_MESSAGE__BODY_ACK_SUCCESS;
+		msg->ack_success = ep_mem_zalloc(sizeof *msg->ack_success);
+		gdp_message__ack_success__init(msg->ack_success);
 		break;
 
 	case GDP_ACK_CHANGED:
-		body->command_body_case = GDP_BODY__COMMAND_BODY_ACK_CHANGED;
-		body->ack_changed = ep_mem_zalloc(sizeof *body->ack_changed);
-		gdp_body__ack_changed__init(body->ack_changed);
+		msg->body_case = GDP_MESSAGE__BODY_ACK_CHANGED;
+		msg->ack_changed = ep_mem_zalloc(sizeof *msg->ack_changed);
+		gdp_message__ack_changed__init(msg->ack_changed);
 		break;
 
 	case GDP_ACK_CONTENT:
-		body->command_body_case = GDP_BODY__COMMAND_BODY_ACK_CONTENT;
-		body->ack_content = ep_mem_zalloc(sizeof *body->ack_content);
-		gdp_body__ack_content__init(body->ack_content);
-		body->ack_content->datum = ep_mem_zalloc(sizeof *body->ack_content->datum);
-		gdp_datum__init(body->ack_content->datum);
+		msg->body_case = GDP_MESSAGE__BODY_ACK_CONTENT;
+		msg->ack_content = ep_mem_zalloc(sizeof *msg->ack_content);
+		gdp_message__ack_content__init(msg->ack_content);
+		msg->ack_content->datum = ep_mem_zalloc(sizeof *msg->ack_content->datum);
+		gdp_datum__init(msg->ack_content->datum);
 		break;
 
 	default:
 		if (cmd >= GDP_NAK_C_MIN && cmd <= GDP_NAK_S_MAX)
 		{
-			body->command_body_case = GDP_BODY__COMMAND_BODY_NAK;
-			body->nak = ep_mem_zalloc(sizeof *body->nak);
-			gdp_body__nak_generic__init(body->nak);
+			msg->body_case = GDP_MESSAGE__BODY_NAK;
+			msg->nak = ep_mem_zalloc(sizeof *msg->nak);
+			gdp_message__nak_generic__init(msg->nak);
 			break;
 		}
-		body->command_body_case = GDP_BODY__COMMAND_BODY__NOT_SET;
+		msg->body_case = GDP_MESSAGE__BODY__NOT_SET;
 		break;
 	}
 
@@ -204,37 +199,28 @@ static void
 print_pb_ts(const GdpTimestamp *ts, FILE *fp)
 {
 	if (ts == NULL)
-	{
 		fprintf(fp, "(none)");
-		return;
-	}
-	fprintf(fp, "%" PRIu64, ts->sec);
+	else if (ts->sec == EP_TIME_NOTIME)
+		fprintf(fp, "(notime)");
+	else
+		fprintf(fp, "%" PRIu64, ts->sec);
 }
 
 
 static void
-print_pb_datum(const GdpDatum *d, FILE *fp)
+print_pb_datum(const GdpDatum *d, FILE *fp, int indent)
 {
-	int indent = 12;
 	fprintf(fp, "datum@%p\n", d);
-	fprintf(fp, "%*srecno %" PRIgdp_recno "\n",
-			indent, "", d->recno);
-	if (d->ts != NULL)
-	{
-		fprintf(fp, "%*sts ", indent, "");
-		print_pb_ts(d->ts, fp);
-		fprintf(fp, "\n");
-	}
-	if (d->sig != NULL)
-		fprintf(fp, "%*ssig (someday)\n", indent, "");		//XXX
-	if (d->hash != NULL)
-		fprintf(fp, "%*shash (someday)\n", indent, "");		//XXX
+	fprintf(fp, "%srecno %" PRIgdp_recno ", ts ",
+			_gdp_pr_indent(indent), d->recno);
+	print_pb_ts(d->ts, fp);
+	fprintf(fp, " data[%zd]=\n", d->data.len);
 	ep_hexdump(d->data.data, d->data.len, fp, EP_HEXDUMP_ASCII, 0);
 }
 
 
 void
-_gdp_msg_dump(const gdp_msg_t *msg, FILE *fp)
+_gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 {
 	gdp_pname_t pname;
 	char ebuf[100];
@@ -242,7 +228,7 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp)
 	if (fp == NULL)
 		fp = ep_dbg_getfile();
 	flockfile(fp);
-	fprintf(fp, "Msg@%p: ", msg);
+	fprintf(fp, "msg@%p: ", msg);
 	if (msg == NULL)
 	{
 		fprintf(fp, "NULL\n");
@@ -262,178 +248,179 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp)
 	else
 		fprintf(fp, "%" PRIgdp_seqno, msg->seqno);
 
-	GdpBody *body = msg->body;
-	fprintf(fp, "\n\tbody=");
-	if (body == NULL)
+	fprintf(fp, "\n%sbody=", _gdp_pr_indent(indent));
+	switch (msg->body_case)
 	{
-		fprintf(fp, "(none)\n");
-		goto done;
-	}
-
-	switch (body->command_body_case)
-	{
-	case GDP_BODY__COMMAND_BODY__NOT_SET:
+	case GDP_MESSAGE__BODY__NOT_SET:
 		fprintf(fp, "(not set)\n");
 		break;
 
-	case GDP_BODY__COMMAND_BODY_CMD_CREATE:
-		fprintf(fp, "cmd_create:\n\tlogname=%s\n\tmetadata=",
-				gdp_printable_name(body->cmd_create->logname.data, pname));
-		if (!body->cmd_create->has_metadata)
+	case GDP_MESSAGE__BODY_CMD_CREATE:
+		fprintf(fp, "cmd_create:\n%slogname=%s\n%smetadata=",
+				_gdp_pr_indent(indent),
+				gdp_printable_name(msg->cmd_create->logname.data, pname),
+				_gdp_pr_indent(indent + 1));
+		if (!msg->cmd_create->has_metadata)
 			fprintf(fp, "(none)\n");
 		else
 		{
 			fprintf(fp, "\n");
-			ep_hexdump(body->cmd_create->metadata.data,
-						body->cmd_create->metadata.len,
+			ep_hexdump(msg->cmd_create->metadata.data,
+						msg->cmd_create->metadata.len,
 						fp, EP_HEXDUMP_ASCII, 0);
 		}
 		break;
 
-	case GDP_BODY__COMMAND_BODY_CMD_OPEN:
+	case GDP_MESSAGE__BODY_CMD_OPEN:
 		fprintf(fp, "cmd_open\n");
 		break;
 
-	case GDP_BODY__COMMAND_BODY_CMD_CLOSE:
+	case GDP_MESSAGE__BODY_CMD_CLOSE:
 		fprintf(fp, "cmd_close\n");
 		break;
 
-	case GDP_BODY__COMMAND_BODY_CMD_APPEND:
+	case GDP_MESSAGE__BODY_CMD_APPEND:
 		fprintf(fp, "cmd_append: ");
-		print_pb_datum(body->cmd_append->datum, fp);
+		print_pb_datum(msg->cmd_append->datum, fp, indent + 1);
 		break;
 
-	case GDP_BODY__COMMAND_BODY_CMD_READ_BY_RECNO:
+	case GDP_MESSAGE__BODY_CMD_READ_BY_RECNO:
 		fprintf(fp, "cmd_read_by_recno: recno=%" PRIgdp_recno,
-				body->cmd_read_by_recno->recno);
-		if (body->cmd_read_by_recno->has_nrecs)
-			fprintf(fp, ", nrecs=%d", body->cmd_read_by_recno->nrecs);
+				msg->cmd_read_by_recno->recno);
+		if (msg->cmd_read_by_recno->has_nrecs)
+			fprintf(fp, ", nrecs=%d", msg->cmd_read_by_recno->nrecs);
 		fprintf(fp, "\n");
 		break;
 
-	case GDP_BODY__COMMAND_BODY_CMD_READ_BY_TS:
+	case GDP_MESSAGE__BODY_CMD_READ_BY_TS:
 		fprintf(fp, "cmd_read_by_ts: ");
-		print_pb_ts(body->cmd_read_by_ts->timestamp, fp);
-		if (body->cmd_read_by_ts->has_nrecs)
-			fprintf(fp, ", nrecs=%d", body->cmd_read_by_ts->nrecs);
+		print_pb_ts(msg->cmd_read_by_ts->timestamp, fp);
+		if (msg->cmd_read_by_ts->has_nrecs)
+			fprintf(fp, ", nrecs=%d", msg->cmd_read_by_ts->nrecs);
 		fprintf(fp, "\n");
 		break;
 
-	case GDP_BODY__COMMAND_BODY_CMD_READ_BY_HASH:
+	case GDP_MESSAGE__BODY_CMD_READ_BY_HASH:
 		fprintf(fp, "cmd_read_by_hash: UNIMPLEMENTED\n");
 		break;
 
-	case GDP_BODY__COMMAND_BODY_CMD_SUBSCRIBE_BY_RECNO:
+	case GDP_MESSAGE__BODY_CMD_SUBSCRIBE_BY_RECNO:
 		fprintf(fp, "cmd_subscribe_by_recno: UNIMPLEMENTED\n");
 		break;
 
-	case GDP_BODY__COMMAND_BODY_CMD_SUBSCRIBE_BY_TS:
+	case GDP_MESSAGE__BODY_CMD_SUBSCRIBE_BY_TS:
 		fprintf(fp, "cmd_subscribe_by_hash: UNIMPLEMENTED\n");
 		break;
 
-	case GDP_BODY__COMMAND_BODY_CMD_SUBSCRIBE_BY_HASH:
+	case GDP_MESSAGE__BODY_CMD_SUBSCRIBE_BY_HASH:
 		fprintf(fp, "cmd_subscribe_by_hash: UNIMPLEMENTED\n");
 		break;
 
-	case GDP_BODY__COMMAND_BODY_CMD_UNSUBSCRIBE:
+	case GDP_MESSAGE__BODY_CMD_UNSUBSCRIBE:
 		fprintf(fp, "cmd_unsubscribe: (no payload)\n");
 		break;
 
-	case GDP_BODY__COMMAND_BODY_CMD_GET_METADATA:
+	case GDP_MESSAGE__BODY_CMD_GET_METADATA:
 		fprintf(fp, "cmd_get_metadata: (no payload)\n");
 		break;
 
-	case GDP_BODY__COMMAND_BODY_CMD_NEW_SEGMENT:
+	case GDP_MESSAGE__BODY_CMD_NEW_SEGMENT:
 		fprintf(fp, "cmd_new_segment: (no payload)\n");
 		break;
 
-	case GDP_BODY__COMMAND_BODY_CMD_DELETE:
+	case GDP_MESSAGE__BODY_CMD_DELETE:
 		fprintf(fp, "cmd_delete: (no payload)\n");
 		break;
 
-	case GDP_BODY__COMMAND_BODY_ACK_SUCCESS:
-		fprintf(fp, "ack_success\n");
-		if (body->ack_success->has_recno)
-			fprintf(fp, "\t    recno=%" PRIgdp_recno "\n",
-						body->ack_success->recno);
-		if (body->ack_success->ts != NULL)
+	case GDP_MESSAGE__BODY_ACK_SUCCESS:
+		fprintf(fp, "ack_success");
+		if (msg->ack_success->has_recno)
+			fprintf(fp, ", recno=%" PRIgdp_recno "\n",
+						msg->ack_success->recno);
+		fprintf(fp, ", ts=");
+		print_pb_ts(msg->ack_success->ts, fp);
+		fprintf(fp, "\n");
+		if (msg->ack_success->has_hash)
 		{
-			fprintf(fp, "\t    ts=");
-			print_pb_ts(body->ack_success->ts, fp);
-			fprintf(fp, "\n");
+			fprintf(fp, "%shash=", _gdp_pr_indent(indent + 1));
+			ep_hexdump(msg->ack_success->hash.data,
+						msg->ack_success->hash.len,
+						fp, EP_HEXDUMP_TERSE, 0);
 		}
-		if (body->ack_success->has_hash)
+		if (msg->ack_success->has_metadata)
 		{
-			fprintf(fp, "\t    hash=\n");
-			ep_hexdump(body->ack_success->hash.data,
-						body->ack_success->hash.len,
-						fp, EP_HEXDUMP_HEX, 0);
-		}
-		if (body->ack_success->has_metadata)
-		{
-			fprintf(fp, "\t    metadata=\n");
-			ep_hexdump(body->ack_success->metadata.data,
-						body->ack_success->metadata.len,
+			fprintf(fp, "%smetadata=\n", _gdp_pr_indent(indent + 1));
+			ep_hexdump(msg->ack_success->metadata.data,
+						msg->ack_success->metadata.len,
 						fp, EP_HEXDUMP_ASCII, 0);
 		}
 		break;
 
-	case GDP_BODY__COMMAND_BODY_ACK_CHANGED:
+	case GDP_MESSAGE__BODY_ACK_CHANGED:
 		fprintf(fp, "ack_changed\n");
 		break;
 
-	case GDP_BODY__COMMAND_BODY_ACK_CONTENT:
+	case GDP_MESSAGE__BODY_ACK_CONTENT:
 		fprintf(fp, "ack_content: ");
-		print_pb_datum(body->ack_content->datum, fp);
+		print_pb_datum(msg->ack_content->datum, fp, indent + 1);
 		break;
 
-	case GDP_BODY__COMMAND_BODY_NAK:
+	case GDP_MESSAGE__BODY_NAK:
 		fprintf(fp, "nak:\n");
-		if (body->nak->has_ep_stat)
-			fprintf(fp, "\t    ep_stat=%s\n",
-					ep_stat_tostr(EP_STAT_FROM_INT(body->nak->ep_stat),
+		if (msg->nak->has_ep_stat)
+			fprintf(fp, "%sep_stat=%s\n",
+					_gdp_pr_indent(indent),
+					ep_stat_tostr(EP_STAT_FROM_INT(msg->nak->ep_stat),
 								ebuf, sizeof ebuf));
-		if (body->nak->description != NULL)
-			fprintf(fp, "\t    detail=%s\n", body->nak->description);
-		if (body->nak->has_recno)
-			fprintf(fp, "\t    recno=%" PRIgdp_recno "\n",
-					body->nak->recno);
+		if (msg->nak->description != NULL)
+			fprintf(fp, "%sdetail=%s\n",
+					_gdp_pr_indent(indent),
+					msg->nak->description);
+		if (msg->nak->has_recno)
+			fprintf(fp, "%srecno=%" PRIgdp_recno "\n",
+					_gdp_pr_indent(indent),
+					msg->nak->recno);
 		break;
 
-	case GDP_BODY__COMMAND_BODY_NAK_CONFLICT:
+	case GDP_MESSAGE__BODY_NAK_CONFLICT:
 		fprintf(fp, "nak_conflict\n");
-		if (body->nak_conflict->has_ep_stat)
-			fprintf(fp, "\t    ep_stat=%s\n",
-					ep_stat_tostr(EP_STAT_FROM_INT(body->nak_conflict->ep_stat),
+		if (msg->nak_conflict->has_ep_stat)
+			fprintf(fp, "%sep_stat=%s\n",
+					_gdp_pr_indent(indent),
+					ep_stat_tostr(EP_STAT_FROM_INT(msg->nak_conflict->ep_stat),
 								ebuf, sizeof ebuf));
-		if (body->nak_conflict->description != NULL)
-			fprintf(fp, "\t    detail=%s\n", body->nak_conflict->description);
-		if (body->nak_conflict->has_recno)
-			fprintf(fp, "\t    recno=%" PRIgdp_recno "\n",
-					body->nak_conflict->recno);
+		if (msg->nak_conflict->description != NULL)
+			fprintf(fp, "%sdetail=%s\n",
+					_gdp_pr_indent(indent),
+					msg->nak_conflict->description);
+		if (msg->nak_conflict->has_recno)
+			fprintf(fp, "%srecno=%" PRIgdp_recno "\n",
+					_gdp_pr_indent(indent),
+					msg->nak_conflict->recno);
 		break;
 
 	default:
-		fprintf(fp, "unknown body case %d\n", body->command_body_case);
+		fprintf(fp, "unknown body case %d\n", msg->body_case);
 		break;
 	}
 
-	fprintf(fp, "\ttrailer=");
-	if (msg->trailer == NULL)
-	{
+	fprintf(fp, "%ssig=%p", _gdp_pr_indent(indent), msg->sig);
+	if (msg->sig == NULL)
 		fprintf(fp, "(none)\n");
-		goto done;
+	else
+		fprintf(fp, "\n%ssig_type=0x%x, sig.len=%zd, sig.data=%p\n",
+					_gdp_pr_indent(indent + 1),
+					msg->sig->sig_type,
+					msg->sig->sig.len,
+					msg->sig->sig.data);
+	if (msg->has_hash)
+	{
+		fprintf(fp, "%shash[%zd]=", _gdp_pr_indent(indent), msg->hash.len);
+		ep_hexdump(msg->hash.data, msg->hash.len, fp, EP_HEXDUMP_TERSE, 0);
 	}
 	else
 	{
-		fprintf(fp, "sig=%p", msg->trailer->sig);
-		if (msg->trailer->sig == NULL)
-			fprintf(fp, " (no signature)\n");
-		else
-			fprintf(fp, "\n\t    sig_type=0x%x, sig.len=%zd, sig.data=%p\n",
-						msg->trailer->sig->sig_type,
-						msg->trailer->sig->sig.len,
-						msg->trailer->sig->sig.data);
+		fprintf(fp, "%shash=(none)\n", _gdp_pr_indent(indent));
 	}
 done:
 	funlockfile(fp);

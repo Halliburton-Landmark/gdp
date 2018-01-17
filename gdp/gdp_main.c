@@ -400,7 +400,7 @@ process_resp(void *rpdu_)
 							" for unknown GOB\n",
 							rpdu->msg->cmd, _gdp_proto_cmd_name(rpdu->msg->cmd));
 				if (ep_dbg_test(DbgProcResp, 24))
-					_gdp_pdu_dump(rpdu, ep_dbg_getfile());
+					_gdp_pdu_dump(rpdu, ep_dbg_getfile(), 0);
 				else
 					ep_dbg_printf("    %s\n", gdp_printable_name(rpdu->src, pname));
 			}
@@ -453,7 +453,7 @@ process_resp(void *rpdu_)
 			if (ep_dbg_test(DbgProcResp, 1))
 			{
 				ep_dbg_printf("process_resp: no req for incoming response\n");
-				_gdp_pdu_dump(rpdu, ep_dbg_getfile());
+				_gdp_pdu_dump(rpdu, ep_dbg_getfile(), 0);
 				_gdp_gob_dump(gob, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
 			}
 			_gdp_gob_decref(&gob, false);
@@ -477,7 +477,7 @@ process_resp(void *rpdu_)
 			{
 				ep_dbg_printf("process_resp(%d): rpdu == req->rpdu\n",
 							rpdu->msg->cmd);
-				_gdp_pdu_dump(rpdu, ep_dbg_getfile());
+				_gdp_pdu_dump(rpdu, ep_dbg_getfile(), 0);
 			}
 		}
 		EP_ASSERT(gob == req->gob);
@@ -506,7 +506,7 @@ process_resp(void *rpdu_)
 		if (ep_dbg_test(DbgProcResp, 41))
 		{
 			ep_dbg_printf("process_resp: req->rpdu already set\n    ");
-			_gdp_pdu_dump(req->rpdu, ep_dbg_getfile());
+			_gdp_pdu_dump(req->rpdu, ep_dbg_getfile(), 0);
 		}
 		_gdp_pdu_free(&req->rpdu);
 	}

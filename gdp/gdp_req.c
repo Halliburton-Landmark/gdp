@@ -640,31 +640,33 @@ _gdp_req_dump(const gdp_req_t *req, FILE *fp, int detail, int indent)
 		fprintf(fp, "req@%p: null\n", req);
 		return;
 	}
+	indent++;
 	VALGRIND_HG_DISABLE_CHECKING(req, sizeof *req);
 	flockfile(fp);
 	fprintf(fp, "req@%p:\n", req);
-	fprintf(fp, "    nextrec=%" PRIgdp_recno ", numrecs=%" PRIu32 ", chan=%p\n"
+	fprintf(fp, "%snextrec=%" PRIgdp_recno ", numrecs=%" PRIu32 ", chan=%p\n"
 			"    postproc=%p, sub_cbfunc=%p, sub_cbarg=%p\n"
 			"    gin=%p, state=%s, stat=%s\n",
+			_gdp_pr_indent(indent),
 			req->nextrec, req->numrecs, req->chan,
 			req->postproc, req->sub_cbfunc, req->sub_cbarg,
 			req->gin, statestr(req),
 			ep_stat_tostr(req->stat, ebuf, sizeof ebuf));
-	fprintf(fp, "    act_ts=");
+	fprintf(fp, "%sact_ts=", _gdp_pr_indent(indent));
 	ep_time_print(&req->act_ts, fp, EP_TIME_FMT_HUMAN);
-	fprintf(fp, "\n    flags=");
+	fprintf(fp, "\n%sflags=", _gdp_pr_indent(indent));
 	ep_prflags(req->flags, ReqFlags, fp);
-	fprintf(fp, "\n    ");
-	_gdp_gob_dump(req->gob, fp, detail, indent);
+	fprintf(fp, "\n%s", _gdp_pr_indent(indent));
+	_gdp_gob_dump(req->gob, fp, detail, indent + 1);
 	if (req->cpdu != NULL)
 	{
-		fprintf(fp, "    c");
-		_gdp_pdu_dump(req->cpdu, fp);
+		fprintf(fp, "%sc", _gdp_pr_indent(indent));
+		_gdp_pdu_dump(req->cpdu, fp, indent + 1);
 	}
 	if (req->rpdu != NULL)
 	{
-		fprintf(fp, "    r");
-		_gdp_pdu_dump(req->rpdu, fp);
+		fprintf(fp, "%sr", _gdp_pr_indent(indent));
+		_gdp_pdu_dump(req->rpdu, fp, indent + 1);
 	}
 	funlockfile(fp);
 	VALGRIND_HG_ENABLE_CHECKING(req, sizeof *req);

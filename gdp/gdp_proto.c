@@ -88,8 +88,8 @@ _gdp_invoke(gdp_req_t *req)
 				req->gob);
 		if (ep_dbg_test(Dbg, 11))
 		{
-			ep_dbg_printf("\t");
-			_gdp_pdu_dump(req->cpdu, ep_dbg_getfile());
+			ep_dbg_printf("%s", _gdp_pr_indent(1));
+			_gdp_pdu_dump(req->cpdu, ep_dbg_getfile(), 2);
 		}
 	}
 	EP_ASSERT_ELSE(req->state == GDP_REQ_ACTIVE, return EP_STAT_ASSERT_ABORT);
@@ -213,7 +213,6 @@ _gdp_invoke(gdp_req_t *req)
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		if (ep_dbg_test(Dbg, 22))
 		{
-			ep_dbg_printf("  ");
 			_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 			ep_dbg_printf("\n");
 		}
@@ -364,13 +363,13 @@ ack_data_changed(gdp_req_t *req)
 	estat = ack_success(req);
 	EP_STAT_CHECK(estat, return estat);
 
-	EP_ASSERT_ELSE(req->rpdu->msg->body->command_body_case ==
-						GDP_BODY__COMMAND_BODY_ACK_CHANGED,
+	EP_ASSERT_ELSE(req->rpdu->msg->body_case ==
+						GDP_MESSAGE__BODY_ACK_CHANGED,
 				return EP_STAT_ASSERT_ABORT);
 
 	// keep track of number of records (in case we lose sync)
 	if (req->gob != NULL)
-		req->gob->nrecs = req->rpdu->msg->body->ack_changed->recno;
+		req->gob->nrecs = req->rpdu->msg->ack_changed->recno;
 
 	return estat;
 }
@@ -387,12 +386,12 @@ ack_data_content(gdp_req_t *req)
 	estat = ack_success(req);
 	EP_STAT_CHECK(estat, return estat);
 
-	EP_ASSERT_ELSE(req->rpdu->msg->body->command_body_case ==
-						GDP_BODY__COMMAND_BODY_ACK_CONTENT,
+	EP_ASSERT_ELSE(req->rpdu->msg->body_case ==
+						GDP_MESSAGE__BODY_ACK_CONTENT,
 				return EP_STAT_ASSERT_ABORT);
 
 	// hack to try to "self heal" in case we get out of sync
-	GdpBody__AckContent *payload = req->rpdu->msg->body->ack_content;
+	GdpMessage__AckContent *payload = req->rpdu->msg->ack_content;
 	if (req->gob->nrecs < payload->datum->recno)
 		req->gob->nrecs = payload->datum->recno;
 
@@ -453,13 +452,13 @@ nak_conflict(gdp_req_t *req)
 
 	EP_STAT_CHECK(estat, return estat);
 	GDP_MSG_CHECK(req->rpdu, return EP_STAT_ASSERT_ABORT);
-	EP_ASSERT_ELSE(req->rpdu->msg->body->command_body_case ==
-						GDP_BODY__COMMAND_BODY_NAK_CONFLICT,
+	EP_ASSERT_ELSE(req->rpdu->msg->body_case ==
+						GDP_MESSAGE__BODY_NAK_CONFLICT,
 				return EP_STAT_ASSERT_ABORT);
 
 	// adjust nrecs to match the server's view
 	if (req->gob != NULL)
-		req->gob->nrecs = req->rpdu->msg->body->nak_conflict->recno;
+		req->gob->nrecs = req->rpdu->msg->nak_conflict->recno;
 
 	return estat;
 }

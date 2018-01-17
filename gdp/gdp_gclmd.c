@@ -377,7 +377,7 @@ _gdp_gclmd_deserialize(uint8_t *smd, size_t smd_len)
 	if (ep_dbg_test(Dbg, 24))
 	{
 		ep_dbg_printf("_gdp_gclmd_deserialize:\n  ");
-		gdp_gclmd_print(gmd, ep_dbg_getfile(), 4);
+		gdp_gclmd_print(gmd, ep_dbg_getfile(), 4, 0);
 	}
 
 	return gmd;
@@ -397,8 +397,9 @@ static EP_PRFLAGS_DESC	MdatumFlags[] =
 };
 
 void
-gdp_gclmd_print(const gdp_gclmd_t *gmd, FILE *fp, int detail)
+gdp_gclmd_print(const gdp_gclmd_t *gmd, FILE *fp, int detail, int indent)
 {
+	indent++;
 	if (detail > 1)
 		fprintf(fp, "GCLMD@%p: ", gmd);
 	if (gmd == NULL)
@@ -409,17 +410,19 @@ gdp_gclmd_print(const gdp_gclmd_t *gmd, FILE *fp, int detail)
 
 	if (detail > 1)
 	{
-		fprintf(fp, "nalloc = %d, nused = %d, databuf = %p\n    flags = ",
-				gmd->nalloc, gmd->nused, gmd->databuf);
+		fprintf(fp, "nalloc = %d, nused = %d, databuf = %p\n%sflags = ",
+				gmd->nalloc, gmd->nused, gmd->databuf,
+				_gdp_pr_indent(indent));
 		ep_prflags(gmd->flags, GclmdFlags, fp);
-		fprintf(fp, "\n    mds = %p\n", gmd->mds);
+		fprintf(fp, "\n%smds = %p\n", _gdp_pr_indent(indent), gmd->mds);
 		if (detail > 2)
 		{
 			int i;
 
 			for (i = 0; i < gmd->nused; i++)
 			{
-				fprintf(fp, "\tid = %08x, len = %" PRIu32 ", flags = ",
+				fprintf(fp, "%sid = %08x, len = %" PRIu32 ", flags = ",
+						_gdp_pr_indent(indent + 1),
 						gmd->mds[i].md_id, gmd->mds[i].md_len);
 				ep_prflags(gmd->mds[i].md_flags, MdatumFlags, fp);
 				fprintf(fp, "\n");
@@ -435,7 +438,8 @@ gdp_gclmd_print(const gdp_gclmd_t *gmd, FILE *fp, int detail)
 		int i;
 
 		for (i = 0; i < gmd->nused; i++)
-			fprintf(fp, "\tMetadata %2d, id %8x, length %" PRIu32 "\n",
+			fprintf(fp, "%sMetadata %2d, id %8x, length %" PRIu32 "\n",
+					_gdp_pr_indent(indent),
 					i, gmd->mds[i].md_id, gmd->mds[i].md_len);
 	}
 }

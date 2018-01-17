@@ -55,7 +55,7 @@ typedef struct gdp_req		gdp_req_t;
 typedef struct gdp_gob		gdp_gob_t;
 typedef struct gdp_gin		gdp_gin_t;
 typedef GdpMessage			gdp_msg_t;
-typedef GdpCommandCode		gdp_cmd_t;
+typedef GdpMsgCode			gdp_cmd_t;
 typedef struct event_base	event_base_t;
 STAILQ_HEAD(gev_list, gdp_event);
 
@@ -93,8 +93,7 @@ extern bool			_GdpLibInitialized;	// are we initialized?
 // helper to do sanity checks
 #define GDP_MSG_CHECK(pdu, recovery)										\
 			EP_ASSERT_ELSE(pdu != NULL, recovery);							\
-			EP_ASSERT_ELSE(pdu->msg != NULL, recovery);						\
-			EP_ASSERT_ELSE(pdu->msg->body != NULL, recovery);
+			EP_ASSERT_ELSE(pdu->msg != NULL, recovery);
 
 #include "gdp_pdu.h"
 
@@ -740,7 +739,8 @@ void			_gdp_msg_free(				// free a message
 
 void			_gdp_msg_dump(				// print a message for debugging
 					const gdp_msg_t *msg,
-					FILE *fp);
+					FILE *fp,
+					int indent);
 
 
 /*
@@ -835,6 +835,14 @@ void			_gdp_sign_md(				// sign the metadata
 #define GDP_MUTEX_LORDER_CHAN		14
 #define GDP_MUTEX_LORDER_DATUM		18
 #define GDP_MUTEX_LORDER_LEAF		31	// freelists, etc.
+
+
+/*
+**  Utility routines
+*/
+
+const char		*_gdp_pr_indent(			// return indenting for debug output
+						int indent);
 
 
 /*

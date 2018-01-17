@@ -5,17 +5,152 @@
 **  Layer 5 (Session Layer) in the OSI model.
 */
 
-// Corresponds to gdp_pdu_t.
+// More-or-less corresponds to gdp_pdu_t.
 message GdpMessage
 {
-	required GdpCommandCode	cmd = 1;		// command or ack/nak
+	required GdpMsgCode		cmd = 1;		// command or ack/nak
 	optional uint32			rid = 2;		// request distinguisher
 	optional uint32			seqno = 3;		// sequence number
-	optional GdpBody		body = 10;		// command payload
-	optional GdpTrailer		trailer = 15;	// trailer (sig/hash)
+	oneof body
+	{
+		CmdCreate			cmd_create				= 66;
+		CmdOpen				cmd_open				= 67;
+		CmdClose			cmd_close				= 70;
+		CmdAppend			cmd_append				= 71;
+		CmdReadByRecno		cmd_read_by_recno		= 72;
+		CmdReadByTs			cmd_read_by_ts			= 73;
+		CmdReadByHash		cmd_read_by_hash		= 74;
+		CmdSubscribeByRecno	cmd_subscribe_by_recno	= 75;
+		CmdSubscribeByTs	cmd_subscribe_by_ts		= 76;
+		CmdSubscribeByHash	cmd_subscribe_by_hash	= 77;
+		CmdUnsubscribe		cmd_unsubscribe			= 78;
+		CmdGetMetadata		cmd_get_metadata		= 79;
+		CmdNewSegment		cmd_new_segment			= 80;
+		CmdDelete			cmd_delete				= 81;
+
+		AckSuccess			ack_success				= 128;
+		AckChanged			ack_changed				= 132;
+		AckContent			ack_content				= 133;
+
+		NakGeneric			nak						= 192;
+		NakConflict			nak_conflict			= 201;
+	}
+	optional GdpSignature	sig = 4;			// signature
+	optional bytes			hash = 5;			// hash of previous record
+
+	message CmdAdvertise
+	{
+		required bytes			adname = 1;			// name to advertise
+	}
+
+	message CmdCreate
+	{
+		required bytes			logname = 1;		// name of new log
+		optional bytes			metadata = 2;		// log metadata
+	}
+
+	message CmdOpen
+	{
+	}
+
+	message CmdClose
+	{
+	}
+
+	message CmdAppend
+	{
+		required GdpDatum		datum = 1;			// data to append
+	}
+
+	message CmdReadByRecno
+	{
+		required uint64			recno = 1;			// record number
+		optional int32			nrecs = 2;			// number of records
+	}
+
+	message CmdReadByTs
+	{
+		required GdpTimestamp	timestamp = 1;		// timestamp
+		optional int32			nrecs = 2;			// number of records
+	}
+
+	message CmdReadByHash
+	{
+		required bytes			hash = 1;			// hash value
+		optional int32			nrecs = 2;			// number of records
+	}
+
+	message CmdSubscribeByRecno
+	{
+		optional uint64			start = 1;			// starting record number
+		optional uint64			nrecs = 2;			// number of records
+		optional GdpTimestamp	timeout = 3;		// timeout
+	}
+
+	message CmdSubscribeByTs
+	{
+		required GdpTimestamp	timestamp = 1;		// timestamp
+		optional int32			nrecs = 2;			// number of records
+		optional GdpTimestamp	timeout = 3;		// timeout
+	}
+
+	message CmdSubscribeByHash
+	{
+		required bytes			hash = 1;			// hash value
+		optional int32			nrecs = 2;			// number of records
+		optional GdpTimestamp	timeout = 3;		// timeout
+	}
+
+	message CmdUnsubscribe
+	{
+	}
+
+	message CmdGetMetadata
+	{
+	}
+
+	message CmdNewSegment
+	{
+	}
+
+	message CmdDelete
+	{
+	}
+
+	message AckSuccess
+	{
+		optional uint64			recno = 1;
+		optional GdpTimestamp	ts = 2;
+		optional bytes			hash = 3;
+		optional bytes			metadata = 4;
+	}
+
+	message AckChanged
+	{
+		required uint64			recno = 1;
+	};
+
+	message AckContent
+	{
+		required GdpDatum		datum = 1;			// returned data
+	}
+
+	message NakGeneric
+	{
+		optional uint32			ep_stat = 1;
+		optional string			description = 2;
+		optional uint64			recno = 3;
+	}
+
+	message NakConflict
+	{
+		optional uint32			ep_stat = 1;
+		optional string			description = 2;
+		optional uint64			recno = 3;
+	}
 }
 
-enum GdpCommandCode
+enum GdpMsgCode
 {
 	// 0-63		Blind commands (no response)
 	CMD_NONE =					0;			// no command (can use as keepalive)
@@ -82,171 +217,30 @@ enum GdpCommandCode
 }
 
 
-message GdpHash
-{
-	required bytes			hash = 1;		// hash value
-}
-
-// Corresponds to gdp_datum_t.
+// More-or-less corresponds to gdp_datum_t.
 message GdpDatum
 {
 	required uint64			recno = 1;			// record number
 	optional GdpTimestamp	ts = 2;				// timestamp
 	required bytes			data = 3;			// actual content
-	optional GdpSignature	sig = 4;			// signature
-	optional GdpHash		hash = 5;			// hash of previous record
 }
 
 /*
 **	Log metadata must be independently serialized (i.e., not using
 **	protobufs) since it has to stand on its own when creating a log.
-**  We could serialize it as a protobuf, but for now the code is
-**  already written.  Thus, it's just listed as "bytes" for the type.
+**  We could serialize it as a protobuf, but that might not survive
+**  software updates.  Thus, it's just listed as "bytes" for the type.
 */
 
 message GdpBody
 {
-	message CommandAdvertise
-	{
-		required bytes			adname = 1;			// name to advertise
-	}
-
-	message CommandCreate
-	{
-		required bytes			logname = 1;		// name of new log
-		optional bytes			metadata = 2;		// log metadata
-	}
-
-	message CommandOpen
-	{
-	}
-
-	message CommandClose
-	{
-	}
-
-	message CommandAppend
-	{
-		required GdpDatum		datum = 1;			// data to append
-	}
-
-	message CommandReadByRecno
-	{
-		required uint64			recno = 1;			// record number
-		optional int32			nrecs = 2;			// number of records
-	}
-
-	message CommandReadByTs
-	{
-		required GdpTimestamp	timestamp = 1;		// timestamp
-		optional int32			nrecs = 2;			// number of records
-	}
-
-	message CommandReadByHash
-	{
-		required GdpHash		hash = 1;			// hash value
-		optional int32			nrecs = 2;			// number of records
-	}
-
-	message CommandSubscribeByRecno
-	{
-		optional uint64			start = 1;			// starting record number
-		optional uint64			nrecs = 2;			// number of records
-		optional GdpTimestamp	timeout = 3;		// timeout
-	}
-
-	message CommandSubscribeByTs
-	{
-		required GdpTimestamp	timestamp = 1;		// timestamp
-		optional int32			nrecs = 2;			// number of records
-		optional GdpTimestamp	timeout = 3;		// timeout
-	}
-
-	message CommandSubscribeByHash
-	{
-		required GdpHash		hash = 1;			// hash value
-		optional int32			nrecs = 2;			// number of records
-		optional GdpTimestamp	timeout = 3;		// timeout
-	}
-
-	message CommandUnsubscribe
-	{
-	}
-
-	message CommandGetMetadata
-	{
-	}
-
-	message CommandNewSegment
-	{
-	}
-
-	message CommandDelete
-	{
-	}
-
-	message AckSuccess
-	{
-		optional uint64			recno = 1;
-		optional GdpTimestamp	ts = 2;
-		optional bytes			hash = 3;
-		optional bytes			metadata = 4;
-	}
-
-	message AckChanged
-	{
-		required uint64			recno = 1;
-	};
-
-	message AckContent
-	{
-		required GdpDatum		datum = 1;			// returned data
-	}
-
-	message NakGeneric
-	{
-		optional uint32			ep_stat = 1;
-		optional string			description = 2;
-		optional uint64			recno = 3;
-	}
-
-	message NakConflict
-	{
-		optional uint32			ep_stat = 1;
-		optional string			description = 2;
-		optional uint64			recno = 3;
-	}
-
-	oneof command_body
-	{
-		CommandCreate			cmd_create				= 66;
-		CommandOpen				cmd_open				= 67;
-		CommandClose			cmd_close				= 70;
-		CommandAppend			cmd_append				= 71;
-		CommandReadByRecno		cmd_read_by_recno		= 72;
-		CommandReadByTs			cmd_read_by_ts			= 73;
-		CommandReadByHash		cmd_read_by_hash		= 74;
-		CommandSubscribeByRecno	cmd_subscribe_by_recno	= 75;
-		CommandSubscribeByTs	cmd_subscribe_by_ts		= 76;
-		CommandSubscribeByHash	cmd_subscribe_by_hash	= 77;
-		CommandUnsubscribe		cmd_unsubscribe			= 78;
-		CommandGetMetadata		cmd_get_metadata		= 79;
-		CommandNewSegment		cmd_new_segment			= 80;
-		CommandDelete			cmd_delete				= 81;
-
-		AckSuccess				ack_success				= 128;
-		AckChanged				ack_changed				= 132;
-		AckContent				ack_content				= 133;
-
-		NakGeneric				nak						= 192;
-		NakConflict				nak_conflict			= 201;
-	}
 }
 
 
 message GdpTimestamp
 {
-	required int64			sec = 1 [default = -9223372036854775807];
+	optional int64			sec = 1 [default = -9223372036854775807];
+									// EP_TIME_NOTIME = INT64_MIN + 1
 	optional uint32			nsec = 2;
 	optional float			accuracy = 3;
 }

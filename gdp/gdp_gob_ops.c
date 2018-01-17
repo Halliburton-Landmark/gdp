@@ -37,6 +37,7 @@
 #include <ep/ep_prflags.h>
 
 #include "gdp.h"
+#include "gdp_chan.h"		// for PUT64
 #include "gdp_event.h"
 #include "gdp_gclmd.h"
 #include "gdp_priv.h"
@@ -108,8 +109,7 @@ _gdp_gob_create(gdp_name_t gobname,
 
 	msg = req->cpdu->msg;
 	EP_ASSERT_ELSE(msg != NULL, return EP_STAT_ASSERT_ABORT);
-	EP_ASSERT_ELSE(msg->body != NULL, return EP_STAT_ASSERT_ABORT);
-	GdpBody__CommandCreate *payload = msg->body->cmd_create;
+	GdpMessage__CmdCreate *payload = msg->cmd_create;
 	EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
 
 	// send the name of the log to be created in the payload
@@ -295,8 +295,7 @@ _gdp_gob_open(gdp_gob_t *gob,
 
 	msg = req->cpdu->msg;
 	EP_ASSERT_ELSE(msg != NULL, return EP_STAT_ASSERT_ABORT);
-	EP_ASSERT_ELSE(msg->body != NULL, return EP_STAT_ASSERT_ABORT);
-	GdpBody__CommandOpen *payload = msg->body->cmd_open;
+	GdpMessage__CmdOpen *payload = msg->cmd_open;
 	EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
 
 	// nothing actually sent in the payload
@@ -305,20 +304,19 @@ _gdp_gob_open(gdp_gob_t *gob,
 	EP_STAT_CHECK(estat, goto fail0);
 	msg = req->rpdu->msg;
 	EP_ASSERT(msg != NULL);
-	EP_ASSERT(msg->body != NULL);
-	if (msg->body->command_body_case !=
-			GDP_BODY__COMMAND_BODY_ACK_SUCCESS)
+	if (msg->body_case !=
+			GDP_MESSAGE__BODY_ACK_SUCCESS)
 	{
 		ep_dbg_cprintf(Dbg, 1,
 				"_gdp_gob_open: unexpected response type %d (expected %d)\n",
-				msg->body->command_body_case,
-				GDP_BODY__COMMAND_BODY_ACK_SUCCESS);
+				msg->body_case,
+				GDP_MESSAGE__BODY_ACK_SUCCESS);
 		//estat = ???;
 	}
 	else
 	{
 		// success
-		GdpBody__AckSuccess *payload = msg->body->ack_success;
+		GdpMessage__AckSuccess *payload = msg->ack_success;
 
 		// save the number of records
 		gob->nrecs = payload->recno;
@@ -459,29 +457,54 @@ append_common(gdp_gob_t *gob,
 	EP_STAT_CHECK(estat, goto fail0);
 	req = *reqp;
 
+	// assumes records are written in order with no gaps
+	datum->recno = gob->nrecs + 1;
+
 	// set up the message content
 	msg = req->cpdu->msg;
 	EP_ASSERT_ELSE(msg != NULL, return EP_STAT_ASSERT_ABORT);
-	EP_ASSERT_ELSE(msg->body != NULL, return EP_STAT_ASSERT_ABORT);
-	GdpBody__CommandAppend *payload = msg->body->cmd_append;
+	GdpMessage__CmdAppend *payload = msg->cmd_append;
 	EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
+
+	payload->datum = ep_mem_zalloc(sizeof *payload->datum);
+	gdp_datum__init(payload->datum);
+	_gdp_datum_to_pb(datum, payload->datum);
 
 	// set up for signing (req->md will be updated with data part)
 	req->md = gob->digest;
-	datum->recno = gob->nrecs + 1;
+	if (req->md != NULL)
+	{
+		uint8_t recnobuf[8];		// 64 bits
+		uint8_t *pbp = recnobuf;
+		size_t len;
+		EP_CRYPTO_MD *md = ep_crypto_md_clone(req->md);
+
+		recnobuf[0] = req->cpdu->msg->cmd;
+		ep_crypto_sign_update(md, &recnobuf[0], 1);
+		PUT64(datum->recno);
+		ep_crypto_sign_update(md, recnobuf, sizeof recnobuf);
+		len = payload->datum->data.len;
+		ep_crypto_sign_update(md, payload->datum->data.data, len);
+		len = EP_CRYPTO_MAX_PUB_KEY;
+		req->cpdu->msg->sig->sig.data = ep_mem_malloc(len);
+		estat = ep_crypto_sign_final(md, req->cpdu->msg->sig->sig.data, &len);
+		if (!EP_STAT_ISOK(estat))
+		{
+			ep_mem_free(req->cpdu->msg->sig->sig.data);
+			ep_mem_free(req->cpdu->msg->sig);
+			req->cpdu->msg->sig = NULL;
+		}
+		else
+		{
+			req->cpdu->msg->sig->sig.len = len;
+		}
+	}
 
 	// Note that this is just a guess: the append may still fail,
 	// but we need to do this if there are multiple threads appending
 	// at the same time.
 	// If the append fails, we'll be out of sync and all hell breaks loose.
 	gob->nrecs++;
-
-	// add the datum to the output payload
-	{
-		payload->datum = ep_mem_zalloc(sizeof *payload->datum);
-		gdp_datum__init(payload->datum);
-		_gdp_datum_to_pb(datum, payload->datum);
-	}
 
 fail0:
 	return estat;
@@ -623,8 +646,7 @@ _gdp_gob_read_by_recno(gdp_gob_t *gob,
 	{
 		gdp_msg_t *msg = req->cpdu->msg;
 		EP_ASSERT_ELSE(msg != NULL, return EP_STAT_ASSERT_ABORT);
-		EP_ASSERT_ELSE(msg->body != NULL, return EP_STAT_ASSERT_ABORT);
-		GdpBody__CommandReadByRecno *payload = msg->body->cmd_read_by_recno;
+		GdpMessage__CmdReadByRecno *payload = msg->cmd_read_by_recno;
 		EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
 		payload->recno = recno;
 	}
@@ -636,8 +658,7 @@ _gdp_gob_read_by_recno(gdp_gob_t *gob,
 	{
 		gdp_msg_t *msg = req->rpdu->msg;
 		EP_ASSERT_ELSE(msg != NULL, return EP_STAT_ASSERT_ABORT);
-		EP_ASSERT_ELSE(msg->body != NULL, return EP_STAT_ASSERT_ABORT);
-		GdpBody__AckContent *payload = msg->body->ack_content;
+		GdpMessage__AckContent *payload = msg->ack_content;
 		EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
 
 		// ok, done!  pass the datum contents to the caller and free the request
@@ -692,8 +713,7 @@ _gdp_gob_read_by_recno_async(
 
 	msg = req->cpdu->msg;
 	EP_ASSERT_ELSE(msg != NULL, return EP_STAT_ASSERT_ABORT);
-	EP_ASSERT_ELSE(msg->body != NULL, return EP_STAT_ASSERT_ABORT);
-	GdpBody__CommandReadByRecno *payload = msg->body->cmd_read_by_recno;
+	GdpMessage__CmdReadByRecno *payload = msg->cmd_read_by_recno;
 	EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
 	payload->recno = recno;
 	payload->nrecs = nrecs;
@@ -744,20 +764,19 @@ _gdp_gob_getmetadata(gdp_gob_t *gob,
 
 	msg = req->rpdu->msg;
 	EP_ASSERT(msg != NULL);
-	EP_ASSERT(msg->body != NULL);
-	if (msg->body->command_body_case !=
-			GDP_BODY__COMMAND_BODY_ACK_SUCCESS)
+	if (msg->body_case !=
+			GDP_MESSAGE__BODY_ACK_SUCCESS)
 	{
 		ep_dbg_cprintf(Dbg, 1,
 				"_gdp_gob_open: unexpected response type %d (expected %d)\n",
-				msg->body->command_body_case,
-				GDP_BODY__COMMAND_BODY_ACK_SUCCESS);
+				msg->body_case,
+				GDP_MESSAGE__BODY_ACK_SUCCESS);
 		//estat = ???;
 	}
 	else
 	{
 		// success
-		GdpBody__AckSuccess *payload = msg->body->ack_success;
+		GdpMessage__AckSuccess *payload = msg->ack_success;
 
 		// read in the metadata to internal format
 		gob->gclmd = _gdp_gclmd_deserialize(payload->metadata.data,

@@ -243,7 +243,7 @@ print_event(gdp_event_t *gev, bool subscribe)
 
 	  default:
 		// let the library handle this
-		gdp_event_print(gev, stderr, 1);
+		gdp_event_print(gev, stderr, 1, 0);
 		break;
 	}
 
@@ -459,7 +459,7 @@ print_metadata(gdp_gcl_t *gcl)
 	estat = gdp_gcl_getmetadata(gcl, &gmd);
 	EP_STAT_CHECK(estat, goto fail0);
 
-	gdp_gclmd_print(gmd, stdout, 5);
+	gdp_gclmd_print(gmd, stdout, 5, 0);
 	gdp_gclmd_free(gmd);
 	return;
 

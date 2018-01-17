@@ -164,7 +164,8 @@ extern EP_STAT			gdp_event_free(			// free event from gdp_event_next
 extern void				gdp_event_print(		// print event (for debugging)
 							const gdp_event_t *gev,	// event in question
 							FILE *fp,				// output file
-							int detail);			// how detailed?
+							int detail,				// how detailed?
+							int indent);			// indentation level
 
 extern int				gdp_event_gettype(		// get the type of the event
 							gdp_event_t *gev);
@@ -491,7 +492,8 @@ EP_STAT			gdp_gclmd_find(
 void			gdp_gclmd_print(
 					const gdp_gclmd_t *gmd,
 					FILE *fp,
-					int detail);
+					int detail,
+					int indent);
 
 /*
 **  Datum handling

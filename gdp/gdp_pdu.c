@@ -61,7 +61,7 @@ static EP_DBG	DbgOut = EP_DBG_INIT("gdp.pdu.out", "GDP PDU outgoing traffic");
 
 
 void
-_gdp_pdu_dump(const gdp_pdu_t *pdu, FILE *fp)
+_gdp_pdu_dump(const gdp_pdu_t *pdu, FILE *fp, int indent)
 {
 	if (fp == NULL)
 		fp = ep_dbg_getfile();
@@ -72,12 +72,12 @@ _gdp_pdu_dump(const gdp_pdu_t *pdu, FILE *fp)
 		fprintf(fp, "NULL\n");
 		goto done;
 	}
-	fprintf(fp, "\n\tdst=");
+	fprintf(fp, "\n%sdst=", _gdp_pr_indent(indent));
 	gdp_print_name(pdu->dst, fp);
-	fprintf(fp, "\n\tsrc=");
+	fprintf(fp, "\n%ssrc=", _gdp_pr_indent(indent));
 	gdp_print_name(pdu->src, fp);
-	fprintf(fp, "\n    ");
-	_gdp_msg_dump(pdu->msg, fp);
+	fprintf(fp, "\n%s", _gdp_pr_indent(indent));
+	_gdp_msg_dump(pdu->msg, fp, indent + 1);
 
 done:
 	funlockfile(fp);
@@ -123,8 +123,9 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 	** Copy PDU information into Protobuf.
 	*/
 
-#if 0 //TODO: IMPLEMENT_ME
-	if (basemd != NULL)
+
+#if 0	//XXX should compute signature before calling _gdp_pdu_out
+	if (basemd != NULL && pdu->msg != NULL)
 	{
 		// compute the signature
 		EP_CRYPTO_MD *md = ep_crypto_md_clone(basemd);
@@ -157,7 +158,7 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 			ep_dbg_cprintf(DbgOut, 1, "_gdp_pdu_out: cannot clone message digest");
 		}
 	}
-#endif //TODO
+#endif	//XXX
 	if (ep_dbg_test(DbgOut, 1))
 		flockfile(ep_dbg_getfile());
 
@@ -227,8 +228,8 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 
 	if (ep_dbg_test(DbgOut, 22))
 	{
-		ep_dbg_printf("    ");
-		_gdp_pdu_dump(pdu, ep_dbg_getfile());
+		ep_dbg_printf("%s", _gdp_pr_indent(1));
+		_gdp_pdu_dump(pdu, ep_dbg_getfile(), 2);
 	}
 
 fail1:
@@ -313,7 +314,7 @@ fail1:
 		ep_dbg_printf("_gdp_pdu_in(%s) => %s\n", cmdname,
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		if (ep_dbg_test(DbgIn, 22))
-			_gdp_pdu_dump(pdu, ep_dbg_getfile());
+			_gdp_pdu_dump(pdu, ep_dbg_getfile(), 0);
 		funlockfile(ep_dbg_getfile());
 	}
 
