@@ -470,14 +470,14 @@ append_common(gdp_gob_t *gob,
 	gdp_datum__init(payload->datum);
 	_gdp_datum_to_pb(datum, payload->datum);
 
-	// set up for signing (req->md will be updated with data part)
-	req->md = gob->digest;
-	if (req->md != NULL)
+	// set up for signing (req->digest will be updated with data part)
+	req->digest = gob->digest;
+	if (req->digest != NULL)
 	{
 		uint8_t recnobuf[8];		// 64 bits
 		uint8_t *pbp = recnobuf;
 		size_t len;
-		EP_CRYPTO_MD *md = ep_crypto_md_clone(req->md);
+		EP_CRYPTO_MD *md = ep_crypto_md_clone(req->digest);
 
 		recnobuf[0] = req->cpdu->msg->cmd;
 		ep_crypto_sign_update(md, &recnobuf[0], 1);

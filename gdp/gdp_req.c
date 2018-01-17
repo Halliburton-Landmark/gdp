@@ -322,7 +322,7 @@ _gdp_req_free(gdp_req_t **reqp)
 		_gdp_gob_decref(&req->gob, true);
 	req->state = GDP_REQ_FREE;
 	req->flags = 0;
-	req->md = NULL;
+	req->digest = NULL;
 	req->sub_cbarg = NULL;
 
 	// add the empty request to the free list
@@ -480,7 +480,7 @@ _gdp_req_send(gdp_req_t *req)
 	}
 
 	// write the message out
-	estat = _gdp_pdu_out(req->cpdu, req->chan, req->md);
+	estat = _gdp_pdu_out(req->cpdu, req->chan, req->digest);
 
 	// done
 	return estat;
