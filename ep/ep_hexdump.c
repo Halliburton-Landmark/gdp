@@ -42,6 +42,8 @@ ep_hexdump(const void *bufp, size_t buflen, FILE *fp,
 	size_t bufleft = buflen;
 	const uint8_t *b = bufp;
 	const size_t width = 16;
+	bool terse = EP_UT_BITSET(EP_HEXDUMP_TERSE, format);
+	bool ascii = EP_UT_BITSET(EP_HEXDUMP_ASCII, format);
 
 	flockfile(fp);			// to make threads happy
 	while (bufleft > 0)
@@ -50,17 +52,20 @@ ep_hexdump(const void *bufp, size_t buflen, FILE *fp,
 		int i;
 		int shift;
 
-		shift = offset % width;
-		if (lim > width)
-			lim = width;
-		if (lim > (width - shift))
-			lim = width - shift;
-		fprintf(fp, "%08zx", offset);
-		if (shift != 0)
-			fprintf(fp, "%*s", shift * 3, "");
+		if (!terse)
+		{
+			shift = offset % width;
+			if (lim > width)
+				lim = width;
+			if (lim > (width - shift))
+				lim = width - shift;
+			fprintf(fp, "%08zx", offset);
+			if (shift != 0)
+				fprintf(fp, "%*s", shift * 3, "");
+		}
 		for (i = 0; i < lim; i++)
-			fprintf(fp, " %02x", b[i]);
-		if (EP_UT_BITSET(EP_HEXDUMP_ASCII, format))
+			fprintf(fp, "%s%02x", terse ? "" : " ", b[i]);
+		if (ascii)
 		{
 			fprintf(fp, "\n        ");
 			if (shift != 0)

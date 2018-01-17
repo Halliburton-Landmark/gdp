@@ -46,3 +46,4 @@ void	ep_hexdump(
 // format flags
 #define EP_HEXDUMP_HEX		0	// no special formatting
 #define EP_HEXDUMP_ASCII	0x0001	// show ASCII equivalent
+#define EP_HEXDUMP_TERSE	0x0002	// minimal formating
