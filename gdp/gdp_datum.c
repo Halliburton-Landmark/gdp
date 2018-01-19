@@ -339,7 +339,9 @@ _gdp_datum_dump(const gdp_datum_t *datum,
 
 
 void
-_gdp_datum_to_pb(const gdp_datum_t *datum, GdpDatum *pb)
+_gdp_datum_to_pb(const gdp_datum_t *datum,
+				GdpMessage *msg,
+				GdpDatum *pb)
 {
 	pb->recno = datum->recno;
 	if (EP_TIME_IS_VALID(&datum->ts))
@@ -367,7 +369,9 @@ _gdp_datum_to_pb(const gdp_datum_t *datum, GdpDatum *pb)
 
 
 void
-_gdp_datum_from_pb(gdp_datum_t *datum, const GdpDatum *pb)
+_gdp_datum_from_pb(gdp_datum_t *datum,
+				const GdpMessage *msg,
+				const GdpDatum *pb)
 {
 	// recno
 	datum->recno = pb->recno;
@@ -388,4 +392,14 @@ _gdp_datum_from_pb(gdp_datum_t *datum, const GdpDatum *pb)
 	if (datum->dbuf == NULL)
 		datum->dbuf = gdp_buf_new();
 	gdp_buf_write(datum->dbuf, pb->data.data, pb->data.len);
+
+	// signature
+	if (msg->sig != NULL)
+	{
+		if (datum->sig == NULL)
+			datum->sig = gdp_buf_new();
+		datum->sigmdalg = msg->sig->sig_type;
+		datum->siglen = msg->sig->sig.len;
+		gdp_buf_write(datum->sig, msg->sig->sig.data, msg->sig->sig.len);
+	}
 }

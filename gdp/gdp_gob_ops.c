@@ -468,7 +468,7 @@ append_common(gdp_gob_t *gob,
 
 	payload->datum = ep_mem_zalloc(sizeof *payload->datum);
 	gdp_datum__init(payload->datum);
-	_gdp_datum_to_pb(datum, payload->datum);
+	_gdp_datum_to_pb(datum, msg, payload->datum);
 
 	// set up for signing (req->digest will be updated with data part)
 	req->digest = gob->digest;
@@ -479,24 +479,29 @@ append_common(gdp_gob_t *gob,
 		size_t len;
 		EP_CRYPTO_MD *md = ep_crypto_md_clone(req->digest);
 
-		recnobuf[0] = req->cpdu->msg->cmd;
+		recnobuf[0] = msg->cmd;
 		ep_crypto_sign_update(md, &recnobuf[0], 1);
 		PUT64(datum->recno);
 		ep_crypto_sign_update(md, recnobuf, sizeof recnobuf);
 		len = payload->datum->data.len;
 		ep_crypto_sign_update(md, payload->datum->data.data, len);
+		if (msg->sig == NULL)
+		{
+			msg->sig = ep_mem_zalloc(sizeof *msg->sig);
+			gdp_signature__init(msg->sig);
+		}
 		len = EP_CRYPTO_MAX_PUB_KEY;
-		req->cpdu->msg->sig->sig.data = ep_mem_malloc(len);
-		estat = ep_crypto_sign_final(md, req->cpdu->msg->sig->sig.data, &len);
+		msg->sig->sig.data = ep_mem_malloc(len);
+		estat = ep_crypto_sign_final(md, msg->sig->sig.data, &len);
 		if (!EP_STAT_ISOK(estat))
 		{
-			ep_mem_free(req->cpdu->msg->sig->sig.data);
-			ep_mem_free(req->cpdu->msg->sig);
-			req->cpdu->msg->sig = NULL;
+			ep_mem_free(msg->sig->sig.data);
+			ep_mem_free(msg->sig);
+			msg->sig = NULL;
 		}
 		else
 		{
-			req->cpdu->msg->sig->sig.len = len;
+			msg->sig->sig.len = len;
 		}
 	}
 
@@ -662,7 +667,7 @@ _gdp_gob_read_by_recno(gdp_gob_t *gob,
 		EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
 
 		// ok, done!  pass the datum contents to the caller and free the request
-		_gdp_datum_from_pb(datum, payload->datum);
+		_gdp_datum_from_pb(datum, msg, payload->datum);
 	}
 
 fail1:

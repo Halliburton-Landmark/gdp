@@ -145,10 +145,12 @@ void			_gdp_datum_dump(		// dump data record (for debugging)
 
 void			_gdp_datum_to_pb(		// convert datum to protobuf form
 						const gdp_datum_t *datum,
+						GdpMessage *msg,
 						GdpDatum *pb);
 
 void			_gdp_datum_from_pb(		// convert protobuf form to datum
 						gdp_datum_t *datum,
+						const GdpMessage *msg,
 						const GdpDatum *pb);
 
 gdp_datum_t		*gdp_datum_dup(		// duplicate a datum

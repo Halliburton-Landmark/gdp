@@ -402,6 +402,7 @@ cmd_open(gdp_req_t *req)
 		olen = _gdp_gclmd_serialize(gob->gclmd, &obuf);
 		resp->metadata.data = obuf;
 		resp->metadata.len = olen;
+		resp->has_metadata = true;
 	}
 	resp->recno = gob->nrecs;
 	resp->has_recno = true;
@@ -555,7 +556,7 @@ cmd_read_helper(gdp_req_t *req)
 	{
 		gdpd_ack_resp(req, GDP_ACK_CONTENT);
 		GdpMessage__AckContent *resp = req->rpdu->msg->ack_content;
-		_gdp_datum_to_pb(datum, resp->datum);
+		_gdp_datum_to_pb(datum, req->cpdu->msg, resp->datum);
 	}
 	else
 	{
@@ -841,7 +842,7 @@ cmd_append(gdp_req_t *req)
 		}
 		else
 		{
-			_gdp_datum_from_pb(datum, payload->datum);
+			_gdp_datum_from_pb(datum, req->cpdu->msg, payload->datum);
 		}
 
 		// make sure the timestamp is current
@@ -882,7 +883,7 @@ cmd_append(gdp_req_t *req)
 	{
 fail1:
 		estat = gdpd_nak_resp(req, GDP_NAK_C_FORBIDDEN,
-						"cmd_append: XXX forbidden",
+						"cmd_append",
 						GDP_STAT_NAK_FORBIDDEN);
 		req->rpdu->msg->nak->recno = req->gob->nrecs;
 	}
@@ -936,7 +937,7 @@ post_subscribe(gdp_req_t *req)
 			// OK, the next record exists: send it
 			gdpd_ack_resp(req, GDP_ACK_CONTENT);
 			GdpMessage__AckContent *resp = req->rpdu->msg->ack_content;
-			_gdp_datum_to_pb(datum, resp->datum);
+			_gdp_datum_to_pb(datum, req->rpdu->msg, resp->datum);
 		}
 		else if (EP_STAT_IS_SAME(estat, GDP_STAT_RECORD_MISSING))
 		{

@@ -43,6 +43,13 @@ message GdpMessage
 		required bytes			adname = 1;			// name to advertise
 	}
 
+	/*
+	**  Log metadata must be independently serialized (i.e., not using
+	**  protobufs) since it has to stand on its own when creating a log.
+	**  We could serialize it as a protobuf, but that might not survive
+	**  software updates.  Thus, it's just listed as "bytes" for the type.
+	*/
+
 	message CmdCreate
 	{
 		required bytes			logname = 1;		// name of new log
@@ -224,18 +231,6 @@ message GdpDatum
 	optional GdpTimestamp	ts = 2;				// timestamp
 	required bytes			data = 3;			// actual content
 }
-
-/*
-**	Log metadata must be independently serialized (i.e., not using
-**	protobufs) since it has to stand on its own when creating a log.
-**  We could serialize it as a protobuf, but that might not survive
-**  software updates.  Thus, it's just listed as "bytes" for the type.
-*/
-
-message GdpBody
-{
-}
-
 
 message GdpTimestamp
 {
