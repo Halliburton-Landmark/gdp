@@ -142,11 +142,7 @@ gdp-log-check.o: ../gdplogd/logd_disklog.c ../gdplogd/logd_gcl.c
 gdp-rest:	gdp-rest.c ../scgilib/scgilib.o
 	${CC} ${INCS} -o $@ ${LDFLAGS} gdp-rest.c ${LDLIBS} ../scgilib/scgilib.o
 
-# XXX It's unclear what to do here
-# I want to rebuild the apps if the libraries change, but including this
-# dependency puts the literal path to the libraries into the command line,
-# which breaks the C++ compiler.
-#${CLEANALL}:	${LIBROOT}/gdp/libgdp.a ${LIBROOT}/ep/libep.a
+${CLEANALL}:	${LIBROOT}/gdp/libgdp.a ${LIBROOT}/ep/libep.a
 
 clean:
 	-rm -f ${CLEANALL} *.o *.core
@@ -168,5 +164,11 @@ UPDATE_LICENSE=	${ADM}/update-license.sh
 
 update-license:
 	${UPDATE_LICENSE} Makefile *.[ch]
+
+# Redefine the implicit compile rule; GNU make changed the rule slightly
+# which causes explicit paths to libgdp.a and libep.a to be added to
+# the command, which in turn breaks compiling under C++.
+.c:
+	${LINK.c} -o $@ $< ${LDLIBS}
 
 FORCE:
