@@ -97,7 +97,7 @@ _gdp_gob_new(gdp_name_t gob_name, gdp_gob_t **pgob)
 	if (gob == NULL)
 	{
 		// allocate the memory to hold the gob handle
-		gob = ep_mem_zalloc(sizeof *gob);
+		gob = (gdp_gob_t *) ep_mem_zalloc(sizeof *gob);
 		if (gob == NULL)
 			goto fail1;
 

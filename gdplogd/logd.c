@@ -99,7 +99,7 @@ logd_reclaim_resources_callback(int fd, short what, void *ctx)
 void
 renew_advertisements(int fd, short what, void *_chan)
 {
-	gdp_chan_t *chan = _chan;
+	gdp_chan_t *chan = (gdp_chan_t *) _chan;
 	ep_sd_notifyf("WATCHDOG=1\n");
 	(void) logd_advertise_all(chan, GDP_CMD_ADVERTISE, NULL);
 }

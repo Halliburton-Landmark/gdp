@@ -65,7 +65,7 @@ _gdp_msg_new(gdp_cmd_t cmd, gdp_rid_t rid, gdp_seqno_t seqno)
 				_gdp_proto_cmd_name(cmd), cmd, rid, seqno);
 
 	EP_ASSERT(cmd >= 0 && cmd <= 255);
-	msg = ep_mem_zalloc(sizeof *msg);
+	msg = (gdp_msg_t *) ep_mem_zalloc(sizeof *msg);
 	gdp_message__init(msg);
 	msg->cmd = cmd;
 	if (rid != GDP_PDU_NO_RID)
@@ -84,7 +84,8 @@ _gdp_msg_new(gdp_cmd_t cmd, gdp_rid_t rid, gdp_seqno_t seqno)
 	{
 	case GDP_CMD_CREATE:
 		msg->body_case = GDP_MESSAGE__BODY_CMD_CREATE;
-		msg->cmd_create = ep_mem_zalloc(sizeof *msg->cmd_create);
+		msg->cmd_create = (GdpMessage__CmdCreate *)
+					ep_mem_zalloc(sizeof *msg->cmd_create);
 		gdp_message__cmd_create__init(msg->cmd_create);
 		break;
 
@@ -92,59 +93,58 @@ _gdp_msg_new(gdp_cmd_t cmd, gdp_rid_t rid, gdp_seqno_t seqno)
 	case GDP_CMD_OPEN_RO:
 	case GDP_CMD_OPEN_RA:
 		msg->body_case = GDP_MESSAGE__BODY_CMD_OPEN;
-		msg->cmd_open = ep_mem_zalloc(sizeof *msg->cmd_open);
+		msg->cmd_open = (GdpMessage__CmdOpen *)
+					ep_mem_zalloc(sizeof *msg->cmd_open);
 		gdp_message__cmd_open__init(msg->cmd_open);
 		break;
 
 	case GDP_CMD_APPEND:
 		msg->body_case = GDP_MESSAGE__BODY_CMD_APPEND;
-		msg->cmd_append = ep_mem_zalloc(sizeof *msg->cmd_append);
+		msg->cmd_append = (GdpMessage__CmdAppend *)
+					ep_mem_zalloc(sizeof *msg->cmd_append);
 		gdp_message__cmd_append__init(msg->cmd_append);
 		break;
 
 	case GDP_CMD_READ_BY_RECNO:
-		msg->body_case =
-						GDP_MESSAGE__BODY_CMD_READ_BY_RECNO;
-		msg->cmd_read_by_recno = ep_mem_zalloc(sizeof *msg->cmd_read_by_recno);
+		msg->body_case = GDP_MESSAGE__BODY_CMD_READ_BY_RECNO;
+		msg->cmd_read_by_recno = (GdpMessage__CmdReadByRecno *)
+					ep_mem_zalloc(sizeof *msg->cmd_read_by_recno);
 		gdp_message__cmd_read_by_recno__init(msg->cmd_read_by_recno);
 		break;
 
 	case GDP_CMD_READ_BY_TS:
-		msg->body_case =
-						GDP_MESSAGE__BODY_CMD_READ_BY_TS;
-		msg->cmd_read_by_ts = ep_mem_zalloc(sizeof *msg->cmd_read_by_ts);
+		msg->body_case = GDP_MESSAGE__BODY_CMD_READ_BY_TS;
+		msg->cmd_read_by_ts = (GdpMessage__CmdReadByTs *)
+					ep_mem_zalloc(sizeof *msg->cmd_read_by_ts);
 		gdp_message__cmd_read_by_ts__init(msg->cmd_read_by_ts);
 		break;
 
 	case GDP_CMD_READ_BY_HASH:
-		msg->body_case =
-						GDP_MESSAGE__BODY_CMD_READ_BY_HASH;
-		msg->cmd_read_by_hash = ep_mem_zalloc(sizeof *msg->cmd_read_by_hash);
+		msg->body_case = GDP_MESSAGE__BODY_CMD_READ_BY_HASH;
+		msg->cmd_read_by_hash = (GdpMessage__CmdReadByHash *)
+					ep_mem_zalloc(sizeof *msg->cmd_read_by_hash);
 		gdp_message__cmd_read_by_hash__init(msg->cmd_read_by_hash);
 		break;
 
 	case GDP_CMD_SUBSCRIBE_BY_RECNO:
-		msg->body_case =
-						GDP_MESSAGE__BODY_CMD_SUBSCRIBE_BY_RECNO;
-		msg->cmd_subscribe_by_recno =
+		msg->body_case = GDP_MESSAGE__BODY_CMD_SUBSCRIBE_BY_RECNO;
+		msg->cmd_subscribe_by_recno = (GdpMessage__CmdSubscribeByRecno *)
 						ep_mem_zalloc(sizeof *msg->cmd_subscribe_by_recno);
 		gdp_message__cmd_subscribe_by_recno__init(
 						msg->cmd_subscribe_by_recno);
 		break;
 
 	case GDP_CMD_SUBSCRIBE_BY_TS:
-		msg->body_case =
-						GDP_MESSAGE__BODY_CMD_SUBSCRIBE_BY_TS;
-		msg->cmd_subscribe_by_ts =
+		msg->body_case = GDP_MESSAGE__BODY_CMD_SUBSCRIBE_BY_TS;
+		msg->cmd_subscribe_by_ts = (GdpMessage__CmdSubscribeByTs *)
 						ep_mem_zalloc(sizeof *msg->cmd_subscribe_by_ts);
 		gdp_message__cmd_subscribe_by_ts__init(
 						msg->cmd_subscribe_by_ts);
 		break;
 
 	case GDP_CMD_SUBSCRIBE_BY_HASH:
-		msg->body_case =
-						GDP_MESSAGE__BODY_CMD_SUBSCRIBE_BY_HASH;
-		msg->cmd_subscribe_by_hash =
+		msg->body_case = GDP_MESSAGE__BODY_CMD_SUBSCRIBE_BY_HASH;
+		msg->cmd_subscribe_by_hash = (GdpMessage__CmdSubscribeByHash *)
 						ep_mem_zalloc(sizeof *msg->cmd_subscribe_by_hash);
 		gdp_message__cmd_subscribe_by_hash__init(
 						msg->cmd_subscribe_by_hash);
@@ -152,21 +152,25 @@ _gdp_msg_new(gdp_cmd_t cmd, gdp_rid_t rid, gdp_seqno_t seqno)
 
 	case GDP_ACK_SUCCESS:
 		msg->body_case = GDP_MESSAGE__BODY_ACK_SUCCESS;
-		msg->ack_success = ep_mem_zalloc(sizeof *msg->ack_success);
+		msg->ack_success = (GdpMessage__AckSuccess *)
+					ep_mem_zalloc(sizeof *msg->ack_success);
 		gdp_message__ack_success__init(msg->ack_success);
 		break;
 
 	case GDP_ACK_CHANGED:
 		msg->body_case = GDP_MESSAGE__BODY_ACK_CHANGED;
-		msg->ack_changed = ep_mem_zalloc(sizeof *msg->ack_changed);
+		msg->ack_changed = (GdpMessage__AckChanged *)
+					ep_mem_zalloc(sizeof *msg->ack_changed);
 		gdp_message__ack_changed__init(msg->ack_changed);
 		break;
 
 	case GDP_ACK_CONTENT:
 		msg->body_case = GDP_MESSAGE__BODY_ACK_CONTENT;
-		msg->ack_content = ep_mem_zalloc(sizeof *msg->ack_content);
+		msg->ack_content = (GdpMessage__AckContent *)
+					ep_mem_zalloc(sizeof *msg->ack_content);
 		gdp_message__ack_content__init(msg->ack_content);
-		msg->ack_content->datum = ep_mem_zalloc(sizeof *msg->ack_content->datum);
+		msg->ack_content->datum = (GdpDatum *)
+					ep_mem_zalloc(sizeof *msg->ack_content->datum);
 		gdp_datum__init(msg->ack_content->datum);
 		break;
 
@@ -174,7 +178,8 @@ _gdp_msg_new(gdp_cmd_t cmd, gdp_rid_t rid, gdp_seqno_t seqno)
 		if (cmd >= GDP_NAK_C_MIN && cmd <= GDP_NAK_S_MAX)
 		{
 			msg->body_case = GDP_MESSAGE__BODY_NAK;
-			msg->nak = ep_mem_zalloc(sizeof *msg->nak);
+			msg->nak = (GdpMessage__NakGeneric *)
+						ep_mem_zalloc(sizeof *msg->nak);
 			gdp_message__nak_generic__init(msg->nak);
 			break;
 		}

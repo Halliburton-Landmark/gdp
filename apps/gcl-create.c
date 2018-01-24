@@ -82,7 +82,7 @@ select_logd_name(void)
 		int l = sizeof "edu.berkeley.eecs.gdp-00.gdplogd" + 1;
 		char *nbuf;
 
-		nbuf = ep_mem_malloc(l);
+		nbuf = (char *) ep_mem_malloc(l);
 		snprintf(nbuf, l, "edu.berkeley.eecs.gdp-0%d.gdplogd", r);
 		p = nbuf;
 	}
@@ -552,7 +552,7 @@ main(int argc, char **argv)
 			evutil_secure_rng_get_bytes(tempname, sizeof tempname);
 			gdp_printable_name(tempname, pbuf);
 			len = strlen(keyfile) + sizeof pbuf + 6;
-			tempkeyfile = ep_mem_malloc(len);
+			tempkeyfile = (char *) ep_mem_malloc(len);
 			snprintf(tempkeyfile, len, "%s/%s.pem", keyfile, pbuf);
 			localkeyfile = tempkeyfile;
 		}
@@ -644,7 +644,7 @@ main(int argc, char **argv)
 
 		gdp_printable_name(*gdp_gcl_getname(gcl), pbuf);
 		len = strlen(keyfile) + sizeof pbuf + 6;
-		finalkeyfile = ep_mem_malloc(len);
+		finalkeyfile = (char *) ep_mem_malloc(len);
 		snprintf(finalkeyfile, len, "%s/%s.pem", keyfile, pbuf);
 		if (rename(tempkeyfile, finalkeyfile) != 0)
 		{

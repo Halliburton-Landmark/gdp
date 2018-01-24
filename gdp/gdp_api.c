@@ -271,7 +271,7 @@ _gdp_gin_new(gdp_gob_t *gob)
 
 	if (gin == NULL)
 	{
-		gin = ep_mem_zalloc(sizeof *gin);
+		gin = (gdp_gin_t *) ep_mem_zalloc(sizeof *gin);
 		ep_thr_mutex_init(&gin->mutex, EP_THR_MUTEX_DEFAULT);
 		ep_thr_mutex_setorder(&gin->mutex, GDP_MUTEX_LORDER_GIN);
 	}
@@ -523,6 +523,7 @@ gdp_exit_debug(void)
 EP_STAT
 gdp_init(const char *router_addr)
 {
+	gdp_chan_x_t *chanx = NULL;
 	EP_STAT estat = EP_STAT_OK;
 
 	ep_dbg_cprintf(Dbg, 9, "gdp_init, initialized = %d\n", _GdpLibInitialized);
@@ -533,7 +534,7 @@ gdp_init(const char *router_addr)
 	estat = gdp_lib_init(NULL);
 	EP_STAT_CHECK(estat, goto fail0);
 
-	gdp_chan_x_t *chanx = ep_mem_zalloc(sizeof *chanx);
+	chanx = (gdp_chan_x_t *) ep_mem_zalloc(sizeof *chanx);
 	LIST_INIT(&chanx->reqs);
 
 	// open at least one channel to the routing subsystem
@@ -1249,7 +1250,7 @@ gdp_gcl_open_info_new(void)
 {
 	gdp_gcl_open_info_t *info;
 
-	info = ep_mem_zalloc(sizeof*info);
+	info = (gdp_gcl_open_info_t *) ep_mem_zalloc(sizeof*info);
 	return info;
 }
 

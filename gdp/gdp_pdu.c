@@ -197,7 +197,7 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 			goto fail1;
 		}
 
-		pb_len = gdp_message__pack(pdu->msg, v[0].iov_base);
+		pb_len = gdp_message__pack(pdu->msg, (uint8_t*) v[0].iov_base);
 		v[0].iov_len = pb_len;
 		istat = evbuffer_commit_space(obuf, v, 1);
 		if (istat < 0)
@@ -358,7 +358,7 @@ _gdp_pdu_new(GdpMessage *msg, gdp_name_t src, gdp_name_t dst)
 			TAILQ_REMOVE(&PduFreeList, pdu, list);
 		else
 		{
-			pdu = ep_mem_zalloc(sizeof *pdu);
+			pdu = (gdp_pdu_t *) ep_mem_zalloc(sizeof *pdu);
 		}
 		EP_ASSERT_ELSE(!EP_UT_BITSET(GDP_PDU_INUSE, pdu->flags), pdu = NULL);
 	} while (pdu == NULL);

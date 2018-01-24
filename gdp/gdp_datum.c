@@ -71,7 +71,7 @@ gdp_datum_new(void)
 	if (datum == NULL)
 	{
 		// nothing on the free list; allocate anew
-		datum = ep_mem_zalloc(sizeof *datum);
+		datum = (gdp_datum_t *) ep_mem_zalloc(sizeof *datum);
 		ep_thr_mutex_init(&datum->mutex, EP_THR_MUTEX_DEFAULT);
 		ep_thr_mutex_setorder(&datum->mutex, GDP_MUTEX_LORDER_DATUM);
 	}
@@ -348,7 +348,7 @@ _gdp_datum_to_pb(const gdp_datum_t *datum,
 	{
 		if (pb->ts == NULL)
 		{
-			pb->ts = ep_mem_zalloc(sizeof *pb->ts);
+			pb->ts = (GdpTimestamp *) ep_mem_zalloc(sizeof *pb->ts);
 			gdp_timestamp__init(pb->ts);
 		}
 		pb->ts->sec = datum->ts.tv_sec;
@@ -358,7 +358,7 @@ _gdp_datum_to_pb(const gdp_datum_t *datum,
 	if (datum->dbuf != NULL && gdp_buf_getlength(datum->dbuf) > 0)
 	{
 		size_t l = gdp_buf_getlength(datum->dbuf);
-		pb->data.data = ep_mem_malloc(l);
+		pb->data.data = (uint8_t *) ep_mem_malloc(l);
 		memcpy(pb->data.data, gdp_buf_getptr(datum->dbuf, l), l);
 		pb->data.len = l;
 	}

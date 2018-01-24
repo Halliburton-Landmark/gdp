@@ -84,7 +84,7 @@ _gdp_event_new(gdp_event_t **gevp)
 	}
 	if (gev == NULL)
 	{
-		gev = ep_mem_zalloc(sizeof *gev);
+		gev = (gdp_event_t *) ep_mem_zalloc(sizeof *gev);
 	}
 	VALGRIND_HG_CLEAN_MEMORY(gev, sizeof *gev);
 	*gevp = gev;

@@ -69,7 +69,7 @@ ep_log_file(void *_fp,
 	struct tm *tm;
 	time_t tvsec;
 	EP_TIME_SPEC tv;
-	FILE *fp = _fp;
+	FILE *fp = (FILE *) _fp;
 
 	flockfile(fp);
 	if (fp == stderr || fp == stdout)
@@ -186,7 +186,7 @@ ep_log_addmethod(EP_LOG_FUNC *func, void *ctx, int minsev)
 
 	for (lfh = &LogFuncList; (lf = *lfh) != NULL; lfh = &lf->next)
 		continue;
-	*lfh = lf = ep_mem_zalloc(sizeof *lf);
+	*lfh = lf = (struct logfunc *) ep_mem_zalloc(sizeof *lf);
 	lf->func = func;
 	lf->ctx = ctx;
 	lf->minsev = minsev;

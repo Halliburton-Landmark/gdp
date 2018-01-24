@@ -63,7 +63,7 @@ struct meminfo
 static IORESULT_T
 memread(void *cookie, char *buf, IOBLOCK_T size)
 {
-	struct meminfo *minf = cookie;
+	struct meminfo *minf = (struct meminfo *) cookie;
 	size_t l = minf->bufs - minf->bufx;
 
 	if (l > size)
@@ -77,8 +77,8 @@ memread(void *cookie, char *buf, IOBLOCK_T size)
 static IORESULT_T
 memwrite(void *cookie, const char *buf, IOBLOCK_T size)
 {
-	struct meminfo *minf = cookie;
 	ssize_t l = minf->bufs - minf->bufx;
+	struct meminfo *minf = (struct meminfo *) cookie;
 
 	if (l > size)
 		l = size;
@@ -97,7 +97,7 @@ memwrite(void *cookie, const char *buf, IOBLOCK_T size)
 static int
 memclose(void *cookie)
 {
-	struct meminfo *minf = cookie;
+	struct meminfo *minf = (struct meminfo *) cookie;
 
 	if (minf->bufs > minf->bufx)
 		minf->bufb[minf->bufx] = '\0';
@@ -111,12 +111,10 @@ ep_fopen_smem(void *buf,
 	size_t size,
 	const char *mode)
 {
-	struct meminfo *minf;
-
-	minf = ep_mem_zalloc(sizeof *minf);
+	struct meminfo *minf = (struct meminfo *) ep_mem_zalloc(sizeof *minf);
 	if (minf == NULL)
 		return NULL;
-	minf->bufb = buf;
+	minf->bufb = (char *) buf;
 	minf->bufs = size;
 	minf->bufx = 0;
 

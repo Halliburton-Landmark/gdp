@@ -179,8 +179,9 @@ ep_crypto_md_update(EP_CRYPTO_MD *md, void *data, size_t dsize)
 */
 
 EP_STAT
-ep_crypto_md_final(EP_CRYPTO_MD *md, void *dbuf, size_t *dbufsize)
+ep_crypto_md_final(EP_CRYPTO_MD *md, void *_dbuf, size_t *dbufsize)
 {
+	uint8_t *dbuf = (uint8_t *) _dbuf;
 	int istat;
 	unsigned int dbsize = *dbufsize;
 
@@ -216,7 +217,7 @@ ep_crypto_md_free(EP_CRYPTO_MD *md)
 void
 ep_crypto_md_sha256(const void *data, size_t dlen, uint8_t *out)
 {
-	SHA256(data, dlen, out);
+	SHA256((uint8_t *) data, dlen, out);
 }
 
 

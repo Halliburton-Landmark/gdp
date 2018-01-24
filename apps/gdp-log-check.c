@@ -305,7 +305,7 @@ recseq_db_getnext(DBC *dbc, gdp_recno_t *startp, gdp_recno_t *endp)
 	EP_STAT_CHECK(estat, return estat);
 
 	EP_ASSERT(key_thang.size == 3 * sizeof *key);
-	key = key_thang.data;
+	key = (gdp_recno_t *) key_thang.data;
 	*startp = key[0];
 	*endp = key[1];
 
@@ -472,7 +472,7 @@ recseq_flush(struct ctx *ctx,
 void
 recseq_process(struct ctx *ctx)
 {
-	struct recno_vect *rv = ep_mem_zalloc(sizeof *rv);
+	struct recno_vect *rv = (struct recno_vect *) ep_mem_zalloc(sizeof *rv);
 	gdp_recno_t start, end;
 	int i;
 
@@ -573,7 +573,8 @@ recseq_process(struct ctx *ctx)
 			ep_dbg_cprintf(Dbg, 94,
 						"recseq_process: expanding to %d entries\n",
 						new_nalloc);
-			rv->ends = ep_mem_realloc(rv->ends, new_nalloc * sizeof rv->ends[0]);
+			rv->ends = (gdp_recno_t *) ep_mem_realloc(rv->ends,
+											new_nalloc * sizeof rv->ends[0]);
 			rv->nalloc = new_nalloc;
 		}
 		ep_dbg_cprintf(Dbg, 91,
@@ -684,7 +685,7 @@ find_segs(gdp_gob_t *gob)
 		{
 			// allocate 50% more space for segment indices
 			allocsegs = (segno + 1) * 3 / 2;
-			phys->segments = ep_mem_zrealloc(phys->segments,
+			phys->segments = (segment_t **) ep_mem_zrealloc(phys->segments,
 					allocsegs * sizeof *phys->segments);
 		}
 		if (phys->segments[segno] == NULL)
@@ -1065,7 +1066,7 @@ check_record(
 			goto fail0;
 		}
 
-		tvalp = tval_dbt.data;
+		tvalp = (tidx_value_t *) tval_dbt.data;
 		if (tvalp->recno != rec->recno)
 		{
 			estat = LOGCHECK_DUPLICATE_TIMESTAMP;

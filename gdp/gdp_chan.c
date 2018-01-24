@@ -314,7 +314,7 @@ chan_read_cb(struct bufferevent *bev, void *ctx)
 {
 	EP_STAT estat;
 	gdp_buf_t *ibuf = GDP_BUF_FROM_EVBUFFER(bufferevent_get_input(bev));
-	gdp_chan_t *chan = ctx;
+	gdp_chan_t *chan = (gdp_chan_t *) ctx;
 	gdp_name_t src, dst;
 
 	ep_dbg_cprintf(Dbg, 50, "chan_read_cb: fd %d, %zd bytes\n",
@@ -393,7 +393,7 @@ static void
 chan_event_cb(struct bufferevent *bev, short events, void *ctx)
 {
 	bool restart_connection = false;
-	gdp_chan_t *chan = ctx;
+	gdp_chan_t *chan = (gdp_chan_t *) ctx;
 	uint32_t cbflags = 0;
 
 	if (ep_dbg_test(Dbg, 10))
@@ -756,7 +756,7 @@ _gdp_chan_open(
 	ep_dbg_cprintf(Dbg, 11, "_gdp_chan_open(%s)\n", router_addr);
 
 	// allocate a new channel structure
-	chan = ep_mem_zalloc(sizeof *chan);
+	chan = (gdp_chan_t *) ep_mem_zalloc(sizeof *chan);
 	ep_thr_mutex_init(&chan->mutex, EP_THR_MUTEX_DEFAULT);
 	ep_thr_mutex_setorder(&chan->mutex, GDP_MUTEX_LORDER_CHAN);
 	ep_thr_cond_init(&chan->cond);

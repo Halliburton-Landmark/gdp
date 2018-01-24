@@ -230,9 +230,9 @@ check_cache_consistency(const char *where)
 
 // helper routine
 static void
-sorted_insert(size_t klen, const void *key, void *gob_, va_list av)
+sorted_insert(size_t klen, const void *key, const void *gob_, va_list av)
 {
-	gdp_gob_t *gob = gob_;
+	gdp_gob_t *gob = (gdp_gob_t *) gob_;
 
 	// if this is being dropped, just skip this GOB
 	if (EP_UT_BITSET(GCLF_DROPPING, gob->flags))
@@ -304,7 +304,8 @@ add_cache_unlocked(gdp_gob_t *gob)
 	ep_dbg_cprintf(Dbg, 49,
 			"_gdp_gob_cache_add(%p): insert into _OpenGOBCache\n",
 			gob);
-	g2 = ep_hash_insert(_OpenGOBCache, sizeof (gdp_name_t), gob->name, gob);
+	g2 = (gdp_gob_t *) ep_hash_insert(_OpenGOBCache,
+								sizeof (gdp_name_t), gob->name, gob);
 	if (g2 != NULL)
 	{
 		EP_ASSERT_PRINT("duplicate GOB cache entry, gob=%p (%s)",
@@ -417,7 +418,8 @@ _gdp_gob_cache_get(
 		rebuild_lru_list();
 
 	// see if we have a pointer to this GOB in the cache
-	gob = ep_hash_search(_OpenGOBCache, sizeof (gdp_name_t), (void *) gob_name);
+	gob = (gdp_gob_t *) ep_hash_search(_OpenGOBCache,
+							sizeof (gdp_name_t), (void *) gob_name);
 	if (gob != NULL)
 	{
 		_gdp_gob_lock(gob);

@@ -946,7 +946,7 @@ int scgi_send( scgi_request *req, char *txt, int len )
    */
   if ( len >= d->outbufsize - 5 )
   {
-    char *newbuf = calloc( len + 6, sizeof(char) );
+    char *newbuf = (char *) calloc( len + 6, sizeof(char) );
 
     if ( !newbuf )
       return 0;

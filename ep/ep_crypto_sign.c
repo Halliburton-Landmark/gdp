@@ -116,9 +116,10 @@ ep_crypto_sign_update(EP_CRYPTO_MD *md, void *dbuf, size_t dbufsize)
 */
 
 EP_STAT
-ep_crypto_sign_final(EP_CRYPTO_MD *md, void *sbuf, size_t *sbufsize)
+ep_crypto_sign_final(EP_CRYPTO_MD *md, void *_sbuf, size_t *sbufsize)
 {
 	int istat;
+	uint8_t *sbuf = (uint8_t *) _sbuf;
 
 	istat = EVP_DigestSignFinal(md, sbuf, sbufsize);
 	if (istat != 1)

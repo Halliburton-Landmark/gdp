@@ -106,7 +106,7 @@ read_param_file(char *path)
 		vp = ep_mem_strdup(vp);
 
 		// store it into the hash table
-		op = ep_hash_insert(ParamHash, strlen(np), np, vp);
+		op = (char *) ep_hash_insert(ParamHash, strlen(np), np, vp);
 		if (op != NULL)
 			ep_mem_free(op);
 	}
@@ -161,7 +161,7 @@ get_param_path(void)
 		{
 			if (*path == '~')
 			{
-				char *home = getenv("HOME");
+				const char *home = getenv("HOME");
 				int j;
 
 				if (home == NULL)
@@ -239,7 +239,7 @@ getparamval(
 		recurse = false;
 	}
 
-	return ep_hash_search(ParamHash, strlen(pname), pname);
+	return (const char *) ep_hash_search(ParamHash, strlen(pname), pname);
 }
 
 

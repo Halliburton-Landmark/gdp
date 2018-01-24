@@ -70,8 +70,9 @@ int
 def_hfunc(
 	const EP_HASH *const hp,
 	const size_t keysize,
-	const void *key)
+	const void *_key)
 {
+	uint8_t *key = (uint8_t *) _key;
 	int hfunc = 0;
 	size_t i;
 
@@ -109,7 +110,7 @@ ep_hash_new(
 	// figure how much extra space we need to allocate for table
 	xtra = tabsize * sizeof hash->tab[0];
 
-	hash = ep_rpool_zalloc(rp, sizeof *hash + xtra);
+	hash = (EP_HASH *) ep_rpool_zalloc(rp, sizeof *hash + xtra);
 	hash->rpool = rp;
 	hash->hfunc = hfunc;
 	hash->flags = flags;
@@ -205,7 +206,7 @@ ep_hash_insert(
 	}
 
 	// not found -- insert it
-	n = ep_rpool_malloc(hp->rpool, sizeof *n);
+	n = (struct node *) ep_rpool_malloc(hp->rpool, sizeof *n);
 	n->keylen = keylen;
 	kp = ep_rpool_malloc(hp->rpool, keylen);
 	memcpy(kp, key, keylen);

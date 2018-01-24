@@ -141,7 +141,7 @@ ep_dbg_setto(const char *fpat,
 	int patlen = strlen(fpat) + 1;
 	char *tpat;
 
-	fp = ep_mem_malloc(sizeof *fp + patlen);
+	fp = (FLAGPAT *) ep_mem_malloc(sizeof *fp + patlen);
 	tpat = ((char *) fp) + sizeof *fp;
 	(void) strncpy(tpat, fpat, patlen);
 	fp->pat = tpat;

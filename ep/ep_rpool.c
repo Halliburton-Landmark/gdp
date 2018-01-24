@@ -166,7 +166,7 @@ ep_rpool_new(const char *name,
 
 	if (name == NULL)
 		name = "anonymous rpool";
-	rp = ep_mem_zalloc(sizeof *rp);
+	rp = (EP_RPOOL *) ep_mem_zalloc(sizeof *rp);
 	rp->name = name;
 	ep_thr_mutex_init(&rp->mutex, EP_THR_MUTEX_DEFAULT);
 
@@ -223,7 +223,7 @@ ep_rpool_free(EP_RPOOL *rp)
 	for (sp = rp->head; sp != NULL; sp = newsp)
 	{
 		newsp = sp->next;
-		if (sp->segbase != ((void *) sp) + sizeof *sp)
+		if (sp->segbase != ((uint8_t *) sp) + sizeof *sp)
 			ep_mem_free(sp->segbase);
 		ep_mem_free(sp);
 	}
@@ -309,7 +309,7 @@ ep_rpool_ialloc(EP_RPOOL *rp,
 {
 	struct rpseg *sp;
 	ssize_t spaceleft;
-	void *p;
+	uint8_t *p;
 	bool aligned;
 
 	if (ep_dbg_test(Dbg, 90))
@@ -382,12 +382,12 @@ ep_rpool_ialloc(EP_RPOOL *rp,
 			**	in malloc.
 			*/
 
-			sp = ep_mem_ialloc(sizeof *sp,
+			sp = (struct rpseg *) ep_mem_ialloc(sizeof *sp,
 					NULL,
 					0,
 					file,
 					line);
-			sp->segbase = ep_mem_ialloc(nbytes,
+			sp->segbase = (uint8_t *) ep_mem_ialloc(nbytes,
 					NULL,
 					0,
 					file,
@@ -402,11 +402,12 @@ ep_rpool_ialloc(EP_RPOOL *rp,
 				segsize = rp->qsize;
 
 			// do the physical allocation
-			sp = p = ep_mem_ialloc(segsize + sizeof *sp,
+			p = (uint8_t *) ep_mem_ialloc(segsize + sizeof *sp,
 					NULL,
 					0,
 					file,
 					line);
+			sp = (struct rpseg *) p;
 			sp->segbase = p + sizeof *sp;
 		}
 		sp->segsize = segsize;
@@ -464,10 +465,11 @@ ep_rpool_ialloc(EP_RPOOL *rp,
 
 void *
 ep_rpool_realloc(EP_RPOOL *rp,
-	void *emem,
+	void *_emem,
 	size_t oldsize,
 	size_t newsize)
 {
+	uint8_t *emem = (uint8_t *) _emem;
 	void *p;
 	struct rpseg *sp;
 	ssize_t spaceleft;
@@ -576,7 +578,7 @@ ep_rpool_istrdup(
 	l = strlen(s);
 	if (slen >= 0 && l > slen)
 		l = slen;
-	p = ep_rpool_ialloc(rp, l + 1, flags, file, line);
+	p = (char *) ep_rpool_ialloc(rp, l + 1, flags, file, line);
 	memcpy(p, s, l);
 	p[l] = '\0';
 	return p;

@@ -86,7 +86,7 @@ ep_funclist_new(
 		name = "<funclist>";
 
 	rp = ep_rpool_new(name, (size_t) 0);
-	flp = ep_rpool_zalloc(rp, sizeof *flp);
+	flp = (EP_FUNCLIST *) ep_rpool_zalloc(rp, sizeof *flp);
 
 	flp->flags = flags;
 	flp->rpool = rp;
@@ -114,7 +114,7 @@ ep_funclist_push(EP_FUNCLIST *flp,
 	ep_thr_mutex_lock(&flp->mutex);
 
 	// allocate a new function block and fill it
-	fsp = ep_rpool_malloc(flp->rpool, sizeof *fsp);
+	fsp = (struct fseg *) ep_rpool_malloc(flp->rpool, sizeof *fsp);
 	fsp->func = func;
 	fsp->arg = arg;
 

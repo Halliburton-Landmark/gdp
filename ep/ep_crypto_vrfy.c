@@ -104,8 +104,9 @@ ep_crypto_vrfy_update(EP_CRYPTO_MD *md, void *dbuf, size_t dbufsize)
 */
 
 EP_STAT
-ep_crypto_vrfy_final(EP_CRYPTO_MD *md, void *obuf, size_t obufsize)
+ep_crypto_vrfy_final(EP_CRYPTO_MD *md, void *_obuf, size_t obufsize)
 {
+	uint8_t *obuf = (uint8_t *) _obuf;
 	int istat;
 
 	istat = EVP_DigestVerifyFinal(md, obuf, obufsize);

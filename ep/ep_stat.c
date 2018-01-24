@@ -90,7 +90,7 @@ ep_stat_reg_strings(struct ep_stat_to_string *r)
 	while (r->estr != NULL)
 	{
 		(void) ep_hash_insert(EpStatStrings,
-			sizeof r->estat, &r->estat, r->estr);
+			sizeof r->estat, &r->estat, (const void *) r->estr);
 		r++;
 	}
 }
@@ -208,7 +208,8 @@ ep_stat_tostr(EP_STAT stat,
 				EP_STAT_REGISTRY(stat),
 				EP_STAT_MODULE(stat),
 				0);
-		module = ep_hash_search(EpStatStrings, sizeof xstat, &xstat);
+		module = (const char *) ep_hash_search(EpStatStrings,
+						sizeof xstat, &xstat);
 	}
 	if (module == NULL)
 	{
@@ -221,7 +222,8 @@ ep_stat_tostr(EP_STAT stat,
 	{
 		const char *s;
 
-		s = ep_hash_search(EpStatStrings, sizeof stat, &stat);
+		s = (const char *) ep_hash_search(
+					EpStatStrings, sizeof stat, &stat);
 		if (s != NULL)
 			detail = s;
 	}

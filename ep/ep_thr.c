@@ -347,7 +347,8 @@ static void
 lorder_init(void)
 {
 	int istat;
-	struct lorder *lorder = ep_mem_zalloc(sizeof *lorder);
+	struct lorder *lorder =
+			(struct lorder *) ep_mem_zalloc(sizeof *lorder);
 
 	lorder->lorder_used = 0;
 	istat = pthread_key_create(&lorder_key, lorder_free);
@@ -407,7 +408,7 @@ _ep_thr_mutex_lock(EP_THR_MUTEX *mtx,
 
 		mask = ~((1 << (mtxorder - 1)) - 1) << 1;
 		pthread_once(&lorder_once, lorder_init);
-		lorder = pthread_getspecific(lorder_key);
+		lorder = (struct lorder *) pthread_getspecific(lorder_key);
 		if (lorder != NULL)
 		{
 			int llu = ffsl(lorder->lorder_used & mask);
@@ -465,7 +466,7 @@ _ep_thr_mutex_trylock(EP_THR_MUTEX *mtx,
 #if EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
 	struct lorder *lorder;
 	pthread_once(&lorder_once, lorder_init);
-	lorder = pthread_getspecific(lorder_key);
+	lorder = (struct lorder *) pthread_getspecific(lorder_key);
 	if (err == 0 && mtxorder > 0 && lorder != NULL)
 		lorder->lorder_used |= 1 << (mtxorder - 1);
 #endif
@@ -497,8 +498,9 @@ _ep_thr_mutex_unlock(EP_THR_MUTEX *mtx,
 #if EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
 	if (err == 0 && mtxorder > 0)
 	{
+		struct lorder *lorder;
 		pthread_once(&lorder_once, lorder_init);
-		struct lorder *lorder = pthread_getspecific(lorder_key);
+		lorder = (struct lorder *) pthread_getspecific(lorder_key);
 		if (lorder != NULL)
 			lorder->lorder_used &= ~(1 << (mtxorder - 1));
 	}

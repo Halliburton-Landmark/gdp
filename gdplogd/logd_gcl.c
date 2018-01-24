@@ -52,7 +52,7 @@ gob_alloc(gdp_name_t gob_name, gdp_iomode_t iomode, gdp_gob_t **pgob)
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// add the gdpd-specific information
-	gob->x = ep_mem_zalloc(sizeof *gob->x);
+	gob->x = (struct gdp_gob_xtra *) ep_mem_zalloc(sizeof *gob->x);
 	if (gob->x == NULL)
 	{
 		estat = EP_STAT_OUT_OF_MEMORY;
@@ -140,7 +140,7 @@ do_physical_open(gdp_gob_t *gob, void *open_info_)
 	if (ep_dbg_test(Dbg, 11))
 		ep_dbg_printf("do_physical_open: %s\n", gob->pname);
 
-	gob->x = ep_mem_zalloc(sizeof *gob->x);
+	gob->x = (struct gdp_gob_xtra *) ep_mem_zalloc(sizeof *gob->x);
 	gob->x->gob = gob;
 
 	//XXX for now, assume all GOBs are on disk

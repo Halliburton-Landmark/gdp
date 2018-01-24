@@ -236,7 +236,7 @@ service_resolver_callback(AvahiServiceResolver *r,
 		AVAHI_GCC_UNUSED AvahiLookupResultFlags flags,
 		void *userdata)
 {
-	service_info_t *i = userdata;
+	service_info_t *i = (service_info_t *) userdata;
 
 	assert(r);
 	assert(i);
@@ -248,7 +248,7 @@ service_resolver_callback(AvahiServiceResolver *r,
 			char *t;
 			char address[AVAHI_ADDRESS_STR_MAX];
 			struct in_addr unused_address;
-			zcinfo_t *info = avahi_malloc(sizeof(zcinfo_t));
+			zcinfo_t *info = (zcinfo_t *) avahi_malloc(sizeof(zcinfo_t));
 
 			avahi_address_snprint(address, sizeof(address), a);
 
@@ -389,7 +389,7 @@ service_browser_callback(AvahiServiceBrowser *b,
 		void *userdata)
 {
 
-	config_t *c = userdata;
+	config_t *c = (config_t *) userdata;
 
 	assert(b);
 	assert(c);
@@ -542,7 +542,7 @@ client_callback(AvahiClient *c,
 		AvahiClientState state,
 		AVAHI_GCC_UNUSED void * userdata)
 {
-	config_t *conf = userdata;
+	config_t *conf = (config_t *) userdata;
 
 	/*
 		This function might be called when avahi_client_new() has not
@@ -708,7 +708,7 @@ list_copy_reverse(zcinfo_t **list)
 	*newlist = NULL;
 	for (i = *list, k = *newlist; i; i = i->info_next)
 	{
-		k = avahi_malloc(sizeof(zcinfo_t));
+		k = (zcinfo_t *) avahi_malloc(sizeof(zcinfo_t));
 		k->port = i->port;
 		k->address = ep_mem_strdup(i->address);
 		infolist_append_front(newlist, k);
@@ -742,7 +742,7 @@ list_pop_str(zcinfo_t **list, int index)
 
 	length = list_length(list);
 	total_strlen = length * ((MAX_PORT_LEN+2) + MAX_ADDR_LEN) + 1;
-	outstr = avahi_malloc(sizeof(char) * total_strlen);
+	outstr = (char *) avahi_malloc(sizeof(char) * total_strlen);
 	*outstr = '\0';
 	info = *list;
 	if (length == 0)
@@ -795,7 +795,7 @@ gdp_zc_addr_str(zcinfo_t **list)
 	listcopy = list_copy_reverse(list);
 	length = list_length(listcopy);
 	total_strlen = length * (MAX_PORT_LEN + MAX_ADDR_LEN) + 1;
-	outstr = avahi_malloc(sizeof(char) * total_strlen);
+	outstr = (char *) avahi_malloc(sizeof(char) * total_strlen);
 	*outstr = '\0';
 	srand(time(NULL));
 	while(length > 0)

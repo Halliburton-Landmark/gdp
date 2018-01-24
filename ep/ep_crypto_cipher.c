@@ -106,7 +106,7 @@ ep_crypto_cipher_new(
 	if (ciphertype == NULL)
 		return NULL;
 
-	ctx = ep_mem_zalloc(sizeof *ctx);
+	ctx = (EP_CRYPTO_CIPHER_CTX *) ep_mem_zalloc(sizeof *ctx);
 	EVP_CIPHER_CTX_init(&ctx->ctx);
 	if (EVP_CipherInit_ex(&ctx->ctx, ciphertype, engine, key, iv, enc) <= 0)
 	{
@@ -172,7 +172,7 @@ ep_crypto_cipher_crypt(
 			outlen, inlen, EVP_CIPHER_CTX_key_length(&ctx->ctx));
 	}
 
-	if (EVP_CipherUpdate(&ctx->ctx, out, &olen, in, inlen) <= 0)
+	if (EVP_CipherUpdate(&ctx->ctx, (uint8_t *) out, &olen, (uint8_t *) in, inlen) <= 0)
 	{
 		return _ep_crypto_error(EP_STAT_CRYPTO_CIPHER,
 				"ep_crypto_cipher_crypt: "
@@ -196,11 +196,13 @@ ep_crypto_cipher_crypt(
 EP_STAT
 ep_crypto_cipher_update(
 		EP_CRYPTO_CIPHER_CTX *ctx,
-		void *in,
+		void *_in,
 		size_t inlen,
-		void *out,
+		void *_out,
 		size_t outlen)
 {
+	uint8_t *in = (uint8_t *) _in;
+	uint8_t *out = (uint8_t *) _out;
 	int olen;
 
 	if (EVP_CipherUpdate(&ctx->ctx, out, &olen, in, inlen) <= 0)
@@ -210,7 +212,7 @@ ep_crypto_cipher_update(
 				"cannot encrypt/decrypt");
 	}
 
-	EP_ASSERT(olen >= 0 && olen <= outlen);
+	EP_ASSERT(olen >= 0 && (unsigned) olen <= outlen);
 	return EP_STAT_FROM_INT(olen);
 }
 
@@ -218,13 +220,14 @@ ep_crypto_cipher_update(
 EP_STAT
 ep_crypto_cipher_final(
 		EP_CRYPTO_CIPHER_CTX *ctx,
-		void *out,
+		void *_out,
 		size_t outlen)
 {
+	uint8_t *out = (uint8_t *) _out;
 	int olen;
 
 	// allow room for possible final padding
-	if (outlen < EVP_CIPHER_CTX_key_length(&ctx->ctx))
+	if ((ssize_t) outlen < EVP_CIPHER_CTX_key_length(&ctx->ctx))
 	{
 		// potential buffer overflow
 		return _ep_crypto_error(EP_STAT_BUF_OVERFLOW,

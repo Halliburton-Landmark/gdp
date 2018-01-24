@@ -175,7 +175,7 @@ signkey_cb(
 {
 	FILE *fp;
 	EP_CRYPTO_KEY *skey;
-	const char *signing_key_file = udata;
+	const char *signing_key_file = (const char *) udata;
 
 	ep_dbg_cprintf(Dbg, 1, "signkey_cb(%s)\n", signing_key_file);
 

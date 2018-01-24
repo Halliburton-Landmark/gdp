@@ -717,7 +717,7 @@ fail0:
 static segment_t *
 segment_alloc(uint32_t segno)
 {
-	segment_t *seg = ep_mem_zalloc(sizeof *seg);
+	segment_t *seg = (segment_t *) ep_mem_zalloc(sizeof *seg);
 
 	seg->segno = segno;
 
@@ -990,11 +990,11 @@ segment_get(gdp_gob_t *gob, int segno)
 	}
 
 	// see if we need to expand segment list
-	if (phys->segments == NULL || segno >= phys->nsegments)
+	if (phys->segments == NULL || ((unsigned) segno) >= phys->nsegments)
 	{
 		// not enough space for segment pointers allocated
 		EP_ASSERT(phys->segments != NULL || phys->nsegments == 0);
-		phys->segments = ep_mem_realloc(phys->segments,
+		phys->segments = (segment_t **) ep_mem_realloc(phys->segments,
 							(segno + 1) * sizeof phys->segments[0]);
 		memset(&phys->segments[phys->nsegments], 0,
 				(segno + 1 - phys->nsegments) * sizeof phys->segments[0]);
@@ -1188,7 +1188,7 @@ fail1:
 static gob_physinfo_t *
 physinfo_alloc(gdp_gob_t *gob)
 {
-	gob_physinfo_t *phys = ep_mem_zalloc(sizeof *phys);
+	gob_physinfo_t *phys = (gob_physinfo_t *) ep_mem_zalloc(sizeof *phys);
 
 	if (ep_thr_rwlock_init(&phys->lock) != 0)
 		goto fail1;
@@ -2383,7 +2383,7 @@ disk_ts_to_recno(gdp_gob_t *gob,
 			estat = GDP_STAT_CORRUPT_INDEX;
 			goto fail0;
 		}
-		tidx_value_t *tvalp = tval_dbt.data;
+		tidx_value_t *tvalp = (tidx_value_t *) tval_dbt.data;
 		datum->recno = tvalp->recno;
 	}
 
@@ -2546,10 +2546,10 @@ disk_getmetadata(gdp_gob_t *gob,
 			gob->x->n_md_entries);
 
 	// allocate and populate the header
-	gmd = ep_mem_zalloc(sizeof *gmd);
+	gmd = (gdp_gclmd_t *) ep_mem_zalloc(sizeof *gmd);
 	gmd->flags = GCLMDF_READONLY;
 	gmd->nalloc = gmd->nused = gob->x->n_md_entries;
-	gmd->mds = ep_mem_zalloc(gmd->nalloc * sizeof *gmd->mds);
+	gmd->mds = (struct metadatum *) ep_mem_zalloc(gmd->nalloc * sizeof *gmd->mds);
 
 	// lock the GOB so that no one else seeks around on us
 	ep_thr_rwlock_rdlock(&phys->lock);
@@ -2584,12 +2584,14 @@ disk_getmetadata(gdp_gob_t *gob,
 	STDIOCHECK("gob_physgetmetadata: fread#2", 1,
 			fread(gmd->databuf, tlen, 1, seg->fp));
 
-	// now map the pointers to the data
-	void *dbuf = gmd->databuf;
-	for (i = 0; i < gmd->nused; i++)
 	{
-		gmd->mds[i].md_data = dbuf;
-		dbuf += gmd->mds[i].md_len;
+		// now map the pointers to the data
+		uint8_t *dbuf = (uint8_t *) gmd->databuf;
+		for (i = 0; i < gmd->nused; i++)
+		{
+			gmd->mds[i].md_data = dbuf;
+			dbuf += gmd->mds[i].md_len;
+		}
 	}
 
 	*gmdp = gmd;

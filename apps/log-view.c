@@ -90,7 +90,7 @@ show_metadata(int nmds, FILE *dfp, size_t *foffp, int plev)
 		uint32_t md_id;
 		uint32_t md_len;
 	};
-	struct mdhdr *mdhdrs = alloca(nmds * sizeof *mdhdrs);
+	struct mdhdr *mdhdrs = (struct mdhdr *) alloca(nmds * sizeof *mdhdrs);
 
 	if (plev > 0)
 		printf("    --------------- Metadata ---------------\n");
@@ -121,7 +121,7 @@ show_metadata(int nmds, FILE *dfp, size_t *foffp, int plev)
 		mdhdrs[i].md_id = ep_net_ntoh32(mdhdrs[i].md_id);
 		mdhdrs[i].md_len = ep_net_ntoh32(mdhdrs[i].md_len);
 
-		mdata = ep_mem_malloc(mdhdrs[i].md_len + 1);
+		mdata = (uint8_t *) ep_mem_malloc(mdhdrs[i].md_len + 1);
 											// +1 for null-terminator
 		if (fread(mdata, mdhdrs[i].md_len, 1, dfp) != 1)
 		{
@@ -247,7 +247,7 @@ show_record(segment_record_t *rec, FILE *dfp, size_t *foffp, int plev)
 
 	if (rec->data_length > 0)
 	{
-		char *data_buffer = ep_mem_malloc(rec->data_length);
+		char *data_buffer = (char *) ep_mem_malloc(rec->data_length);
 		if (fread(data_buffer, rec->data_length, 1, dfp) != 1)
 		{
 			fprintf(stderr, "fread() failed while reading data @ %jd, "
@@ -316,7 +316,7 @@ open_index(const char *ridx_filename, struct stat *st, ridx_header_t *phdr)
 		return NULL;
 	}
 
-	if (st->st_size < SIZEOF_RIDX_HEADER)
+	if (st->st_size < (ssize_t) SIZEOF_RIDX_HEADER)
 	{
 		phdr->magic = 0;
 		return ridx_fp;
@@ -441,7 +441,7 @@ show_index_contents(const char *gcl_dir_name, gdp_name_t gcl_name, int plev)
 	// Add 5 in the middle for '/_xx/'
 	int filename_size = strlen(gcl_dir_name) + 5 + strlen(gcl_pname) +
 			strlen(GCL_RIDX_SUFFIX) + 1;
-	char *ridx_filename = alloca(filename_size);
+	char *ridx_filename = (char *) alloca(filename_size);
 	snprintf(ridx_filename, filename_size,
 			"%s/_%02x/%s%s",
 			gcl_dir_name, gcl_name[0], gcl_pname, GCL_RIDX_SUFFIX);
@@ -517,7 +517,7 @@ show_segment(const char *gcl_dir_name,
 	// Add 5 in the middle for '/_xx/'
 	int filename_size = strlen(gcl_dir_name) + 5 + strlen(gcl_pname) +
 			strlen(segment_str) + strlen(GCL_LDF_SUFFIX) + 1;
-	char *filename = alloca(filename_size);
+	char *filename = (char *) alloca(filename_size);
 
 	snprintf(filename, filename_size,
 			"%s/_%02x/%s%s%s",
@@ -626,7 +626,7 @@ show_gcl(const char *gcl_dir_name, gdp_name_t gcl_name, int plev)
 	// Add 5 in the middle for '/_xx/'
 	int filename_size = strlen(gcl_dir_name) + 5 + strlen(gcl_pname) +
 			strlen(GCL_RIDX_SUFFIX) + 1;
-	char *filename = alloca(filename_size);
+	char *filename = (char *) alloca(filename_size);
 
 	snprintf(filename, filename_size,
 			"%s/_%02x/%s%s",

@@ -57,13 +57,14 @@ gdp_gclmd_new(int nentries)
 	gdp_gclmd_t *gmd;
 	size_t len = sizeof *gmd;
 
-	gmd = ep_mem_zalloc(len);
+	gmd = (gdp_gclmd_t *) ep_mem_zalloc(len);
 	if (nentries > MINMDS)
 		gmd->nalloc = nentries;
 	else
 		gmd->nalloc = MINMDS;
 	gmd->nused = 0;
-	gmd->mds = ep_mem_zalloc(gmd->nalloc * sizeof *gmd->mds);
+	gmd->mds = (struct metadatum *)
+				ep_mem_zalloc(gmd->nalloc * sizeof *gmd->mds);
 	ep_dbg_cprintf(Dbg, 21, "gdp_gclmd_new() => %p\n", gmd);
 	return gmd;
 }
@@ -129,7 +130,8 @@ gdp_gclmd_add(gdp_gclmd_t *gmd,
 	{
 		// no room; get some more (allocate 50% more than we have)
 		gmd->nalloc = (gmd->nalloc / 2) * 3;
-		gmd->mds = ep_mem_realloc(gmd->mds, gmd->nalloc * sizeof *gmd->mds);
+		gmd->mds = (struct metadatum *)
+				ep_mem_realloc(gmd->mds, gmd->nalloc * sizeof *gmd->mds);
 	}
 
 	gmd->mds[gmd->nused].md_id = id;
@@ -157,9 +159,10 @@ gdp_gclmd_add(gdp_gclmd_t *gmd,
 
 void
 _gdp_gclmd_adddata(gdp_gclmd_t *gmd,
-			void *data)
+			void *_data)
 {
 	int i;
+	uint8_t *data = (uint8_t *) _data;
 
 	EP_ASSERT_POINTER_VALID(gmd);
 
@@ -270,7 +273,7 @@ _gdp_gclmd_serialize(gdp_gclmd_t *gmd, uint8_t **obufp)
 	for (i = 0; i < gmd->nused; i++)
 		slen += gmd->mds[i].md_len;		// data
 
-	pbp = obuf = ep_mem_malloc(slen);
+	pbp = obuf = (uint8_t *) ep_mem_malloc(slen);
 
 	// write the number of entries
 	PUT16(gmd->nused);
@@ -328,13 +331,14 @@ _gdp_gclmd_deserialize(uint8_t *smd, size_t smd_len)
 		return NULL;
 
 	// allocate and populate the header
-	gdp_gclmd_t *gmd = ep_mem_zalloc(sizeof *gmd);
+	gdp_gclmd_t *gmd = (gdp_gclmd_t *) ep_mem_zalloc(sizeof *gmd);
 	gmd->flags = GCLMDF_READONLY;
 	gmd->nalloc = gmd->nused = nmd;
 
 	// allocate and read in the metadata headers
 	size_t tlen = 0;		// total data length
-	gmd->mds = ep_mem_malloc(nmd * sizeof *gmd->mds);
+	gmd->mds = (struct metadatum *) 
+			ep_mem_malloc(nmd * sizeof *gmd->mds);
 	{
 		int i;
 		for (i = 0; i < nmd; i++)
@@ -365,7 +369,7 @@ _gdp_gclmd_deserialize(uint8_t *smd, size_t smd_len)
 
 	// we can now insert the pointers into the data
 	{
-		void *dbuf = gmd->databuf;
+		uint8_t *dbuf = (uint8_t *) gmd->databuf;
 		int i;
 		for (i = 0; i < nmd; i++)
 		{

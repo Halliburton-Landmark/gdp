@@ -94,7 +94,7 @@ logd_advertise_one(gdp_chan_t *chan, gdp_name_t gname, int cmd)
 static EP_STAT
 advertise_one(gdp_name_t gname, void *ax_)
 {
-	gdp_advert_x_t *ax = ax_;
+	gdp_advert_x_t *ax = (gdp_advert_x_t *) ax_;
 	EP_STAT estat;
 
 	estat = _gdp_chan_advertise(ax->chan, gname, ax->adcert,
@@ -115,7 +115,7 @@ advertise_one(gdp_name_t gname, void *ax_)
 static EP_STAT
 withdraw_one(gdp_name_t gname, void *ax_)
 {
-	gdp_advert_x_t *ax = ax_;
+	gdp_advert_x_t *ax = (gdp_advert_x_t *) ax_;
 	EP_STAT estat;
 
 	if (!EP_ASSERT(ax != NULL))

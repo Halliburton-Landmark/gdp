@@ -45,8 +45,8 @@ size_t
 ep_fread_unlocked(void *ptr, size_t size, size_t n, FILE *fp)
 {
 	size_t nbytes = size * n;
-	char *b = ptr;
 	int i;
+	char *b = (char *) ptr;
 	int c;
 
 	if (nbytes == 0)
@@ -76,8 +76,8 @@ size_t
 ep_fwrite_unlocked(void *ptr, size_t size, size_t n, FILE *fp)
 {
 	size_t nbytes = size * n;
-	char *b = ptr;
 	int i;
+	char *b = (char *) ptr;
 
 	if (nbytes == 0)
 		return 0;

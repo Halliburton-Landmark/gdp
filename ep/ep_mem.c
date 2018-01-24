@@ -333,7 +333,7 @@ ep_mem_istrdup(
 	if (slen >= 0 && l > slen)
 		l = slen;
 	EP_ASSERT(l + 1 > l);
-	p = ep_mem_ialloc(l + 1, NULL, flags, file, line);
+	p = (char *) ep_mem_ialloc(l + 1, NULL, flags, file, line);
 	if (p != NULL)
 	{
 		memcpy(p, s, l);

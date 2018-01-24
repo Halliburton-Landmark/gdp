@@ -40,7 +40,7 @@ ep_hexdump(const void *bufp, size_t buflen, FILE *fp,
 		int format, size_t offset)
 {
 	size_t bufleft = buflen;
-	const uint8_t *b = bufp;
+	const uint8_t *b = (const uint8_t *) bufp;
 	const size_t width = 16;
 	bool terse = EP_UT_BITSET(EP_HEXDUMP_TERSE, format);
 	bool ascii = EP_UT_BITSET(EP_HEXDUMP_ASCII, format);

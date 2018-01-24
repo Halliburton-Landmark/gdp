@@ -138,8 +138,8 @@ static EP_THR_MUTEX		GclCreateMutex			EP_THR_MUTEX_INITIALIZER;
 static void
 process_cmd(void *cpdu_)
 {
-	gdp_pdu_t *cpdu = cpdu_;
 	int cmd;
+	gdp_pdu_t *cpdu = (gdp_pdu_t *) cpdu_;
 	EP_STAT estat;
 	gdp_gob_t *gob = NULL;
 	gdp_req_t *req = NULL;
@@ -359,7 +359,7 @@ fail0:
 static void
 process_resp(void *rpdu_)
 {
-	gdp_pdu_t *rpdu = rpdu_;
+	gdp_pdu_t *rpdu = (gdp_pdu_t *) rpdu_;
 	gdp_chan_t *chan = _GdpChannel;
 	int cmd = rpdu->msg->cmd;
 	EP_STAT estat;

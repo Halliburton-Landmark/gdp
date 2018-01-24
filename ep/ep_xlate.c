@@ -94,7 +94,7 @@ ep_xlate_in(
 	char stopchar,
 	uint32_t how)
 {
-	const uint8_t *in = _in;
+	const uint8_t *in = (const uint8_t *) _in;
 	size_t ol = olen;
 	unsigned char *op = out;
 	char ch;
@@ -258,7 +258,7 @@ ep_xlate_out(
 {
 	int osize = 0;
 	char encode_char;
-	const uint8_t *tval = _tval;
+	const uint8_t *tval = (const uint8_t *) _tval;
 
 	if (EP_UT_BITSET(EP_XLATE_PERCENT, how))
 		encode_char = '%';

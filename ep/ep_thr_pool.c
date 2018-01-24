@@ -70,7 +70,7 @@ twork_new(void)
 		STAILQ_REMOVE_HEAD(&FreeTWork, next);
 	ep_thr_mutex_unlock(&FreeTWorkMutex);
 	if (tw == NULL)
-		tw = ep_mem_zalloc(sizeof *tw);
+		tw = (struct twork *) ep_mem_zalloc(sizeof *tw);
 	return tw;
 }
 

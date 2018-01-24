@@ -63,7 +63,7 @@ struct syslog_info
 static IORESULT_T
 syslog_write(void *cookie, const char *buf, IOBLOCK_T size)
 {
-	struct syslog_info *slinf = cookie;
+	struct syslog_info *slinf = (struct syslog_info *) cookie;
 	int size_as_int = size;			// avoid gcc warnings
 
 	syslog(slinf->pri, "%.*s", size_as_int, buf);
@@ -85,7 +85,7 @@ ep_fopen_syslog(
 {
 	struct syslog_info *slinf;
 
-	slinf = ep_mem_zalloc(sizeof *slinf);
+	slinf = (struct syslog_info *) ep_mem_zalloc(sizeof *slinf);
 	if (slinf == NULL)
 		return NULL;
 	slinf->pri = pri;

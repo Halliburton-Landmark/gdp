@@ -837,7 +837,8 @@ cmd_append(gdp_req_t *req)
 		datum->recno = payload->datum->recno;
 		if (payload->datum->ts == NULL)
 		{
-			payload->datum->ts = ep_mem_zalloc(sizeof *payload->datum->ts);
+			payload->datum->ts = (GdpTimestamp *)
+						ep_mem_zalloc(sizeof *payload->datum->ts);
 			gdp_timestamp__init(payload->datum->ts);
 		}
 		else
