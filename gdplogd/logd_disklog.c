@@ -1344,7 +1344,7 @@ ridx_fseek_to_recno(
 		off_t actual_size = fsizeof(phys->ridx.fp);
 
 		// computed offset is out of range
-		ep_dbg_cprintf(Dbg, GdplogdForgive.allow_log_gaps ? 28 : 8,
+		ep_dbg_cprintf(Dbg, EP_UT_BITSET(FORGIVE_LOG_GAPS, GdplogdForgive) ? 28 : 8,
 				"ridx_fseek_to_recno(%s): recno %" PRIgdp_recno
 				" computed offset %jd out of range (%jd - %jd)"
 				" actual max %jd\n",
@@ -1364,9 +1364,9 @@ ridx_fseek_to_recno(
 			return GDP_STAT_CORRUPT_INDEX;
 		}
 
-		if (xoff > actual_size && !GdplogdForgive.allow_log_gaps)
+		if (xoff > actual_size && !EP_UT_BITSET(FORGIVE_LOG_GAPS, GdplogdForgive))
 			return GDP_STAT_NAK_NOTFOUND;
-		if (xoff < actual_size && !GdplogdForgive.allow_log_dups)
+		if (xoff < actual_size && !EP_UT_BITSET(FORGIVE_LOG_DUPS, GdplogdForgive))
 			return GDP_STAT_RECORD_DUPLICATED;
 		if (actual_size > phys->ridx.max_offset)
 			phys->ridx.max_offset = actual_size;

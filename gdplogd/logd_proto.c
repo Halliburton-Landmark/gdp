@@ -725,8 +725,8 @@ cmd_append(gdp_req_t *req)
 
 	if (payload->datum->recno != req->gob->nrecs + 1)
 	{
-		bool random_order_ok = GdplogdForgive.allow_log_gaps &&
-								GdplogdForgive.allow_log_dups;
+		bool random_order_ok = EP_UT_BITSET(FORGIVE_LOG_GAPS, GdplogdForgive) &&
+							EP_UT_BITSET(FORGIVE_LOG_DUPS, GdplogdForgive);
 
 		// replay or missing a record
 		ep_dbg_cprintf(Dbg, random_order_ok ? 29 : 9,
@@ -741,7 +741,7 @@ cmd_append(gdp_req_t *req)
 			// may be a duplicate append, or just filling in a gap
 			// (should probably see if duplicates are the same data)
 
-			if (!GdplogdForgive.allow_log_dups &&
+			if (!EP_UT_BITSET(FORGIVE_LOG_DUPS, GdplogdForgive) &&
 				req->gob->x->physimpl->recno_exists(
 									req->gob, payload->datum->recno))
 			{
@@ -755,7 +755,7 @@ cmd_append(gdp_req_t *req)
 			}
 		}
 		else if (payload->datum->recno > req->gob->nrecs + 1 &&
-				!GdplogdForgive.allow_log_gaps)
+				!EP_UT_BITSET(FORGIVE_LOG_GAPS, GdplogdForgive))
 		{
 			// gap in record numbers
 			char mbuf[100];

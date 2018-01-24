@@ -50,6 +50,12 @@
 static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.main", "GDP Log Daemon");
 
 
+__BEGIN_DECLS
+uint32_t		GdplogdForgive = 0;			// treatment of gaps and dups
+uint32_t		GdpSignatureStrictness = 0;	// how strongly we enforce signatures
+
+extern const char	GdplogdVersion[];
+__END_DECLS
 
 
 /*
@@ -374,10 +380,10 @@ main(int argc, char **argv)
 
 	// check for some options
 #if _GDPLOGD_FORGIVING
-	GdplogdForgive.allow_log_gaps =
-		ep_adm_getboolparam("swarm.gdplogd.sequencing.allowgaps", true);
-	GdplogdForgive.allow_log_dups =
-		ep_adm_getboolparam("swarm.gdplogd.sequencing.allowdups", true);
+	if (ep_adm_getboolparam("swarm.gdplogd.sequencing.allowgaps", true))
+		GdplogdForgive |= FORGIVE_LOG_GAPS;
+	if (ep_adm_getboolparam("swarm.gdplogd.sequencing.allowdups", true))
+		GdplogdForgive |= FORGIVE_LOG_DUPS;
 #endif
 
 	// go into background mode (before creating any threads!)

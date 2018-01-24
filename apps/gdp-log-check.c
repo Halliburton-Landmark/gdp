@@ -90,6 +90,8 @@ struct
 	bool	tidx_only:1;
 } Flags;
 
+uint32_t		GdplogdForgive;
+
 struct ctx
 {
 	// info about the log we are working on
@@ -1008,7 +1010,7 @@ check_record(
 		else if (xent->offset != offset)
 		{
 			estat = GDP_STAT_RECORD_DUPLICATED;		// most likely
-			if (!GdplogdForgive.allow_log_dups || Flags.verbose)
+			if (!EP_UT_BITSET(FORGIVE_LOG_DUPS, GdplogdForgive) || Flags.verbose)
 				testfail("ridx offset inconsistency: recno %" PRIgdp_recno
 						": %jd != %jd\n",
 								xent->offset, offset);
@@ -1619,10 +1621,10 @@ main(int argc, char **argv)
 	// have to hold this until after -D flag is processed
 	disk_init_internal(false);
 
-	GdplogdForgive.allow_log_gaps =
-			ep_adm_getboolparam("swarm.gdplogd.sequencing.allowgaps", true);
-	GdplogdForgive.allow_log_dups =
-			ep_adm_getboolparam("swarm.gdplogd.sequencing.allowdups", true);
+	if (ep_adm_getboolparam("swarm.gdplogd.sequencing.allowgaps", true))
+		GdplogdForgive |= FORGIVE_LOG_GAPS;
+	if (ep_adm_getboolparam("swarm.gdplogd.sequencing.allowdups", true))
+		GdplogdForgive |= FORGIVE_LOG_DUPS;
 
 	ep_dbg_cprintf(Dbg, 1, "Running as %d:%d (%d:%d)\n",
 						getuid(), getgid(), geteuid(), getegid());

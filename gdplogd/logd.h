@@ -49,6 +49,22 @@
 #include <sys/queue.h>
 
 
+/*
+**  "Forgive" decisions.  Which problems will we forgive and repair?
+**
+**		Probably lowers security, but raises resilience.
+*/
+
+#ifndef _GDPLOGD_FORGIVING
+# define _GDPLOGD_FORGIVING	1
+#endif
+
+#if _GDPLOGD_FORGIVING
+extern uint32_t		GdplogdForgive;
+#define FORGIVE_LOG_GAPS			0x00000001
+#define FORGIVE_LOG_DUPS			0x00000002
+#endif //_GDPLOGD_FORGIVING
+
 // how strongly we enforce signatures
 uint32_t	GdpSignatureStrictness;		// how strongly we enforce signatures
 
@@ -195,22 +211,5 @@ struct gob_phys_impl
 extern struct gob_phys_impl		GdpDiskImpl;
 
 
-/*
-**  "Forgive" decisions.  Which problems will we forgive and repair?
-**
-**		Probably lowers security, but raises resilience.
-*/
-
-#ifndef _GDPLOGD_FORGIVING
-# define _GDPLOGD_FORGIVING	1
-#endif
-
-#if _GDPLOGD_FORGIVING
-struct gdplogd_forgive
-{
-	bool		allow_log_gaps		:1;		// allow records that don't exist
-	bool		allow_log_dups		:1;		// allow overwrites of records
-}	GdplogdForgive;
-#endif //_GDPLOGD_FORGIVING
-
+__END_DECLS
 #endif //_GDPLOG_LOGD_H_
