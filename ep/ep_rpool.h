@@ -64,7 +64,7 @@ extern void	*ep_rpool_realloc(		// change allocation size
 extern char	*ep_rpool_istrdup(		// save string in rpool
 			EP_RPOOL *rp,			// rpool to use
 			const char *s,			// str to copy
-			int slen,			// max length of s
+			ssize_t slen,			// max length of s
 			uint32_t flags,			// action modifiers
 			const char *file,		// dbg: file name
 			int line);			// dbg: line number

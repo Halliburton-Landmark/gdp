@@ -91,7 +91,7 @@ extern int			gdp_buf_write(				// write data to buffer
 extern int			gdp_buf_move(				// move data between buffers
 						gdp_buf_t *obuf,
 						gdp_buf_t *ibuf,
-						size_t sz);
+						ssize_t sz);
 
 extern int			gdp_buf_copy(				// duplicate data
 						gdp_buf_t *obuf,

@@ -75,7 +75,7 @@ statestr(const gdp_req_t *req)
 		return "(NONE)";
 
 	state = req->state;
-	if (state >= 0 && state < sizeof ReqStates)
+	if (state >= 0 && (unsigned) state < sizeof ReqStates)
 	{
 		return ReqStates[state];
 	}

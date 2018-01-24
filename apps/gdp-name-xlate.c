@@ -90,7 +90,7 @@ int
 main(int argc, char **argv)
 {
 	int opt;
-	int i;
+	unsigned int i;
 	bool show_usage = false;
 	gdp_name_t gdpiname;
 	gdp_pname_t gdppname;

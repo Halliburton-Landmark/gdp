@@ -92,7 +92,7 @@ ep_dbg_set(const char *fspec)
 		return;
 	while (*f != '\0')
 	{
-		int i = 0;
+		unsigned int i = 0;
 		char pbuf[200];
 
 		if (strchr(",; ", *f) != NULL)

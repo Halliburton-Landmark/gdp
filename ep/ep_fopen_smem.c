@@ -77,8 +77,8 @@ memread(void *cookie, char *buf, IOBLOCK_T size)
 static IORESULT_T
 memwrite(void *cookie, const char *buf, IOBLOCK_T size)
 {
-	ssize_t l = minf->bufs - minf->bufx;
 	struct meminfo *minf = (struct meminfo *) cookie;
+	size_t l = minf->bufs - minf->bufx;
 
 	if (l > size)
 		l = size;
@@ -88,10 +88,12 @@ memwrite(void *cookie, const char *buf, IOBLOCK_T size)
 	{
 		memcpy(minf->bufb + minf->bufx, buf, l);
 		minf->bufx += l;
+		return l;
 	}
 	else
-		l = -1;
-	return l;
+	{
+		return -1;
+	}
 }
 
 static int

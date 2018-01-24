@@ -308,7 +308,7 @@ ep_rpool_ialloc(EP_RPOOL *rp,
 	int line)
 {
 	struct rpseg *sp;
-	ssize_t spaceleft;
+	size_t spaceleft;
 	uint8_t *p;
 	bool aligned;
 
@@ -521,7 +521,8 @@ ep_rpool_realloc(EP_RPOOL *rp,
 	if (emem != NULL && sp != NULL && spaceleft > 0 &&
 	    (emem > sp->segbase && emem < sp->segfree) &&
 	    emem + oldsize == sp->segfree &&
-	    newsize - oldsize <= spaceleft)
+	    spaceleft >= 0 &&
+	    newsize - oldsize <= (size_t) spaceleft)
 	{
 		// excellent; just increase the allocation
 		sp->segfree += newsize - oldsize;
@@ -565,12 +566,12 @@ char *
 ep_rpool_istrdup(
 	EP_RPOOL *rp,
 	const char *s,
-	int slen,
+	ssize_t slen,
 	uint32_t flags,
 	const char *file,
 	int line)
 {
-	size_t l;
+	ssize_t l;
 	char *p;
 
 	if (s == NULL)

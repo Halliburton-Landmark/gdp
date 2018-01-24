@@ -47,7 +47,7 @@ ep_pcvt_str(
 	size_t osize,
 	const char *val)
 {
-	int vl;
+	size_t vl;
 
 	if (val == NULL)
 	{

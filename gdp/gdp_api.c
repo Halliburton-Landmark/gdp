@@ -454,7 +454,7 @@ bool
 gdp_name_is_valid(const gdp_name_t name)
 {
 	const uint32_t *up;
-	int i;
+	unsigned int i;
 
 	up = (uint32_t *) name;
 	for (i = 0; i < sizeof (gdp_name_t) / 4; i++)

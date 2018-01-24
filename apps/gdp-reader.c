@@ -338,7 +338,7 @@ do_multiread(gdp_gcl_t *gcl,
 	// now start reading the events that will be generated
 	if (!use_callbacks)
 	{
-		uint32_t ndone = 0;
+		int32_t ndone = 0;
 		for (;;)
 		{
 			// for testing: force early termination and close

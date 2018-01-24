@@ -226,11 +226,11 @@ gdp_buf_printf(gdp_buf_t *buf, const char *fmt, ...)
 */
 
 int
-gdp_buf_move(gdp_buf_t *obuf, gdp_buf_t *ibuf, size_t sz)
+gdp_buf_move(gdp_buf_t *obuf, gdp_buf_t *ibuf, ssize_t sz)
 {
 	if (sz == -1)
 		sz = gdp_buf_getlength(ibuf);
-	return evbuffer_remove_buffer(ibuf, obuf, sz);
+	return evbuffer_remove_buffer(ibuf, obuf, (size_t) sz);
 }
 
 /*

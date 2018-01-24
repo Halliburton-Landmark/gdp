@@ -111,10 +111,10 @@ ep_b64_encode(const void *bbin, size_t bsize,
 		char *txt, size_t tsize,
 		const char *encoding)
 {
-	const uint8_t *bin = bbin;
+	const uint8_t *bin = (uint8_t *) bbin;
 	int maxline;
-	int bx, tx;			// indexes into binary & text
-	int lx;				// index into current output line
+	size_t bx, tx;			// indexes into binary & text
+	size_t lx;			// index into current output line
 	int nextc = 0;
 	size_t neededlength = ep_b64_enc_len(bsize, encoding) + 1;
 					// +1 for null terminator on string
@@ -129,7 +129,7 @@ ep_b64_encode(const void *bbin, size_t bsize,
 
 	for (bx = tx = lx = 0; bx < bsize;)
 	{
-		if (maxline > 0 && lx >= maxline)
+		if (maxline > 0 && lx >= (unsigned) maxline)
 		{
 			txt[tx++] = '\r';
 			txt[tx++] = '\n';
@@ -220,9 +220,9 @@ ep_b64_decode(const char *txt, size_t tsize,
 		void *bbin, size_t bsize,
 		const char *encoding)
 {
-	uint8_t *bin = bbin;
+	uint8_t *bin = (uint8_t *) bbin;
 	int8_t decode[256];
-	int bx, tx;
+	size_t bx, tx;
 	int state;	// logical position in input, ignoring noise chars
 	int nextb = 0;
 

@@ -50,7 +50,7 @@ struct logfunc
 	struct logfunc	*next;		// next in chain
 	EP_LOG_FUNC	*func;		// function to call
 	void		*ctx;		// external context
-	int		minsev;		// minimum severity to log
+	unsigned int	minsev;		// minimum severity to log
 };
 
 static const char	*LogTag = NULL;

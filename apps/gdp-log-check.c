@@ -603,7 +603,7 @@ EP_STAT
 find_segs(gdp_gob_t *gob)
 {
 	EP_STAT estat = EP_STAT_OK;
-	int allocsegs = 0;				// allocation size of phys->segments
+	unsigned int allocsegs = 0;		// allocation size of phys->segments
 	bool pre_segment = false;		// set if created before we had segments
 	char dirname[GOB_PATH_MAX];
 	struct physinfo *phys = GETPHYS(gob);
@@ -629,7 +629,7 @@ find_segs(gdp_gob_t *gob)
 
 	for (;;)
 	{
-		int segno;
+		unsigned int segno = 0;
 
 		errno = 0;
 		struct dirent *dent = readdir(dir);
@@ -680,7 +680,9 @@ find_segs(gdp_gob_t *gob)
 		}
 		else
 		{
-			segno = atol(&dent->d_name[GDP_GCL_PNAME_LEN + 1]);
+			long ssegno = atol(&dent->d_name[GDP_GCL_PNAME_LEN + 1]);
+			if (ssegno > 0)
+				segno = ssegno;
 		}
 		// add segment number to known segment list
 		if (allocsegs <= segno)
@@ -733,8 +735,9 @@ scan_recs(gdp_gob_t *gob,
 {
 	EP_STAT estat = EP_STAT_OK;
 	EP_STAT return_stat = EP_STAT_OK;
-	int segno;
+	unsigned int segno;
 	struct physinfo *phys = GETPHYS(gob);
+	off_t record_offset = 0;
 
 	for (segno = 0; segno < phys->nsegments; segno++)
 	{
@@ -787,7 +790,7 @@ scan_recs(gdp_gob_t *gob,
 			goto fail1;
 		}
 
-		off_t record_offset = ftello(seg->fp);
+		record_offset = ftello(seg->fp);
 		for (;;)
 		{
 			segment_record_t log_record;

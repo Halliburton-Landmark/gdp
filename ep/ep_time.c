@@ -476,7 +476,8 @@ fail0:
 			// getdate failed, fall back to internal version
 			if (gd_err > 0 && ep_dbg_test(Dbg, 28))
 			{
-				if (gd_err < (sizeof gd_errs / sizeof gd_errs[0]))
+				if ((unsigned) gd_err <
+					(sizeof gd_errs / sizeof gd_errs[0]))
 					ep_dbg_printf("Cannot convert date; getdate says:\n"
 							"    %s\n",
 							gd_errs[gd_err]);

@@ -130,8 +130,8 @@ struct gdp_datum
 	EP_TIME_SPEC		ts;				// commit timestamp
 	gdp_buf_t			*dbuf;			// data buffer
 	gdp_buf_t			*sig;			// signature (may be NULL)
-	short				sigmdalg;		// message digest algorithm
-	short				siglen;			// signature length;
+	uint16_t			sigmdalg;		// message digest algorithm
+	uint16_t			siglen;			// signature length;
 };
 
 #define GDP_DATUM_ISGOOD(datum)											\

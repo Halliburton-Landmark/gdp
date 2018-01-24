@@ -227,7 +227,7 @@ enum GdpMsgCode
 // More-or-less corresponds to gdp_datum_t.
 message GdpDatum
 {
-	required uint64			recno = 1;			// record number
+	required int64			recno = 1;			// record number
 	optional GdpTimestamp	ts = 2;				// timestamp
 	required bytes			data = 3;			// actual content
 }

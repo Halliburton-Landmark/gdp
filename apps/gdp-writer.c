@@ -88,16 +88,16 @@ static char	*EventTypes[] =
 void
 showstat(gdp_event_t *gev)
 {
-	int evtype = gdp_event_gettype(gev);
+	unsigned int evtype = gdp_event_gettype(gev);
 	EP_STAT estat = gdp_event_getstat(gev);
 	gdp_datum_t *d = gdp_event_getdatum(gev);
 	char ebuf[100];
 	char tbuf[20];
 	char *evname;
 
-	if (evtype < 0 || evtype >= sizeof EventTypes / sizeof EventTypes[0])
+	if (evtype >= sizeof EventTypes / sizeof EventTypes[0])
 	{
-		snprintf(tbuf, sizeof tbuf, "%d", evtype);
+		snprintf(tbuf, sizeof tbuf, "%u", evtype);
 		evname = tbuf;
 	}
 	else

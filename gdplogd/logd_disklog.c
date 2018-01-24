@@ -978,7 +978,7 @@ segment_get(gdp_gob_t *gob, int segno)
 
 	if (segno < 0)
 	{
-		int i;
+		unsigned int i;
 
 		for (i = 0; i < phys->nsegments; i++)
 		{
@@ -1257,7 +1257,7 @@ physinfo_free(gob_physinfo_t *phys)
 static void
 physinfo_dump(gob_physinfo_t *phys, FILE *fp)
 {
-	int segno;
+	unsigned int segno;
 
 	fprintf(fp, "physinfo @ %p: min_recno %" PRIgdp_recno
 			", max_recno %" PRIgdp_recno "\n",
@@ -1341,7 +1341,7 @@ ridx_fseek_to_recno(
 			", min_recno=%" PRIgdp_recno ", ridx_hdrsize=%zd, xoff=%jd\n",
 			recno, phys->min_recno,
 			phys->ridx.header_size, (intmax_t) xoff);
-	if (xoff < phys->ridx.header_size || xoff > phys->ridx.max_offset)
+	if (xoff < (off_t) phys->ridx.header_size || xoff > phys->ridx.max_offset)
 	{
 		off_t actual_size = fsizeof(phys->ridx.fp);
 
@@ -1358,7 +1358,7 @@ ridx_fseek_to_recno(
 				(intmax_t) actual_size);
 
 		// under no circumstances can we clobber the header
-		if (xoff < phys->ridx.header_size)
+		if (xoff < (off_t) phys->ridx.header_size)
 		{
 			ep_log(GDP_STAT_CORRUPT_INDEX,
 					"ridx_fseek_to_recno(%" PRIgdp_recno "): xoff %jd",
@@ -1550,7 +1550,7 @@ ridx_open(gdp_gob_t *gob, const char *suffix, int openmode)
 	ridx_header_t ridx_header;
 
 	ridx_header.magic = 0;
-	if (fsizeof(ridx_fp) < sizeof ridx_header)
+	if (fsizeof(ridx_fp) < (off_t) sizeof ridx_header)
 	{
 		// must be old style
 	}
@@ -2724,7 +2724,7 @@ disk_getstats(
 		gdp_gob_t *gob,
 		struct gob_phys_stats *st)
 {
-	int segno;
+	unsigned int segno;
 	gob_physinfo_t *phys = GETPHYS(gob);
 
 	st->nrecs = gob->nrecs;

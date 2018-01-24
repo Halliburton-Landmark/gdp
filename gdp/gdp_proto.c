@@ -392,7 +392,8 @@ ack_data_content(gdp_req_t *req)
 
 	// hack to try to "self heal" in case we get out of sync
 	GdpMessage__AckContent *payload = req->rpdu->msg->ack_content;
-	if (req->gob->nrecs < payload->datum->recno)
+	if (payload->datum->recno > 0 &&
+			((gdp_recno_t) req->gob->nrecs) < payload->datum->recno)
 		req->gob->nrecs = payload->datum->recno;
 
 	// keep track of how many more records we expect

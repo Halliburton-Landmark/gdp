@@ -723,7 +723,7 @@ cmd_append(gdp_req_t *req)
 		goto fail0;
 	}
 
-	if (payload->datum->recno != req->gob->nrecs + 1)
+	if (payload->datum->recno != (gdp_recno_t) (req->gob->nrecs + 1))
 	{
 		bool random_order_ok = EP_UT_BITSET(FORGIVE_LOG_GAPS, GdplogdForgive) &&
 							EP_UT_BITSET(FORGIVE_LOG_DUPS, GdplogdForgive);
@@ -736,7 +736,7 @@ cmd_append(gdp_req_t *req)
 						payload->datum->recno, req->gob->nrecs + 1,
 						req->gob->pname);
 
-		if (payload->datum->recno <= req->gob->nrecs)
+		if (payload->datum->recno <= (gdp_recno_t) req->gob->nrecs)
 		{
 			// may be a duplicate append, or just filling in a gap
 			// (should probably see if duplicates are the same data)
@@ -754,7 +754,7 @@ cmd_append(gdp_req_t *req)
 				goto fail0;
 			}
 		}
-		else if (payload->datum->recno > req->gob->nrecs + 1 &&
+		else if (payload->datum->recno > (gdp_recno_t) (req->gob->nrecs + 1) &&
 				!EP_UT_BITSET(FORGIVE_LOG_GAPS, GdplogdForgive))
 		{
 			// gap in record numbers

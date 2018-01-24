@@ -48,9 +48,9 @@ ep_hexdump(const void *bufp, size_t buflen, FILE *fp,
 	flockfile(fp);			// to make threads happy
 	while (bufleft > 0)
 	{
-		int lim = bufleft;
-		int i;
-		int shift;
+		size_t lim = bufleft;
+		unsigned int i;
+		int shift = 0;
 
 		if (!terse)
 		{
