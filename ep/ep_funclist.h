@@ -37,6 +37,9 @@
 #ifndef _EP_FUNCLIST_H_
 #define _EP_FUNCLIST_H_
 
+#include <ep/ep.h>
+__BEGIN_DECLS
+
 // the function list itself (contents are private)
 typedef struct EP_FUNCLIST	EP_FUNCLIST;
 
@@ -55,4 +58,5 @@ extern void		ep_funclist_push(
 extern void		ep_funclist_invoke(
 				EP_FUNCLIST *flp);
 
+__END_DECLS
 #endif //_EP_FUNCLIST_H_

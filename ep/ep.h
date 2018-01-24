@@ -38,6 +38,7 @@
 #ifndef _EP_H_
 #define _EP_H_
 
+#include <sys/cdefs.h>
 #include <ep/ep_conf.h>
 
 #include <unistd.h>
@@ -51,6 +52,8 @@
 
 //XXX hacks for non-libep settings
 #define EP_SRC_ID(x)
+
+__BEGIN_DECLS
 
 /*
 **  Initialization
@@ -107,5 +110,7 @@ extern size_t		ep_fwrite_unlocked(	// unlocked version of fwrite
 				size_t sz,		// size of one item
 				size_t n,		// number of items
 				FILE *fp);		// file to write
+
+__END_DECLS
 
 #endif // _EP_H_

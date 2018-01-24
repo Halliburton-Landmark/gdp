@@ -36,6 +36,8 @@
 
 #ifndef _EP_MEM_H_
 #define _EP_MEM_H_
+#include <ep/ep.h>
+__BEGIN_DECLS
 
 #ifndef EP_MEM_DEBUG
 # define EP_MEM_DEBUG	1
@@ -125,4 +127,5 @@ extern void	ep_mem_set_malloc_functions(
 extern void	ep_mem_set_recovery_func(
 			void (*f)(void));
 
+__END_DECLS
 #endif // _EP_MEM_H_

@@ -32,6 +32,7 @@
 #define _EP_TIME_H_
 
 #include <ep/ep.h>
+__BEGIN_DECLS
 
 #include <time.h>
 #include <sys/time.h>
@@ -117,4 +118,5 @@ extern EP_STAT	ep_time_nanosleep(int64_t);
 // invalidate a timestamp
 #define EP_TIME_INVALIDATE(ts)	((ts)->tv_sec = EP_TIME_NOTIME)
 
+__END_DECLS
 #endif //_EP_TIME_H_

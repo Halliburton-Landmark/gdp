@@ -82,8 +82,9 @@
 
 #ifndef _EP_STAT_H
 # define _EP_STAT_H
-
 # include <ep/ep.h>
+__BEGIN_DECLS
+
 # include <limits.h>
 
 typedef struct _ep_stat
@@ -190,4 +191,5 @@ char		*ep_stat_tostr(
 const char	*ep_stat_sev_tostr(
 			int sev);
 
+__END_DECLS
 #endif // _EP_STAT_H

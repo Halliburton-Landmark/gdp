@@ -37,6 +37,8 @@
 # if EP_OSCF_USE_PTHREADS
 #  include <pthread.h>
 
+__BEGIN_DECLS
+
 /*
 **  THREADS LOCKING SUPPORT
 **
@@ -334,4 +336,5 @@ typedef int	EP_THR_RWLOCK;
 
 # endif // EP_OSCF_USE_PTHREADS
 
+__END_DECLS
 #endif // _EP_THR_H_

@@ -18,10 +18,12 @@
 #ifndef SCGILIB_H
 #define SCGILIB_H
 
+#include <sys/cdefs.h>
 #include <sys/time.h>
 #include <unistd.h>
 #include <fcntl.h>
 
+__BEGIN_DECLS
 typedef struct SCGI_PORT scgi_port;
 typedef struct SCGI_HEADER scgi_header;
 typedef struct SCGI_REQUEST scgi_request;
@@ -291,4 +293,5 @@ do									\
    }									\
 } while(0)
 
+__END_DECLS
 #endif //ends the "#ifdef SCGILIB_H" from the beginning of the file

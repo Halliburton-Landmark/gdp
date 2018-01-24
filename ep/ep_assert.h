@@ -86,6 +86,8 @@
 
 #include "ep.h"
 
+__BEGIN_DECLS
+
 #if !_EP_CCCF_ASSERT_NONE
 
 // assert that an expression must be true
@@ -170,5 +172,7 @@ extern bool	EpAssertAllAbort;		// abort on all assertions
 #define EP_ASSERT_ENSURE(e)		EP_ASSERT(e)
 #define EP_ASSERT_INSIST(e)		EP_ASSERT(e)
 #define EP_ASSERT_INVARIANT(e)		EP_ASSERT(e)
+
+__END_DECLS
 
 #endif /*_EP_ASSERT_H_*/

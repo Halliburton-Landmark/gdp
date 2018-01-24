@@ -36,6 +36,7 @@
 # define _EP_LOG_H_
 
 # include <ep/ep.h>
+__BEGIN_DECLS
 
 typedef void	EP_LOG_FUNC(
 		void		*ctx,	// function-specific
@@ -65,4 +66,5 @@ void	ep_logv(EP_STAT estat, const char *fmt, va_list ap);
 void EP_TYPE_PRINTFLIKE(2, 3)
 		ep_log(EP_STAT estat, const char *fmt, ...);
 
+__END_DECLS
 #endif // _EP_LOG_H_

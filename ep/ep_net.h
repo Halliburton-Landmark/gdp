@@ -30,6 +30,8 @@
 
 #ifndef _EP_NET_H_
 #define _EP_NET_H_
+#include <ep/ep.h>
+__BEGIN_DECLS
 
 #include <arpa/inet.h>
 
@@ -49,4 +51,5 @@
 extern uint64_t		_ep_net_swap64(uint64_t v);
 extern int		_ep_net_swap_timespec(EP_TIME_SPEC *v);
 
+__END_DECLS
 #endif //_EP_NET_H_

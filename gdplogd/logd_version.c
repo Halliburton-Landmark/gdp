@@ -32,4 +32,10 @@
 
 #include <gdp/gdp_version.h>
 
-const char	GdplogdVersion[] = "@(#)gdplogd " GDP_VER_STRING " " _VERSION_INFO_;
+__BEGIN_DECLS
+#if __cplusplus
+extern
+# endif
+		const char	GdplogdVersion[] =
+						"@(#)gdplogd " GDP_VER_STRING " " _VERSION_INFO_;
+__END_DECLS

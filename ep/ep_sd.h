@@ -32,8 +32,10 @@
 #ifndef _EP_SD_NOTIFY_H
 #define _EP_SD_NOTIFY_H
 
-#include <ep/ep_conf.h>
+#include <ep/ep.h>
+__BEGIN_DECLS
 
 void EP_TYPE_PRINTFLIKE(1, 2)	ep_sd_notifyf(const char *fmt, ...);
 
+__END_DECLS
 #endif //_EP_SD_NOTIFY_H

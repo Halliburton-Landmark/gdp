@@ -34,6 +34,8 @@
 # include <ep/ep.h>
 # include <stdarg.h>
 
+__BEGIN_DECLS
+
 /**************************  BEGIN PRIVATE  **************************/
 
 // if the current generation is greater than that in the flag then some
@@ -93,5 +95,6 @@ extern void	ep_dbg_backtrace(void);
 // crackarg parsing
 extern EP_STAT	epCavDebug(const char *vp, void *rp);
 
+__END_DECLS
 
 #endif /*_EP_DEBUG_H_*/

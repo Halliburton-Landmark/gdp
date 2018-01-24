@@ -31,6 +31,8 @@
 #ifndef _EP_XLATE_H_
 #define _EP_XLATE_H_
 
+#include <ep/ep.h>
+__BEGIN_DECLS
 
 #define EP_XLATE_PERCENT	0x00000001	// translate %xx like SMTP/URLs
 #define EP_XLATE_BSLASH		0x00000002	// translate \ like C
@@ -53,4 +55,5 @@ extern int	ep_xlate_out(
 			FILE *osp,
 			const char *forbid,
 			uint32_t how);
+__END_DECLS
 #endif // _EP_XLATE_H_

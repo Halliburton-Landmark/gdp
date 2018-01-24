@@ -30,6 +30,8 @@
 
 #ifndef _EP_PRFLAGS_H_
 #define _EP_PRFLAGS_H_
+#include <ep/ep.h>
+__BEGIN_DECLS
 
 typedef struct ep_prflags_desc
 {
@@ -43,4 +45,5 @@ extern void	ep_prflags(
 			const EP_PRFLAGS_DESC	*flagdesc,
 			FILE			*outfile);
 
+__END_DECLS
 #endif // _EP_PRFLAGS_H_

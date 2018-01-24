@@ -30,6 +30,8 @@
 
 #ifndef _EP_SYSLOG_H_
 #define _EP_SYSLOG_H_	1
+#include <ep/ep.h>
+__BEGIN_DECLS
 
 #include <syslog.h>
 
@@ -42,4 +44,5 @@ extern int	ep_syslog_fac_from_name(	// get facility by name
 extern char	*ep_syslog_name_from_fac(	// get name by facility
 			int fac);
 
+__END_DECLS
 #endif // _EP_SYSLOG_H_

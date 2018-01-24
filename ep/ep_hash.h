@@ -30,6 +30,8 @@
 
 #ifndef _EP_HASH_H_
 #define _EP_HASH_H_
+#include <ep/ep.h>
+__BEGIN_DECLS
 
 /***********************************************************************
 **
@@ -76,4 +78,5 @@ extern void	ep_hash_forall(
 #define EP_HASH_DEFHFUNC	((EP_HASH_HASH_FUNCP) NULL)
 #define EP_HASH_DEFHSIZE	0
 
+__END_DECLS
 #endif //_EP_HASH_H_

@@ -28,6 +28,11 @@
 **  ----- END LICENSE BLOCK -----
 ***********************************************************************/
 
+#ifndef _EP_HEXDUMP_H_
+#define _EP_HEXDUMP_H_
+#include <ep/ep.h>
+__BEGIN_DECLS
+
 /*
 **  Print binary area to file for human consumption.
 **
@@ -47,3 +52,6 @@ void	ep_hexdump(
 #define EP_HEXDUMP_HEX		0	// no special formatting
 #define EP_HEXDUMP_ASCII	0x0001	// show ASCII equivalent
 #define EP_HEXDUMP_TERSE	0x0002	// minimal formating
+
+__END_DECLS
+#endif //_EP_HEXDUMP_H_

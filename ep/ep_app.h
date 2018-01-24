@@ -31,8 +31,9 @@
 #ifndef _EP_APP_H_
 # define _EP_APP_H_
 # include <ep/ep.h>
-# include <ep/ep_conf.h>
 # include <stdlib.h>
+
+__BEGIN_DECLS
 
 extern void EP_TYPE_PRINTFLIKE(1, 2)
 			ep_app_info(const char *fmt, ...);
@@ -67,5 +68,7 @@ extern void		ep_app_setflags(uint32_t flags);
 #define EP_APP_FLAG_LOG_OK		0x00000040	// log OK messages
 	// pseudo (doesn't have an associated log severity)
 #define EP_APP_FLAG_LOG_INFO		0x00000040	// log ep_app_info
+
+__END_DECLS
 
 #endif //_EP_APP_H_

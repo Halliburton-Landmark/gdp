@@ -48,6 +48,7 @@
 #define _EP_B64_H_
 
 #include <ep/ep.h>
+__BEGIN_DECLS
 
 extern EP_STAT	ep_b64_encode(const void *bin,		// raw binary input
 				size_t bsize,		// sizeof bin
@@ -73,5 +74,7 @@ extern EP_STAT	ep_b64_decode(const char *txt,		// text input
 #define EP_B64_ENC_MIME		"+/N"	// WRAP76  PAD  IGNCRUD
 #define EP_B64_ENC_PEM		"+/E"	// WRAP64  PAD -IGNCRUD
 #define EP_B64_ENC_URL		"-_@"	// NOWRAP -PAD -IGNCRUD
+
+__END_DECLS
 
 #endif // _EP_B64_H_

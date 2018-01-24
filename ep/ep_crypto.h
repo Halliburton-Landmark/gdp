@@ -40,10 +40,11 @@
 **  in the future switch to another package, e.g., NaCl.
 */
 
+__BEGIN_DECLS
+
 # include <openssl/evp.h>
 # include <openssl/sha.h>
 # include <openssl/opensslv.h>
-
 
 
 /*
@@ -352,5 +353,7 @@ EP_STAT			_ep_crypto_error(
 //# define EVP_MD_CTX_new		EVP_MD_CTX_create
 //# define EVP_MD_CTX_free	EVP_MD_CTX_destroy
 //#endif
+
+__END_DECLS
 
 #endif // _EP_CRYPTO_H_

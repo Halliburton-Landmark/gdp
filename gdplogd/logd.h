@@ -48,6 +48,7 @@
 #include <string.h>
 #include <sys/queue.h>
 
+__BEGIN_DECLS
 
 /*
 **  "Forgive" decisions.  Which problems will we forgive and repair?

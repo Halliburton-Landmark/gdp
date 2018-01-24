@@ -28,6 +28,11 @@
 **  ----- END LICENSE BLOCK -----
 ***********************************************************************/
 
+#ifndef _EP_UUID_H_
+#define _EP_UUID_H_
+#include <ep/ep.h>
+__BEGIN_DECLS
+
 #if EP_OSCF_HAS_BSD_UUID
 # include <uuid.h>
 #else
@@ -61,3 +66,6 @@ extern int	ep_uuid_compare(		// compare two UUIDs
 extern bool	ep_uuid_equal(			// test if UUIDs are identical
 			EP_UUID *u1,
 			EP_UUID *u2);
+
+__END_DECLS
+#endif //_EP_UUID_H_

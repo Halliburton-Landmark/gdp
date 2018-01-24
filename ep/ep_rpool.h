@@ -36,6 +36,8 @@
 
 #ifndef _EP_RPOOL_H_
 #define _EP_RPOOL_H_
+#include <ep/ep.h>
+__BEGIN_DECLS
 
 # include <ep/ep_mem.h>
 
@@ -89,4 +91,5 @@ extern void	*ep_rpool_ialloc(		// allocate memory from pool
 				ep_rpool_istrdup(rp, s, l, 0, \
 					_EP_MEM_FILE_LINE_)
 
+__END_DECLS
 #endif //_EP_RPOOL_H_

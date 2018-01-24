@@ -42,6 +42,7 @@
 #define _EP_VERSION_H_
 
 #include <ep/ep.h>
+__BEGIN_DECLS
 
 // change these as necessary
 #define EP_VERSION_MAJOR	3
@@ -62,4 +63,5 @@
 
 extern const char	EpVersion[];
 
+__END_DECLS
 #endif
