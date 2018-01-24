@@ -410,20 +410,22 @@ main(int argc, char **argv)
 	// open the channel connection
 	phase = "connection to router";
 
-	gdp_chan_x_t *chanx = ep_mem_zalloc(sizeof *chanx);
-	LIST_INIT(&chanx->reqs);
+	{
+		gdp_chan_x_t *chanx = (gdp_chan_x_t *) ep_mem_zalloc(sizeof *chanx);
+		LIST_INIT(&chanx->reqs);
 
-	_GdpChannel = NULL;
-	estat = _gdp_chan_open(router_addr,			// IP of router
-						NULL,					// qos (unused as yet)
-						&_gdp_io_recv,			// receive callback
-						NULL,					// send callback
-						&_gdp_io_event,			// close/error/eof callback
-						&_gdp_router_event,		// router event callback
-						&logd_advertise_all,	// advertise callback
-						chanx,					// user channel data
-						&_GdpChannel);			// output: new channel
-	EP_STAT_CHECK(estat, goto fail0);
+		_GdpChannel = NULL;
+		estat = _gdp_chan_open(router_addr,			// IP of router
+							NULL,					// qos (unused as yet)
+							&_gdp_io_recv,			// receive callback
+							NULL,					// send callback
+							&_gdp_io_event,			// close/error/eof callback
+							&_gdp_router_event,		// router event callback
+							&logd_advertise_all,	// advertise callback
+							chanx,					// user channel data
+							&_GdpChannel);			// output: new channel
+		EP_STAT_CHECK(estat, goto fail0);
+	}
 
 	// GCLs will be advertised when connection is established
 

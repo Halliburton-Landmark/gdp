@@ -352,44 +352,46 @@ main(int argc, char **argv)
 		fprintf(stdout, "\nStarting to read input\n");
 	}
 
-	// we need a place to buffer the input
-	gdp_datum_t *datum = gdp_datum_new();
-
-	if (one_record)
 	{
-		// read the entire stdin into a single datum
-		char buf[8 * 1024];
-		int l;
+		// we need a place to buffer the input
+		gdp_datum_t *datum = gdp_datum_new();
 
-		while ((l = fread(buf, 1, sizeof buf, stdin)) > 0)
-			gdp_buf_write(gdp_datum_getbuf(datum), buf, l);
-
-		estat = write_record(datum, gcl);
-	}
-	else
-	{
-		// write lines into multiple datums
-		char buf[200];
-
-		while (fgets(buf, sizeof buf, stdin) != NULL)
+		if (one_record)
 		{
-			// strip off newlines
-			char *p = strchr(buf, '\n');
-			if (p != NULL)
-				*p++ = '\0';
+			// read the entire stdin into a single datum
+			char buf[8 * 1024];
+			int l;
 
-			// first copy the text buffer into the datum buffer
-			gdp_buf_write(gdp_datum_getbuf(datum), buf, strlen(buf));
+			while ((l = fread(buf, 1, sizeof buf, stdin)) > 0)
+				gdp_buf_write(gdp_datum_getbuf(datum), buf, l);
 
-			// write the record to the log
 			estat = write_record(datum, gcl);
-			if (!EP_STAT_ISOK(estat) && !KeepGoing)
-				break;
 		}
-	}
+		else
+		{
+			// write lines into multiple datums
+			char buf[200];
 
-	// OK, all done.  Free our resources and exit
-	gdp_datum_free(datum);
+			while (fgets(buf, sizeof buf, stdin) != NULL)
+			{
+				// strip off newlines
+				char *p = strchr(buf, '\n');
+				if (p != NULL)
+					*p++ = '\0';
+
+				// first copy the text buffer into the datum buffer
+				gdp_buf_write(gdp_datum_getbuf(datum), buf, strlen(buf));
+
+				// write the record to the log
+				estat = write_record(datum, gcl);
+				if (!EP_STAT_ISOK(estat) && !KeepGoing)
+					break;
+			}
+		}
+
+		// OK, all done.  Free our resources and exit
+		gdp_datum_free(datum);
+	}
 
 	// give a chance to collect async results
 	if (AsyncIo)

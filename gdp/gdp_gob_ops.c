@@ -109,27 +109,29 @@ _gdp_gob_create(gdp_name_t gobname,
 
 	msg = req->cpdu->msg;
 	EP_ASSERT_ELSE(msg != NULL, return EP_STAT_ASSERT_ABORT);
-	GdpMessage__CmdCreate *payload = msg->cmd_create;
-	EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
-
-	// send the name of the log to be created in the payload
-	payload->logname.len = sizeof (gdp_name_t);
-	payload->logname.data = ep_mem_zalloc(sizeof (gdp_name_t));
-	memcpy(payload->logname.data, gobname, sizeof (gdp_name_t));
-
-	// add the metadata to the output stream
 	{
-		uint8_t *mdbuf;
-		size_t mdlen;
-		mdlen = _gdp_gclmd_serialize(gmd, &mdbuf);
-		payload->metadata.len = mdlen;
-		payload->metadata.data = mdbuf;
-		payload->has_metadata = true;
-	}
+		GdpMessage__CmdCreate *payload = msg->cmd_create;
+		EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
 
-	// send command and wait for results
-	estat = _gdp_invoke(req);
-	GDP_GOB_ASSERT_ISLOCKED(gob);
+		// send the name of the log to be created in the payload
+		payload->logname.len = sizeof (gdp_name_t);
+		payload->logname.data = (uint8_t *) ep_mem_zalloc(sizeof (gdp_name_t));
+		memcpy(payload->logname.data, gobname, sizeof (gdp_name_t));
+
+		// add the metadata to the output stream
+		{
+			uint8_t *mdbuf;
+			size_t mdlen;
+			mdlen = _gdp_gclmd_serialize(gmd, &mdbuf);
+			payload->metadata.len = mdlen;
+			payload->metadata.data = mdbuf;
+			payload->has_metadata = true;
+		}
+
+		// send command and wait for results
+		estat = _gdp_invoke(req);
+		GDP_GOB_ASSERT_ISLOCKED(gob);
+	}
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// change GOB name
@@ -295,8 +297,6 @@ _gdp_gob_open(gdp_gob_t *gob,
 
 	msg = req->cpdu->msg;
 	EP_ASSERT_ELSE(msg != NULL, return EP_STAT_ASSERT_ABORT);
-	GdpMessage__CmdOpen *payload = msg->cmd_open;
-	EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
 
 	// nothing actually sent in the payload
 
@@ -463,8 +463,9 @@ append_common(gdp_gob_t *gob,
 	// set up the message content
 	msg = req->cpdu->msg;
 	EP_ASSERT_ELSE(msg != NULL, return EP_STAT_ASSERT_ABORT);
-	GdpMessage__CmdAppend *payload = msg->cmd_append;
-	EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
+	{
+		GdpMessage__CmdAppend *payload = msg->cmd_append;
+		EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
 
 		payload->datum = (GdpDatum *) ep_mem_zalloc(sizeof *payload->datum);
 		gdp_datum__init(payload->datum);
@@ -474,7 +475,35 @@ append_common(gdp_gob_t *gob,
 		req->digest = gob->digest;
 		if (req->digest != NULL)
 		{
-			msg->sig->sig.len = len;
+			uint8_t recnobuf[8];		// 64 bits
+			uint8_t *pbp = recnobuf;
+			size_t len;
+			EP_CRYPTO_MD *md = ep_crypto_md_clone(req->digest);
+
+			recnobuf[0] = msg->cmd;
+			ep_crypto_sign_update(md, &recnobuf[0], 1);
+			PUT64(datum->recno);
+			ep_crypto_sign_update(md, recnobuf, sizeof recnobuf);
+			len = payload->datum->data.len;
+			ep_crypto_sign_update(md, payload->datum->data.data, len);
+			if (msg->sig == NULL)
+			{
+				msg->sig = (GdpSignature *) ep_mem_zalloc(sizeof *msg->sig);
+				gdp_signature__init(msg->sig);
+			}
+			len = EP_CRYPTO_MAX_PUB_KEY;
+			msg->sig->sig.data = (uint8_t *) ep_mem_malloc(len);
+			estat = ep_crypto_sign_final(md, msg->sig->sig.data, &len);
+			if (!EP_STAT_ISOK(estat))
+			{
+				ep_mem_free(msg->sig->sig.data);
+				ep_mem_free(msg->sig);
+				msg->sig = NULL;
+			}
+			else
+			{
+				msg->sig->sig.len = len;
+			}
 		}
 	}
 

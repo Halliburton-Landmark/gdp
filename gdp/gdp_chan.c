@@ -510,6 +510,8 @@ chan_open_helper(
 		void *adata)
 {
 	EP_STAT estat = EP_STAT_OK;
+	char abuf[500] = "";
+	char *port = NULL;		// keep gcc happy
 
 	if (chan->bev == NULL)
 	{
@@ -519,8 +521,6 @@ chan_open_helper(
 	}
 
 	// attach to a socket
-	char abuf[500] = "";
-	char *port = NULL;		// keep gcc happy
 	char *host;
 
 	// get the host:port info into abuf
@@ -574,142 +574,144 @@ chan_open_helper(
 
 	// strip off addresses and try them
 	estat = GDP_STAT_NOTFOUND;				// anything that is not OK
-	char *delim = abuf;
-	do
 	{
-		char pbuf[10];
-
-		host = delim;						// beginning of address spec
-		delim = strchr(delim, ';');			// end of address spec
-		if (delim != NULL)
-			*delim++ = '\0';
-
-		host = &host[strspn(host, " \t")];	// strip early spaces
-		if (*host == '\0')
-			continue;						// empty spec
-
-		ep_dbg_cprintf(Dbg, 1, "Trying %s\n", host);
-
-		port = host;
-		if (*host == '[')
+		char *delim = abuf;
+		do
 		{
-			// IPv6 literal
-			host++;						// strip [] to satisfy getaddrinfo
-			port = strchr(host, ']');
-			if (port != NULL)
-				*port++ = '\0';
-		}
+			char pbuf[10];
 
-		// see if we have a port number
-		if (port != NULL)
-		{
-			// use strrchr so IPv6 addr:port without [] will work
-			port = strrchr(port, ':');
-			if (port != NULL)
-				*port++ = '\0';
-		}
-		if (port == NULL || *port == '\0')
-		{
-			int portno;
+			host = delim;						// beginning of address spec
+			delim = strchr(delim, ';');			// end of address spec
+			if (delim != NULL)
+				*delim++ = '\0';
 
-			portno = ep_adm_getintparam("swarm.gdp.router.port",
-							GDP_PORT_DEFAULT);
-			snprintf(pbuf, sizeof pbuf, "%d", portno);
-			port = pbuf;
-		}
+			host = &host[strspn(host, " \t")];	// strip early spaces
+			if (*host == '\0')
+				continue;						// empty spec
 
-		ep_dbg_cprintf(Dbg, 20, "chan_open_helper: trying host %s port %s\n",
-				host, port);
+			ep_dbg_cprintf(Dbg, 1, "Trying %s\n", host);
 
-		// parsing done....  let's try the lookup
-		struct addrinfo *res, *a;
-		struct addrinfo hints;
-		int r;
-
-		memset(&hints, '\0', sizeof hints);
-		hints.ai_socktype = SOCK_STREAM;
-		hints.ai_protocol = IPPROTO_TCP;
-		r = getaddrinfo(host, port, &hints, &res);
-		if (r != 0)
-		{
-			// address resolution failed; try the next one
-			switch (r)
+			port = host;
+			if (*host == '[')
 			{
-			case EAI_SYSTEM:
-				estat = ep_stat_from_errno(errno);
-				if (!EP_STAT_ISOK(estat))
-					break;
-				// ... fall through
-
-			case EAI_NONAME:
-				estat = EP_STAT_DNS_NOTFOUND;
-				break;
-
-			default:
-				estat = EP_STAT_DNS_FAILURE;
-			}
-			ep_dbg_cprintf(Dbg, 1,
-					"chan_open_helper: getaddrinfo(%s, %s) =>\n"
-					"    %s\n",
-					host, port, gai_strerror(r));
-			continue;
-		}
-
-		// attempt connects on all available addresses
-		_gdp_chan_lock(chan);
-		for (a = res; a != NULL; a = a->ai_next)
-		{
-			// make the actual connection
-			// it would be nice to have a private timeout here...
-			evutil_socket_t sock = socket(a->ai_family, SOCK_STREAM, 0);
-			if (sock < 0)
-			{
-				// bad news, but keep trying
-				estat = ep_stat_from_errno(errno);
-				ep_log(estat, "chan_open_helper: cannot create socket");
-				continue;
+				// IPv6 literal
+				host++;						// strip [] to satisfy getaddrinfo
+				port = strchr(host, ']');
+				if (port != NULL)
+					*port++ = '\0';
 			}
 
-			// shall we disable Nagle algorithm?
-			if (ep_adm_getboolparam("swarm.gdp.tcp.nodelay", false))
+			// see if we have a port number
+			if (port != NULL)
 			{
-				int enable = 1;
-				if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
-							(void *) &enable, sizeof enable) != 0)
+				// use strrchr so IPv6 addr:port without [] will work
+				port = strrchr(port, ':');
+				if (port != NULL)
+					*port++ = '\0';
+			}
+			if (port == NULL || *port == '\0')
+			{
+				int portno;
+
+				portno = ep_adm_getintparam("swarm.gdp.router.port",
+								GDP_PORT_DEFAULT);
+				snprintf(pbuf, sizeof pbuf, "%d", portno);
+				port = pbuf;
+			}
+
+			ep_dbg_cprintf(Dbg, 20, "chan_open_helper: trying host %s port %s\n",
+					host, port);
+
+			// parsing done....  let's try the lookup
+			struct addrinfo *res, *a;
+			struct addrinfo hints;
+			int r;
+
+			memset(&hints, '\0', sizeof hints);
+			hints.ai_socktype = SOCK_STREAM;
+			hints.ai_protocol = IPPROTO_TCP;
+			r = getaddrinfo(host, port, &hints, &res);
+			if (r != 0)
+			{
+				// address resolution failed; try the next one
+				switch (r)
 				{
+				case EAI_SYSTEM:
 					estat = ep_stat_from_errno(errno);
-					ep_log(estat, "chan_open_helper: cannot set TCP_NODELAY");
-					// error not fatal, let's just go on
+					if (!EP_STAT_ISOK(estat))
+						break;
+					// ... fall through
+
+				case EAI_NONAME:
+					estat = EP_STAT_DNS_NOTFOUND;
+					break;
+
+				default:
+					estat = EP_STAT_DNS_FAILURE;
 				}
-			}
-			if (connect(sock, a->ai_addr, a->ai_addrlen) < 0)
-			{
-				// connection failure
-				estat = ep_stat_from_errno(errno);
-				ep_dbg_cprintf(Dbg, 38,
-						"chan_open_helper[%d]: connect failed: %s\n",
-						getpid(), strerror(errno));
-				close(sock);
+				ep_dbg_cprintf(Dbg, 1,
+						"chan_open_helper: getaddrinfo(%s, %s) =>\n"
+						"    %s\n",
+						host, port, gai_strerror(r));
 				continue;
 			}
 
-			// success!  Make it non-blocking and associate with bufferevent
-			ep_dbg_cprintf(Dbg, 39, "successful connect\n");
-			estat = EP_STAT_OK;
-			evutil_make_socket_nonblocking(sock);
-			bufferevent_setfd(chan->bev, sock);
-			break;
-		}
+			// attempt connects on all available addresses
+			_gdp_chan_lock(chan);
+			for (a = res; a != NULL; a = a->ai_next)
+			{
+				// make the actual connection
+				// it would be nice to have a private timeout here...
+				evutil_socket_t sock = socket(a->ai_family, SOCK_STREAM, 0);
+				if (sock < 0)
+				{
+					// bad news, but keep trying
+					estat = ep_stat_from_errno(errno);
+					ep_log(estat, "chan_open_helper: cannot create socket");
+					continue;
+				}
 
-		_gdp_chan_unlock(chan);
-		freeaddrinfo(res);
+				// shall we disable Nagle algorithm?
+				if (ep_adm_getboolparam("swarm.gdp.tcp.nodelay", false))
+				{
+					int enable = 1;
+					if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
+								(void *) &enable, sizeof enable) != 0)
+					{
+						estat = ep_stat_from_errno(errno);
+						ep_log(estat, "chan_open_helper: cannot set TCP_NODELAY");
+						// error not fatal, let's just go on
+					}
+				}
+				if (connect(sock, a->ai_addr, a->ai_addrlen) < 0)
+				{
+					// connection failure
+					estat = ep_stat_from_errno(errno);
+					ep_dbg_cprintf(Dbg, 38,
+							"chan_open_helper[%d]: connect failed: %s\n",
+							getpid(), strerror(errno));
+					close(sock);
+					continue;
+				}
 
-		if (EP_STAT_ISOK(estat))
-		{
-			// success
-			break;
-		}
-	} while (delim != NULL);
+				// success!  Make it non-blocking and associate with bufferevent
+				ep_dbg_cprintf(Dbg, 39, "successful connect\n");
+				estat = EP_STAT_OK;
+				evutil_make_socket_nonblocking(sock);
+				bufferevent_setfd(chan->bev, sock);
+				break;
+			}
+
+			_gdp_chan_unlock(chan);
+			freeaddrinfo(res);
+
+			if (EP_STAT_ISOK(estat))
+			{
+				// success
+				break;
+			}
+		} while (delim != NULL);
+	}
 
 	// error cleanup and return
 	if (!EP_STAT_ISOK(estat))

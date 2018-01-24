@@ -341,21 +341,23 @@ fail0:
 		}
 	}
 #else
-	int fileflags = O_RDWR;
-	BTREEINFO btinfo;
-
-	if (EP_UT_BITSET(DB_CREATE, dbflags))
-		fileflags |= O_CREAT;
-	if (EP_UT_BITSET(DB_EXCL, dbflags))
-		fileflags |= O_EXCL;
-	memset(&btinfo, 0, sizeof btinfo);
-	btinfo.compare = cmpf;
-	if ((db = dbopen(filename, fileflags, filemode, dbtype, &btinfo)) == NULL)
 	{
-		int _errno = errno;
+		int fileflags = O_RDWR;
+		BTREEINFO btinfo;
 
-		estat = ep_stat_from_errno(_errno);
-		ep_dbg_cprintf(Dbg, 2, "bdb_open: %s\n", strerror(_errno));
+		if (EP_UT_BITSET(DB_CREATE, dbflags))
+			fileflags |= O_CREAT;
+		if (EP_UT_BITSET(DB_EXCL, dbflags))
+			fileflags |= O_EXCL;
+		memset(&btinfo, 0, sizeof btinfo);
+		btinfo.compare = cmpf;
+		if ((db = dbopen(filename, fileflags, filemode, dbtype, &btinfo)) == NULL)
+		{
+			int _errno = errno;
+
+			estat = ep_stat_from_errno(_errno);
+			ep_dbg_cprintf(Dbg, 2, "bdb_open: %s\n", strerror(_errno));
+		}
 	}
 #endif
 
@@ -1450,10 +1452,12 @@ ridx_create(gdp_gob_t *gob,
 	EP_STAT_CHECK(estat, goto fail0);
 
 	ep_dbg_cprintf(Dbg, 20, "ridx_create: creating %s\n", ridx_pbuf);
-	int openflags = O_RDWR | O_CREAT;
-	if (!EP_UT_BITSET(FLAG_TMPFILE, flags))
-		openflags |= O_EXCL;
-	ridx_fd = open(ridx_pbuf, openflags, GOBfilemode);
+	{
+		int openflags = O_RDWR | O_CREAT;
+		if (!EP_UT_BITSET(FLAG_TMPFILE, flags))
+			openflags |= O_EXCL;
+		ridx_fd = open(ridx_pbuf, openflags, GOBfilemode);
+	}
 	if (ridx_fd < 0)
 	{
 		char nbuf[40];
@@ -1672,15 +1676,17 @@ tidx_create(gdp_gob_t *gob, const char *suffix, uint32_t flags)
 	EP_STAT_CHECK(estat, goto fail0);
 
 	ep_dbg_cprintf(Dbg, 20, "tidx_create: creating %s\n", tidx_pbuf);
-	int dbflags = DB_CREATE;
-	if (!EP_UT_BITSET(FLAG_TMPFILE, flags))
-		dbflags |= DB_EXCL;
-	estat = bdb_open(tidx_pbuf, dbflags, GOBfilemode,
-						DB_BTREE, NULL, &phys->tidx.db);
-	if (!EP_STAT_ISOK(estat))
 	{
-		ep_log(estat, "tidx_create: create(%s)", tidx_pbuf);
-		goto fail0;
+		int dbflags = DB_CREATE;
+		if (!EP_UT_BITSET(FLAG_TMPFILE, flags))
+			dbflags |= DB_EXCL;
+		estat = bdb_open(tidx_pbuf, dbflags, GOBfilemode,
+							DB_BTREE, NULL, &phys->tidx.db);
+		if (!EP_STAT_ISOK(estat))
+		{
+			ep_log(estat, "tidx_create: create(%s)", tidx_pbuf);
+			goto fail0;
+		}
 	}
 
 fail0:
@@ -2124,9 +2130,11 @@ disk_read_by_recno(gdp_gob_t *gob,
 		gdp_datum_t *datum)
 {
 	gob_physinfo_t *phys = GETPHYS(gob);
+	segment_t *seg = NULL;
 	EP_STAT estat = EP_STAT_OK;
 	ridx_entry_t ridx_entry;
 	ridx_entry_t *xent;
+	const char *phase = "init";
 
 	EP_ASSERT_POINTER_VALID(gob);
 	gdp_buf_reset(datum->dbuf);
@@ -2234,41 +2242,43 @@ disk_read_by_recno(gdp_gob_t *gob,
 
 
 	// read data in chunks and add it to the buffer
-	char read_buffer[GCL_READ_BUFFER_SIZE];
-	int64_t data_length = log_record.data_length;
+	{
+		char read_buffer[GCL_READ_BUFFER_SIZE];
+		off_t data_length = log_record.data_length;
 
-	char *phase = "data";
-	while (data_length >= sizeof read_buffer)
-	{
-		if (fread(read_buffer, sizeof read_buffer, 1, seg->fp) < 1)
-			goto fail2;
-		gdp_buf_write(datum->dbuf, read_buffer, sizeof read_buffer);
-		data_length -= sizeof read_buffer;
-	}
-	if (data_length > 0)
-	{
-		if (fread(read_buffer, data_length, 1, seg->fp) < 1)
-			goto fail2;
-		gdp_buf_write(datum->dbuf, read_buffer, data_length);
-	}
-
-	// read signature
-	if (datum->siglen > 0)
-	{
-		phase = "signature";
-		if (datum->siglen > sizeof read_buffer)
+		phase = "data";
+		while (data_length >= (off_t) sizeof read_buffer)
 		{
-			fprintf(stderr, "datum->siglen = %d, sizeof read_buffer = %zd\n",
-					datum->siglen, sizeof read_buffer);
-			EP_ASSERT(datum->siglen <= sizeof read_buffer);
+			if (fread(read_buffer, sizeof read_buffer, 1, seg->fp) < 1)
+				goto fail2;
+			gdp_buf_write(datum->dbuf, read_buffer, sizeof read_buffer);
+			data_length -= sizeof read_buffer;
 		}
-		if (datum->sig == NULL)
-			datum->sig = gdp_buf_new();
-		else
-			gdp_buf_reset(datum->sig);
-		if (fread(read_buffer, datum->siglen, 1, seg->fp) < 1)
-			goto fail2;
-		gdp_buf_write(datum->sig, read_buffer, datum->siglen);
+		if (data_length > 0)
+		{
+			if (fread(read_buffer, data_length, 1, seg->fp) < 1)
+				goto fail2;
+			gdp_buf_write(datum->dbuf, read_buffer, data_length);
+		}
+
+		// read signature
+		if (datum->siglen > 0)
+		{
+			phase = "signature";
+			if (datum->siglen > sizeof read_buffer)
+			{
+				fprintf(stderr, "datum->siglen = %d, sizeof read_buffer = %zd\n",
+						datum->siglen, sizeof read_buffer);
+				EP_ASSERT(datum->siglen <= sizeof read_buffer);
+			}
+			if (datum->sig == NULL)
+				datum->sig = gdp_buf_new();
+			else
+				gdp_buf_reset(datum->sig);
+			if (fread(read_buffer, datum->siglen, 1, seg->fp) < 1)
+				goto fail2;
+			gdp_buf_write(datum->sig, read_buffer, datum->siglen);
+		}
 	}
 
 	// done

@@ -169,6 +169,7 @@ static EP_STAT
 generate_ec_key(EP_CRYPTO_KEY *key, const char *curve)
 {
 	EP_STAT estat;
+	EC_KEY *eckey = NULL;
 
 	if (curve == NULL)
 		curve = ep_adm_getstrparam("libep.crypto.key.ec.curve",
@@ -180,7 +181,7 @@ generate_ec_key(EP_CRYPTO_KEY *key, const char *curve)
 				"unknown EC curve name %s", curve);
 		goto fail0;
 	}
-	EC_KEY *eckey = EC_KEY_new_by_curve_name(nid);
+	eckey = EC_KEY_new_by_curve_name(nid);
 	if (eckey == NULL)
 	{
 		estat = _ep_crypto_error(EP_STAT_CRYPTO_KEYCREATE,

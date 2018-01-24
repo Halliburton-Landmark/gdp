@@ -149,6 +149,8 @@ main(int argc, char **argv)
 	int exponent = 0;
 	const char *curve = NULL;
 	const char *keyfile = NULL;
+	bool keyfile_is_directory = false;
+	char *tempkeyfile = NULL;
 	int keyform = EP_CRYPTO_KEYFORM_PEM;
 	int key_enc_alg = -1;
 	char *passwd = NULL;
@@ -461,7 +463,6 @@ main(int argc, char **argv)
 	}
 
 	// see if we have an existing key
-	bool keyfile_is_directory = false;
 	if (keyfile == NULL)
 	{
 		// nope -- create a key in current directory if requested
@@ -536,7 +537,6 @@ main(int argc, char **argv)
 	**		name of the GCL yet.
 	*/
 
-	char *tempkeyfile = NULL;
 	if (make_new_key)
 	{
 		const char *localkeyfile = keyfile;

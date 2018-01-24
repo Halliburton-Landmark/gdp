@@ -1156,14 +1156,16 @@ _gdp_router_event(
 	else
 		goto fail0;
 
-	//XXX wildcard seqno?
-	GdpMessage *msg = _gdp_msg_new(cmd, GDP_PDU_ANY_RID, GDP_PDU_NO_SEQNO);
-	gdp_pdu_t *pdu = _gdp_pdu_new(msg, src, dst);
+	{
+		//XXX wildcard seqno?
+		GdpMessage *msg = _gdp_msg_new(cmd, GDP_PDU_ANY_RID, GDP_PDU_NO_SEQNO);
+		gdp_pdu_t *pdu = _gdp_pdu_new(msg, src, dst);
 
-	if (msg->cmd != 0)
-		_gdp_pdu_process(pdu, chan);
-	else
-		_gdp_pdu_free(&pdu);
+		if (msg->cmd != 0)
+			_gdp_pdu_process(pdu, chan);
+		else
+			_gdp_pdu_free(&pdu);
+	}
 
 fail0:
 	{
