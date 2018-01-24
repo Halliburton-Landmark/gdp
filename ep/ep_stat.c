@@ -168,7 +168,8 @@ ep_stat_tostr(EP_STAT stat,
 		{
 		  case EP_STAT_MOD_ERRNO:
 			module = "errno";
-			strerror_r(EP_STAT_DETAIL(stat), rbuf, sizeof rbuf);
+			(void) (0 == strerror_r(EP_STAT_DETAIL(stat),
+					rbuf, sizeof rbuf));
 			detail = rbuf;
 			break;
 

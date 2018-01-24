@@ -177,7 +177,7 @@ do_simpleread(gdp_gcl_t *gcl,
 		{
 			char nbuf[40];
 
-			strerror_r(errno, nbuf, sizeof nbuf);
+			(void) (0 == strerror_r(errno, nbuf, sizeof nbuf));
 			ep_app_warn("buffer reset failed: %s", nbuf);
 		}
 

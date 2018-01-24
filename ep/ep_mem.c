@@ -188,7 +188,7 @@ ep_mem_ialloc(
 		if (p == NULL)
 		{
 			// no luck ...  bail out
-			strerror_r(errno, e1buf, sizeof e1buf);
+			(void) (0 == strerror_r(errno, e1buf, sizeof e1buf));
 			ep_assert_failure(file, line,
 					"Out of memory: %s", e1buf);
 			/*NOTREACHED*/

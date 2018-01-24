@@ -128,7 +128,7 @@ diagnose_thr_err(int err,
 	{
 		char nbuf[40];
 
-		strerror_r(err, nbuf, sizeof nbuf);
+		(void) (0 == strerror_r(err, nbuf, sizeof nbuf));
 		if (name == NULL)
 			name = "???";
 		ep_dbg_printf("ep_thr_%-13s: %s:%d %s (%p): %s\n",

@@ -96,7 +96,7 @@ fsizeof(FILE *fp)
 	{
 		char errnobuf[200];
 
-		strerror_r(errno, errnobuf, sizeof errnobuf);
+		(void) (0 == strerror_r(errno, errnobuf, sizeof errnobuf));
 		ep_dbg_cprintf(Dbg, 1, "fsizeof: fstat failure: %s\n", errnobuf);
 		return -1;
 	}
@@ -1052,7 +1052,7 @@ segment_create(gdp_gob_t *gob,
 			char nbuf[40];
 
 			estat = ep_stat_from_errno(errno);
-			strerror_r(errno, nbuf, sizeof nbuf);
+			(void) (0 == strerror_r(errno, nbuf, sizeof nbuf));
 			ep_log(estat, "segment_create(%s): %s",
 					data_pbuf, nbuf);
 			if (data_fd >= 0)
@@ -1065,7 +1065,7 @@ segment_create(gdp_gob_t *gob,
 			char nbuf[40];
 
 			estat = ep_stat_from_errno(errno);
-			strerror_r(errno, nbuf, sizeof nbuf);
+			(void) (0 == strerror_r(errno, nbuf, sizeof nbuf));
 			ep_log(estat, "segment_create: fdopen(%s): %s",
 					data_pbuf, nbuf);
 			(void) close(data_fd);
@@ -1463,7 +1463,7 @@ ridx_create(gdp_gob_t *gob,
 		char nbuf[40];
 
 		estat = ep_stat_from_errno(errno);
-		strerror_r(errno, nbuf, sizeof nbuf);
+		(void) (0 == strerror_r(errno, nbuf, sizeof nbuf));
 		ep_log(estat, "ridx_create: create(%s): %s",
 			ridx_pbuf, nbuf);
 		goto fail0;
@@ -1474,7 +1474,7 @@ ridx_create(gdp_gob_t *gob,
 		char nbuf[40];
 
 		estat = ep_stat_from_errno(errno);
-		strerror_r(errno, nbuf, sizeof nbuf);
+		(void) (0 == strerror_r(errno, nbuf, sizeof nbuf));
 		ep_log(estat, "ridx_create: fdopen(%s): %s", ridx_pbuf, nbuf);
 		(void) close(ridx_fd);
 		(void) unlink(ridx_pbuf);

@@ -72,7 +72,7 @@ init_error(const char *datum, const char *where)
 	EP_STAT estat = ep_stat_from_errno(errno);
 	char nbuf[40];
 
-	strerror_r(errno, nbuf, sizeof nbuf);
+	(void) (0 == strerror_r(errno, nbuf, sizeof nbuf));
 	ep_log(estat, "gdp_init: %s: %s", where, datum);
 	ep_app_error("gdp_init: %s: %s: %s", where, datum, nbuf);
 	return estat;

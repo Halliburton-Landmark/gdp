@@ -151,7 +151,7 @@ printmessage(struct msginfo *mi,
 	{
 		char nbuf[40];
 
-		strerror_r(errno, nbuf, sizeof nbuf);
+		(void) (0 == strerror_r(errno, nbuf, sizeof nbuf));
 		fprintf(stderr, "\n\t(%s)", nbuf);
 	}
 	fprintf(stderr, "\n");

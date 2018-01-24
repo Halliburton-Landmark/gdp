@@ -196,7 +196,7 @@ write_scgi(scgi_request *req,
 		char obuf[40];
 		char nbuf[40];
 
-		strerror_r(errno, nbuf, sizeof nbuf);
+		(void) (0 == strerror_r(errno, nbuf, sizeof nbuf));
 		ep_app_error("scgi_write (%s) failed: %s",
 				ep_pcvt_str(obuf, sizeof obuf, sbuf), nbuf);
 	}
@@ -426,7 +426,7 @@ error500(scgi_request *req, const char *detail, int eno)
 {
 	char nbuf[40];
 
-	strerror_r(eno, nbuf, sizeof nbuf);
+	(void) (0 == strerror_r(eno, nbuf, sizeof nbuf));
 	(void) gdp_failure(req, "500", "Internal Server Error", "ss",
 			"errno", nbuf,
 			"detail", detail);
@@ -882,7 +882,7 @@ a_read_datum(scgi_request *req, gdp_name_t gcliname, gdp_recno_t recno)
 			{
 				char nbuf[40];
 
-				strerror_r(errno, nbuf, sizeof nbuf);
+				(void) (0 == strerror_r(errno, nbuf, sizeof nbuf));
 				ep_app_abort("Cannot open memory for GCL read response: %s",
 						nbuf);
 			}
@@ -919,7 +919,7 @@ a_read_datum(scgi_request *req, gdp_name_t gcliname, gdp_recno_t recno)
 			{
 				char nbuf[40];
 
-				strerror_r(errno, nbuf, sizeof nbuf);
+				(void) (0 == strerror_r(errno, nbuf, sizeof nbuf));
 				ep_app_abort("Cannot allocate memory for GCL read response: %s",
 						nbuf);
 			}
@@ -1235,7 +1235,7 @@ pfx_kv(scgi_request *req, char *uri)
 		{
 			char nbuf[40];
 
-			strerror_r(errno, nbuf, sizeof nbuf);
+			(void) (0 == strerror_r(errno, nbuf, sizeof nbuf));
 			ep_app_abort("Cannot open memory for GCL read response: %s",
 					nbuf);
 		}
@@ -1419,7 +1419,7 @@ main(int argc, char **argv, char **env)
 			{
 				char nbuf[40];
 
-				strerror_r(errno, nbuf, sizeof nbuf);
+				(void) (0 == strerror_r(errno, nbuf, sizeof nbuf));
 				ep_app_error("Cannot initialize gdp library: %s", nbuf);
 				return EX_TEMPFAIL;
 			}
@@ -1452,7 +1452,7 @@ main(int argc, char **argv, char **env)
 	{
 		char nbuf[40];
 
-		strerror_r(errno, nbuf, sizeof nbuf);
+		(void) (0 == strerror_r(errno, nbuf, sizeof nbuf));
 		ep_app_error("could not initialize SCGI port %d: %s",
 				listenport, nbuf);
 		return EX_OSERR;

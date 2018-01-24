@@ -168,7 +168,7 @@ restart:
 				{
 					char errno_buf[40];
 
-					strerror_r(err, errno_buf, sizeof errno_buf);
+					(void) (0 == strerror_r(err, errno_buf, sizeof errno_buf));
 					EP_ASSERT_PRINT("gdp_event_next: ep_thr_cond_wait => %s",
 							errno_buf);
 				}

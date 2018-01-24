@@ -42,16 +42,16 @@
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.buf", "GDP buffer processing");
 
-#define DIAGNOSE(cmd, istat)										\
-			do														\
-			{														\
-				if (istat < 0 && ep_dbg_test(Dbg, 9))				\
-				{													\
-					char ebuf[40];									\
-					strerror_r(errno, ebuf, sizeof ebuf);			\
-					ep_dbg_printf("gdp_buf_%s: stat %d: %s\n",		\
-							cmd, istat, ebuf);						\
-				}													\
+#define DIAGNOSE(cmd, istat)											\
+			do															\
+			{															\
+				if (istat < 0 && ep_dbg_test(Dbg, 9))					\
+				{														\
+					char ebuf[40];										\
+					(void) (0 == strerror_r(errno, ebuf, sizeof ebuf));	\
+					ep_dbg_printf("gdp_buf_%s: stat %d: %s\n",			\
+							cmd, istat, ebuf);							\
+				}														\
 			} while (false)
 
 /*
