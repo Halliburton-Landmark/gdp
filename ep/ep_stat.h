@@ -142,7 +142,7 @@ typedef struct _ep_stat
 
 // casting to and from int
 #define EP_STAT_TO_INT(s)	((s).code)
-#define EP_STAT_FROM_INT(i)	((EP_STAT) { (i) })
+#define EP_STAT_FROM_INT(i)	((EP_STAT) { (uint32_t) (i) })
 
 // error checking quick routine, e.g., EP_STAT_CHECK(stat, break);
 #define EP_STAT_CHECK(st, failure) \

@@ -48,6 +48,7 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.subscr", "GDP subscriptions");
 static bool			SubscriptionThreadRunning;
 static EP_THR		SubscriptionThreadId;
 EP_THR_MUTEX		_GdpSubscriptionMutex	EP_THR_MUTEX_INITIALIZER;
+struct req_head		_GdpSubscriptionRequests;
 
 
 /*

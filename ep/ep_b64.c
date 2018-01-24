@@ -35,7 +35,7 @@
 #include <ep/ep_b64.h>
 #include <ep/ep_dbg.h>
 
-static const char	EncChars[62] =
+static const char	*EncChars =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
 #define EP_STAT_B64_OVERFLOW		EP_STAT_ABORT
@@ -233,14 +233,14 @@ ep_b64_decode(const char *txt, size_t tsize,
 		tx = ILL;
 	for (bx = 0; bx < sizeof decode; bx++)
 		decode[bx] = tx;
-	for (bx = 0; bx < sizeof EncChars; bx++)
+	for (bx = 0; EncChars[bx] != '\0'; bx++)
 		decode[(int) EncChars[bx]] = bx;
 	decode[(int) encoding[0]] = 62;
 	decode[(int) encoding[1]] = 63;
 	if ((encoding[2] & EP_B64_WRAPMASK) != 0)
-		decode['\r'] = decode['\n'] = IGN;
+		decode[(int) '\r'] = decode[(int) '\n'] = IGN;
 	if (EP_UT_BITSET(EP_B64_PAD, encoding[2]))
-		decode['='] = IGN;
+		decode[(int) '='] = IGN;
 
 	// TODO: check to make sure output buffer won't overflow
 

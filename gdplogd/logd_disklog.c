@@ -2182,7 +2182,7 @@ disk_read_by_recno(gdp_gob_t *gob,
 	// xent now points to the ridx entry for this record
 
 	// get the open segment
-	segment_t *seg = segment_get(gob, xent->segment);
+	seg = segment_get(gob, xent->segment);
 	estat = segment_open(gob, seg);
 	if (!EP_STAT_ISOK(estat))
 	{
@@ -2738,11 +2738,11 @@ disk_getstats(
 }
 
 
+__BEGIN_DECLS
 struct gob_phys_impl	GdpDiskImpl =
 {
 	.init =				disk_init,
 	.read_by_recno =	disk_read_by_recno,
-	.ts_to_recno =		disk_ts_to_recno,
 	.create =			disk_create,
 	.open =				disk_open,
 	.close =			disk_close,
@@ -2754,5 +2754,7 @@ struct gob_phys_impl	GdpDiskImpl =
 	.remove =			disk_remove,
 	.foreach =			disk_foreach,
 	.getstats =			disk_getstats,
+	.ts_to_recno =		disk_ts_to_recno,
 	.recno_exists =		disk_recno_exists,
 };
+__END_DECLS

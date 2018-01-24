@@ -242,7 +242,7 @@ typedef struct
 	EP_STAT		estat;		// corresponding status
 } dispatch_ent_t;
 
-static dispatch_ent_t	DispatchTable[256];
+static EP_STAT	get_default_estat(gdp_cmd_t);
 
 
 /*
@@ -278,7 +278,7 @@ acknak(gdp_req_t *req, const char *where, bool reuse_pdu)
 	}
 	else
 	{
-		estat = DispatchTable[req->rpdu->msg->cmd].estat;
+		estat = get_default_estat(req->rpdu->msg->cmd);
 	}
 
 fail0:
@@ -757,6 +757,12 @@ _gdp_proto_cmd_name(uint8_t cmd)
 		snprintf(buf, sizeof buf, "%d", cmd);
 		return buf;
 	}
+}
+
+static EP_STAT
+get_default_estat(gdp_cmd_t cmd)
+{
+	return DispatchTable[cmd].estat;
 }
 
 

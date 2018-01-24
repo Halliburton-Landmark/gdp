@@ -178,6 +178,7 @@ show_metadata(int nmds, FILE *dfp, size_t *foffp, int plev)
 						ep_hexdump(mdata + 4, mdhdrs[i].md_len - 4,
 								stdout, EP_HEXDUMP_HEX, 0);
 					continue;
+
 				default:
 					printf("\n");
 					break;

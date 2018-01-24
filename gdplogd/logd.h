@@ -67,7 +67,7 @@ extern uint32_t		GdplogdForgive;
 #endif //_GDPLOGD_FORGIVING
 
 // how strongly we enforce signatures
-uint32_t	GdpSignatureStrictness;		// how strongly we enforce signatures
+extern uint32_t		GdpSignatureStrictness;		// how strongly we enforce signatures
 
 #define GDP_SIG_MUSTVERIFY	0x01		// sig must verify if it exists
 #define GDP_SIG_REQUIRED	0x02		// sig must exist if pub key exists

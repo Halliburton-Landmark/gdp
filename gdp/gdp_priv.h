@@ -787,7 +787,7 @@ EP_STAT			_gdp_advertise_me(			// advertise me only
 #define GDP_SUBSCR_TIMEOUT_DEF	180L		// default timeout (sec)
 
 extern EP_THR_MUTEX		_GdpSubscriptionMutex;
-struct req_head			_GdpSubscriptionRequests;
+extern struct req_head	_GdpSubscriptionRequests;
 
 void			_gdp_subscr_lost(			// subscription disappeared
 						gdp_req_t *req);

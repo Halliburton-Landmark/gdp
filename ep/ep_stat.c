@@ -66,7 +66,7 @@ ep_stat_from_errno(int uerrno)
 	if (uerrno == 0)
 		return EP_STAT_OK;
 	return EP_STAT_NEW(ERROR, EP_REGISTRY_EPLIB,
-			EP_STAT_MOD_ERRNO, (unsigned long) uerrno);
+			EP_STAT_MOD_ERRNO, (uint32_t) uerrno);
 }
 
 

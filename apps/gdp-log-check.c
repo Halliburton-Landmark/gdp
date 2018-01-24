@@ -81,7 +81,7 @@ static struct ep_stat_to_string	Stats[] =
 	{ EP_STAT_OK,					NULL,									}
 };
 
-struct
+static struct
 {
 	bool	verbose:1;
 	bool	silent:1;
