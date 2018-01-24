@@ -137,7 +137,8 @@ create_services(AvahiClient *c)
 		if ((ret = avahi_entry_group_add_service
 					(
 						AGroup, AVAHI_IF_UNSPEC, AVAHI_PROTO_UNSPEC,
-						0, SName, "_gdp._tcp", NULL, NULL, SPort, NULL
+						(AvahiPublishFlags) 0, SName, "_gdp._tcp",
+						NULL, NULL, SPort, NULL
 					)) < 0)
 		{
 			if (ret == AVAHI_ERR_COLLISION)
@@ -247,7 +248,7 @@ gdp_zc_publish(const char *instance, uint16_t port_no)
 
 	/* Allocate a new client */
 	client = avahi_client_new(avahi_simple_poll_get(SimplePoll),
-			0, client_callback, NULL, &error);
+			(AvahiClientFlags) 0, client_callback, NULL, &error);
 
 	/* Check whether creating the client object succeeded */
 	if (!client)

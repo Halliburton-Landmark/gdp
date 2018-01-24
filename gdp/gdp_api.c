@@ -645,7 +645,7 @@ gdp_gcl_open(gdp_name_t name,
 {
 	EP_STAT estat;
 	gdp_gob_t *gob = NULL;
-	int cmd;
+	gdp_cmd_t cmd;
 
 	if (ep_dbg_test(Dbg, 19))
 	{

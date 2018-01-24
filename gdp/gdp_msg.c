@@ -181,9 +181,11 @@ _gdp_msg_new(gdp_cmd_t cmd, gdp_rid_t rid, gdp_seqno_t seqno)
 			msg->nak = (GdpMessage__NakGeneric *)
 						ep_mem_zalloc(sizeof *msg->nak);
 			gdp_message__nak_generic__init(msg->nak);
-			break;
 		}
-		msg->body_case = GDP_MESSAGE__BODY__NOT_SET;
+		else
+		{
+			msg->body_case = GDP_MESSAGE__BODY__NOT_SET;
+		}
 		break;
 	}
 

@@ -66,7 +66,7 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.proto", "GDP Log Daemon protocol");
 
 static EP_STAT
 gdpd_nak_resp(gdp_req_t *req,
-			int nak_type,
+			gdp_cmd_t nak_type,
 			const char *detail,
 			EP_STAT estat)
 {
@@ -119,7 +119,7 @@ gdpd_nak_resp(gdp_req_t *req,
 static EP_STAT
 gdpd_ack_resp(
 			gdp_req_t *req,
-			int ack_type)
+			gdp_cmd_t ack_type)
 {
 	gdp_msg_t *msg;
 
@@ -875,7 +875,7 @@ cmd_append(gdp_req_t *req)
 	}
 	else
 	{
-		estat = gdpd_nak_resp(req, 0,
+		estat = gdpd_nak_resp(req, GDP_MSG_CODE__CMD_NONE,
 						"cmd_append: append failure",
 						estat);
 	}

@@ -208,7 +208,7 @@ subscr_poker_thread(void *unused)
 
 EP_STAT
 _gdp_gcl_subscribe(gdp_gin_t *gin,
-		int cmd,
+		gdp_cmd_t cmd,
 		gdp_recno_t start,
 		int32_t numrecs,
 		EP_TIME_SPEC *timeout,

@@ -299,7 +299,7 @@ EP_STAT			_gdp_gob_create(			// create a new GDP object
 
 EP_STAT			_gdp_gob_open(				// open a GCL
 						gdp_gob_t *gob,
-						int cmd,
+						gdp_cmd_t cmd,
 						gdp_gcl_open_info_t *open_info,
 						gdp_chan_t *chan,
 						uint32_t reqflags);
@@ -346,7 +346,7 @@ EP_STAT			_gdp_gob_append_async(		// append asynchronously
 
 EP_STAT			_gdp_gcl_subscribe(			// subscribe to data
 						gdp_gin_t *gin,
-						int cmd,
+						gdp_cmd_t cmd,
 						gdp_recno_t start,
 						int32_t numrecs,
 						EP_TIME_SPEC *timeout,
@@ -633,7 +633,7 @@ struct gdp_req
 #define GDP_REQ_ROUTEFAIL		0x00000400	// fail immediately on route failure
 
 EP_STAT			_gdp_req_new(				// create new request
-						int cmd,
+						gdp_cmd_t cmd,
 						gdp_gob_t *gob,
 						gdp_chan_t *chan,
 						gdp_pdu_t *pdu,
@@ -810,9 +810,9 @@ void			_gdp_reclaim_resources_init(
 
 void			_gdp_dump_state(int plev);
 
-int				_gdp_acknak_from_estat(		// produce acknak code from status
+gdp_cmd_t		_gdp_acknak_from_estat(		// produce acknak code from status
 						EP_STAT estat,			// status to evaluate
-						int def);				// use this if nothing better...
+						gdp_cmd_t def);			// use this if nothing better...
 
 /*
 **  Cryptography support

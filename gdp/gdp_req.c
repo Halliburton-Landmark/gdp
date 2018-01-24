@@ -108,7 +108,7 @@ statestr(const gdp_req_t *req)
 */
 
 EP_STAT
-_gdp_req_new(int cmd,
+_gdp_req_new(gdp_cmd_t cmd,
 		gdp_gob_t *gob,
 		gdp_chan_t *chan,
 		gdp_pdu_t *pdu,

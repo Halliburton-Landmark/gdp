@@ -329,7 +329,7 @@ add_service(config_t *c,
 	{
 		if (!(i->resolver = avahi_service_resolver_new(Client, interface,
 						protocol, name, type, domain, AVAHI_PROTO_UNSPEC,
-						0, service_resolver_callback, i)))
+						(AvahiLookupFlags) 0, service_resolver_callback, i)))
 		{
 			avahi_free(i);
 			fprintf(stderr,
@@ -484,7 +484,7 @@ browse_service_type(config_t *c,
 			AVAHI_PROTO_UNSPEC,
 			stype,
 			domain,
-			0,
+			(AvahiLookupFlags) 0,
 			service_browser_callback,
 			c)))
 	{
@@ -624,7 +624,7 @@ create_new_simple_poll_client(config_t *conf)
 	int error = 0;
 
 	Client = avahi_client_new(avahi_simple_poll_get(SimplePoll),
-			conf->no_fail ? AVAHI_CLIENT_NO_FAIL : 0,
+			conf->no_fail ? AVAHI_CLIENT_NO_FAIL : (AvahiClientFlags) 0,
 			client_callback,
 			conf,
 			&error);

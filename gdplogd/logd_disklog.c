@@ -261,7 +261,7 @@ static EP_STAT
 bdb_open(const char *filename,
 		int dbflags,
 		int filemode,
-		int dbtype,
+		DBTYPE dbtype,
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
 		int (*cmpf)(DB *, const DBT *, const DBT *),
 #else

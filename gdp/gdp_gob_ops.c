@@ -275,7 +275,7 @@ find_secret_key(gdp_gob_t *gob,
 
 EP_STAT
 _gdp_gob_open(gdp_gob_t *gob,
-			int cmd,
+			gdp_cmd_t cmd,
 			gdp_gcl_open_info_t *open_info,
 			gdp_chan_t *chan,
 			uint32_t reqflags)

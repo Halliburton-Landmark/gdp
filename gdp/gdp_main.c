@@ -79,10 +79,10 @@ init_error(const char *datum, const char *where)
 }
 
 
-int
-_gdp_acknak_from_estat(EP_STAT estat, int def)
+gdp_cmd_t
+_gdp_acknak_from_estat(EP_STAT estat, gdp_cmd_t def)
 {
-	int resp = def;
+	gdp_cmd_t resp = def;
 
 	if (EP_STAT_ISOK(estat))
 	{
@@ -104,14 +104,14 @@ _gdp_acknak_from_estat(EP_STAT estat, int def)
 		if (EP_STAT_ISOK(estat))
 		{
 			if (d >= 200 && d < (200 + GDP_ACK_MAX - GDP_ACK_MIN))
-				resp = d - 200 + GDP_ACK_MIN;
+				resp = (gdp_cmd_t) (d - 200 + GDP_ACK_MIN);
 		}
 		else if (d >= 400 && d < (400 + GDP_NAK_C_MAX - GDP_NAK_C_MIN))
-			resp = d - 400 + GDP_NAK_C_MIN;
+			resp = (gdp_cmd_t) (d - 400 + GDP_NAK_C_MIN);
 		else if (d >= 500 && d < (500 + GDP_NAK_S_MAX - GDP_NAK_S_MIN))
-				resp = d - 500 + GDP_NAK_S_MIN;
+				resp = (gdp_cmd_t) (d - 500 + GDP_NAK_S_MIN);
 		else if (d >= 600 && d < (600 + GDP_NAK_R_MAX - GDP_NAK_R_MIN))
-			resp = d - 600 + GDP_NAK_R_MIN;
+			resp = (gdp_cmd_t) (d - 600 + GDP_NAK_R_MIN);
 	}
 
 	if (ep_dbg_test(Dbg, 41))
@@ -138,8 +138,8 @@ static EP_THR_MUTEX		GclCreateMutex			EP_THR_MUTEX_INITIALIZER;
 static void
 process_cmd(void *cpdu_)
 {
-	int cmd;
 	gdp_pdu_t *cpdu = (gdp_pdu_t *) cpdu_;
+	gdp_cmd_t cmd;
 	EP_STAT estat;
 	gdp_gob_t *gob = NULL;
 	gdp_req_t *req = NULL;
@@ -222,7 +222,7 @@ process_cmd(void *cpdu_)
 	}
 
 	// send response PDU if appropriate
-	req->rpdu->msg->cmd = resp;
+	req->rpdu->msg->cmd = (GdpMsgCode) resp;
 	req->stat = _gdp_pdu_out(req->rpdu, req->chan, NULL);
 	//XXX anything to do with estat here?
 
@@ -1149,7 +1149,7 @@ _gdp_router_event(
 		EP_STAT estat)
 {
 	// fake up a PDU for the router event
-	int cmd = 0;;
+	gdp_cmd_t cmd = (gdp_cmd_t) 0;
 
 	if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOROUTE))
 		cmd = GDP_NAK_R_NOROUTE;
