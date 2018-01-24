@@ -32,6 +32,7 @@ BINALL= \
 		t_fwd_append \
 		t_multimultiread \
 		t_sub_and_append \
+		t_unsubscribe \
 
 SBINALL=
 
@@ -121,25 +122,9 @@ MKDIR=		mkdir -p
 all:	${ALL}
 	@echo "To actually run the tests, run make allTests"
 
-gdp-stresser:	gdp-stresser.o t_common_support.o
-	${CC} -o $@ gdp-stresser.o ${LDFLAGS}
 
-t_ep_uuid:	t_ep_uuid.o t_common_support.o
-	${CC} -o $@ t_ep_uuid.o ${LDFLAGS}
-
-t_fwd_append:	t_fwd_append.o t_common_support.o
-	${CC} -o $@ t_fwd_append.o ${LDFLAGS}
-
-t_multimultiread:	t_multimultiread.o t_common_support.o
-	${CC} -o $@ t_multimultiread.o ${LDFLAGS}
-
-t_sub_and_append:	t_sub_and_append.o t_common_support.o
-	${CC} -o $@ t_sub_and_append.o ${LDFLAGS}
-
-t_unsubscribe:	t_unsubscribe.o t_common_support.o
-	${CC} -o $@ t_unsubscribe.o ${LDFLAGS}
-
-${CLEANALL}:	${LIBROOT}/gdp/libgdp.a ${LIBROOT}/ep/libep.a
+${CLEANALL}:	${LIBROOT}/gdp/libgdp.a ${LIBROOT}/ep/libep.a \
+		t_common_support.o
 
 clean:
 	-rm -f ${CLEANALL} *.o *.core
@@ -159,5 +144,11 @@ UPDATE_LICENSE=	${ADM}/update-license.sh
 
 update-license:
 	${UPDATE_LICENSE} Makefile *.[ch]
+
+# Redefine the implicit compile rule; GNU make changed the rule slightly
+# which causes explicit paths to libgdp.a and libep.a to be added to
+# the command, which in turn breaks compiling under C++.
+.c:
+	${LINK.c} -o $@ $< ${LDLIBS}
 
 FORCE:
