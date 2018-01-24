@@ -471,7 +471,7 @@ void scgi_flush_response( scgi_desc *d )
   return;
 }
 
-void scgi_perror( char *txt )
+void scgi_perror( const char *txt )
 {
   //XXX should log here
   fprintf( stderr, "%s\n", txt );
@@ -919,7 +919,7 @@ scgi_request *scgi_recv( void )
  * This is one of the functions which you (the programmer making use of the SCGI C Library)
  * are likely to use in practice.
  */
-int scgi_write( scgi_request *req, char *txt )
+int scgi_write( scgi_request *req, const char *txt )
 {
   int len = strlen(txt);
 
@@ -937,7 +937,7 @@ int scgi_write( scgi_request *req, char *txt )
  * This is one of the functions which you (the programmer making use of the SCGI C Library)
  * are likely to use in practice.
  */
-int scgi_send( scgi_request *req, char *txt, int len )
+int scgi_send( scgi_request *req, const char *txt, int len )
 {
   scgi_desc *d = req->descriptor;
 

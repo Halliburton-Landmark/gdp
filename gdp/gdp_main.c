@@ -807,8 +807,8 @@ static EP_DBG	EvlibDbg = EP_DBG_INIT("gdp.libevent", "GDP Libevent");
 static void
 evlib_log_cb(int severity, const char *msg)
 {
-	char *sev;
-	char *sevstrings[] = { "debug", "msg", "warn", "error" };
+	const char *sev;
+	const char *sevstrings[] = { "debug", "msg", "warn", "error" };
 
 	if (severity < 0 || severity > 3)
 		sev = "?";

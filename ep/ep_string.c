@@ -408,7 +408,7 @@ ep_str_char_set(
 	if (type == NULL)
 	{
 		// try to guess based on environment
-		char *p;
+		const char *p;
 
 		if (!isatty(1))
 			return EP_STAT_OK;

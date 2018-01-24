@@ -48,8 +48,8 @@
 struct node
 {
 	size_t			keylen;		// length of key
-	void			*key;		// actual key
-	void			*val;		// value
+	const void		*key;		// actual key
+	const void		*val;		// value
 	struct node		*next;		// next in chain
 };
 
@@ -156,14 +156,14 @@ find_node_ptr(EP_HASH *hp,
 }
 
 
-void *
+const void *
 ep_hash_search(
 	EP_HASH *hp,
 	size_t keylen,
 	const void *key)
 {
 	struct node **npp;
-	void *val;
+	const void *val;
 
 	EP_ASSERT_POINTER_VALID(hp);
 
@@ -178,12 +178,12 @@ ep_hash_search(
 }
 
 
-void *
+const void *
 ep_hash_insert(
 	EP_HASH *hp,
 	size_t keylen,
 	const void *key,
-	void *val)
+	const void *val)
 {
 	struct node **npp;
 	struct node *n;
@@ -196,7 +196,7 @@ ep_hash_insert(
 	if (*npp != NULL)
 	{
 		// there is an existing value; replace it
-		void *oldval;
+		const void *oldval;
 
 		n = *npp;
 		oldval = n->val;
@@ -219,7 +219,7 @@ ep_hash_insert(
 }
 
 
-void *
+const void *
 ep_hash_delete(
 	EP_HASH *hp,
 	size_t keylen,
@@ -227,7 +227,7 @@ ep_hash_delete(
 {
 	struct node **npp;
 	struct node *n;
-	void *v;
+	const void *v;
 
 	EP_ASSERT_POINTER_VALID(hp);
 

@@ -141,7 +141,7 @@ fail0:
 */
 
 static void
-check_cache_helper(size_t klen, const void *key, void *val, va_list av)
+check_cache_helper(size_t klen, const void *key, const void *val, va_list av)
 {
 	const gdp_gob_t *gob;
 	const gdp_gob_t *g2;
@@ -149,7 +149,7 @@ check_cache_helper(size_t klen, const void *key, void *val, va_list av)
 	if (val == NULL)
 		return;
 
-	gob = val;
+	gob = (const gdp_gob_t *) val;
 	LIST_FOREACH(g2, &GobsByUse, ulist)
 	{
 		if (g2 == gob)

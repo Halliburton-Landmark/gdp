@@ -114,7 +114,7 @@ ep_stat_reg_strings(struct ep_stat_to_string *r)
 **		(Will always be "buf")
 */
 
-static char	*GenericErrors[] =
+static const char	*GenericErrors[] =
 {
 	"generic error",		// 0
 	"out of memory",		// 1

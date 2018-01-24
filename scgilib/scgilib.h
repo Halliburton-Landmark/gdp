@@ -272,10 +272,10 @@ void free_scgi_request( scgi_request *r );
 void scgi_flush_response( scgi_desc *d );
 void scgi_listen_to_request( scgi_desc *d );
 void scgi_answer_the_phone( scgi_port *p );
-void scgi_perror( char *txt );
+void scgi_perror( const char *txt );
 int scgi_initialize(int port);
-int scgi_send( scgi_request *req, char *txt, int len );
-int scgi_write( scgi_request *req, char *txt );
+int scgi_send( scgi_request *req, const char *txt, int len );
+int scgi_write( scgi_request *req, const char *txt );
 scgi_request *scgi_recv( void );
 void scgi_register_fd_callbacks(void *(*regcb)(int fd, enum scgi_fd_type),
 	void (*freecb)(int fd, void *));

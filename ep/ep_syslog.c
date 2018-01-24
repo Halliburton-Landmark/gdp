@@ -35,8 +35,8 @@
 
 struct code
 {
-	char	*c_name;
-	int	c_val;
+	const char	*c_name;
+	const int	c_val;
 };
 
 static struct code	PriNames[] =
@@ -126,7 +126,7 @@ ep_syslog_pri_from_name(const char *name)
 
 
 
-char *
+const char *
 ep_syslog_name_from_pri(int pri)
 {
 	struct code *c;
@@ -156,7 +156,7 @@ ep_syslog_fac_from_name(const char *name)
 
 
 
-char *
+const char *
 ep_syslog_name_from_fac(int fac)
 {
 	struct code *c;

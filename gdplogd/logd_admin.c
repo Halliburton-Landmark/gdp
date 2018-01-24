@@ -62,7 +62,7 @@ static const char	*AdminStatsFileName = NULL;
 static ino_t		AdminStatsIno = -1;
 static FILE			*AdminStatsFp;
 static uint32_t		AdminRunMask = 0xffffffff;
-static char			*AdminPrefix = "";
+static const char	*AdminPrefix = "";
 static bool			AdminInitialized = false;
 static EP_THR_MUTEX	AdminProbeMutex		EP_THR_MUTEX_INITIALIZER;
 

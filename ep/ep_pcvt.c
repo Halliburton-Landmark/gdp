@@ -29,6 +29,7 @@
 ***********************************************************************/
 
 #include <ep.h>
+#include <ep_pcvt.h>
 #include <ep_string.h>
 
 
@@ -72,7 +73,7 @@ ep_pcvt_int(
 	int base,
 	long val)
 {
-	char *fmtstr;
+	const char *fmtstr;
 
 	switch (base)
 	{

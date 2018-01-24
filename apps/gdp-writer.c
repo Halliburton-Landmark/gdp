@@ -76,7 +76,7 @@ do_log(const char *tag)
 #define LOG(tag)	{ if (LogFile != NULL) do_log(tag); }
 
 
-static char	*EventTypes[] =
+static const char	*EventTypes[] =
 {
 	"Free (internal use)",
 	"Data",
@@ -93,7 +93,7 @@ showstat(gdp_event_t *gev)
 	gdp_datum_t *d = gdp_event_getdatum(gev);
 	char ebuf[100];
 	char tbuf[20];
-	char *evname;
+	const char *evname;
 
 	if (evtype >= sizeof EventTypes / sizeof EventTypes[0])
 	{

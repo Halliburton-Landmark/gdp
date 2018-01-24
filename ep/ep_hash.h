@@ -44,7 +44,7 @@ typedef struct EP_HASH		EP_HASH;
 typedef void	(*EP_HASH_FORALL_FUNCP)(
 			size_t keylen,
 			const void *key,
-			void *val,
+			const void *val,
 			va_list av);
 typedef int	(*EP_HASH_HASH_FUNCP)(
 			const EP_HASH *const hash,
@@ -57,16 +57,19 @@ extern EP_HASH	*ep_hash_new(
 			int tabsize);
 extern void	ep_hash_free(
 			EP_HASH *hash);
-extern void	*ep_hash_search(
+extern const void
+		*ep_hash_search(
 			EP_HASH *hash,
 			size_t keylen,
 			const void *key);
-extern void	*ep_hash_insert(
+extern const void
+		*ep_hash_insert(
 			EP_HASH *hash,
 			size_t keylen,
 			const void *key,
-			void *val);
-extern void	*ep_hash_delete(
+			const void *val);
+extern const void
+		*ep_hash_delete(
 			EP_HASH *hash,
 			size_t keylen,
 			const void *key);

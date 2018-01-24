@@ -174,7 +174,7 @@ extern EP_STAT	ep_stat_from_errno(int uerrno);
 struct ep_stat_to_string
 {
 	EP_STAT		estat;		// status code
-	char		*estr;		// string representation
+	const char	*estr;		// string representation
 };
 
 // register stat code to string mappings

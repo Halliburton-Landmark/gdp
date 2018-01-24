@@ -67,7 +67,7 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.proto", "GDP Log Daemon protocol");
 static EP_STAT
 gdpd_nak_resp(gdp_req_t *req,
 			int nak_type,
-			char *detail,
+			const char *detail,
 			EP_STAT estat)
 {
 	gdp_pname_t pname;
@@ -140,7 +140,7 @@ gdpd_ack_resp(
 */
 
 EP_STAT
-implement_me(char *s)
+implement_me(const char *s)
 {
 	ep_app_error("Not implemented: %s", s);
 	return GDP_STAT_NOT_IMPLEMENTED;

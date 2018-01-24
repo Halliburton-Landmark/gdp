@@ -33,8 +33,15 @@
 #include <ep/ep.h>
 __BEGIN_DECLS
 
-extern char	*ep_pcvt_str(char *obuf, size_t osize, const char *val);
-extern char	*ep_pcvt_int(char *obuf, size_t osize, int base, long val);
+extern const char	*ep_pcvt_str(
+				char *obuf,
+				size_t osize,
+				const char *val);
+extern const char	*ep_pcvt_int(
+				char *obuf,
+				size_t osize,
+				int base,
+				long val);
 
 __END_DECLS
 #endif // _EP_PCVT_H_
