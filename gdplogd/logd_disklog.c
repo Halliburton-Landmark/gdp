@@ -2042,26 +2042,26 @@ disk_close(gdp_gob_t *gob)
 
 
 /*
-**  DISK_DELETE --- delete a disk-based log
+**  DISK_REMOVE --- remove a disk-based log
 **
 **		It is assume that permission has already been granted.
 */
 
 static EP_STAT
-disk_delete(gdp_gob_t *gob)
+disk_remove(gdp_gob_t *gob)
 {
 	EP_STAT estat = EP_STAT_OK;
 
 	if (!EP_ASSERT_POINTER_VALID(gob) || !EP_ASSERT_POINTER_VALID(gob->x))
 		return EP_STAT_ASSERT_ABORT;
 
-	ep_dbg_cprintf(Dbg, 18, "disk_delete(%s)\n", gob->pname);
+	ep_dbg_cprintf(Dbg, 18, "disk_remove(%s)\n", gob->pname);
 
 	DIR *dir;
 	char dbuf[GOB_PATH_MAX];
 
 	snprintf(dbuf, sizeof dbuf, "%s/_%02x", GclDir, gob->name[0]);
-	ep_dbg_cprintf(Dbg, 21, "  delete directory %s%s%s\n",
+	ep_dbg_cprintf(Dbg, 21, "  remove directory %s%s%s\n",
 					EpChar->lquote, dbuf, EpChar->rquote);
 	dir = opendir(dbuf);
 	if (dir == NULL)
@@ -2080,13 +2080,13 @@ disk_delete(gdp_gob_t *gob)
 		if (i != 0)
 		{
 			estat = ep_stat_from_errno(i);
-			ep_log(estat, "disk_delete: readdir_r(%s) failed", dbuf);
+			ep_log(estat, "disk_remove: readdir_r(%s) failed", dbuf);
 			break;
 		}
 		if (dent == NULL)
 			break;
 
-		ep_dbg_cprintf(Dbg, 50, "  delete trial %s%s%s ",
+		ep_dbg_cprintf(Dbg, 50, "  remove trial %s%s%s ",
 						EpChar->lquote, dent->d_name, EpChar->rquote);
 		if (strncmp(gob->pname, dent->d_name, GDP_GCL_PNAME_LEN) == 0)
 		{
@@ -2741,7 +2741,7 @@ struct gob_phys_impl	GdpDiskImpl =
 #if SEGMENT_SUPPORT
 	.newsegment =		disk_newsegment,
 #endif
-	.delete =			disk_delete,
+	.remove =			disk_remove,
 	.foreach =			disk_foreach,
 	.getstats =			disk_getstats,
 	.recno_exists =		disk_recno_exists,

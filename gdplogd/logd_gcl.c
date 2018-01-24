@@ -112,8 +112,8 @@ gob_delete(gdp_gob_t *gob)
 		gob->x->physimpl->close(gob);
 
 	// now delete the files
-	if (gob->x->physimpl->delete != NULL)
-		gob->x->physimpl->delete(gob);
+	if (gob->x->physimpl->remove != NULL)
+		gob->x->physimpl->remove(gob);
 
 	ep_mem_free(gob->x);
 	gob->x = NULL;

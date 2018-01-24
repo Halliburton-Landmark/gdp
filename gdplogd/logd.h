@@ -190,7 +190,7 @@ struct gob_phys_impl
 						gdp_gclmd_t **gmdp);
 	EP_STAT		(*newsegment)(
 						gdp_gob_t *gob);
-	EP_STAT		(*delete)(
+	EP_STAT		(*remove)(
 						gdp_gob_t *gob);
 	EP_STAT		(*foreach)(
 						EP_STAT (*func)(
