@@ -154,11 +154,13 @@ ep_crypto_cipher_free(EP_CRYPTO_CIPHER_CTX *ctx)
 EP_STAT
 ep_crypto_cipher_crypt(
 		EP_CRYPTO_CIPHER_CTX *ctx,
-		void *in,
+		void *_in,
 		size_t inlen,
-		void *out,
+		void *_out,
 		size_t outlen)
 {
+	uint8_t *in = (uint8_t *) _in;
+	uint8_t *out = (uint8_t *) _out;
 	int olen;
 	int rval;
 

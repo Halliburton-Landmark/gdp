@@ -99,8 +99,8 @@ struct rpseg
 
 	// the actual memory
 	size_t		segsize;	// size of this segment
-	void *		segfree;	// free pointer
-	void *		segbase;	// base of memory
+	uint8_t *	segfree;	// free pointer
+	uint8_t *	segbase;	// base of memory
 };
 
 
