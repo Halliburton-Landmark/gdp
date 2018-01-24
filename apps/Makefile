@@ -141,7 +141,11 @@ gdp-log-check.o: ../gdplogd/logd_disklog.c ../gdplogd/logd_gcl.c
 gdp-rest:	gdp-rest.c ../scgilib/scgilib.o
 	${CC} ${INCS} -o $@ ${LDFLAGS} gdp-rest.c ${LDLIBS} ../scgilib/scgilib.o
 
-${CLEANALL}:	${LIBROOT}/gdp/libgdp.a ${LIBROOT}/ep/libep.a
+# XXX It's unclear what to do here
+# I want to rebuild the apps if the libraries change, but including this
+# dependency puts the literal path to the libraries into the command line,
+# which breaks the C++ compiler.
+#${CLEANALL}:	${LIBROOT}/gdp/libgdp.a ${LIBROOT}/ep/libep.a
 
 clean:
 	-rm -f ${CLEANALL} *.o *.core
