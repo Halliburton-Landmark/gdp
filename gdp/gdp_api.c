@@ -349,7 +349,7 @@ gdp_printable_name(const gdp_name_t internal, gdp_pname_t external)
 				"gdp_printable_name: ep_b64_encode failure\n"
 				"\tstat = %s\n",
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
-		strcpy("(unknown)", external);
+		strcpy(external, "(unknown)");
 	}
 	else if (EP_STAT_TO_INT(estat) != GDP_GCL_PNAME_LEN)
 	{
