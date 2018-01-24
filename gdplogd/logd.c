@@ -32,6 +32,7 @@
 #include "logd_pubsub.h"
 
 #include <gdp/gdp_chan.h>
+#include <gdp/gdp_version.h>
 
 #include <ep/ep_sd.h>
 #include <ep/ep_string.h>
@@ -354,6 +355,8 @@ main(int argc, char **argv)
 			myname = ep_adm_getstrparam(argname, NULL);
 		}
 	}
+
+	ep_dbg_cprintf(Dbg, 1, "%s\n", GdplogdVersion);
 
 	// print our name as a reminder
 	{
