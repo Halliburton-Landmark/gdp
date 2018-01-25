@@ -95,6 +95,7 @@ Protocol Overview (Option 1)
 ----------------------------
 
 Every PDU consists of three parts, two of which may be of zero length.
+The first and third parts are visible to the routing layer.
 
 The first portion is the Protocol Header.  This is binary encoded,
 and intended to contain all the information that the Switching Layer
@@ -131,42 +132,45 @@ relates to the flags indicated in the fourth octet.
 | Offset 	| Len 	| Alternative 	| Detail								|
 |-------:	|----:	|-------------	|-------------------					|
 |      0	|   1	|				| Magic/Version [1]						|
-|	   1	|   1	|				| Time to Live							|
-|	   2	|   1	|				| Flags [2]								|
-|	   3	|   1	|				| Header Length	 [2]					|
-|      4    |   1   |               | Trailer Length [3]					|
-|      5	|   3	|				| Payload Length [4]					|
+|	   1	|   1	|				| Header Length	 [2]					|
+|	   2	|   1	|				| Time to Live							|
+|	   3	|   1	|				| Flags/Type of Service [3]				|
+|      4    |   1   |               | Trailer Length [5]					|
+|      5	|   1	|				| Reserved (MBZ)						|
+|      6	|   2	|				| Payload Length [4]					|
 |      8 	|   4   | IFLOWID      	| Initiator FlowID						|
 |      - 	|   4   | RFLOWID      	| Return FlowID							|
 |      - 	|  32  	| GDPADDR     	| Destination Addr						|
 |      - 	|  32  	| GDPADDR     	| Source Addr							|
 |      -	|   V	|				| Options								|
-|      -	|   V   |             	| Protobuf-encoded Payload [5]			|
-|	   -	|   V	|				| Trailer								|
 
 
-[1]	Magic and Version identify this PDU.  The version number is
-	4 in this version.
+[1]	Magic and Version identify this PDU.  Must be 4.
 
 [2] Size of header in units of 32 bits.  This starts at offset
 	zero and includes the options.  This constrains the header to at
 	most 1020 octets.
 
-[3]	Size of PDU Trailer (primarily HMAC) in units of 32 bits.
-	If the MPAYLOAD flag is set, this must be zero.
+[3]	Flags indicate the format of the additional parts of the header,
+	notably choosing between FlowIds and full GDP addresses.
+	Type of Service is _for further study_.
+	If the MPAYLOAD flag is set, this PDU includes multiple
+	payloads, each starting with a Trailer Length and a Payload
+	Length field.  The Payload Length field is the total size of
+	the merged payloads, including initial counts.  This is
+	_for further study_.
 
 [4] Size of Payload in units of 32 bits.  It is represented in network
 	byte order (big endian).  This constrains the maximum size of a
-	PDU payload to 2 ^ 26 = 67,108,864 octets.
+	PDU payload to 2 ^ 18 = 262,144 octets.
 
-[5] If the MPAYLOAD flag is set, this PDU includes multiple
-	payloads, each starting with a Trailer Length and a Payload
-	Length field.  The Payload Length field is the total size of
-	the merged payloads, including initial counts.
-
-[[_The format of the Trailer still needs to be defined.  It is
-what Nitesh has called the HMAC portion, but this is a
-generalization of that concept._]]
+[5]	Size of PDU Trailer (primarily HMAC) in units of 32 bits.
+	If the MPAYLOAD flag is set, this must be zero.
+	[[_The format of the Trailer still needs to be defined.  It is
+	what Nitesh has called the HMAC portion, but this is a
+	generalization of that concept._]]
+	[[_Does this need to be in units of 32 bits?  It might be easier
+	if it were in octet units._]]
 
 The total size of the PDU is the sum of the Header Length, the
 Payload Length, and the Trailer Length.
@@ -193,11 +197,16 @@ Flags are:
 | 0x08		| MPAYLOAD	| Multiple commands inside payload	|
 | 0x10		| MULTICAST	| [[_??? Per Nitesh_]]				|
 
+Note that a single PDU could contain both Flow IDs and GDP addresses.
+It's unclear that this is well defined, and might change.
+
 
 ### Options
 
 Options are used to convey additional information to the switching
-layer, e.g., Quality of Service.
+layer, e.g., Quality of Service.  These are for future use.  Note
+that options are included in the header size, so routers that do
+not support options can skip this part without additional processing.
 
 Each Option starts with a single octet of option id.  If the high
 order bit of that option id is zero, the bottom four bits encode the
@@ -230,6 +239,8 @@ that a 256-bit address is implied by a FlowID.
 
 Protocol Overview (Option 2)
 ----------------------------
+
+[[_Ignore this section --- we're not going to do it._]]
 
 This approach is more flexible but may impose excessive burden on
 the data forwarding elements.  However, it does "future proof"
@@ -305,6 +316,8 @@ simple as possible._]]
 Protocol Overview (Option 3)
 ----------------------------
 
+[[_Ignore this section --- we're not going to do it._]]
+
 This section is a placeholder.  It presumes that the GDP protocol
 is a Layer 3 (packet-based) protocol, and as such has to include
 fields to do packet fragmentation/reassembly, retransmission,
@@ -325,65 +338,7 @@ a lot like the previous options).
 Payload Encoding (All options)
 ------------------------------
 
-[[_Please ignore this section — it hasn't really even been started,
-much yet ready for review._]]
-
-The payload is encoded using some form of encoding, of which the
-best known example is probably Protocol Buffers.
-
-```
-    syntax = "proto3";
-
-    message GdpAnyPdu
-    {
-    	oneof fooXXX
-    	{
-    		message GdpCommandResponse = 1;
-			message RouterCommand = 3;
-    	}
-    }
-
-	message GdpCommandResponse
-	{
-		required uint16 cmd = 1;
-		optional uint32 rid = 2;
-		optional int64 recno = 3;
-		optional bytes timestamp = 4;
-		optional bytes sig = 5;
-		oneof barXXX
-		{
-			message GdpCommand = 1;
-			message GdpResponse = 2;
-		}
-	}
-
-    message GdpCommand
-    {
-    }
-
-    message GdpResponse
-    {
-    }
-
-	message RouterCommand
-	{
-		required uint16 cmd = 1;
-	}
-```
-
-
-Fields to consider:
-
-* rid (4)
-* siglen/alg (2)
-* optslen (1)
-* optflags (1)
-* recno (8)
-* seqno (8)
-* timestamp (16)
-* dlen (4)
-* data
-* sig
+[[_Move this into another document, or see the code._]]
 
 
 Trailer Encoding (All Options)
@@ -399,6 +354,9 @@ Things to Address
   implies message fragmentation and reassembly, which means a few
   fields from both IP and TCP need to be added, e.g. window size,
   sequence number, ack number, and checksum.
+  [[_Rick, you may want to address this.  In particular, are you
+  encapsulating these (Layer 4 PDUs) into a more basic Layer 3 PDU
+  that is not IP?_]]
 
 * Should multiple commands be permitted in one PDU?  If so, the
   Payload and Trailer information needs to be in some sort of
@@ -406,3 +364,6 @@ Things to Address
   source and destination addresses, since this is specific to the
   routing/forwarding layer (i.e, forwarding of a partial PDU is not
   permitted).
+
+* Do we need a trailer at all?  I think so, but Nitesh may be able
+  to give more information.
