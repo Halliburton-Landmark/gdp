@@ -4,9 +4,9 @@
 GDP Protocol Version 4 Proposal
 ===============================
 
+_Eric Allman, 2018-01-24_
+
 Everything here is for discussion.
-Several options are presented, each with different tradeoffs.
-Obviously we need to pick one.
 
 Principles
 ----------
@@ -91,8 +91,8 @@ Definitions
 * Routing: determining the location of a destination.
 
 
-Protocol Overview (Option 1)
-----------------------------
+Protocol Overview
+-----------------
 
 Every PDU consists of three parts, two of which may be of zero length.
 The first and third parts are visible to the routing layer.
@@ -126,7 +126,7 @@ flag is set.
 ### Protocol Header
 
 Details are shown after the table.  The **Alternative** field
-relates to the flags indicated in the fourth octet.
+relates to the flags indicated in the **Flags** field.
 
 
 | Offset 	| Len 	| Alternative 	| Detail								|
@@ -159,6 +159,9 @@ relates to the flags indicated in the fourth octet.
 	Length field.  The Payload Length field is the total size of
 	the merged payloads, including initial counts.  This is
 	_for further study_.
+	[[_What are the semantics if none of IFLOWID, RFLOWID, or
+	GDPADDR are not set?  Should probably make GDPADDR be the
+	default._]]
 
 [4] Size of Payload in units of 32 bits.  It is represented in network
 	byte order (big endian).  This constrains the maximum size of a
@@ -237,112 +240,14 @@ Note that some Options may be implied by a FlowID, in the same way
 that a 256-bit address is implied by a FlowID.
 
 
-Protocol Overview (Option 2)
-----------------------------
-
-[[_Ignore this section --- we're not going to do it._]]
-
-This approach is more flexible but may impose excessive burden on
-the data forwarding elements.  However, it does "future proof"
-the design, and some features may fall out "for free", such as
-variable length integers.
-
-Protobuf is just a placeholder.  It could just as easily be
-Cap'n Proto or any of the other alternatives.
-
-This alternative assumes that we are running over some Layer 4
-protocol that gives us reliable, ordered transmission of arbitrarily
-sized PDUs (for example, TCP).  That would make this a Layer 5
-protocol.
-
-For efficiency, it is possible to encode multiple commands (each
-essentially an independent payload) in the PDU as indicated by
-the Protobuf-encoded Header field.
-
-This section needs to be fleshed out.
-
-
-### Protocol Header
-
-Since Protobufs are not self-delimiting, a small amount of fixed
-information is required at the start of every PDU, but the
-majority of the total header is Protobuf encoded.  The intent
-is that the Protobuf-encoded Header contains only information
-needed by the forwarding/routing layer; everything else will
-be in the Payload.
-
-
-| Offset	| Len	| Detail							|
-|-------:	|----:	|--------------------------------	|
-|	   0	|	1	| Magic/Version [1]					|
-|	   1	|	1	| Time to Live						|
-|	   2	|	2	| Header Length [2]					|
-|	   4	|	V	| Protobuf-encoded Header [3]		|
-|	   -	|	V	| Protobuf-encoded Payload [4]		|
-|	   -	|	V	| Protobuf-encoded Trailer [5]		|
-
-[1] As above.
-
-[2] The size of the "Protobuf-encoded Header" in units of one
-    octet.  It is in network byte order (alternative: little
-	endian for ease of use on x86 architecture; the important
-	thing is that it be defined).
-
-[3] The Protobuf-encoded header, contents to be determined.
-    The lengths of the remaining fields are included in this area.
-
-[4] The Protobuf-encoded payload.  The size of this field is
-    contained in the Protobuf-encoded Header.
-
-[5]	Includes any trailing HMAC.  The size of this field is
-    contained in the Protobuf-encoded Header.
-
-If the Protobuf-encoded Header indicates that this PDU contains
-multiple payloads the final two fields are repeated as
-necessary.
-
-The Protobuf-encoded Header [[_still needs to be defined.
-Notably, it needs to include source/destination addresses,
-perhaps as a FlowID, Payload Length, and Trailer Length.  If
-multiple commands can be encoded in one PDU, it must include
-the length of the component payloads, which are concatenated
-in the Payload Field (i.e., the "Protobuf-encoded Payload
-field is actually several fields; if this option is taken, the
-Protobuf-encoded Header should include the size of the rest
-of the PDU as a single field to keep the forwarding layer as
-simple as possible._]]
-
-
-Protocol Overview (Option 3)
-----------------------------
-
-[[_Ignore this section --- we're not going to do it._]]
-
-This section is a placeholder.  It presumes that the GDP protocol
-is a Layer 3 (packet-based) protocol, and as such has to include
-fields to do packet fragmentation/reassembly, retransmission,
-packet ordering, windowing, congestion/flow control, etc.
-It would probably run directly on top of IP (which would mean
-tunneling one L3 protocol through another), but it could
-conceivably run as a peer to IP.
-
-As a practical matter, this would be multiple protocols, one at
-Layer 3 to route packets using GDP addresses, one at Layer 4 to
-provide TCP-like functions noted above, and at least one at a
-higher layer to interpret the payload (which would probably look
-a lot like the previous options).
-
-[[_Not specified at this time._]]
-
-
-Payload Encoding (All options)
-------------------------------
+Payload Encoding
+----------------
 
 [[_Move this into another document, or see the code._]]
 
 
-Trailer Encoding (All Options)
-------------------------------
+Trailer Encoding
+----------------
 
 [[_Not specified at this time._]]
 
