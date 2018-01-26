@@ -4,7 +4,7 @@
 GDP Protocol Version 4 Proposal
 ===============================
 
-_Eric Allman, 2018-01-24_
+_Eric Allman, 2018-02-25_
 
 Everything here is for discussion.
 
@@ -161,11 +161,12 @@ relates to the flags indicated in the **Flags** field.
 	_for further study_.
 	[[_What are the semantics if none of IFLOWID, RFLOWID, or
 	GDPADDR are not set?  Should probably make GDPADDR be the
-	default._]]
+	default.  But is there some reason that one might have both
+	full 256-bit addresses and flow ids in the same PDU?_]]
 
-[4] Size of Payload in units of 32 bits.  It is represented in network
+[4] Size of Payload in units of 8 bits.  It is represented in network
 	byte order (big endian).  This constrains the maximum size of a
-	PDU payload to 2 ^ 18 = 262,144 octets.
+	PDU payload to 2 ^ 16 - 1 = 65,535 octets.
 
 [5]	Size of PDU Trailer (primarily HMAC) in units of 32 bits.
 	If the MPAYLOAD flag is set, this must be zero.
