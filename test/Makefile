@@ -149,6 +149,6 @@ update-license:
 # which causes explicit paths to libgdp.a and libep.a to be added to
 # the command, which in turn breaks compiling under C++.
 .c:
-	${LINK.c} -o $@ $< ${LDLIBS}
+	${CC} ${CFLAGS} ${LDFLAGS} -o $@ $< ${LDLIBS}
 
 FORCE:

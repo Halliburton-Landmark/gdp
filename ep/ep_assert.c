@@ -40,6 +40,7 @@
 #include <string.h>
 
 #define SECONDS			* INT64_C(1000000000)
+#define MILLISECONDS		* INT64_C(1000000)
 
 
 void	(*EpAssertInfo)(void) = NULL;	// can be used to dump state
@@ -81,7 +82,6 @@ ep_assert_breakpoint(void)
 **  EP_ASSERT_PRINT[V] -- print assertion failure message (but do not abort)
 */
 
-#define MILLISECONDS	* INT64_C(1000000)
 
 void
 ep_assert_printv(

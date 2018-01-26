@@ -38,6 +38,10 @@
 #ifndef _EP_H_
 #define _EP_H_
 
+// definitions required on RedHat C++ compilers
+#define __STDC_CONSTANT_MACROS	// include <type>_C macros
+#define __STDC_FORMAT_MACROS	// include PRI<type> macros
+
 #include <sys/cdefs.h>
 #include <ep/ep_conf.h>
 
