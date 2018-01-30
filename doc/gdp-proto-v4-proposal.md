@@ -4,7 +4,7 @@
 GDP Protocol Version 4 Proposal
 ===============================
 
-_Eric Allman, 2018-02-25_
+_Eric Allman, 2018-01-30_
 
 Everything here is for discussion.
 
@@ -14,40 +14,22 @@ Principles
 These are guiding principles for this proposal.
 
 * What we have previously called the routing layer is broken up
-  into two sub-layers: a "forwarding" (a.k.a. "switch") layer that
+  into three sub-layers: a "forwarding" (a.k.a. "switch") layer that
   shovels PDUs from a source to a destination as quickly as
-  possible, and a "routing" layer that deals with advertisements,
-  DHT lookup, etc.
+  possible, a "routing" layer that deals with advertisements,
+  DHT lookup, etc., and an "ingress/egress layer" that deals with
+  communications between GDP Principals (notably clients and log
+  servers) and the rest of the routing/switching infrastructure.
 
-* Forwarders only look at the PDU header.  Forwarders should need
-  a minimum amount of information.  Generally speaking, this means
-  the source and destination of the PDU, Time to Live (TTL), PDU
-  size, and fragmentation and sequencing information.  If the
-  switching layer does not have enough information to fully process
-  the PDU, it can invoke the routing layer.
-
-* Ideally the TTL would not be in a higher-level encoding of the
-  header, since that is the only field that forwarders need to
-  change.  It should certainly _not_ be included in any signature.
-  
-* The routing layer has a distinguished address.  Advertisements
-  are sent using this address as the destination.
+* This description defines only the PDU used for the ingress/egress
+  layer.  Other details such as Time to Live (TTL), fragmentation,
+  and sequencing are not discussed.
 
 * "End to end" PDU contents should be in some language-agnostic format
   (such as Protocol Buffers or Cap'n Proto).
 
 * End-to-end PDU contents should be opaque to the switching layer; in
   particular, it should be possible for it to be encrypted.
-
-* One option in this proposal includes a format amenable to transport
-  over limited size, unreliable, datagram-based (L3) transport
-  protocols (UDP or raw IP), and hence needs to have the information
-  necessary for PDU fragmentation/reassembly, packet retransmission,
-  out of order delivery, and all that standard low-level stuff.
-  This need not be an "all-or-nothing" decision: for example, one
-  possible transport would be RUDP, which includes retransmissions and
-  acknowledgements, flow control, and guaranteed ordering, but
-  not fragmentation/reassembly.
 
 * Implementation of some operations (e.g., delivery of subscribed
   data) should play well with multicast.
@@ -94,90 +76,82 @@ Definitions
 Protocol Overview
 -----------------
 
-Every PDU consists of three parts, two of which may be of zero length.
-The first and third parts are visible to the routing layer.
-
-The first portion is the Protocol Header.  This is binary encoded,
-and intended to contain all the information that the Switching Layer
-needs to route packets (assuming that layer has the necessary
-routing information already cached).  It is designed to be small
-and fast.
+Every PDU consists of two parts.  The first portion is the Protocol
+Header.  This is binary encoded, and intended to contain all the
+information that the Switching Layer needs to route packets
+(assuming that layer has the necessary routing information already
+cached).  It is designed to be small and fast.
 
 The second portion is the Payload.  This is intended to be encoded
 in some industry-standard, platform agnostic encoding.  Popular
 examples include ProtoBuf and Cap'n Proto.  The contents of the
-Payload is message dependent.  It may be zero length.
-
-The third portion is an optional Protocol Trailer (notably, containing
-an HMAC).  This can be used for both integrity checking (e.g., in lieu
-of a checksum) and as a security verification.  [[_Does this mean that
-only some PDUs will have checksums?_]]
+Payload is message dependent.
 
 This alternative assumes that we are running over some Layer 4
 protocol that gives us reliable, ordered transmission of arbitrarily
 sized PDUs (for example, TCP).  That would make this a Layer 5
 protocol.
 
-For efficiency, it is possible to encode multiple commands (each
-essentially an independent payload) in the PDU if the `MPAYLOAD`
-flag is set.
-
 
 ### Protocol Header
 
 Details are shown after the table.  The **Alternative** field
-relates to the flags indicated in the **Flags** field.
+relates to the flags indicated in the **Flags** field.  [[_Note:
+these have been changed, so the **Alternative** column is not
+accurate at this time._]]
 
 
 | Offset 	| Len 	| Alternative 	| Detail								|
 |-------:	|----:	|-------------	|-------------------					|
 |      0	|   1	|				| Magic/Version [1]						|
-|	   1	|   1	|				| Header Length	 [2]					|
-|	   2	|   1	|				| Time to Live							|
-|	   3	|   1	|				| Flags/Type of Service [3]				|
-|      4    |   1   |               | Trailer Length [5]					|
-|      5	|   1	|				| Reserved (MBZ)						|
-|      6	|   2	|				| Payload Length [4]					|
-|      8 	|   4   | IFLOWID      	| Initiator FlowID						|
-|      - 	|   4   | RFLOWID      	| Return FlowID							|
+|	   1	|   1	|				| Header Length	/ 4 [2]					|
+|	   2	|   1	|				| Flags/Control [3]						|
+|      3	|   1	|				| Reserved (MBZ) [4]					|
+|      4	|   2	|				| Payload Length [5]					|
+|      6 	|   4?  | IFLOWID      	| Initiator FlowID						|
+|      - 	|   4?  | RFLOWID      	| Return FlowID							|
 |      - 	|  32  	| GDPADDR     	| Destination Addr						|
 |      - 	|  32  	| GDPADDR     	| Source Addr							|
 |      -	|   V	|				| Options								|
+|	   -	| 0-3	|				| padding								|
 
 
 [1]	Magic and Version identify this PDU.  Must be 4.
 
 [2] Size of header in units of 32 bits.  This starts at offset
 	zero and includes the options.  This constrains the header to at
-	most 1020 octets.
+	most 1020 octets.  It must be at least 2 [or more for addresses
+	and flow ids?].
 
-[3]	Flags indicate the format of the additional parts of the header,
-	notably choosing between FlowIds and full GDP addresses.
-	Type of Service is _for further study_.
-	If the MPAYLOAD flag is set, this PDU includes multiple
-	payloads, each starting with a Trailer Length and a Payload
-	Length field.  The Payload Length field is the total size of
-	the merged payloads, including initial counts.  This is
-	_for further study_.
-	[[_What are the semantics if none of IFLOWID, RFLOWID, or
-	GDPADDR are not set?  Should probably make GDPADDR be the
-	default.  But is there some reason that one might have both
-	full 256-bit addresses and flow ids in the same PDU?_]]
+[3] Flags/Control is a multipurpose field.  The low-order three
+	bits define the address fields.  If zero, there are two 32
+	octet (256 bit) fields designating the destination and source
+	addresses.  Other values are to support address compression
+	and are reserved.  If the high order (0x80) bit is set, the
+	next four bits are a command for Principal-Router communication,
+	where a Principal can be either a GDP client or a GDP log
+	server.  Such values are defined below.  If the high order
+	bit is zero the remaining bits must be zero as well.  This is
+	reserved for future expansion.
 
-[4] Size of Payload in units of 8 bits.  It is represented in network
+[4] The reserved field is partly to improve memory alignment but
+	more importantly to allow for future expansion.  It is
+	immediately before Payload Length so that it could be used
+	to allow larger payloads, should they become necessary.
+	It must be zero when the PDU is generated, and ignored when
+	the PDU is read.
+
+[5] Size of Payload in units of 8 bits.  It is represented in network
 	byte order (big endian).  This constrains the maximum size of a
 	PDU payload to 2 ^ 16 - 1 = 65,535 octets.
 
-[5]	Size of PDU Trailer (primarily HMAC) in units of 32 bits.
-	If the MPAYLOAD flag is set, this must be zero.
-	[[_The format of the Trailer still needs to be defined.  It is
-	what Nitesh has called the HMAC portion, but this is a
-	generalization of that concept._]]
-	[[_Does this need to be in units of 32 bits?  It might be easier
-	if it were in octet units._]]
-
-The total size of the PDU is the sum of the Header Length, the
-Payload Length, and the Trailer Length.
+The total size of the PDU is the sum of the Header Length and the
+Payload Length.  Note that since the header length must be a multiple
+of four there will always be two octets of options which will
+often be zero.  If this is a problem we can reduce the header size
+to be in units of 16 bits, at the cost of allowing less space for
+options.  However, since IPv4 only allows 40 octets for options,
+this is unlikely to be a big issue.
 
 The source and destination address can be specified either explicitly
 or by encoding into a FlowID.  Mechanisms for managing FlowIDs are
@@ -191,18 +165,8 @@ FlowID are both FlowIDs."_]]
 
 ### Flag Bits
 
-Flags are:
-
-| Value		| Name		| Detail							|
-|------:	|-----:		| -----------------					|
-| 0x01		| GDPADDR	| Includes Dst & Src Addrs			|
-| 0x02		| IFLOWID	| Includes Initiator FlowID			|
-| 0x04		| RFLOWID	| Includes Return FlowID			|
-| 0x08		| MPAYLOAD	| Multiple commands inside payload	|
-| 0x10		| MULTICAST	| [[_??? Per Nitesh_]]				|
-
-Note that a single PDU could contain both Flow IDs and GDP addresses.
-It's unclear that this is well defined, and might change.
+None defined at this time &mdash; must be zero when a PDU is
+created.  PDU interpreters should ignore these bits.
 
 
 ### Options
@@ -231,14 +195,18 @@ between "Critical" and "Elective" options._]]
 
 Options:
 
-| Value		| Name		| Detail					|
-|------:	|-----:		| -----------------			|
-| 0x00		| EOOL		| End of Option List		|
+| Value		| Name			| Detail					|
+|------:	|-----:			| -----------------			|
+| 0x00		| OPT\_END		| End of Option List		|
 
 [[_Need to define other options._]]
 
 Note that some Options may be implied by a FlowID, in the same way
 that a 256-bit address is implied by a FlowID.
+
+[[_It might be useful to have a compact (single octet) encoding
+for options with length 32, since that is the length of a GDP
+address._]]
 
 
 Payload Encoding
@@ -247,22 +215,53 @@ Payload Encoding
 [[_Move this into another document, or see the code._]]
 
 
-Trailer Encoding
-----------------
+Client-Router Protocol
+----------------------
 
-[[_Not specified at this time._]]
+Sometimes a GDP principal (client or log server) needs to communicate
+with the routing layer, for example, for advertising known names.
+This is done using the Flags/Control field.  If the high order (0x80)
+bit is set in that octet, this PDU is either directed to or sent
+from the routing layer.  This approximates ICMP in IP networks.
+
+Note that the bottom three bits of this octet are not part of the
+Client-Router protocol, as they are used to represent the address
+format.
+
+[[_This is temporary, just so Rick and Eric can get something, anything,
+working.  We know advertising has to be done using certs._]]
+
+The following table assumes that the Flags/Control field is masked
+with 0xf8 (i.e., the bottom three bits are ignored):
+
+| Value		| Name			| Detail							|
+|------:	|-----:			| -----------------					|
+| 0x80		| FORWARD		| Forward PDU [1]					|
+| 0x90		| ADVERTISE		| Advertise names [2]				|
+| 0x98		| WITHDRAW		| Withdraw names [2]				|
+| 0xF0		| NOROUTE		| Cannot find route [3]				|
+
+[1] FORWARD passes the PDU to another entity (which could be a
+    router or a server), strips off the header, and processes
+	the payload as though it were a PDU.  This can be used for
+	source routing, particularly during some operations
+	associated with replication.  It is the equivalent of the
+	IP-in-IP protocol (4) in IPv4.
+
+[2]	ADVERTISE asserts to the routing layer that the source is
+	willing to respond on behalf of the list of 256-bit names
+	listed in the payload.  WITHDRAW removes that assertion. 
+	[[_These need to be replaced with a challenge-response
+	certificate exchange._]]
+
+[3]	Sent from the routing layer to a GDP Principal when that
+	Principal has sent to an address that cannot be found.
+	Approximately equivalent to an ICMP "unreachable" code.
+	The source address must be the unroutable name.
 
 
 Things to Address
 =================
-
-* Do we need to allow for fields to handle physical networks?  That
-  implies message fragmentation and reassembly, which means a few
-  fields from both IP and TCP need to be added, e.g. window size,
-  sequence number, ack number, and checksum.
-  [[_Rick, you may want to address this.  In particular, are you
-  encapsulating these (Layer 4 PDUs) into a more basic Layer 3 PDU
-  that is not IP?_]]
 
 * Should multiple commands be permitted in one PDU?  If so, the
   Payload and Trailer information needs to be in some sort of
@@ -271,5 +270,10 @@ Things to Address
   routing/forwarding layer (i.e, forwarding of a partial PDU is not
   permitted).
 
-* Do we need a trailer at all?  I think so, but Nitesh may be able
-  to give more information.
+* Because the header length is specified as the number of 32 bit
+  words, and header with no options ends on a 16-bit boundary, most
+  headers will probably have two bytes of padding.  This seems
+  wasteful.
+
+* Nitesh doesn't include WITHDRAW in his prototype, using timeouts
+  instead.  Do we need it?
