@@ -2,6 +2,7 @@ all:
 	gcc -Wall -o gdp-directoryd gdp-directoryd.c \
 		-I/usr/include/mariadb -lmariadb
 
+# invoke from sudo
 install:
 	systemctl stop gdp-directoryd
 	cp gdp-directoryd /usr/sbin/gdp-directoryd

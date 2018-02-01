@@ -133,18 +133,19 @@ int main(int argc, char **argv)
 				  ntohs(si_rem.sin_port), otw_dir_len);
 			continue;
 		}
-		debug(INFO, "Received packet len %d from %s:%d\n", otw_dir_len,
+		debug(INFO, "\nReceived packet len %d from %s:%d\n", otw_dir_len,
 			  inet_ntoa(si_rem.sin_addr), ntohs(si_rem.sin_port));
 
 		// handle request
 		switch (otw_dir.cmd)
 		{
+
 		case GDP_CMD_DIR_FIND:
 		{
 			char *q;
 			
 			// one entry per key, so no multiple replies for now
-			debug(INFO, "cmd -> find\n");
+			debug(INFO, "id(0x%x) cmd -> find\n", ntohs(otw_dir.id));
 
 			// build the query
 
@@ -168,7 +169,7 @@ int main(int argc, char **argv)
 		{
 			char *q;
 			
-			debug(INFO, "cmd -> add\n");
+			debug(INFO, "id(0x%x) cmd -> add\n", ntohs(otw_dir.id));
 
 			oguid_len = otw_dir_len - offsetof(otw_dir_t, oguid);
 			if (oguid_len % sizeof(gdp_name_t) != 0)
@@ -241,7 +242,7 @@ int main(int argc, char **argv)
 		{
 			char *q;
 			
-			debug(INFO, "cmd -> remove\n");
+			debug(INFO, "id(0x%x) cmd -> remove\n", ntohs(otw_dir.id));
 
 			oguid_len = otw_dir_len - offsetof(otw_dir_t, oguid);
 			if (oguid_len % sizeof(gdp_name_t) != 0)
@@ -372,10 +373,11 @@ int main(int argc, char **argv)
 		}
 
 		if (otw_dir_len < 0)
-			fprintf(stderr, "Error: sendto len %d error %s\n",
-					otw_dir_len, strerror(errno));
+			debug(ERR, "Error: id(0x%x) send len %d error %s\n",
+				  ntohs(otw_dir.id), otw_dir_len, strerror(errno));
 		else
-			debug(INFO, "Send len %d\n", otw_dir_len);
+			debug(INFO, "id(0x%x) send len %d\n",
+				  ntohs(otw_dir.id), otw_dir_len);
 	}
 
 	// unreachable at the moment, but leave as a reminder to future expansion

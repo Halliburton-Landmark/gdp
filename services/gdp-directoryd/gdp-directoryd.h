@@ -43,19 +43,20 @@
 			fprintf(stderr, fmt, ##__VA_ARGS__); \
 	} while (0)
 
-#if 1
+// #define TESTING
+#ifndef TESTING
 
 // PRODUCTION SETTINGS
 #define PORT 9001
 int debug_knob = WARN;
 
-#else
+#else // TESTING
 
 // TEST SETTINGS
 #define PORT 9002
 int debug_knob = VERB;
 
-#endif
+#endif // TESTING
 
 // FIXME version 3 otw_pdu support for the moment...
 #define GDP_CHAN_PROTO_VERSION 3
@@ -73,9 +74,8 @@ int debug_knob = VERB;
 typedef struct __attribute__((packed)) otw_dir_s
 {
 	uint8_t ver;
-	uint8_t ttl;
-	uint8_t rsvd1;
 	uint8_t cmd;
+	uint16_t id;
 	uint8_t eguid[sizeof(gdp_name_t)];
 	uint8_t dguid[sizeof(gdp_name_t)];
 	uint8_t oguid[sizeof(gdp_name_t) * DIR_OGUID_MAX];	

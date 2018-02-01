@@ -34,6 +34,8 @@
 #include <netinet/in.h>
 #include <stdio.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <string.h>
@@ -75,6 +77,8 @@ int main(int argc, char *argv[])
 	int arg_index;
 	int otw_dir_len;
 	int oguid_len;
+	int fd_dr;
+	uint16_t dr;
 
 	// sanity check compiler directive is operational
 	assert(sizeof(otw_dir_t) == OTW_DIR_SIZE_ASSERT);
@@ -91,12 +95,16 @@ int main(int argc, char *argv[])
 	{
 		if (argc > 4 + DIR_OGUID_MAX)
 			help("extraneous parameter(s)");			
+		if (argc < 4)
+			help("missing parameter(s)");
 		otw_dir.cmd = GDP_CMD_DIR_ADD;
 	}
 	else if (strcmp(argv[1], "remove") == 0)
 	{
 		if (argc > 4 + DIR_OGUID_MAX)
 			help("extraneous parameter(s)");			
+		if (argc < 4)
+			help("missing parameter(s)");
 		otw_dir.cmd = GDP_CMD_DIR_REMOVE;
 	}
 	else
@@ -129,6 +137,14 @@ int main(int argc, char *argv[])
 
 	otw_dir.ver = GDP_CHAN_PROTO_VERSION;
 
+	fd_dr = open("/dev/random", O_RDONLY);
+	if (read(fd_dr, &dr, sizeof(dr)) != 2)
+		fail("read /dev/random error");
+	else
+		close(fd_dr);
+	
+	otw_dir.id = htons(dr); // htons comments on expected endianess of id field
+	
 	if (otw_dir.cmd != GDP_CMD_DIR_FIND)
 	{
 		// set eguid
@@ -178,7 +194,7 @@ int main(int argc, char *argv[])
 		// connection-oriented udp - hardwired destination, simply send
 		otw_dir_len = send(fd_connect, (uint8_t *) &otw_dir.ver,
 						   offsetof(otw_dir_t, oguid) + oguid_len, 0);
-		printf("Send len %d\n", otw_dir_len);
+		printf("id(0x%x) send len %d\n", ntohs(otw_dir.id), otw_dir_len);
 	}
 	else
 	{
@@ -204,7 +220,10 @@ int main(int argc, char *argv[])
 	if (otw_dir_len < 0)
 		fail("recv");
 
-	printf("Recv len %d\n", otw_dir_len);
+	if (otw_dir_len < offsetof(otw_dir_t, oguid))
+		fail("short");
+
+	printf("id(0x%x) recv len %d\n", ntohs(otw_dir.id), otw_dir_len);
 		
 	oguid_len = otw_dir_len - offsetof(otw_dir_t, oguid);
 	if (oguid_len % sizeof(gdp_name_t) != 0)
