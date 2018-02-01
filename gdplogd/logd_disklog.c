@@ -196,6 +196,7 @@ ep_stat_from_dbstat(int dbstat)
 
 // desperation: make all Berkeley DB operations single threaded for now
 static EP_THR_MUTEX		BdbMutex		EP_THR_MUTEX_INITIALIZER;
+static bool				UseAutoCommit;
 
 
 static EP_STAT
@@ -203,6 +204,7 @@ bdb_init(const char *db_home, bool use_auto_commit)
 {
 	EP_STAT estat = EP_STAT_OK;
 
+	UseAutoCommit = use_auto_commit;
 	BdbCacheSize = ep_adm_getlongparam("swarm.gdplogd.gob.bdb.cachesize", 0);
 	BdbPageSize = ep_adm_getlongparam("swarm.gdplogd.gob.bdb.pagesize", 0);
 	BdbSyncBeforeClose =
@@ -234,7 +236,7 @@ bdb_init(const char *db_home, bool use_auto_commit)
 						DB_INIT_LOCK |
 						DB_INIT_LOG |
 						DB_INIT_MPOOL ;
-		if (use_auto_commit)
+		if (UseAutoCommit)
 			dbenv_flags |= DB_AUTO_COMMIT;
 		if (ep_adm_getboolparam("swarm.gdplogd.gob.bdb.private", true))
 			dbenv_flags |= DB_PRIVATE;
@@ -326,7 +328,9 @@ bdb_open(const char *filename,
 	}
 
 	phase = "db->open";
-	dbflags |= DB_AUTO_COMMIT | DB_THREAD;
+	dbflags |= DB_THREAD;
+	if (UseAutoCommit)
+		dbflags |= DB_AUTO_COMMIT;
 	dbstat = db->open(db, NULL, filename, NULL, dbtype, dbflags, filemode);
 	if (dbstat != 0)
 	{
