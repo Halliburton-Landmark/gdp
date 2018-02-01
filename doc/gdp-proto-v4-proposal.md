@@ -250,7 +250,7 @@ with 0xf8 (i.e., the bottom three bits are ignored):
 
 [2]	ADVERTISE asserts to the routing layer that the source is
 	willing to respond on behalf of the list of 256-bit names
-	listed in the payload.  WITHDRAW removes that assertion. 
+	listed in the payload.  WITHDRAW removes that assertion.
 	[[_These need to be replaced with a challenge-response
 	certificate exchange._]]
 

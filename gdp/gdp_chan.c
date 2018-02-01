@@ -108,12 +108,11 @@ struct gdp_chan
 **		---	---	-------
 **		0	1	version (must be 4) [1]
 **		1	1	header length in units of 32 bits (= H / 4)
-**		2	1	time to live in hops
-**		3	1	flags / type of service [2]
+**		2	1	flags / type of service [2]
 **		4	4	payload (SDU) length (= P)
-**		8	4	flow id (if GDP_PDUF_FLOWID flag is set)
-**		8	32	destination address (if GDP_PDUF_FLOWID flag is clear)
-**		40	32	source address (if GDP_PDUF_FLOWID flag is clear)
+**		8	4	flow id
+**		8	32	destination address
+**		40	32	source address
 **		?	?	for future use (probably options)
 **		H	P	payload (SDU) (starts at offset given in octet 1)
 **
@@ -122,22 +121,50 @@ struct gdp_chan
 **			client generates or sees a PDU, the high order bit must
 **			be zero.  The remainder of a router-to-router PDU is not
 **			defined here.
-**		[2] If the high order bit of flags/type of service is set,
+**
+**		[2] The low-order three bits define the address fields.  If
+**			zero, there are two 32-byte (256-bit) addresses for
+**			destination and source respectively.  Other values are
+**			reserved.
+**
+**			If the high order bit of flags/type of service is set,
 **			this is a client-to-router interaction (e.g.,
 **			advertise) and the low order bits are a specific
-**			command.
+**			command (see below).
+**
 **			It is likely that router-to-router commands will want
 **			to re-use this field as a command.
+**
+**		Special flag values (masked with 0xF8) are:
+**			0x80	Forward this PDU to the destination, strip off the
+**					header, and re-interpret the payload as a new
+**					PDU.
+**			0x90	Payload contains an advertisement.
+**			0x98	Payload contains a withdrawal.
+**			0xF0	(Router-to-client) Indicates a "name not found"
+**					(or "no route") error.
+**		Question: should the PDU have a "protocol" field (a la IPv4
+**			packets) with a special value of GDP_in_GDP, by analogy
+**			with IP's IP_in_IP, rather than using a FORWARD bit?
 */
 
-// values for flags field
-#define GDP_PDUF_ROUTER		0x80	// router should interpret this PDU
-#define GDP_PDUF_FLOWID		0x40	// uses FlowID instead of dst/src
+// values for flags / router control / type of service field
+#define GDP_TOS_ADDR_FMT	0x07	// indicates structure of addresses
+#define GDP_TOS_ROUTER		0x80	// router should interpret this PDU
+#define GDP_TOS_ROUTERMASK	0xf8	// mask for the router command
+#define GDP_TOS_FORWARD		0x80	// forward to another address
+#define GDP_TOS_ADVERTISE	0x90	// name advertisement
+#define GDP_TOS_WITHDRAW	0x98	// name withdrawal
+#define GDP_TOS_NOROUTE		0xF0	// no route / name unknown
 
-#define MIN_HEADER_LENGTH	(1 + 1 + 1 + 1 + 4 + 32 + 32)
+//XXX following needs to be changed if ADDR_FMT != 0
+// magic, hdrlen, tos, rsvd, paylen, dst, src, pad
+#define MIN_HEADER_LENGTH	(1 + 1 + 1 + 1 + 2 + 32 + 32 + 2)
 #endif	// PROTOCOL_L4_V3
 #define MAX_HEADER_LENGTH	(255 * 4)
 
+//XXX obsolete
+#if PROTOCOL_L4_V3
 static uint8_t	RoutingLayerAddr[32] =
 	{
 		0xff, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff, 0x00,
@@ -145,6 +172,7 @@ static uint8_t	RoutingLayerAddr[32] =
 		0xff, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff, 0x00,
 		0xff, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff, 0x00,
 	};
+#endif // PROTOCOL_L4_V3
 
 
 /*
@@ -227,8 +255,8 @@ read_header(gdp_chan_t *chan,
 		gdp_buf_drain(ibuf, gdp_buf_getlength(ibuf));
 		goto done;
 	}
-	GET8(b);				// time to live (ignored by non-routing layer)
 #if PROTOCOL_L4_V3
+	GET8(b);				// time to live (ignored by non-routing layer)
 	int rnak;
 	GET8(b);					// reserved (ignored)
 	GET8(rnak);					// command (ignored except for router naks)
@@ -253,17 +281,53 @@ read_header(gdp_chan_t *chan,
 		estat = GDP_STAT_PDU_CORRUPT;
 		goto done;
 	}
-	GET8(b);				// type of service (ignored)
 
 	// if we don't yet have the whole header, wait until we do
 	if (gdp_buf_getlength(ibuf) < hdr_len)
 		return GDP_STAT_KEEP_READING;
 
-	GET32(payload_len);
-	memcpy(src, pbp, sizeof (gdp_name_t));
-	pbp += sizeof (gdp_name_t);
-	memcpy(dst, pbp, sizeof (gdp_name_t));
-	pbp += sizeof (gdp_name_t);
+	int flags;
+	GET8(flags);			// flags/type of service (ignored)
+	GET8(b);				// reserved (MBZ)
+	if (b != 0)				//DEBUG: really shouldn't test for zero here
+	{
+		ep_dbg_cprintf(Dbg, 1, "read_header: reserved (MBZ) = 0x%02x\n", b);
+		estat = GDP_STAT_PDU_CORRUPT;
+		goto done;
+	}
+	GET16(payload_len);
+	if ((flags & GDP_TOS_ADDR_FMT) == 0)
+	{
+		memcpy(dst, pbp, sizeof (gdp_name_t));
+		pbp += sizeof (gdp_name_t);
+		memcpy(src, pbp, sizeof (gdp_name_t));
+		pbp += sizeof (gdp_name_t);
+	}
+	else
+	{
+		ep_dbg_cprintf(Dbg, 1,
+				"read_header: unknown address format 0x%02x\n",
+				flags & GDP_TOS_ADDR_FMT);
+		estat = GDP_STAT_PDU_CORRUPT;
+		goto done;
+	}
+
+	// check for router meta-commands (tos)
+	if (EP_UT_BITSET(GDP_TOS_ROUTER, flags))
+	{
+		if ((flags & GDP_TOS_ROUTERMASK) == GDP_TOS_NOROUTE)
+		{
+			estat = GDP_STAT_NAK_NOROUTE;
+			goto done;
+		}
+		else
+		{
+			ep_dbg_cprintf(Dbg, 1, "read_header: PDU router tos = %0xd\n",
+					flags & GDP_TOS_ROUTERMASK);
+			estat = GDP_STAT_PDU_CORRUPT;
+			goto done;
+		}
+	}
 #endif	// PROTOCOL_L4_V3
 
 	// XXX check for rational payload_len here? XXX
@@ -280,14 +344,23 @@ read_header(gdp_chan_t *chan,
 #if PROTOCOL_L4_V3
 	if (rnak == GDP_NAK_R_NOROUTE)
 		estat = GDP_STAT_NAK_NOROUTE;
-	else
 #endif
-		estat = EP_STAT_FROM_INT(payload_len);
 
 done:
+	if (EP_STAT_ISOK(estat))
+		estat = EP_STAT_FROM_INT(payload_len);
+	else
+	{
+		ep_dbg_cprintf(Dbg, 19, "read_header: draining %zd on error\n",
+						hdr_len + payload_len);
+		gdp_buf_drain(ibuf, hdr_len + payload_len);
+		payload_len = 0;
+	}
+
 	{
 		char ebuf[100];
-		ep_dbg_cprintf(Dbg, 32, "read_header: %s\n",
+		ep_dbg_cprintf(Dbg, 32, "read_header: hdr %zd pay %zd stat %s\n",
+				hdr_len, payload_len,
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 	*plenp = payload_len;
@@ -332,7 +405,6 @@ chan_read_cb(struct bufferevent *bev, void *ctx)
 		if (EP_STAT_IS_SAME(estat, GDP_STAT_KEEP_READING))
 			break;
 
-#if PROTOCOL_L4_V3
 		if (!EP_STAT_ISOK(estat))
 		{
 			// deliver routing error to upper level
@@ -349,7 +421,7 @@ chan_read_cb(struct bufferevent *bev, void *ctx)
 				gdp_buf_drain(ibuf, payload_len);
 			}
 		}
-#endif
+
 		// pass it to the L5 callback
 		// note that if the callback is not set, the PDU is thrown away
 		if (EP_STAT_ISOK(estat))
@@ -834,6 +906,10 @@ send_helper(gdp_chan_t *chan,
 {
 	EP_STAT estat = EP_STAT_OK;
 	int i;
+	size_t payload_len = 0;
+
+	if (payload != NULL)
+		payload_len = gdp_buf_getlength(payload);
 
 	if (ep_dbg_test(Dbg, 51))
 	{
@@ -847,19 +923,17 @@ send_helper(gdp_chan_t *chan,
 			ep_dbg_printf("(no payload)\n");
 		else
 		{
-			size_t paylen = gdp_buf_getlength(payload);
-			ep_dbg_printf("len %zd\n", paylen);
-			ep_hexdump(gdp_buf_getptr(payload, paylen), paylen,
+			ep_dbg_printf("len %zd\n", payload_len);
+			ep_hexdump(gdp_buf_getptr(payload, payload_len), payload_len,
 					ep_dbg_getfile(), EP_HEXDUMP_ASCII, 0);
 		}
 	}
 
-#if PROTOCOL_L4_V3
-	// build the V3 header in memory
+	// build the header in memory
 	char pb[MAX_HEADER_LENGTH];
 	char *pbp = pb;
-	size_t payload_len = gdp_buf_getlength(payload);
 
+#if PROTOCOL_L4_V3
 	PUT8(GDP_CHAN_PROTO_VERSION);		// version number (3)
 	PUT8(GDP_TTL_DEFAULT);				// time to live
 	PUT8(0);							// reserved
@@ -874,31 +948,30 @@ send_helper(gdp_chan_t *chan,
 	PUT8(0);							// flags
 	PUT32(payload_len);					// SDU payload length
 #else
-	// build the header in memory
-	char pb[MAX_HEADER_LENGTH];
-	char *pbp = pb;
-	size_t payload_len = gdp_buf_getlength(payload);
-
-	tos &= ~GDP_PDUF_FLOWID;			// flowid not yet supported
 	PUT8(GDP_CHAN_PROTO_VERSION);		// version number
-	PUT8(18);							// header length (= 72 / 4)
-	PUT8(GDP_TTL_DEFAULT);				// time to live
+	PUT8(MIN_HEADER_LENGTH / 4);		// header length (= 72 / 4)
 	PUT8(tos);							// flags / type of service
-	PUT32(payload_len);
+	PUT8(0);							// reserved
+	PUT16(payload_len);
 	memcpy(pbp, dst, sizeof (gdp_name_t));
 	pbp += sizeof (gdp_name_t);
 	memcpy(pbp, src, sizeof (gdp_name_t));
 	pbp += sizeof (gdp_name_t);
+	PUT16(0);							// padding
 #endif
 
 	// now write header to the socket
+	EP_ASSERT((pbp - pb) == MIN_HEADER_LENGTH);
 	if (ep_dbg_test(Dbg, 33))
 	{
 		ep_dbg_printf("send_helper: sending %zd octets:\n",
 					payload_len + (pbp - pb));
 		ep_hexdump(pb, pbp - pb, ep_dbg_getfile(), 0, 0);
-		ep_hexdump(gdp_buf_getptr(payload, payload_len), payload_len,
-				ep_dbg_getfile(), EP_HEXDUMP_ASCII, pbp - pb);
+		if (payload_len > 0)
+		{
+			ep_hexdump(gdp_buf_getptr(payload, payload_len), payload_len,
+					ep_dbg_getfile(), EP_HEXDUMP_ASCII, pbp - pb);
+		}
 	}
 
 	i = bufferevent_write(chan->bev, pb, pbp - pb);
@@ -909,11 +982,14 @@ send_helper(gdp_chan_t *chan,
 	}
 
 	// and the payload
-	i = bufferevent_write_buffer(chan->bev, payload);
-	if (i < 0)
+	if (payload_len > 0)
 	{
-		estat = GDP_STAT_PDU_WRITE_FAIL;
-		goto fail0;
+		i = bufferevent_write_buffer(chan->bev, payload);
+		if (i < 0)
+		{
+			estat = GDP_STAT_PDU_WRITE_FAIL;
+			goto fail0;
+		}
 	}
 
 fail0:
@@ -956,16 +1032,20 @@ _gdp_chan_advertise(
 	ep_dbg_cprintf(Dbg, 39, "_gdp_chan_advertise(%s):\n",
 			gdp_printable_name(gname, pname));
 
-#if PROTOCOL_L4_V3
 	gdp_buf_t *payload = gdp_buf_new();
 
 	// might batch several adverts into one PDU
 	gdp_buf_write(payload, gname, sizeof (gdp_name_t));
 
+#if PROTOCOL_L4_V3
 	estat = send_helper(chan, NULL, _GdpMyRoutingName, RoutingLayerAddr,
 						payload, GDP_CMD_ADVERTISE);
 #else
-# error Implement _gdp_chan_advertise!
+//	gdp_name_t null_name = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+//							 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+	estat = send_helper(chan, NULL, _GdpMyRoutingName, gname,
+						NULL, GDP_TOS_ADVERTISE);
 #endif
 
 	if (ep_dbg_test(Dbg, 21))

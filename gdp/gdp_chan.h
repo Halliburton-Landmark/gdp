@@ -52,7 +52,7 @@
 
 #ifndef PROTOCOL_L4_V3
 // send v4 session traffic over v3 transport layer
-# define PROTOCOL_L4_V3			1
+# define PROTOCOL_L4_V3			0		// L4 over V4
 #endif
 
 #if PROTOCOL_L4_V3
