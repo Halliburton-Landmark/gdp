@@ -235,8 +235,6 @@ _gdp_gcl_subscribe(gdp_gin_t *gin,
 
 	errno = 0;				// avoid spurious messages
 
-	memcpy(req->cpdu->dst, req->gob->name, sizeof req->cpdu->dst);
-	memcpy(req->cpdu->src, _GdpMyRoutingName, sizeof req->cpdu->src);
 	{
 		gdp_msg_t *msg = req->cpdu->msg;
 		EP_ASSERT_ELSE(msg != NULL, return EP_STAT_ASSERT_ABORT);
