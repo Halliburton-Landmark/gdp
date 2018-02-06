@@ -113,8 +113,10 @@ subscr_resub(gdp_req_t *req)
 */
 
 static void *
-subscr_poker_thread(void *unused)
+subscr_poker_thread(void *chan_)
 {
+	gdp_chan_t *chan = chan_;
+	gdp_chan_x_t *chanx = _gdp_chan_get_cdata(chan);
 	long timeout = ep_adm_getlongparam("swarm.gdp.subscr.timeout",
 							GDP_SUBSCR_TIMEOUT_DEF);
 	long delta_poke = ep_adm_getlongparam("swarm.gdp.subscr.refresh",
@@ -149,8 +151,7 @@ subscr_poker_thread(void *unused)
 		do
 		{
 			estat = EP_STAT_OK;
-			for (req = LIST_FIRST(&_GdpSubscriptionRequests); req != NULL;
-													req = nextreq)
+			for (req = LIST_FIRST(&chanx->reqs); req != NULL; req = nextreq)
 			{
 				estat = _gdp_req_lock(req);
 				EP_STAT_CHECK(estat, break);
@@ -170,21 +171,29 @@ subscr_poker_thread(void *unused)
 
 				// lock GOB, then req, then validate req
 				if (ep_thr_mutex_trylock(&gob->mutex) != 0)
+				{
+					ep_dbg_cprintf(Dbg, 51,
+							"   ... gob->mutex trylock failed (%s)\n",
+							strerror(errno));
 					continue;
+				}
 				gob->flags |= GCLF_ISLOCKED;
 				_gdp_req_lock(req);
 
 				if (!EP_UT_BITSET(GDP_REQ_CLT_SUBSCR, req->flags))
 				{
 					// not a subscription: skip this entry
+					ep_dbg_cprintf(Dbg, 51, "   ... not client subscription\n");
 				}
 				else if (ep_time_before(&t_poke, &req->act_ts))
 				{
 					// we've seen activity recently, no need to poke
+					ep_dbg_cprintf(Dbg, 51, "   ... not yet\n");
 				}
 				else
 				{
 					// act_ts <= t_poke: refresh this subscription
+					ep_dbg_cprintf(Dbg, 51, "   ... subscr_resub\n");
 					(void) subscr_resub(req);
 				}
 

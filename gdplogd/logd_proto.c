@@ -1109,8 +1109,8 @@ cmd_subscribe_by_recno(gdp_req_t *req)
 				ep_dbg_printf("cmd_subscribe: comparing to ");
 				_gdp_req_dump(r1, ep_dbg_getfile(), 0, 0);
 			}
-			if (GDP_NAME_SAME(r1->rpdu->dst, req->cpdu->src) &&
-					r1->rpdu->msg->rid == req->cpdu->msg->rid)
+			if (GDP_NAME_SAME(r1->cpdu->dst, req->cpdu->src) &&
+					r1->cpdu->msg->rid == req->cpdu->msg->rid)
 			{
 				ep_dbg_cprintf(Dbg, 20, "cmd_subscribe: refreshing sub\n");
 				break;
