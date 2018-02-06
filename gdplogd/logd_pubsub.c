@@ -236,7 +236,9 @@ sub_end_all_subscriptions(
 
 	if (ep_dbg_test(Dbg, 29))
 	{
-		ep_dbg_printf("sub_end_all_subscriptions: ");
+		gdp_pname_t dst_p;
+		ep_dbg_printf("sub_end_all_subscriptions: rid %" PRIgdp_rid " dst %s\n    ",
+				rid, gdp_printable_name(dest, dst_p));
 		_gdp_gob_dump(gob, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
@@ -253,8 +255,8 @@ sub_end_all_subscriptions(
 			estat = _gdp_req_lock(req);
 			EP_STAT_CHECK(estat, break);
 			nextreq = LIST_NEXT(req, goblist);
-			if (!GDP_NAME_SAME(req->rpdu->dst, dest) ||
-					(rid != GDP_PDU_NO_RID && rid != req->rpdu->msg->rid) ||
+			if (!GDP_NAME_SAME(req->cpdu->dst, dest) ||
+					(rid != GDP_PDU_NO_RID && rid != req->cpdu->msg->rid) ||
 					!EP_ASSERT(req->gob == gob))
 			{
 				_gdp_req_unlock(req);
