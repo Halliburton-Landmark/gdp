@@ -961,6 +961,7 @@ send_helper(gdp_chan_t *chan,
 #endif
 
 	// now write header to the socket
+	bufferevent_lock(chan->bev);
 	EP_ASSERT((pbp - pb) == MIN_HEADER_LENGTH);
 	if (ep_dbg_test(Dbg, 33))
 	{
@@ -993,6 +994,7 @@ send_helper(gdp_chan_t *chan,
 	}
 
 fail0:
+	bufferevent_unlock(chan->bev);
 	return estat;
 }
 
