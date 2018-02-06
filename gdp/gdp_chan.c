@@ -240,6 +240,12 @@ read_header(gdp_chan_t *chan,
 		goto done;
 	}
 
+	if (ep_dbg_test(Dbg, 66))
+	{
+		ep_dbg_printf("read_header: initial header:\n");
+		ep_hexdump(pbp, MIN_HEADER_LENGTH, ep_dbg_getfile(), EP_HEXDUMP_HEX, 0);
+	}
+
 	GET8(b);				// PDU version number
 #if PROTOCOL_L4_V3
 	if (b != 2 && b != 3)
@@ -310,6 +316,17 @@ read_header(gdp_chan_t *chan,
 				flags & GDP_TOS_ADDR_FMT);
 		estat = GDP_STAT_PDU_CORRUPT;
 		goto done;
+	}
+
+	if (ep_dbg_test(Dbg, 55))
+	{
+		gdp_pname_t src_p, dst_p;
+		ep_dbg_printf("read_header(%zd): flags 0x%02x, paylen %zd\n"
+					"    src %s\n"
+					"    dst %s\n",
+				hdr_len, flags, payload_len,
+				gdp_printable_name(*src, src_p),
+				gdp_printable_name(*dst, dst_p));
 	}
 
 	// check for router meta-commands (tos)

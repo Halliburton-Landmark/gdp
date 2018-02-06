@@ -291,7 +291,17 @@ find_req_in_channel_list(
 	gdp_req_t *req;
 	gdp_chan_x_t *chanx;
 
-	ep_dbg_cprintf(DbgProcResp, 14, "find_req_in_channel_list: searching\n");
+	if (ep_dbg_test(DbgProcResp, 14))
+	{
+		gdp_pname_t src_p, dst_p;
+
+		ep_dbg_printf("find_req_in_channel_list: searching for rpdu rid "
+						"%" PRIgdp_rid
+					"\n    src %s\n    dst %s\n",
+				rpdu->msg->rid,
+				gdp_printable_name(rpdu->src, src_p),
+				gdp_printable_name(rpdu->dst, dst_p));
+	}
 	_gdp_chan_lock(chan);
 	chanx = _gdp_chan_get_cdata(chan);
 	if (EP_ASSERT_TEST(chanx != NULL))
@@ -303,9 +313,18 @@ find_req_in_channel_list(
 
 	LIST_FOREACH(req, &chanx->reqs, chanlist)
 	{
-		if (req->cpdu != NULL &&
-				(rpdu->msg->rid == GDP_PDU_ANY_RID ||
-				 req->cpdu->msg->rid == rpdu->msg->rid) &&
+		if (req->cpdu == NULL)
+			continue;
+		if (ep_dbg_test(Dbg, 48))
+		{
+			gdp_pname_t src_p, dst_p;
+			ep_dbg_printf("    ?cpdu rid %" PRIgdp_rid "\t%s =>\n\t    %s\n",
+					req->cpdu->msg->rid,
+					gdp_printable_name(req->cpdu->src, src_p),
+					gdp_printable_name(req->cpdu->dst, dst_p));
+		}
+		if ((rpdu->msg->rid == GDP_PDU_ANY_RID ||
+					req->cpdu->msg->rid == rpdu->msg->rid) &&
 				GDP_NAME_SAME(req->cpdu->src, rpdu->dst) &&
 				GDP_NAME_SAME(req->cpdu->dst, rpdu->src))
 			break;
