@@ -125,8 +125,13 @@ int main(int argc, char **argv)
 							   sizeof(otw_dir), 0,
 							   (struct sockaddr *)&si_rem, &si_rem_len);
 
-		// parse request
-		if (otw_dir.ver != GDP_CHAN_PROTO_VERSION)
+		// handle timeouts along with obviously short packets
+		if (otw_dir_len < offsetof(otw_dir_t, oguid))
+			continue;
+
+		// currently, directory services are identical for v3 and v4 gdp
+		if (otw_dir.ver != GDP_CHAN_PROTO_VERSION_4 &&
+			otw_dir.ver != GDP_CHAN_PROTO_VERSION_3)
 		{
 			debug(WARN, "Warn: unrecognized packet from %s:%d len %d",
 				  inet_ntoa(si_rem.sin_addr),

@@ -135,7 +135,7 @@ int main(int argc, char *argv[])
 	//
 	// dguid* and cguid are stored in oguid[]
 
-	otw_dir.ver = GDP_CHAN_PROTO_VERSION;
+	otw_dir.ver = GDP_CHAN_PROTO_VERSION_4;
 
 	fd_dr = open("/dev/random", O_RDONLY);
 	if (read(fd_dr, &dr, sizeof(dr)) != 2)

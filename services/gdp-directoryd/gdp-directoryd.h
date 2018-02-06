@@ -59,7 +59,8 @@ int debug_knob = VERB;
 #endif // TESTING
 
 // FIXME version 3 otw_pdu support for the moment...
-#define GDP_CHAN_PROTO_VERSION 3
+#define GDP_CHAN_PROTO_VERSION_3 3
+#define GDP_CHAN_PROTO_VERSION_4 4
 
 // FIXME temporary until cmd extensions designed and added to gdp_pdu.h
 #define GDP_CMD_DIR_ADD		7
