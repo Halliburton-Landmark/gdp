@@ -256,6 +256,7 @@ void			_gdp_gob_free(				// free in-memory handle
 
 #define _gdp_gob_lock(g)		_gdp_gob_lock_trace(g, __FILE__, __LINE__, #g)
 #define _gdp_gob_unlock(g)		_gdp_gob_unlock_trace(g, __FILE__, __LINE__, #g)
+#define _gdp_gob_incref(g)		_gdp_gob_incref_trace(g, __FILE__, __LINE__, #g)
 #define _gdp_gob_decref(g, k)	_gdp_gob_decref_trace(g, k, __FILE__, __LINE__, #g)
 
 void			_gdp_gob_lock_trace(		// lock the GCL mutex
@@ -270,8 +271,11 @@ void			_gdp_gob_unlock_trace(		// unlock the GCL mutex
 						int line,
 						const char *id);
 
-void			_gdp_gob_incref(			// increase reference count
-						gdp_gob_t *gob);
+void			_gdp_gob_incref_trace(		// increase reference count (trace)
+						gdp_gob_t *gob,
+						const char *file,
+						int line,
+						const char *id);
 
 void			_gdp_gob_decref_trace(		// decrease reference count (trace)
 						gdp_gob_t **gobp,

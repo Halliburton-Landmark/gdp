@@ -399,14 +399,27 @@ _gdp_mutex_check_isunlocked(
 **		Must be called with GOB locked.
 */
 
+#undef _gdp_gob_incref
+
 void
 _gdp_gob_incref(gdp_gob_t *gob)
+{
+	_gdp_gob_incref_trace(gob, __FILE__, __LINE__, "gob");
+}
+
+void
+_gdp_gob_incref_trace(
+		gdp_gob_t *gob,
+		const char *file,
+		int line,
+		const char *id)
 {
 	EP_ASSERT_ELSE(GDP_GOB_ISGOOD(gob), return);
 	GDP_GOB_ASSERT_ISLOCKED(gob);
 
 	gob->refcnt++;
-	ep_dbg_cprintf(Dbg, 51, "_gdp_gob_incref(%p): %d\n", gob, gob->refcnt);
+	ep_dbg_cprintf(Dbg, 51, "_gdp_gob_incref(%p): %d [%s %s:%d]\n",
+				gob, gob->refcnt, id, file, line);
 }
 
 
@@ -449,8 +462,8 @@ _gdp_gob_decref_trace(
 		ep_assert_print(file, line, "gob->refcnt = %d (%s)", gob->refcnt, id);
 	*gobp = NULL;
 
-	ep_dbg_cprintf(Dbg, 51, "_gdp_gob_decref(%p): %d\n",
-			gob, gob->refcnt);
+	ep_dbg_cprintf(Dbg, 51, "_gdp_gob_decref(%p): %d [%s %s:%d]\n",
+			gob, gob->refcnt, id, file, line);
 	if (gob->refcnt == 0 && !EP_UT_BITSET(GCLF_DEFER_FREE, gob->flags))
 	{
 		EP_ASSERT(!keeplocked && !EP_UT_BITSET(GCLF_KEEPLOCKED, gob->flags));
