@@ -63,6 +63,14 @@ sub_send_message_notification(gdp_req_t *pubreq, gdp_req_t *req)
 		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
+	// sanity checks
+	if (!EP_ASSERT(req->cpdu != NULL) || !EP_ASSERT(req->cpdu->msg != NULL))
+		_gdp_req_dump(req, NULL, GDP_PR_BASIC, 0);
+	if (!EP_ASSERT(pubreq->cpdu != NULL) ||
+			!EP_ASSERT(pubreq->cpdu->msg != NULL) ||
+			!EP_ASSERT(pubreq->cpdu->msg->cmd_append != NULL))
+		_gdp_req_dump(pubreq, NULL, GDP_PR_BASIC, 0);
+
 	gdp_msg_t *msg = _gdp_msg_new(GDP_ACK_CONTENT,
 							req->cpdu->msg->rid, req->cpdu->msg->seqno);
 	GdpDatum *pubdatum = pubreq->cpdu->msg->cmd_append->datum;
