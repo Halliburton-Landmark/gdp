@@ -385,7 +385,8 @@ _gdp_pdu_free(gdp_pdu_t **ppdu)
 	// abandon this PDU if already free
 	EP_ASSERT_ELSE(EP_UT_BITSET(GDP_PDU_INUSE, pdu->flags), return);
 	pdu->flags &= ~GDP_PDU_INUSE;
-	_gdp_msg_free(&pdu->msg);
+	if (pdu->msg != NULL)
+		_gdp_msg_free(&pdu->msg);
 	*ppdu = NULL;
 #if GDP_DEBUG_NO_FREE_LISTS		// avoid helgrind complaints
 	ep_mem_free(pdu);

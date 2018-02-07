@@ -172,6 +172,7 @@ subscr_poker_thread(void *chan_)
 				// lock GOB, then req, then validate req
 				if (ep_thr_mutex_trylock(&gob->mutex) != 0)
 				{
+					// not an error ... we'll get this one next time through
 					ep_dbg_cprintf(Dbg, 51,
 							"   ... gob->mutex trylock failed (%s)\n",
 							strerror(errno));
