@@ -1052,6 +1052,7 @@ cmd_subscribe_by_recno(gdp_req_t *req)
 	}
 
 	gob = req->gob;
+	ep_dbg_cprintf(Dbg, 99, "[1] %d\n", gob->refcnt);
 	if (!EP_ASSERT(GDP_GOB_ISGOOD(gob)))
 	{
 		ep_dbg_printf("cmd_subscribe: bad gob %p in req, flags = %x\n",
@@ -1094,11 +1095,17 @@ cmd_subscribe_by_recno(gdp_req_t *req)
 	ep_dbg_cprintf(Dbg, 24,
 			"cmd_subscribe: starting from %" PRIgdp_recno ", %d records\n",
 			req->nextrec, req->numrecs);
+	ep_dbg_cprintf(Dbg, 99, "[2] %d\n", gob->refcnt);
 
 	// see if this is refreshing an existing subscription
 	{
 		gdp_req_t *r1;
 
+		if (ep_dbg_test(Dbg, 50))
+		{
+			ep_dbg_printf("cmd_subscribe_by_recno: starting ");
+			_gdp_req_dump(req, NULL, 0, 0);
+		}
 		for (r1 = LIST_FIRST(&gob->reqs); r1 != NULL;
 				r1 = LIST_NEXT(r1, goblist))
 		{
@@ -1107,9 +1114,9 @@ cmd_subscribe_by_recno(gdp_req_t *req)
 			if (ep_dbg_test(Dbg, 50))
 			{
 				ep_dbg_printf("cmd_subscribe: comparing to ");
-				_gdp_req_dump(r1, ep_dbg_getfile(), 0, 0);
+				_gdp_req_dump(r1, NULL, 0, 0);
 			}
-			if (GDP_NAME_SAME(r1->cpdu->dst, req->cpdu->src) &&
+			if (GDP_NAME_SAME(r1->cpdu->dst, req->cpdu->dst) &&
 					r1->cpdu->msg->rid == req->cpdu->msg->rid)
 			{
 				ep_dbg_cprintf(Dbg, 20, "cmd_subscribe: refreshing sub\n");
@@ -1120,6 +1127,7 @@ cmd_subscribe_by_recno(gdp_req_t *req)
 		{
 			// make sure we don't send data already sent
 			req->nextrec = r1->nextrec;
+			ep_dbg_cprintf(Dbg, 99, "[3] %d\n", gob->refcnt);
 
 			// abandon old request, we'll overwrite it with new request
 			// (but keep the GOB around)
@@ -1132,6 +1140,7 @@ cmd_subscribe_by_recno(gdp_req_t *req)
 	}
 
 	// the _gdp_gob_decref better not have invalidated the GOB
+	ep_dbg_cprintf(Dbg, 99, "[4] %d\n", gob->refcnt);
 	EP_ASSERT(GDP_GOB_ISGOOD(gob));
 
 	// mark this as persistent and upgradable
