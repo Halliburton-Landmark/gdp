@@ -488,7 +488,7 @@ chan_event_cb(struct bufferevent *bev, short events, void *ctx)
 	if (ep_dbg_test(Dbg, 10))
 	{
 		int sockerr = EVUTIL_SOCKET_ERROR();
-		ep_dbg_printf("gdp_event_cb[%d]: ", getpid());
+		ep_dbg_printf("chan_event_cb[%d]: ", getpid());
 		ep_prflags(events, EventWhatFlags, ep_dbg_getfile());
 		ep_dbg_printf(", fd=%d , errno=%d %s\n",
 				bufferevent_getfd(bev),
@@ -517,7 +517,7 @@ chan_event_cb(struct bufferevent *bev, short events, void *ctx)
 		gdp_buf_t *ibuf = GDP_BUF_FROM_EVBUFFER(bufferevent_get_input(bev));
 		size_t l = gdp_buf_getlength(ibuf);
 
-		ep_dbg_cprintf(Dbg, 1, "gdp_event_cb[%d]: got EOF, %zu bytes left\n",
+		ep_dbg_cprintf(Dbg, 1, "chan_event_cb[%d]: got EOF, %zu bytes left\n",
 					getpid(), l);
 		cbflags |= GDP_IOEVENT_EOF;
 		restart_connection = true;
@@ -526,7 +526,7 @@ chan_event_cb(struct bufferevent *bev, short events, void *ctx)
 	{
 		int sockerr = EVUTIL_SOCKET_ERROR();
 
-		ep_dbg_cprintf(Dbg, 1, "gdp_event_cb[%d]: error: %s\n",
+		ep_dbg_cprintf(Dbg, 1, "chan_event_cb[%d]: error: %s\n",
 				getpid(), evutil_socket_error_to_string(sockerr));
 		cbflags |= GDP_IOEVENT_ERROR;
 		restart_connection = true;
@@ -542,10 +542,6 @@ chan_event_cb(struct bufferevent *bev, short events, void *ctx)
 
 		chan->state = GDP_CHAN_ERROR;
 		ep_thr_cond_broadcast(&chan->cond);
-
-		// close the (now dead) socket file descriptor
-		close(bufferevent_getfd(chan->bev));
-		bufferevent_setfd(chan->bev, -1);
 
 		do
 		{
@@ -601,13 +597,6 @@ chan_open_helper(
 	EP_STAT estat = EP_STAT_OK;
 	char abuf[500] = "";
 	char *port = NULL;		// keep gcc happy
-
-	if (chan->bev == NULL)
-	{
-		estat = ep_stat_from_errno(errno);
-		ep_dbg_cprintf(Dbg, 18, "chan_open_helper: no bufferevent\n");
-		goto fail0;
-	}
 
 	// attach to a socket
 	char *host;
@@ -786,8 +775,18 @@ chan_open_helper(
 				// success!  Make it non-blocking and associate with bufferevent
 				ep_dbg_cprintf(Dbg, 39, "successful connect\n");
 				estat = EP_STAT_OK;
+
+				// set up the bufferevent
 				evutil_make_socket_nonblocking(sock);
-				bufferevent_setfd(chan->bev, sock);
+				chan->bev = bufferevent_socket_new(EventBase, sock,
+								BEV_OPT_CLOSE_ON_FREE | BEV_OPT_THREADSAFE |
+								BEV_OPT_DEFER_CALLBACKS |
+								BEV_OPT_UNLOCK_CALLBACKS);
+				bufferevent_setcb(chan->bev,
+								chan_read_cb, NULL, chan_event_cb, chan);
+				bufferevent_setwatermark(chan->bev,
+								EV_READ, MIN_HEADER_LENGTH, 0);
+				bufferevent_enable(chan->bev, EV_READ | EV_WRITE);
 				break;
 			}
 
@@ -861,23 +860,12 @@ _gdp_chan_open(
 	if (router_addr != NULL)
 		chan->router_addr = ep_mem_strdup(router_addr);
 
-	// set up the bufferevent
-	chan->bev = bufferevent_socket_new(EventBase,
-					-1,
-					BEV_OPT_CLOSE_ON_FREE | BEV_OPT_THREADSAFE |
-					BEV_OPT_DEFER_CALLBACKS | BEV_OPT_UNLOCK_CALLBACKS);
-	bufferevent_setcb(chan->bev, chan_read_cb, NULL, chan_event_cb, chan);
-	bufferevent_setwatermark(chan->bev, EV_READ, MIN_HEADER_LENGTH, 0);
-	bufferevent_enable(chan->bev, EV_READ | EV_WRITE);
-	*pchan = chan;
-
 	estat = chan_open_helper(chan, NULL);
 
-	if (!EP_STAT_ISOK(estat))
-	{
-		*pchan = NULL;
+	if (EP_STAT_ISOK(estat))
+		*pchan = chan;
+	else
 		chan_do_close(chan, BEV_EVENT_ERROR);
-	}
 	return estat;
 }
 
@@ -893,6 +881,11 @@ chan_reopen(gdp_chan_t *chan)
 
 	ep_dbg_cprintf(Dbg, 12, "chan_reopen: %p\n	 advert_cb = %p\n",
 			chan, chan->advert_cb);
+
+	// close the (now dead) bufferevent
+	if (chan->bev != NULL)
+		bufferevent_free(chan->bev);
+	chan->bev = NULL;
 	estat = chan_open_helper(chan, NULL);
 	return estat;
 }
