@@ -32,7 +32,6 @@
 
 /*
 ** This provides the utility functions to support log record enc/dec.
-** This routine can be merged into gdp_util.c or libep. 
 **
 ** Written by Hwa Shin Moon, ETRI (angela.moon@berkeley.edu, hsmoon@etri.re.kr)
 ** last modified : 2017.01.04.

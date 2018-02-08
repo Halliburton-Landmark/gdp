@@ -49,14 +49,20 @@
 // Index	for each AC RULE TYPE 
 #define		DAC_UID_BASE			0x00000001	
 #define		ACR_TYPE_DAC_UID_1		DAC_UID_BASE 
+#define		ACR_TYPE_DAC_UID_1_CAP	DAC_UID_BASE+1 
+#define		ACR_TYPE_SEC_LEV_1		DAC_UID_BASE+2 
+#define		ACR_TYPE_SEC_LEV_1_CAP	DAC_UID_BASE+3 
 #define		CAP_BASE				0x00000101	
+#define		ACR_TYPE_CAP_1			CAP_BASE 
+
 
 
 bool	isSupportedACR(uint32_t);
 int		reflect_ac_rule( int, void **, int, void *, char *);
 bool	checkRequestedRight_wbuf(int, char, void *, int, void *);
 bool	checkRequestedRight_wtoken(int, char, void *, gdp_gclmd_t *);
-//char*	convert_buf_from_token(int, struct ac_token *, int *);
-void	free_ac_rule( int, void *);
 
+void	free_ac_rule( int, void **);
+
+//char*	convert_buf_from_token(int, struct ac_token *, int *);
 #endif		//_ACRULE_H_

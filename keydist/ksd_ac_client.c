@@ -63,6 +63,43 @@ void acread_cb(gdp_event_t *gev)
 }
 
 
+// hsmoon_start
+/*
+** Print STATE INFO 
+*/
+char* get_statestr( char state ) 
+{
+	if( state == NEED_INIT			) return "NEED_INIT";
+	if( state == DOING_INIT			) return "DOING_INIT";
+	if( state == DONE_INIT			) return "DONE_INIT";
+	if( state == NEED_AC_SUBSCRIBE	) return "NEED_AC_SUBSCRIBE";
+	if( state == WAIT_NEXT_ENTRY	) return "WAIT_NEXT_ENTRY";
+	if( state == CHECK_BUF_ENTRY	) return "CHECK_BUF_ENTRY";
+
+	return "UNdefined";
+}
+
+
+/*
+** Print ACL_info data 
+*/
+void print_acinfo( ACL_info *acInfo, char *prefix, FILE *afp )
+{
+	fprintf( afp, "%s AC TYPE: %x (%s), State: %s \n", prefix, 
+			acInfo->acr_type, acInfo->isAvailable?"support":"unsupport", 
+			get_statestr( acInfo->state ) );
+
+	fprintf( afp, "%s firstR: %" PRIgdp_recno ", nextR: %" PRIgdp_recno, 
+					prefix, acInfo->first_recn, acInfo->next_recn  );
+
+	fprintf( afp, " lastR: %" PRIgdp_recno ", reInitR: %" PRIgdp_recno " \n",  
+					acInfo->last_recn, acInfo->reInit_recn );
+
+
+	// LATER acrule info 
+}
+
+
 /*
 ** Return the number of datum 
 **		which arrived out of order and are stored in buffer    
@@ -82,18 +119,44 @@ int get_bufferednum( ACL_info *acInfo )
 }
 
 
+
+/*
+** Print ACL_info->buffer data 
+*/
+void print_acbufinfo( FILE *afp, ACL_info *acInfo, char *prefix )
+{
+
+	if( acInfo->head == NULL )  {
+		fprintf( afp, "%s ACBUF] entry: 0, No hdr \n", prefix );	
+	} else { 
+		fprintf( afp, "%s ACBUF] entry: %d, Hdr->recn: %" PRIgdp_recno "\n", 
+				prefix,	get_bufferednum( acInfo ), 
+				gdp_datum_getrecno( acInfo->head ) ); 
+	}
+
+}
+
+
+
+
+// caller already lock the acInfo / inData 
 /*
 ** Store the datum which arrived out of order in buffer 
 ** [NOTE] ASSUME that acInfo is already locked. 
 ** [NOTE] after calling, caller must set inData = NULL  
+**
+** [Return value] if input datum is deleted, return false 
+**                 Otherwise(input datum is stored), return true
 */
-void insert_acdata_inbuf( ACL_info *acInfo, gdp_recno_t	inRecno, 
+bool insert_acdata_inbuf( ACL_info *acInfo, gdp_recno_t	inRecno, 
 							gdp_datum_t *inData )
 {
 	gdp_recno_t		t_rec = 0;
 	gdp_datum_t		*t_cur = acInfo->head;
 	gdp_datum_t		*t_pre = NULL;
 
+
+	print_acbufinfo( stdout, acInfo, " - Before " );
 
 	while( t_cur != NULL ) {
 
@@ -106,23 +169,27 @@ void insert_acdata_inbuf( ACL_info *acInfo, gdp_recno_t	inRecno,
 		} else if( t_rec == inRecno ) {
 			ep_app_warn( "Repeated rcv data at %" PRIgdp_recno, t_rec ); 
 			// skip this message  
+			ep_thr_mutex_tryunlock( &inData->mutex );
 			gdp_datum_free( inData );
-			return; 
+			return false; 
 
 		} else  break;
 
 	}
-
 
 	if( t_pre == NULL ) {
 		inData->next = acInfo->head;
 		acInfo->head = inData;
 
 	} else {
+		// debugging: insert tail
 		t_pre->next = inData;
 		inData->next = t_cur; 
 	}	
 
+	print_acbufinfo( stdout, acInfo, " - After " );
+
+	return true;
 }
 
 
@@ -138,6 +205,7 @@ void delete_ac_buf_head( ACL_info *acInfo )
 
 	gdp_datum_free( del_datum );
 }
+// hsmoon_end
 
 
 
@@ -211,6 +279,7 @@ void request_acgcl_read_async( ACL_info  *acInfo, gdp_recno_t a_recno )
 }
 
 
+// hsmoon_start
 /*
 ** When we get the data from AC LOG server through subscribe/async read request, 
 **	this function is called. 
@@ -239,6 +308,11 @@ bool update_ac_data( ACL_info *acInfo, gdp_datum_t *datum, bool isMissing )
 		return isBuffered;
 	}
 
+	if( acInfo->isAvailable == false ) {
+		ep_app_warn("Unsupported AC type" );
+		return isBuffered;
+	}
+
 	if( (datum!=NULL) && (datum->dbuf==NULL) ) {
 		ep_app_warn("No ac data in update_ac_data" );
 		return isBuffered;
@@ -253,8 +327,12 @@ bool update_ac_data( ACL_info *acInfo, gdp_datum_t *datum, bool isMissing )
 
 	rd_recn =  gdp_datum_getrecno( datum );
 
+	printf("[UAD] update_ac: rcv %" PRIgdp_recno " recno \n", rd_recn );
+	print_acinfo( acInfo, "   ", stdout );
+
+
 	if( rd_recn < acInfo->next_recn ) {
-		ep_app_warn("Previous data at %" PRIgdp_recno "at expected %"
+		ep_app_warn("Previous data at %" PRIgdp_recno " at expected %"
 					PRIgdp_recno, rd_recn, acInfo->next_recn );
 		return isBuffered;
 	}
@@ -264,6 +342,7 @@ bool update_ac_data( ACL_info *acInfo, gdp_datum_t *datum, bool isMissing )
 
 	acInfo->last_recn   = gdp_gcl_getnrecs( acInfo->gcl );
 	pre_state			= acInfo->state;
+// hsmoon_end
 
 	//print current state  / next state 
 
@@ -387,26 +466,34 @@ bool update_ac_data( ACL_info *acInfo, gdp_datum_t *datum, bool isMissing )
 	dlen = gdp_buf_getlength(datum->dbuf);
 	data = gdp_buf_getptr( datum->dbuf, dlen );
 
+	printf(" ~~~ DLEN: %d , next recn: %" PRIgdp_recno " \n", 
+				dlen, acInfo->next_recn );
+
 	if( !isMissing && dlen > 0 ) {
 		// 
 		// Treat the received data...  : applied or buffered 
 		// 
+		bool				tisRemained  = true;
 
+
+// hsmoon_start
 		ep_thr_mutex_lock( &datum->mutex );
 		if( rd_recn == acInfo->next_recn ) { // applied 
 			int		rval;
+// hsmoon_end
 		
 			if( acInfo->state == WAIT_NEXT_ENTRY ) {
 				acInfo->state = DOING_INIT;
 				acInfo->ref_time = 0;
 			}
 
+// hsmoon_start
 			rval = reflect_ac_rule( acInfo->acr_type, &(acInfo->acrules), 	
 										dlen, data, &rule_mode );
-
 			if( rval == EX_OK ) {
 				acInfo->next_recn++;
 				if( rule_mode == 'd' ) apply_deny = true;
+// hsmoon_end
 
 			} else if( rval == EX_INVALIDDATA ) {
 				// Worng AC data : re- request /read 
@@ -417,22 +504,29 @@ bool update_ac_data( ACL_info *acInfo, gdp_datum_t *datum, bool isMissing )
 				acInfo->ref_time = tv.tv_sec + WAIT_TIME_SEC;
 				acInfo->state = WAIT_NEXT_ENTRY; 
 
-			} else { 
+// hsmoon_start
+			} else if( rval != EX_UNAVAILABLE ) {
+				// Ignore the EX_UNAVAILABLE 
+// hsmoon_end
+				// which type error ??? 
+
 				// why ? internal error : EX_MEMERR 
 				ep_app_error("[CHECK] reflect_rule_erro : %d\n", rval );
 
-				insert_acdata_inbuf( acInfo, rd_recn, datum );
+				tisRemained = insert_acdata_inbuf( acInfo, rd_recn, datum );
 				isBuffered = true;
 			}
 
+// hsmoon_start 
 		} else if( rd_recn  > acInfo->next_recn ) {
-			insert_acdata_inbuf( acInfo, rd_recn, datum );
+			tisRemained = insert_acdata_inbuf( acInfo, rd_recn, datum );
 			isBuffered = true;
 		} else {
 			// ignore this packet... 
 		}
 
-		ep_thr_mutex_unlock( &datum->mutex );
+		if( tisRemained ) 
+			ep_thr_mutex_unlock( &datum->mutex );
 
 	}
 
@@ -446,6 +540,11 @@ step1:
 
 		b_recn = gdp_datum_getrecno( acInfo->head );
 
+		printf(" *** check ac buffer: %" PRIgdp_recno " state: %d \n", 
+					b_recn, acInfo->state );
+// hsmoon_end 
+
+		
 		if( b_recn < acInfo->next_recn ) {
 			// error case 
 			ep_app_error("[CHECK] record(%" PRIgdp_recno ") in buffer head"
@@ -454,6 +553,7 @@ step1:
 							b_recn, acInfo->next_recn );
 			delete_ac_buf_head( acInfo );
 
+// hsmoon_start
 		} else if( b_recn == acInfo->next_recn ) {
 			int			rval;
 	
@@ -466,6 +566,7 @@ step1:
 				delete_ac_buf_head( acInfo );
 				acInfo->next_recn++;
 				if( rule_mode == 'd' ) apply_deny = true;
+// hsmoon_end
 
 				if( acInfo->state == CHECK_BUF_ENTRY ) 
 					acInfo->state = DOING_INIT;
@@ -497,12 +598,21 @@ step1:
 				acInfo->state = WAIT_NEXT_ENTRY; 
 			}
 
+// hsmoon_start
 			break;
 		}
+// hsmoon_end
 
 	}
 
+// hsmoon_start
 	if( acInfo->next_recn > acInfo->last_recn ) acInfo->state = DONE_INIT;
+	else {
+		if( acInfo->state == NEED_INIT ) {
+			if( acInfo->next_recn > acInfo->first_recn ) acInfo->state = DOING_INIT;
+		}
+	}
+
 
 	if( acInfo->state == DONE_INIT ) {
 		if( acInfo->head != NULL ) {
@@ -516,9 +626,13 @@ step1:
 
 	} 
 	
+	if( pre_state != acInfo->state ) {
+		ep_dbg_printf("[ac info state change] %s -> %s \n", 
+						get_statestr(pre_state), 
+						get_statestr(acInfo->state) );
+	}
+// hsmoon_end
 
-	ep_dbg_printf("[ac info state change] %d -> %d \n", 
-										pre_state, acInfo->state );
 	ep_thr_mutex_unlock( &acInfo->mutex );
 
 

@@ -177,6 +177,7 @@ int main(int argc, char **argv)
 
 	// variables for access control information 
 	uint32_t		rType		= 0;
+	uint32_t		utmpV		= 0;
 	char			*roption	= NULL;
 	char			*devinfo	= NULL;
 	FILE			*acfp		= NULL;
@@ -476,7 +477,10 @@ int main(int argc, char **argv)
 			}
 
 		}
-		gdp_gclmd_add( gmd, GDP_GCLMD_ACTYPE,	4, &rType );
+// hsmoon_start
+		utmpV = htonl(rType);
+		gdp_gclmd_add( gmd, GDP_GCLMD_ACTYPE,	4, &utmpV );
+// hsmoon_end 
 
 
 		// if we don't have a log daemon, pick one

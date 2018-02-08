@@ -127,6 +127,17 @@ char* convert_buf_from_token( int a_rtype, struct ac_token *token, int *oLen )
 */
 
 
+// hsmoon_start
+/*
+** Insert the AC rule in the existing set of ac rules    
+** (Reflect the received ac rule in the data for ac rules) 
+** 1'st argu: AC policy(rule) type 
+** 2'nd argu: AC rules 
+** 3'rd argu: the length of 4'th argu 
+** 4'th argu: received ac rule (AC log data received from log server)
+** 5'th argu: [out] the mode of AC rule (add/del) 
+** RETURN value: EX_OK on success or error number on error. 
+*/
 int reflect_ac_rule( int a_rtype, void **outRules, int a_dlen, void *a_data, 
 						char *mode)
 {
@@ -137,7 +148,10 @@ int reflect_ac_rule( int a_rtype, void **outRules, int a_dlen, void *a_data,
 	{
 		case ACR_TYPE_DAC_UID_1:
 				exit_stat = update_DAC_UID_1( a_dlen, a_data, outRules, mode);
+				print_rule_tree( (DAC_R1_node *)(*outRules), 1, stdout );
+
 				break;
+
 		default:
 				ep_app_warn("[CHECK] Not supported Rule %08x", a_rtype );
 				exit_stat = EX_UNAVAILABLE; 
@@ -149,7 +163,12 @@ int reflect_ac_rule( int a_rtype, void **outRules, int a_dlen, void *a_data,
 }
 
 
-void free_ac_rule( int a_rtype, void *rules ) 
+/*
+** Free the memory allocated for AC RULES 
+** 1'st argu: AC policy(rule) type 
+** 2'nd argu: AC rules 
+*/
+void free_ac_rule( int a_rtype, void **rules ) 
 {
 	switch( a_rtype ) 
 	{
@@ -161,4 +180,5 @@ void free_ac_rule( int a_rtype, void *rules )
 				return ;
 	}
 }
+// hsmoon_end
 

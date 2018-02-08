@@ -290,7 +290,8 @@ bool	isAllowedAccess( KSD_info *, gdp_gclmd_t *, char  );
 // INTERNAL functions (for test) 
 // 
 int  init_ks_info_from_file();
-
+ACL_info* get_new_ac_data(size_t, char *);
+void		free_aclinfo( void * );
 
 
 //

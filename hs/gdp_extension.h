@@ -68,6 +68,8 @@
 #define GDP_ACT_PUBKEY		GDP_GCLMD_PUBKEY    
 
 
+#define GDP_MUTEX_LORDER_KSD		10  // lower datum (gdp_priv.h : 687) 		
+#define GDP_MUTEX_LORDER_SE			11  // check value  		
 
 /*
 #define GDP_GCLMD_TSPARM1   0x00545331	 // TS1 : short period param   

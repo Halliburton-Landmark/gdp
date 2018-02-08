@@ -35,7 +35,7 @@
 **		   However, all requests are passed without password. 
 **
 ** written by Hwa Shin Moon, ETRI (angela.moon@berkeley.edu, hsmoon@etri.re.kr) 
-** last modified : 2017.11.15 
+** last modified : 2018.01.10 
 */ 
 
 
@@ -52,6 +52,9 @@
 
 #include <ac/ac_token.h>
 
+
+#define RS_CERT_FILE "/home/hsmoon/etc/certs/registration/rs_ecc.pem"
+#define RS_SKEY_FILE "/home/hsmoon/etc/certs/registration/rs_ecc.key"
 
 
 // hsmoon start 
@@ -100,8 +103,6 @@ void usage(void)
 	exit(64);
 }
 
-/*
-*/
 
 int
 main(int argc, char **argv)
@@ -271,6 +272,40 @@ main(int argc, char **argv)
 		usage();
 	}
 
+	if( rs_pubkey == NULL ) {
+		// open the cert file of default registration service  	
+		rs_cert = ep_x509_cert_read_file( RS_CERT_FILE );
+		if( rs_cert == NULL ) {
+			ep_app_error("Cannot read certificate in file %s", RS_CERT_FILE ); 
+			show_usage = true;
+
+		} else {
+			// extract the public key in the cert file 
+			rs_pubkey = X509_get_pubkey( rs_cert);
+			if( rs_pubkey == NULL ) {
+				ep_app_error("Cannot read public key in cert %s", RS_CERT_FILE );  
+				show_usage = true;
+			}
+		}
+	}
+
+	if( rs_seckey == NULL ) {
+		t_fp = fopen( RS_SKEY_FILE, "r");
+
+		if( t_fp == NULL ) {
+			ep_app_error("Cannot open the secret key in %s", optarg );  
+			show_usage = true;
+
+		} else if( PEM_read_PrivateKey( t_fp, &rs_seckey, NULL, NULL ) == NULL ) {
+			ep_app_error("Cannot read secret key in %s", optarg );  
+			show_usage = true;
+		}
+
+		fclose( t_fp );
+		t_fp = NULL;
+	}
+
+
 	// basic error check 
 	if( device_pubkey==NULL || rs_pubkey==NULL || rs_seckey == NULL )
 			show_usage = true;
@@ -281,6 +316,10 @@ main(int argc, char **argv)
 
 	if( show_usage ) {
 		ep_app_error("Insufficient input info"); 
+
+		if( device_pubkey==NULL || rs_pubkey==NULL || rs_seckey == NULL )
+			ep_app_error( "	>>> No Key info" );
+
 
 		if( device_cert   != NULL ) X509_free(     device_cert   );
 		if( device_pubkey != NULL ) EVP_PKEY_free( device_pubkey );	
@@ -377,11 +416,6 @@ main(int argc, char **argv)
 
 	m_ret = write_actoken_to_file( token, ofp );
 
-// hsmoon end 
-	// k:r:
-	// write to file. 
-
-
 
 fail0:
 
@@ -399,4 +433,5 @@ fail0:
 
 	return m_ret; 
 }
+// hsmoon end 
 

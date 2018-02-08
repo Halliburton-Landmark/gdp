@@ -45,6 +45,7 @@
 #include "DAC_UID_1.h"
 
 
+// hsmoon_start
 /*
 void print_DAC_UID_R1( DAC_UID_R1 a_inRule) 
 {
@@ -62,6 +63,10 @@ void print_DAC_UID_R1( DAC_UID_R1 a_inRule)
 }
 */
 
+
+/*
+** Return the description for the input right 
+*/
 char* get_str_exmode( int a_right ) {
 	switch( a_right ) {
 		case 0 : return "No Permission";
@@ -76,6 +81,10 @@ char* get_str_exmode( int a_right ) {
 	}
 }
 
+
+/*
+** Print the DAC_UID_R1 TYPE AC RULE info  
+*/
 void print_DAC_UID_R1( DAC_UID_R1 a_inRule, FILE *a_fp) 
 {
 	if( a_inRule.add_del == 'a')       fprintf( a_fp, "[ADD] ");
@@ -85,12 +94,11 @@ void print_DAC_UID_R1( DAC_UID_R1 a_inRule, FILE *a_fp)
 		return;
 	}
 
-	fprintf( a_fp, "EX_mode: %d(%s) \n", a_inRule.ex_auth, get_str_exmode(a_inRule.ex_auth) );
-	fprintf( a_fp, "GID(%2zu): %s \n", strlen(a_inRule.gidbuf), a_inRule.gidbuf );
-	fprintf( a_fp, "UID(%2zu): %s \n", strlen(a_inRule.uidbuf), a_inRule.uidbuf );
+	fprintf( a_fp, "EX_mode: %d(%s) ", a_inRule.ex_auth, get_str_exmode(a_inRule.ex_auth) );
+	fprintf( a_fp, "GID(%2zu): %s ", strlen(a_inRule.gidbuf), a_inRule.gidbuf );
+	fprintf( a_fp, "UID(%2zu): %s ", strlen(a_inRule.uidbuf), a_inRule.uidbuf );
 	fprintf( a_fp, "DID(%2zu): %s \n", strlen(a_inRule.didbuf), a_inRule.didbuf );
 }
-
 
 
 // LATER: fix one format (ac_token(gdm format) based or raw buf based) 
@@ -153,7 +161,10 @@ char* convert_acrule_to_buf( char *a_dest, DAC_UID_R1 a_inRule, int a_Mlen )
 
 char	uid1Prefix[3][3] = {"GID", "UID", "DID" };
 
-
+/*
+** Read the data received from AC log server 
+** Convert them into the DAC_UID_R1 object 
+*/ 
 DAC_UID_R1* convert_buf_to_acrule( char *a_in, DAC_UID_R1 *a_outRule, 
 															int a_inLen )
 {
@@ -205,6 +216,7 @@ DAC_UID_R1* convert_buf_to_acrule( char *a_in, DAC_UID_R1 *a_outRule,
 
 	return a_outRule;
 }
+// hsmoon_end
 
 
 DAC_UID_R1* convert_token_to_acrule( gdp_gclmd_t *token, char a_right, 
@@ -242,9 +254,11 @@ DAC_UID_R1* convert_token_to_acrule( gdp_gclmd_t *token, char a_right,
 	return a_outRule;
 }
 
-// all specific id cannot be started with * character. 
-// * means the all id. 
-// * node is located in the head of list
+
+// hsmoon_start
+/*
+** Compare two rule ID value 
+*/
 int	cmp_ruleid( char *in1, char *in2) 
 {
 	if( in1[0] ==  '*'  || in2[0] == '*' ) {
@@ -260,6 +274,9 @@ int	cmp_ruleid( char *in1, char *in2)
 
 
 
+/*
+** Alloc & initialize the memory for new Rule node
+*/
 DAC_R1_node* get_new_DAC_R1_node( DAC_UID_R1 inRule, char *inID )
 {
 	DAC_R1_node		*newNode = NULL;
@@ -288,14 +305,19 @@ DAC_R1_node* get_new_DAC_R1_node( DAC_UID_R1 inRule, char *inID )
 }
 
 
+/*
+** Remove all child nodes in the rule tree 
+*/
 void remove_DAC_R1_allchilds( DAC_R1_node *parent ) 
 {
 	DAC_R1_node		*t_buf;
 	DAC_R1_node		*t_cur =  parent->child;
 
+
 	while( t_cur !=  NULL ) {
 		if( t_cur->child != NULL ) 	remove_DAC_R1_allchilds( t_cur ); 
 
+		// case 1 test 
 		t_buf = t_cur->next; 
 		ep_mem_free( t_cur );
 		t_cur = t_buf;
@@ -304,11 +326,16 @@ void remove_DAC_R1_allchilds( DAC_R1_node *parent )
 	parent->child = NULL;
 }
 
+
+/*
+** Remove all child nodes in the rule tree except first child node 
+*/
 void remove_DAC_R1_allchilds_wo_header( DAC_R1_node *parent ) 
 {
 	DAC_R1_node		*t_buf;
 	DAC_R1_node		*t_cur =  parent->child;
 
+	
 	t_cur = t_cur->next;
 	while( t_cur !=  NULL ) {
 		if( t_cur->child != NULL ) 	remove_DAC_R1_allchilds( t_cur ); 
@@ -322,21 +349,28 @@ void remove_DAC_R1_allchilds_wo_header( DAC_R1_node *parent )
 }
 
 
-void free_rules_on_DAC_UID_1( void *rules )
+void free_rules_on_DAC_UID_1( void **rules )
 {
 	DAC_R1_node		*t_buf;
-	DAC_R1_node		*t_cur = (DAC_R1_node *)rules;
+	DAC_R1_node		*t_cur = (DAC_R1_node *)(*rules);
 
 
 	while( t_cur != NULL ) {
 		remove_DAC_R1_allchilds( t_cur ); 
 
 		t_buf = t_cur->next; 
+	
 		ep_mem_free( t_cur );
 		t_cur = t_buf;
 	}
+
+	(*rules) = NULL;
 }
 
+
+/*
+** Reinit the rule node with the input rule (indicated by second argu.)
+*/
 void reinit_DAC_R1_nodeauth( DAC_R1_node *curNode, DAC_UID_R1 inRule )
 {
 		curNode->mode    = inRule.add_del;
@@ -352,6 +386,9 @@ void reinit_DAC_R1_nodeauth( DAC_R1_node *curNode, DAC_UID_R1 inRule )
 }
 
 
+/*
+** Check whether the indicated node (by first argu) includes the interested rule. 
+*/
 bool isSubset( DAC_R1_node *ruleNode, char cmp_mode, char cmp_exauth ) 
 {
 	if( ruleNode->id[0] != '*' ) return false;
@@ -364,7 +401,9 @@ bool isSubset( DAC_R1_node *ruleNode, char cmp_mode, char cmp_exauth )
 }
 
 
-
+/*
+** When the child node changes, check & update mode of parenet node. 
+*/
 void update_node_modestatus( DAC_R1_node *parent, char premode, char newmode )
 {
 	if( premode == newmode ) return;
@@ -372,12 +411,12 @@ void update_node_modestatus( DAC_R1_node *parent, char premode, char newmode )
 
 	if( premode == 'a' )      parent->allow_count--;
 	else if( premode == 'b' ) parent->both_count--;
-	else				 	  parent->deny_count--;
+	else if( premode == 'd' ) parent->deny_count--;
 
 
 	if( newmode == 'a' )		parent->allow_count++;
 	else if( newmode == 'b' )	parent->both_count++;
-	else						parent->deny_count++;
+	else if( newmode == 'd' )	parent->deny_count++;
 
 	if( parent->both_count == 0 ) {
 		if( parent->allow_count!= 0 && parent->deny_count!= 0 ) parent->mode = 'b';
@@ -389,8 +428,42 @@ void update_node_modestatus( DAC_R1_node *parent, char premode, char newmode )
 }
 
 
-// NAIVE version
-// already locked before calling 
+/*
+** Print the current rule tree info (depth first) for debugging 
+*/
+void print_rule_tree(DAC_R1_node *curNode, int depth, FILE *afp)
+{
+	DAC_R1_node		*tcurNode = curNode;
+
+
+	while( tcurNode != NULL ) {
+		fprintf( afp, "< [d%d] (%c) %s [%d] (%d:%d:%d) > \n", 
+					depth, tcurNode->mode, 
+					tcurNode->id, tcurNode->ex_auth, 
+					tcurNode->allow_count, tcurNode->deny_count, 
+					tcurNode->both_count );
+
+		// print child.. 
+		if( tcurNode->child != NULL ) {
+			print_rule_tree( tcurNode->child, depth+1, afp );
+		}
+
+		// move sibling 
+		tcurNode = tcurNode->next; 
+	}
+
+}
+
+
+/*
+** Insert the input rule info into the rule tree (indicated by third argu outInfo). 
+** NAIVE version 
+** Input rule info: first / second argument (received from the log server) 
+** Output results: third argu (rule tree), forth argu (rule add/del mode info) 
+** return value: EX_OK on success, error_num on error
+**
+** [NODE] acInfo must be already locked before calling. 
+*/
 int update_DAC_UID_1( int inDatalen, void *inData, void **outInfo, char *mode )
 {
 	int					cmpval = -1;
@@ -412,7 +485,7 @@ int update_DAC_UID_1( int inDatalen, void *inData, void **outInfo, char *mode )
 
 		return EX_INVALIDDATA;
 	}
-
+	// print_DAC_UID_R1( inRule, stdout); 
 
 	*mode = inRule.add_del; 
 
@@ -425,12 +498,15 @@ int update_DAC_UID_1( int inDatalen, void *inData, void **outInfo, char *mode )
 		if( cmpval < 0 )  {
 			t_pre = t_cur;
 			t_cur = t_cur->next;
+
 		} else if( cmpval == 0 ) {
 			gnode = t_cur;
 			break;
+
 		} else break;
 			
 	}
+
 
 	//
 	// first rule with this gid
@@ -457,7 +533,6 @@ int update_DAC_UID_1( int inDatalen, void *inData, void **outInfo, char *mode )
 		gnode->child = unode;
 		unode->child = dnode;
 
-
 		if( t_pre == NULL ) {
 			(*outInfo) = gnode; 
 			gnode->next = t_cur;
@@ -470,7 +545,6 @@ int update_DAC_UID_1( int inDatalen, void *inData, void **outInfo, char *mode )
 		return EX_OK; 
 	} 
 
-
 	//
 	// existing rule with this gid. 
 	//
@@ -481,7 +555,6 @@ int update_DAC_UID_1( int inDatalen, void *inData, void **outInfo, char *mode )
 			remove_DAC_R1_allchilds_wo_header( gnode ); 
 			reinit_DAC_R1_nodeauth( gnode->child, inRule );
 			reinit_DAC_R1_nodeauth( gnode->child->child, inRule );
-
 		} else {
 			unode = get_new_DAC_R1_node( inRule, inRule.uidbuf);
 			if( unode == NULL ) return EX_MEMERR;
@@ -503,7 +576,9 @@ int update_DAC_UID_1( int inDatalen, void *inData, void **outInfo, char *mode )
 	}
 
 
+	// 
 	// reflect rule with specific gid, uid 
+	// 
 	t_pre = NULL;
 	t_cur = gnode->child;
 	while( t_cur != NULL ) {
@@ -512,6 +587,7 @@ int update_DAC_UID_1( int inDatalen, void *inData, void **outInfo, char *mode )
 		if( cmpval < 0 )  {
 			t_pre = t_cur;
 			t_cur = t_cur->next;
+
 		} else if( cmpval == 0 ) {
 			unode = t_cur;
 			break;
@@ -522,9 +598,9 @@ int update_DAC_UID_1( int inDatalen, void *inData, void **outInfo, char *mode )
 
 	// first rule with this pair of gid and uid 
 	if( unode == NULL ) {
-		// unode != '*' 
 		if( isSubset( gnode->child, inRule.add_del, inRule.ex_auth ) ) {
 			// head node includes this rule. so skip. 
+			printf("This rule is subset of gnode %s [%d]\n", gnode->id, __LINE__ ); 
 			return EX_OK;
 		}
 
@@ -539,20 +615,19 @@ int update_DAC_UID_1( int inDatalen, void *inData, void **outInfo, char *mode )
 
 		unode->child = dnode;
 
-
 		if( t_pre == NULL ) {
 			gnode->child = unode;
 			unode->next  = t_cur;
-		} else {
+
+		} else { 
 			t_pre->next = unode;
 			unode->next = t_cur;
 		}
 
-		
+		// ex_auth??? :: MUST CHECK 
 		if( inRule.add_del != gnode->mode ) gnode->mode = 'b';
 		if( inRule.add_del == 'a' ) gnode->allow_count++; 
 		else gnode->deny_count++;
-
 
 		return EX_OK;
 	}
@@ -566,13 +641,25 @@ int update_DAC_UID_1( int inDatalen, void *inData, void **outInfo, char *mode )
 		// update existing rule with this in rule. 
 		// this uidnode only has one did node.  
 		char				pre_mode = unode->mode; 
-		
+	
+		// check subset... 
+
 		if( unode->child->id[0] == '*' ) {
 			remove_DAC_R1_allchilds_wo_header( unode ); 
 			reinit_DAC_R1_nodeauth( unode->child, inRule );
 			reinit_DAC_R1_nodeauth( unode, inRule );
 
-			update_node_modestatus( gnode, pre_mode, inRule.add_del );
+			if( isSubset(gnode->child, unode->mode, unode->ex_auth) ) {
+				// delete sub tree pointed by unode 
+				pre_unode->next = unode->next;
+				ep_mem_free( unode->child );
+				ep_mem_free( unode );
+
+				update_node_modestatus( gnode, pre_mode, 0 );
+
+			} else {
+				update_node_modestatus( gnode, pre_mode, inRule.add_del );
+			}
 
 		} else {
 			dnode = get_new_DAC_R1_node( inRule, inRule.didbuf);
@@ -584,11 +671,8 @@ int update_DAC_UID_1( int inDatalen, void *inData, void **outInfo, char *mode )
 			update_node_modestatus( gnode, pre_mode, inRule.add_del );
 		}
 
-
 		return EX_OK; 
 	}
-
-
 
 
 	// reflect rule with specific gid, uid , did 
@@ -613,8 +697,16 @@ int update_DAC_UID_1( int inDatalen, void *inData, void **outInfo, char *mode )
 
 		if( isSubset( unode->child, inRule.add_del, inRule.ex_auth ) ) {
 			// subset ... so skip
+			printf("This rule is subset of gnode %s unode %s\n", 
+						gnode->id, unode->id); 
 			return EX_OK;
 		}  
+
+		if( isSubset( gnode->child, inRule.add_del, inRule.ex_auth ) ) {
+			// head node includes this rule. so skip. 
+			printf("This rule is subset of gnode %s [%d]\n", gnode->id, __LINE__); 
+			return EX_OK;
+		}
 
 		dnode = get_new_DAC_R1_node( inRule, inRule.didbuf);
 		if( dnode == NULL ) return EX_MEMERR;
@@ -658,35 +750,30 @@ int update_DAC_UID_1( int inDatalen, void *inData, void **outInfo, char *mode )
 			// check where unode can be deleted or not. 
 			if( unode->child->next == NULL ) {
 				unode->ex_auth = unode->child->ex_auth;  
-
-				if( isSubset(gnode->child, unode->mode, unode->ex_auth) ) {
-					// delete unode 
-					if( pre_mode == 'a' ) {
-						gnode->allow_count--;
-						if( gnode->allow_count == 0  && gnode->both_count==0 ) 
-								gnode->mode = 'd';
-					} else if( pre_mode == 'b' ) {
-						gnode->both_count--;
-						if( gnode->both_count == 0 ) {
-							if( gnode->allow_count == 0 ) gnode->mode = 'd';
-							else if( gnode->deny_count == 0 ) gnode->mode = 'a'; 
-						}
-					} else {
-						gnode->deny_count--;
-						if( gnode->deny_count == 0  && gnode->both_count==0 ) 
-								gnode->mode = 'a';
-					}
-
-					pre_unode->next = unode->next;
-					ep_mem_free( unode );
-
-				}
 			}
 
 			// remaining case... 
 			update_node_modestatus( gnode, pre_mode, unode->mode );
 
 		} else {
+			if( isSubset( gnode->child, inRule.add_del, inRule.ex_auth ) ) {
+				// head node includes this rule. so skip. 
+				printf("This rule is subset of gnode %s [%d]\n", gnode->id, __LINE__); 
+
+				// delete dnode 
+				update_node_modestatus( unode, dnode->mode, 0 );
+				update_node_modestatus( gnode, pre_mode, unode->mode );
+
+				if( t_pre == NULL ) {
+					unode->child = dnode->next;	
+				} else {
+					t_pre->next = dnode->next;
+				}
+				ep_mem_free( dnode );
+
+				return EX_OK;
+			}
+
 			// change the existing rule 
 			// dnode value is changed with inRule. 
 			update_node_modestatus( unode, dnode->mode, inRule.add_del );
@@ -697,10 +784,17 @@ int update_DAC_UID_1( int inDatalen, void *inData, void **outInfo, char *mode )
 		}
 	}
 
+
 	return EX_OK; 
 }
 
 
+/*
+** Check whether the request is authorized or not 
+** Request info is passed through 4'th argument (ID info) & first argu(right). 
+**		(3'rd argu is the length of 4'th argument.) 
+** Authorization is based on the rules passed through 2'nd argu.  
+*/
 bool check_right_wbuf_on_DAC_UID_1( char a_Right, void *rules, 
 											int a_idLen, void *reqID)
 {
@@ -722,7 +816,16 @@ bool check_right_wbuf_on_DAC_UID_1( char a_Right, void *rules,
 }
 
 
-// NAIVE version
+/*
+** check whether request ID has the requested right on the current 
+**		access policy (rules). 
+** first: requested right info 
+** second: requestd ID info
+** third: access policy info 
+**
+** Return value: true on allowed request / false on nonallowed request
+** NAVIE version 
+*/
 bool check_right_wrule_on_DAC_UID_1( char a_Right, DAC_UID_R1 inRule, 
 											void *rules )
 {
@@ -748,14 +851,15 @@ bool check_right_wrule_on_DAC_UID_1( char a_Right, DAC_UID_R1 inRule,
 		} else break;
 			
 	}
-	
+
 	if( gnode == NULL )		 return false;
 	if( gnode->mode == 'd' ) return false;
 
 
 	// Among the lower nodes of gnode, 
 	//		find the node which is related with the requested UID & DID. 
-	// Authorization is based on the following nodes. (priority is based on the described order).   
+	// Authorization is based on the following nodes. 
+	//		(priority is based on the described order).   
 	// If there is no rule node related following 3 cases, deny.  
 	// 1. The specific node with the same UID & DID
 	// 2. The node with the same UID & * DID  
@@ -765,12 +869,12 @@ bool check_right_wrule_on_DAC_UID_1( char a_Right, DAC_UID_R1 inRule,
 	t_cur = gnode->child;
 	while( t_cur != NULL ) {
 		cmpval = cmp_ruleid( t_cur->id, inRule.uidbuf );	
-
 		if( cmpval < 0 )  {
 			t_cur = t_cur->next;
 		} else if( cmpval == 0 ) {
 			unode = t_cur;
 			break;
+
 		} else break;
 	}			
 
@@ -779,7 +883,6 @@ bool check_right_wrule_on_DAC_UID_1( char a_Right, DAC_UID_R1 inRule,
 		t_cur = unode->child;
 		while( t_cur != NULL ) {
 			cmpval = cmp_ruleid( t_cur->id, inRule.didbuf );	
-
 			if( cmpval < 0 )  {
 				t_cur = t_cur->next;
 			} else if( cmpval == 0 ) {
@@ -806,7 +909,6 @@ bool check_right_wrule_on_DAC_UID_1( char a_Right, DAC_UID_R1 inRule,
 		cmpval = cmp_ruleid( dnode->id, "*");
 		if( cmpval == 0 ) {
 			if( dnode->mode != 'a' ) return false;
-
 			cmpval = dnode->ex_auth & inRule.ex_auth; 
 
 			if( cmpval == inRule.ex_auth ) return true;
@@ -832,4 +934,5 @@ bool check_right_wrule_on_DAC_UID_1( char a_Right, DAC_UID_R1 inRule,
 	
 
 }
+// hsmoon_end
 

@@ -141,6 +141,9 @@ KSD_info* get_new_ks_data( size_t a_len, char *a_name )
 	newInfo->state = NEED_INIT;
 	newInfo->isDuplicated = false;
 
+	ep_thr_mutex_init( &newInfo->mutex, EP_THR_MUTEX_DEFAULT );
+	ep_thr_mutex_setorder( &newInfo->mutex, GDP_MUTEX_LORDER_KSD );
+
 	return newInfo;
 }
 
@@ -175,7 +178,7 @@ ACL_info* get_new_ac_data( size_t a_len, char *a_name )
 	newInfo->ref_count	= 1;
 	newInfo->acr_type	= 0;
 
-	newInfo->first_recn	= 0;
+	newInfo->first_recn	= 1;
 	newInfo->next_recn	= 1;
 	newInfo->reInit_recn	= 0;
 	newInfo->state			= NEED_INIT;
@@ -189,6 +192,10 @@ ACL_info* get_new_ac_data( size_t a_len, char *a_name )
 	newInfo->gcl		= NULL;
 	newInfo->head		= NULL;
 	newInfo->acrules	= NULL;
+
+
+	ep_thr_mutex_init( &newInfo->mutex, EP_THR_MUTEX_DEFAULT );
+	ep_thr_mutex_setorder( &newInfo->mutex, GDP_MUTEX_LORDER_KSD );
 
 	LIST_INIT( &(newInfo->skeys) );
 
@@ -211,6 +218,10 @@ void free_ksdinfo( void *a_val )
 }
 
 
+// hsmoon_start 
+/*
+** Free memory for ACL_info data 
+*/
 void free_aclinfo( void *a_val ) 
 {
 	ACL_info			*t_val = (ACL_info *)a_val;
@@ -225,11 +236,13 @@ void free_aclinfo( void *a_val )
 		gdp_datum_free( t_datum );
 		t_datum = t_val->head; 
 	}
+	t_val->head = NULL;
 
-	free_ac_rule( t_val->acr_type, t_val->acrules );
+	free_ac_rule( t_val->acr_type, &(t_val->acrules) );
 
 	ep_mem_free( t_val );
 }
+// hsmoon_end
 
 
 void free_light_aclinfo( void *a_val ) 

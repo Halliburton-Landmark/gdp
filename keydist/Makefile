@@ -59,11 +59,11 @@ LDLIBS_COM=	\
 		${LIBHS} \
 		${LIBGDP} \
 		${LIBEP} \
+		${LIBEVENT2}
 
 LDLIBS=	${LDLIBS_COM}	\
 		${LIBCRYPTO} \
 		${LIBAC} \
-		${LIBEVENT2}
 #LATER : check avahi?? 
 
 
@@ -112,10 +112,10 @@ OBJS2= ${COM_OBJS} kdc_gcl_ops.o kdc_api.o gdp_devicekey.o gdp_logdatakey.o
 OBJS3= ${OBJS2} gdp-writer-enc.o
 OBJS4= ${OBJS2} gdp-reader-dec.o
 OBJS5= ${OBJS2} kds_manager.o 
-
+OBJS7= ${OBJS} test.o
 
 #ALL= test
-ALL= keydistd  gdp-writer gdp-reader manager_kds ${LIBALL}
+ALL= keydistd  test gdp-writer gdp-reader manager_kds ${LIBALL}
 CLEANALL=	${ALL} 
 #CLEANALL=	${ALL} ${OBJS1} ${OBJS2} ${OBJS3} ${OBJS4} ${OBJS5}
 
@@ -124,6 +124,8 @@ all: ${ALL}
 keydistd: ${OBJS1} 
 	${CC} -o $@ ${OBJS1} ${LDLIBS} ${LDFLAGS1}
 
+test: ${OBJS7} 
+	${CC} -o $@ ${OBJS7} ${LDLIBS} ${LDFLAGS1}
 
 gdp-writer: ${OBJS3} 
 	${CC} -o $@ ${OBJS3} ${LDLIBS} ${LDFLAGS1}

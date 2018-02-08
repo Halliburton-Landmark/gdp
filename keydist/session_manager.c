@@ -31,14 +31,13 @@
 */
 
 /*
-**  SESSION_MANAGER - functions to support secure channel   
+**  SESSION_MANAGER - functions to support secure channel & manage session info  
 **
 ** written by Hwa Shin Moon, ETRI (angela.moon@berkeley.edu, hsmoon@etri.re.kr) 
-** last modified : 2017.11.24 
+** last modified : 2018.01.09 
 */ 
-// LATER: need to devide this into two parts: for KDS server & for general case
 
-
+// hsmoon_start
 #include <string.h>
 #include <arpa/inet.h>
 #include <openssl/evp.h>
@@ -58,7 +57,6 @@
 
 
 
-//#define KS_SKEY_FIL	"/home/hsmoon/GDP/certtest/ec/registration/rs_ecc.key"
 #define	RS_CERT_FILE	"/home/hsmoon/GDP/certtest/ec/registration/rs_ecc.pem"
 #define MY_AC_FILE		"/home/hsmoon/etc/my_ac.tk"
 
@@ -70,9 +68,15 @@ EVP_PKEY			*rs_pubkey = NULL;
 EVP_PKEY			*my_seckey = NULL;
 struct ac_token		*my_token  = NULL;
 
+
+
 // 
 // Internal Functions 
 // 
+
+/*
+** Allocate the memory for session data structure 
+*/
 gdp_session* get_new_session(  )
 {
 	gdp_session			*newSession = NULL;
@@ -81,10 +85,16 @@ gdp_session* get_new_session(  )
 
 	if( newSession == NULL ) return NULL;
 
+	ep_thr_mutex_init( &newSession->mutex, EP_THR_MUTEX_DEFAULT );
+	ep_thr_mutex_setorder( &newSession->mutex, GDP_MUTEX_LORDER_SE );
+
 	return newSession;
 }
 
 
+/*
+** Allocate the memory for session related data & Initialize it.  
+*/
 sapnd_dt* get_new_session_apnddata( char mode )
 {
 	sapnd_dt		*newData	= NULL;
@@ -119,7 +129,6 @@ fail0:
 }
 
 
-// hsmoon_start
 /*
 ** Free memory for session data structure 
 */
@@ -519,7 +528,7 @@ int init_session_manager(  )
 
 	t_fp = fopen( name, "rb");
 	if( t_fp == NULL ) {
-		ep_dbg_printf("Cannot read secret key in session manager \n"); 
+		ep_dbg_printf("Cannot open secret key in session manager \n"); 
 		return EX_FAILURE;
 	}
 
@@ -530,17 +539,42 @@ int init_session_manager(  )
 		return EX_FAILURE;
 	}
 	fclose( t_fp );
-// hsmoon_end
 
 
 	//
 	// 3. Load the secret key of running system or device
 	// 
 
-	name = ep_adm_getstrparam("swarm.gdp.device.mytoken", MY_AC_FILE );
+	// 3.1 check whether this program is service or not 
+	//		If service, use the another param info for the service 
+	snprintf( argname, sizeof argname, "swarm.%s.token", 
+									progname==NULL?"null":progname );
+	name = ep_adm_getstrparam( argname, NULL );
+	printf(" Token first Name: %s \n", name==NULL?"null":name );
+
+	if( name == NULL ) {
+		// 3.2 In the device case, 
+		//		For test, we need to run multiple devices on one machine 
+		//		To do this, we use the following parameter. 	
+		name = ep_adm_getstrparam("swarm.gdp.device.name", NULL );
+
+		if( name != NULL ) {
+			snprintf( argname, sizeof argname, "swarm.gdp.%s.token", name );
+			name = ep_adm_getstrparam( argname, NULL );
+
+			printf("Tmp arg: %s \n", argname );
+			printf("Token Second Name: %s \n", name==NULL?"null":name );
+		}
+
+		if( name == NULL ) {
+			name = ep_adm_getstrparam("swarm.gdp.device.mytoken", MY_AC_FILE );
+			printf("Token Third Name: %s \n", name==NULL?"null":name );
+		}
+	}
+
 	t_fp	= fopen( name, "rb" );
 	if( t_fp == NULL ) {
-		ep_dbg_printf("Cannot find/read ac token in session manager \n"); 
+		ep_dbg_printf("Cannot open ac token in session manager \n"); 
 		return EX_FAILURE;
 	} 
 
@@ -557,12 +591,16 @@ int init_session_manager(  )
 
 
 
+/*
+** This exit function deallocate the memory
+*/
 void exit_session_manager( )
 {
 	if( rs_pubkey != NULL ) EVP_PKEY_free( rs_pubkey );	
 	if( my_seckey != NULL ) EVP_PKEY_free( my_seckey );	
 	if( my_token  != NULL ) free_token(    my_token  ); 
 }
+// hsmoon_end
 
 
 gdp_session* lookup_session( KSD_info * ksData, gdp_req_t *inReq )

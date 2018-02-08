@@ -88,8 +88,12 @@ char*       convert_acrule_to_buf( char *, DAC_UID_R1,   int );
 int			update_DAC_UID_1( int, void *, void **, char *);
 bool		check_right_wbuf_on_DAC_UID_1( char, void *, int, void *);
 bool		check_right_wrule_on_DAC_UID_1( char, DAC_UID_R1,  void *);
-void		free_rules_on_DAC_UID_1( void * );
 DAC_UID_R1*	convert_token_to_acrule(gdp_gclmd_t *, char, DAC_UID_R1 *);
+
+
+void		free_rules_on_DAC_UID_1( void ** );
+
+void		print_rule_tree( DAC_R1_node *, int, FILE * );
 
 #endif		//_DAC_UID_1_H_
 
