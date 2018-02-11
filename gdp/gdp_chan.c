@@ -351,10 +351,7 @@ read_header(gdp_chan_t *chan,
 
 	// make sure entire PDU is in memory
 	if (gdp_buf_getlength(ibuf) < hdr_len + payload_len)
-	{
-		estat = GDP_STAT_KEEP_READING;
-		goto done;
-	}
+		return GDP_STAT_KEEP_READING;
 
 	// consume the header, but leave the payload
 	gdp_buf_drain(ibuf, hdr_len);
