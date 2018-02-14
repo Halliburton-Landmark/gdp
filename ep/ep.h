@@ -102,6 +102,10 @@ extern FILE		*ep_fopen_smem(		// open a static memory buffer
 				void *buf,		// buffer
 				size_t bufsz,		// size of buffer
 				const char *mode);	// mode, e.g., r, w
+extern FILE		*ep_fopen_styled(	// open output with font/colors
+				FILE *underlying,	// underlying output
+				const char *so,		// "shift out" string
+				const char *si);	// "shift in" string
 extern FILE		*ep_fopen_syslog(	// open a syslog channel
 				int pri);		// message priority
 extern size_t		ep_fread_unlocked(	// unlocked version of fread
