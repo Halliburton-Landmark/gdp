@@ -53,8 +53,8 @@
 #define		KS_SERVICE_CHANGE		2	
 #define		KS_SERVICE_CANCLE		3	
 
-#define		KS_MODE_GEN_DIST		4	
-#define		KS_MODE_ONLY_DIST		5	
+#define		KS_MODE_GEN_DIST		'w'	
+#define		KS_MODE_ONLY_DIST		'r'	
 
 
 void			kdc_init( );

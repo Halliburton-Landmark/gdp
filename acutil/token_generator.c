@@ -417,11 +417,40 @@ main(int argc, char **argv)
 	m_ret = write_actoken_to_file( token, ofp );
 
 
+	// verify actoken 
+	{
+		EP_STAT			estat;
+		unsigned char	*tdata = NULL;
+		EP_CRYPTO_MD	*md = NULL;
+
+		md = ep_crypto_vrfy_new( rs_pubkey, token->md_alg_id );
+		if( md == NULL ) {
+			printf("Fail to verify new \n"); 
+			goto tfail2;
+		}
+
+	
+		tdata = gdp_buf_getptr( token->dbuf, token->dlen ); 
+		estat = ep_crypto_vrfy_update( md, (void *)tdata, token->dlen );
+		printf("Crypto Update pass... \n"); 
+
+		estat = ep_crypto_vrfy_final( md, (void *)(token->sigbuf), 
+										token->siglen );
+		if( EP_STAT_ISOK( estat ) ) {
+			printf(" Pass to verify signature ... \n" ); 
+		} else printf("Fail to verify final ... \n" ); 
+
+tfail2: 
+		if( md != NULL ) ep_crypto_vrfy_free( md );
+	}
+
+
+
 fail0:
 
 	if( ofilename     != NULL ) ep_mem_free( ofilename ) ;
 	if( ofp			  != NULL ) fclose( ofp ); 
-	if( token		  != NULL ) free_token( token ); 
+	if( token		  != NULL ) free_token( &token ); 
 
 	if( device_cert   != NULL ) X509_free(     device_cert   );
 	if( device_pubkey != NULL ) EVP_PKEY_free( device_pubkey );	

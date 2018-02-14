@@ -1,0 +1,886 @@
+******* Start Debugging for ac rule [rusr1_3] 
+[INFO] Gclmd_find int, gmd = 0x961dd0, id = 00525459 .. 
+[ACR type] 1 - supported 
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 1 recno 
+    AC TYPE: 1 (support), State: NEED_INIT 
+    firstR: 1, nextR: 1 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 25 , next recn: 1 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+[ac info state change] NEED_INIT -> DOING_INIT 
+ [CB] Not Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 2 recno 
+    AC TYPE: 1 (support), State: DOING_INIT 
+    firstR: 1, nextR: 2 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 12 , next recn: 2 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr2 [4] (1:0:0) > 
+< [d2] (a) * [4] (1:0:0) > 
+< [d3] (a) * [4] (1:0:0) > 
+ [CB] Not Buffered AC data 
+
+Pass Auth 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 3 recno 
+    AC TYPE: 1 (support), State: DOING_INIT 
+    firstR: 1, nextR: 3 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 15 , next recn: 3 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (b) rusr2 [4] (1:1:0) > 
+< [d2] (a) * [4] (1:0:0) > 
+< [d3] (a) * [4] (1:0:0) > 
+< [d2] (d) meta [4] (0:1:0) > 
+< [d3] (d) * [4] (0:1:0) > 
+ [CB] Not Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 3 recno 
+    AC TYPE: 1 (support), State: DOING_INIT 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ [CB] Not Buffered AC data 
+
+[CB] End of Subscription 
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 7 recno 
+    AC TYPE: 1 (support), State: DOING_INIT 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 16 , next recn: 4 
+ - Before  ACBUF] entry: 0, No hdr 
+ - After  ACBUF] entry: 1, Hdr->recn: 7
+ *** check ac buffer: 7 state: 1 
+ [CB] Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 8 recno 
+    AC TYPE: 1 (support), State: DOING_INIT 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 16 , next recn: 4 
+ - Before  ACBUF] entry: 1, Hdr->recn: 7
+ - After  ACBUF] entry: 2, Hdr->recn: 7
+ *** check ac buffer: 7 state: 1 
+ [CB] Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 9 recno 
+    AC TYPE: 1 (support), State: DOING_INIT 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 16 , next recn: 4 
+ - Before  ACBUF] entry: 2, Hdr->recn: 7
+ - After  ACBUF] entry: 3, Hdr->recn: 7
+ *** check ac buffer: 7 state: 1 
+ [CB] Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 10 recno 
+    AC TYPE: 1 (support), State: DOING_INIT 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 18 , next recn: 4 
+ - Before  ACBUF] entry: 3, Hdr->recn: 7
+ - After  ACBUF] entry: 4, Hdr->recn: 7
+ *** check ac buffer: 7 state: 1 
+DOING_INIT] retry async read Rec 4 
+[ac info state change] DOING_INIT -> WAIT_NEXT_ENTRY 
+ [CB] Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 11 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 18 , next recn: 4 
+ - Before  ACBUF] entry: 4, Hdr->recn: 7
+ - After  ACBUF] entry: 5, Hdr->recn: 7
+ *** check ac buffer: 7 state: 4 
+WAIT_NEXT_ENTRY] retry async read Rec 4 
+ [CB] Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 12 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 18 , next recn: 4 
+ - Before  ACBUF] entry: 5, Hdr->recn: 7
+ - After  ACBUF] entry: 6, Hdr->recn: 7
+ *** check ac buffer: 7 state: 4 
+WAIT_NEXT_ENTRY] retry async read Rec 4 
+ [CB] Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 13 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 17 , next recn: 4 
+ - Before  ACBUF] entry: 6, Hdr->recn: 7
+ - After  ACBUF] entry: 7, Hdr->recn: 7
+ *** check ac buffer: 7 state: 4 
+WAIT_NEXT_ENTRY] retry async read Rec 4 
+ [CB] Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 14 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 16 , next recn: 4 
+ - Before  ACBUF] entry: 7, Hdr->recn: 7
+ - After  ACBUF] entry: 8, Hdr->recn: 7
+ *** check ac buffer: 7 state: 4 
+WAIT_NEXT_ENTRY] retry async read Rec 4 
+ [CB] Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 15 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 16 , next recn: 4 
+ - Before  ACBUF] entry: 8, Hdr->recn: 7
+ - After  ACBUF] entry: 9, Hdr->recn: 7
+ *** check ac buffer: 7 state: 4 
+WAIT_NEXT_ENTRY] retry async read Rec 4 
+ [CB] Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 16 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 16 , next recn: 4 
+ - Before  ACBUF] entry: 9, Hdr->recn: 7
+ - After  ACBUF] entry: 10, Hdr->recn: 7
+ *** check ac buffer: 7 state: 4 
+WAIT_NEXT_ENTRY] retry async read Rec 4 
+ [CB] Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 17 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 16 , next recn: 4 
+ - Before  ACBUF] entry: 10, Hdr->recn: 7
+ - After  ACBUF] entry: 11, Hdr->recn: 7
+ *** check ac buffer: 7 state: 4 
+WAIT_NEXT_ENTRY] retry async read Rec 4 
+ [CB] Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 18 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 16 , next recn: 4 
+ - Before  ACBUF] entry: 11, Hdr->recn: 7
+ - After  ACBUF] entry: 12, Hdr->recn: 7
+ *** check ac buffer: 7 state: 4 
+WAIT_NEXT_ENTRY] retry async read Rec 4 
+ [CB] Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 19 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 15 , next recn: 4 
+ - Before  ACBUF] entry: 12, Hdr->recn: 7
+ - After  ACBUF] entry: 13, Hdr->recn: 7
+ *** check ac buffer: 7 state: 4 
+WAIT_NEXT_ENTRY] retry async read Rec 4 
+ [CB] Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 20 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 15 , next recn: 4 
+ - Before  ACBUF] entry: 13, Hdr->recn: 7
+ - After  ACBUF] entry: 14, Hdr->recn: 7
+ *** check ac buffer: 7 state: 4 
+WAIT_NEXT_ENTRY] retry async read Rec 4 
+ [CB] Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 21 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 16 , next recn: 4 
+ - Before  ACBUF] entry: 14, Hdr->recn: 7
+ - After  ACBUF] entry: 15, Hdr->recn: 7
+ *** check ac buffer: 7 state: 4 
+WAIT_NEXT_ENTRY] retry async read Rec 4 
+ [CB] Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 22 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 16 , next recn: 4 
+ - Before  ACBUF] entry: 15, Hdr->recn: 7
+ - After  ACBUF] entry: 16, Hdr->recn: 7
+ *** check ac buffer: 7 state: 4 
+WAIT_NEXT_ENTRY] retry async read Rec 4 
+ [CB] Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 23 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 16 , next recn: 4 
+ - Before  ACBUF] entry: 16, Hdr->recn: 7
+ - After  ACBUF] entry: 17, Hdr->recn: 7
+ *** check ac buffer: 7 state: 4 
+WAIT_NEXT_ENTRY] retry async read Rec 4 
+ [CB] Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 24 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 16 , next recn: 4 
+ - Before  ACBUF] entry: 17, Hdr->recn: 7
+ - After  ACBUF] entry: 18, Hdr->recn: 7
+ *** check ac buffer: 7 state: 4 
+WAIT_NEXT_ENTRY] retry async read Rec 4 
+ [CB] Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 25 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 16 , next recn: 4 
+ - Before  ACBUF] entry: 18, Hdr->recn: 7
+ - After  ACBUF] entry: 19, Hdr->recn: 7
+ *** check ac buffer: 7 state: 4 
+WAIT_NEXT_ENTRY] retry async read Rec 4 
+ [CB] Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 26 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 15 , next recn: 4 
+ - Before  ACBUF] entry: 19, Hdr->recn: 7
+ - After  ACBUF] entry: 20, Hdr->recn: 7
+ *** check ac buffer: 7 state: 4 
+WAIT_NEXT_ENTRY] retry async read Rec 4 
+ [CB] Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 27 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 17 , next recn: 4 
+ - Before  ACBUF] entry: 20, Hdr->recn: 7
+ - After  ACBUF] entry: 21, Hdr->recn: 7
+ *** check ac buffer: 7 state: 4 
+WAIT_NEXT_ENTRY] retry async read Rec 4 
+ [CB] Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 28 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 16 , next recn: 4 
+ - Before  ACBUF] entry: 21, Hdr->recn: 7
+ - After  ACBUF] entry: 22, Hdr->recn: 7
+ *** check ac buffer: 7 state: 4 
+WAIT_NEXT_ENTRY] retry async read Rec 4 
+ [CB] Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 29 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 16 , next recn: 4 
+ - Before  ACBUF] entry: 22, Hdr->recn: 7
+ - After  ACBUF] entry: 23, Hdr->recn: 7
+ *** check ac buffer: 7 state: 4 
+WAIT_NEXT_ENTRY] retry async read Rec 4 
+ [CB] Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 30 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 12 , next recn: 4 
+ - Before  ACBUF] entry: 23, Hdr->recn: 7
+ - After  ACBUF] entry: 24, Hdr->recn: 7
+ *** check ac buffer: 7 state: 4 
+WAIT_NEXT_ENTRY] retry async read Rec 4 
+ [CB] Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 31 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 12 , next recn: 4 
+ - Before  ACBUF] entry: 24, Hdr->recn: 7
+ - After  ACBUF] entry: 25, Hdr->recn: 7
+ *** check ac buffer: 7 state: 4 
+WAIT_NEXT_ENTRY] retry async read Rec 4 
+ [CB] Buffered AC data 
+
+No authorized 
+ [CB] AC last num: 32 
+[UAD] update_ac: rcv 32 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 12 , next recn: 4 
+ - Before  ACBUF] entry: 25, Hdr->recn: 7
+ - After  ACBUF] entry: 26, Hdr->recn: 7
+ *** check ac buffer: 7 state: 4 
+WAIT_NEXT_ENTRY] retry async read Rec 4 
+ [CB] Buffered AC data 
+
+[UAD] update_ac: rcv 4 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 4 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 12 , next recn: 4 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [4] (1:1:0) > 
+< [d2] (a) * [4] (1:0:0) > 
+< [d3] (a) * [4] (1:0:0) > 
+< [d2] (d) meta [4] (0:1:0) > 
+< [d3] (d) * [4] (0:1:0) > 
+ *** check ac buffer: 7 state: 1 
+DOING_INIT] retry async read Rec 5 
+[UAD] update_ac: rcv 4 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 5 lastR: 32, reInitR: 0 
+[UAD] update_ac: rcv 4 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 5 lastR: 32, reInitR: 0 
+[UAD] update_ac: rcv 4 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 5 lastR: 32, reInitR: 0 
+[UAD] update_ac: rcv 4 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 5 lastR: 32, reInitR: 0 
+[UAD] update_ac: rcv 4 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 5 lastR: 32, reInitR: 0 
+[UAD] update_ac: rcv 4 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 5 lastR: 32, reInitR: 0 
+[UAD] update_ac: rcv 4 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 5 lastR: 32, reInitR: 0 
+[UAD] update_ac: rcv 4 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 5 lastR: 32, reInitR: 0 
+[UAD] update_ac: rcv 4 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 5 lastR: 32, reInitR: 0 
+[UAD] update_ac: rcv 4 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 5 lastR: 32, reInitR: 0 
+[UAD] update_ac: rcv 4 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 5 lastR: 32, reInitR: 0 
+[UAD] update_ac: rcv 4 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 5 lastR: 32, reInitR: 0 
+[UAD] update_ac: rcv 4 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 5 lastR: 32, reInitR: 0 
+[UAD] update_ac: rcv 4 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 5 lastR: 32, reInitR: 0 
+[UAD] update_ac: rcv 4 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 5 lastR: 32, reInitR: 0 
+[UAD] update_ac: rcv 4 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 5 lastR: 32, reInitR: 0 
+[UAD] update_ac: rcv 4 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 5 lastR: 32, reInitR: 0 
+[UAD] update_ac: rcv 4 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 5 lastR: 32, reInitR: 0 
+[UAD] update_ac: rcv 4 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 5 lastR: 32, reInitR: 0 
+[UAD] update_ac: rcv 4 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 5 lastR: 32, reInitR: 0 
+[UAD] update_ac: rcv 4 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 5 lastR: 32, reInitR: 0 
+[UAD] update_ac: rcv 4 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 5 lastR: 32, reInitR: 0 
+
+
+
+[UAD] update_ac: rcv 5 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 5 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 12 , next recn: 5 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (a) rusr2 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+ *** check ac buffer: 7 state: 1 
+DOING_INIT] retry async read Rec 6 
+[UAD] update_ac: rcv 6 recno 
+    AC TYPE: 1 (support), State: WAIT_NEXT_ENTRY 
+    firstR: 1, nextR: 6 lastR: 32, reInitR: 0 
+ ~~~ DLEN: 12 , next recn: 6 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (d) rusr2 [7] (0:1:0) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+
+*** check ac buffer: 7 state: 1 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [7] (1:1:0) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+< [d2] (a) meta [5] (1:0:0) > 
+< [d3] (a) d1 [5] (1:0:0) > 
+ *** check ac buffer: 8 state: 1 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [7] (1:1:0) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+< [d2] (a) meta [5] (2:0:0) > 
+< [d3] (a) d1 [5] (1:0:0) > 
+< [d3] (a) d2 [5] (1:0:0) > 
+ *** check ac buffer: 9 state: 1 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [7] (1:1:0) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+< [d2] (a) meta [5] (3:0:0) > 
+< [d3] (a) d1 [5] (1:0:0) > 
+< [d3] (a) d2 [5] (1:0:0) > 
+< [d3] (a) d3 [7] (1:0:0) > 
+ *** check ac buffer: 10 state: 1 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [7] (2:1:0) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+< [d2] (a) hsmoon [1] (1:0:0) > 
+< [d3] (a) d1 [1] (1:0:0) > 
+< [d2] (a) meta [5] (3:0:0) > 
+< [d3] (a) d1 [5] (1:0:0) > 
+< [d3] (a) d2 [5] (1:0:0) > 
+< [d3] (a) d3 [7] (1:0:0) > 
+ *** check ac buffer: 11 state: 1 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [7] (2:1:0) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+< [d2] (a) hsmoon [1] (2:0:0) > 
+< [d3] (a) d1 [1] (1:0:0) > 
+< [d3] (a) d2 [5] (1:0:0) > 
+< [d2] (a) meta [5] (3:0:0) > 
+< [d3] (a) d1 [5] (1:0:0) > 
+< [d3] (a) d2 [5] (1:0:0) > 
+< [d3] (a) d3 [7] (1:0:0) > 
+ *** check ac buffer: 12 state: 1 
+This rule is subset of gnode rusr2 [707]
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [7] (2:1:0) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+< [d2] (a) hsmoon [1] (2:0:0) > 
+< [d3] (a) d1 [1] (1:0:0) > 
+< [d3] (a) d2 [5] (1:0:0) > 
+< [d2] (a) meta [5] (3:0:0) > 
+< [d3] (a) d1 [5] (1:0:0) > 
+< [d3] (a) d2 [5] (1:0:0) > 
+< [d3] (a) d3 [7] (1:0:0) > 
+ *** check ac buffer: 13 state: 1 
+This rule is subset of gnode rusr2 [603]
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [7] (2:1:0) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+< [d2] (a) hsmoon [1] (2:0:0) > 
+< [d3] (a) d1 [1] (1:0:0) > 
+< [d3] (a) d2 [5] (1:0:0) > 
+< [d2] (a) meta [5] (3:0:0) > 
+< [d3] (a) d1 [5] (1:0:0) > 
+< [d3] (a) d2 [5] (1:0:0) > 
+< [d3] (a) d3 [7] (1:0:0) > 
+ *** check ac buffer: 14 state: 1 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [7] (1:1:1) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+< [d2] (a) hsmoon [1] (2:0:0) > 
+< [d3] (a) d1 [1] (1:0:0) > 
+< [d3] (a) d2 [5] (1:0:0) > 
+< [d2] (b) meta [5] (2:1:0) > 
+< [d3] (a) d1 [5] (1:0:0) > 
+< [d3] (d) d2 [5] (0:1:0) > 
+< [d3] (a) d3 [7] (1:0:0) > 
+ *** check ac buffer: 15 state: 1 
+This rule is subset of gnode rusr2 [761]
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [7] (1:1:1) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+< [d2] (a) hsmoon [1] (2:0:0) > 
+< [d3] (a) d1 [1] (1:0:0) > 
+< [d3] (a) d2 [5] (1:0:0) > 
+< [d2] (b) meta [5] (1:1:0) > 
+< [d3] (d) d2 [5] (0:1:0) > 
+< [d3] (a) d3 [7] (1:0:0) > 
+ *** check ac buffer: 16 state: 1 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [7] (1:1:1) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+< [d2] (a) hsmoon [1] (2:0:0) > 
+< [d3] (a) d1 [1] (1:0:0) > 
+< [d3] (a) d2 [5] (1:0:0) > 
+< [d2] (b) meta [5] (2:1:0) > 
+< [d3] (a) d1 [7] (1:0:0) > 
+< [d3] (d) d2 [5] (0:1:0) > 
+< [d3] (a) d3 [7] (1:0:0) > 
+ *** check ac buffer: 17 state: 1 
+This rule is subset of gnode rusr2 [761]
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [7] (2:1:0) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+< [d2] (a) hsmoon [1] (2:0:0) > 
+< [d3] (a) d1 [1] (1:0:0) > 
+< [d3] (a) d2 [5] (1:0:0) > 
+< [d2] (a) meta [5] (2:0:0) > 
+< [d3] (a) d1 [7] (1:0:0) > 
+< [d3] (a) d3 [7] (1:0:0) > 
+ *** check ac buffer: 18 state: 1 
+This rule is subset of gnode rusr2 [761]
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [7] (2:1:0) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+< [d2] (a) hsmoon [1] (2:0:0) > 
+< [d3] (a) d1 [1] (1:0:0) > 
+< [d3] (a) d2 [5] (1:0:0) > 
+< [d2] (a) meta [5] (1:0:0) > 
+< [d3] (a) d1 [7] (1:0:0) > 
+ *** check ac buffer: 19 state: 1 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [7] (2:1:0) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+< [d2] (a) hsmoon [1] (2:0:0) > 
+< [d3] (a) d1 [1] (1:0:0) > 
+< [d3] (a) d2 [5] (1:0:0) > 
+< [d2] (a) meta [5] (1:0:0) > 
+< [d3] (a) * [5] (1:0:0) > 
+ *** check ac buffer: 20 state: 1 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [7] (1:2:0) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+< [d2] (a) hsmoon [1] (2:0:0) > 
+< [d3] (a) d1 [1] (1:0:0) > 
+< [d3] (a) d2 [5] (1:0:0) > 
+< [d2] (d) meta [1] (0:1:0) > 
+< [d3] (d) * [1] (0:1:0) > 
+ *** check ac buffer: 21 state: 1 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [7] (1:1:1) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+< [d2] (a) hsmoon [1] (2:0:0) > 
+< [d3] (a) d1 [1] (1:0:0) > 
+< [d3] (a) d2 [5] (1:0:0) > 
+< [d2] (b) meta [1] (1:1:0) > 
+< [d3] (d) * [1] (0:1:0) > 
+< [d3] (a) d3 [5] (1:0:0) > 
+ *** check ac buffer: 22 state: 1 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [7] (1:2:0) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+< [d2] (a) hsmoon [1] (2:0:0) > 
+< [d3] (a) d1 [1] (1:0:0) > 
+< [d3] (a) d2 [5] (1:0:0) > 
+< [d2] (d) meta [1] (0:1:0) > 
+< [d3] (d) * [1] (0:1:0) > 
+ *** check ac buffer: 23 state: 1 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [7] (1:1:1) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+< [d2] (a) hsmoon [1] (2:0:0) > 
+< [d3] (a) d1 [1] (1:0:0) > 
+< [d3] (a) d2 [5] (1:0:0) > 
+< [d2] (b) meta [1] (1:1:0) > 
+< [d3] (d) * [1] (0:1:0) > 
+< [d3] (a) d2 [5] (1:0:0) > 
+ *** check ac buffer: 24 state: 1 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [7] (1:1:1) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+< [d2] (a) hsmoon [1] (2:0:0) > 
+< [d3] (a) d1 [1] (1:0:0) > 
+< [d3] (a) d2 [5] (1:0:0) > 
+< [d2] (b) meta [1] (2:1:0) > 
+< [d3] (d) * [1] (0:1:0) > 
+< [d3] (a) d2 [5] (1:0:0) > 
+< [d3] (a) d3 [5] (1:0:0) > 
+ *** check ac buffer: 25 state: 1 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [7] (1:1:1) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+< [d2] (a) hsmoon [1] (2:0:0) > 
+< [d3] (a) d1 [1] (1:0:0) > 
+< [d3] (a) d2 [5] (1:0:0) > 
+< [d2] (b) meta [1] (1:1:0) > 
+< [d3] (d) * [1] (0:1:0) > 
+< [d3] (a) d3 [5] (1:0:0) > 
+ *** check ac buffer: 26 state: 1 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [7] (1:1:0) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+< [d2] (a) hsmoon [1] (2:0:0) > 
+< [d3] (a) d1 [1] (1:0:0) > 
+< [d3] (a) d2 [5] (1:0:0) > 
+ *** check ac buffer: 27 state: 1 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [7] (1:1:0) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+< [d2] (a) hsmoon [3] (1:0:0) > 
+< [d3] (a) * [3] (1:0:0) > 
+ *** check ac buffer: 28 state: 1 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [7] (1:1:0) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+< [d2] (a) hsmoon [3] (1:0:0) > 
+< [d3] (a) * [3] (1:0:0) > 
+< [d1] (a) rusr3 [5] (1:0:0) > 
+< [d2] (a) meta [5] (1:0:0) > 
+< [d3] (a) d1 [5] (1:0:0) > 
+ *** check ac buffer: 29 state: 1 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [7] (1:1:0) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+< [d2] (a) hsmoon [3] (1:0:0) > 
+< [d3] (a) * [3] (1:0:0) > 
+< [d1] (b) rusr3 [5] (0:0:1) > 
+< [d2] (b) meta [5] (1:1:0) > 
+< [d3] (a) d1 [5] (1:0:0) > 
+< [d3] (d) d2 [5] (0:1:0) > 
+ *** check ac buffer: 30 state: 1 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [7] (1:1:0) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+< [d2] (a) hsmoon [3] (1:0:0) > 
+< [d3] (a) * [3] (1:0:0) > 
+< [d1] (a) rusr3 [5] (1:0:0) > 
+< [d2] (a) * [5] (1:0:0) > 
+< [d3] (a) * [5] (1:0:0) > 
+ *** check ac buffer: 31 state: 1 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rsur2 [5] (1:0:0) > 
+< [d2] (a) * [5] (1:0:0) > 
+< [d3] (a) * [5] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (b) rusr2 [7] (1:1:0) > 
+< [d2] (d) * [7] (0:1:0) > 
+< [d3] (d) * [7] (0:1:0) > 
+< [d2] (a) hsmoon [3] (1:0:0) > 
+< [d3] (a) * [3] (1:0:0) > 
+< [d1] (a) rusr3 [5] (1:0:0) > 
+< [d2] (a) * [5] (1:0:0) > 
+< [d3] (a) * [5] (1:0:0) > 
+ *** check ac buffer: 32 state: 1 
+< [d1] (a) manager [7] (1:0:0) > 
+< [d2] (a) manager [7] (1:0:0) > 
+< [d3] (a) ms0001 [7] (1:0:0) > 
+< [d1] (a) rsur2 [5] (1:0:0) > 
+< [d2] (a) * [5] (1:0:0) > 
+< [d3] (a) * [5] (1:0:0) > 
+< [d1] (a) rusr1 [7] (1:0:0) > 
+< [d2] (a) * [7] (1:0:0) > 
+< [d3] (a) * [7] (1:0:0) > 
+< [d1] (a) rusr2 [5] (1:0:0) > 
+< [d2] (a) * [5] (1:0:0) > 
+< [d3] (a) * [5] (1:0:0) > 
+< [d1] (a) rusr3 [5] (1:0:0) > 
+< [d2] (a) * [5] (1:0:0) > 
+< [d3] (a) * [5] (1:0:0) > 
+[ac info state change] WAIT_NEXT_ENTRY -> DONE_INIT 

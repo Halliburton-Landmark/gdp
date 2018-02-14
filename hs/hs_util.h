@@ -37,8 +37,8 @@
 */ 
 
 
-#ifndef _EP_UTIL_H
-#define _EP_UTIL_H
+#ifndef _HS_UTIL_H
+#define _HS_UTIL_H
 
 #include <stdint.h>
 

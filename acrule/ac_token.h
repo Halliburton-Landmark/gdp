@@ -57,7 +57,7 @@ struct ac_token
 
 
 struct ac_token*	make_new_token();
-void				free_token( struct ac_token * );
+void				free_token( struct ac_token ** );
 int					add_token_field( struct ac_token *, gdp_gclmd_id_t, 
 										size_t, const void *);
 int					add_token_ctime_field( struct ac_token * );

@@ -463,6 +463,7 @@ void print_rule_tree(DAC_R1_node *curNode, int depth, FILE *afp)
 ** return value: EX_OK on success, error_num on error
 **
 ** [NODE] acInfo must be already locked before calling. 
+** error: EX_INVALIDDATA.  EX_MEMERR. 
 */
 int update_DAC_UID_1( int inDatalen, void *inData, void **outInfo, char *mode )
 {

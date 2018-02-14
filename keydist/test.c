@@ -104,14 +104,28 @@ void test_acread( gdp_event_t *gev )
 	acInfo->last_recn = gdp_gcl_getnrecs(acInfo->gcl);
 	printf(" [CB] AC last num: %" PRIgdp_recno " \n", acInfo->last_recn );
 
-	isBuffered = update_ac_data( acInfo, datum, false );
+	switch( gdp_event_gettype( gev ) ) {
+
+		case GDP_EVENT_DATA:
+			isBuffered = update_ac_data( acInfo, datum, false );
+			break;
+
+		case GDP_EVENT_EOS:
+			printf("End of Subscription \n\n");
+			break;
+
+		case GDP_EVENT_MISSING:
+			printf("EVENT missing \n\n");
+			isBuffered = update_ac_data( acInfo, datum, true );
+			break;
+		
+		default:
+			printf("Defalut case: %d \n", gdp_event_gettype(gev) );
+	}
 
 	if( isBuffered ) printf(" [CB] Buffered AC data \n\n");
-	else printf(" [CB] Not Buffered AC data \n\n" );
 
 //	(void)process_event( gev, true, 'a' );
-	if( gdp_event_gettype(gev) == GDP_EVENT_EOS ) 
-		printf( "[CB] End of Subscription \n" );
 
 
 	if( isBuffered ) gev->datum = NULL;
@@ -211,7 +225,7 @@ int main(int argc, char **argv)
 
 		acb_func = test_acread; 
 		testAC->gcl = gcl;
-		estat = gdp_gcl_subscribe( gcl, 1, 12, NULL, acb_func, (void *)testAC );
+		estat = gdp_gcl_subscribe( gcl, 1, 3, NULL, acb_func, (void *)testAC );
 		if( !EP_STAT_ISOK(estat) ) {
 			sprintf( errMsg, "Cannot subscribe:  %s \n", argv[0] );
 			ep_app_error( "%s", errMsg );
@@ -220,10 +234,13 @@ int main(int argc, char **argv)
 
 		sleep(3);
 
-		free_rules_on_DAC_UID_1( &(testAC->acrules) );
-
-//		estat = gdp_gcl_subscribe( gcl, 1, 1, NULL, acb_func, (void *)testAC );
-//		sleep(3600);
+		estat = gdp_gcl_read_async( gcl, 7, acb_func, (void *)testAC );
+		sleep(1);
+		estat = gdp_gcl_read_async( gcl, 40, acb_func, (void *)testAC );
+		estat = gdp_gcl_read_async( gcl, 32, acb_func, (void *)testAC );
+		estat = gdp_gcl_read_async( gcl, 33, acb_func, (void *)testAC );
+//		estat = gdp_gcl_subscribe( gcl, 7, 0, NULL, acb_func, (void *)testAC );
+		sleep(3600);
 
 tfail0:
 		if( gcl != NULL ) gdp_gcl_close( gcl );

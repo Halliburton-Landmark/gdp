@@ -49,6 +49,7 @@
 #include <ep/ep_app.h>
 #include <ep/ep_dbg.h>
 #include <hs/hs_errno.h>
+#include <hs/hs_util.h>
 #include <hs/gcl_helper.h>
 #include <hs/hs_symkey_gen.h>
 #include <ac/ac_token.h>
@@ -446,6 +447,10 @@ step1:
 // 
 // External Functions 
 // 
+
+/*
+** Put the token info into gdp datum buffer 
+*/
 int insert_mytoken( gdp_buf_t *dbuf ) 
 {
 	return write_token_tobuf( my_token, dbuf );
@@ -542,7 +547,7 @@ int init_session_manager(  )
 
 
 	//
-	// 3. Load the secret key of running system or device
+	// 3. Load the token of running system or device
 	// 
 
 	// 3.1 check whether this program is service or not 
@@ -586,6 +591,18 @@ int init_session_manager(  )
 		return EX_FAILURE;
 	} 
 
+
+	char   tbuf[1024];
+	printf("Session manager Token data: \n");
+	gdp_buf_peek( my_token->dbuf, tbuf, my_token->dlen );
+	ep_print_hexstr( stdout, "", my_token->dlen, tbuf ); 
+
+
+	if( verify_actoken( my_token ) ) {
+		printf(" Pass to verify actoken \n" ); 
+	}  else printf( " Fail to verify actoken \n" );
+
+	
 	return EX_OK;
 }
 
@@ -597,8 +614,12 @@ int init_session_manager(  )
 void exit_session_manager( )
 {
 	if( rs_pubkey != NULL ) EVP_PKEY_free( rs_pubkey );	
-	if( my_seckey != NULL ) EVP_PKEY_free( my_seckey );	
-	if( my_token  != NULL ) free_token(    my_token  ); 
+	if( my_seckey != NULL ) EVP_PKEY_free( my_seckey );	 
+	if( my_token  != NULL ) free_token(    &my_token  ); 
+
+	rs_pubkey	= NULL;
+	my_seckey	= NULL;
+	my_token	= NULL;  
 }
 // hsmoon_end
 
@@ -853,7 +874,7 @@ gdp_session* process_session_req( gdp_req_t *req, char mode )
 			} else curSession->state = 1; 
 
 
-			free_token( token );
+			free_token( &token );
 			break;
 
 		case 1: // check repeated request or change param LATER 
@@ -867,7 +888,7 @@ gdp_session* process_session_req( gdp_req_t *req, char mode )
 	return	curSession; 
 
 fail0:
-	if( token != NULL )			free_token( token );
+	if( token != NULL )			free_token( &token );
 	if(	curSession != NULL )	ep_mem_free( curSession );
 	if( seData != NULL )		ep_mem_free( seData );
 
@@ -1234,7 +1255,7 @@ int update_rmsg_onsession( gdp_pdu_t *pdu, gdp_session *curSession,
 
 		curSession->ac_info = t_token->info;
 		t_token->info		= NULL;
-		free_token( t_token );
+		free_token( &t_token );
 
 		rval = gdp_buf_read( pdu->datum->dbuf, &tlen, 1 ); 
 		if( rval != 1 ) exit_status = EX_SOFTWARE; 
@@ -1505,7 +1526,9 @@ tfail0:
 	return exit_status;
 }
 
-/*
+
+/* 
+// old version / unused function. // remained for reference 
 int update_response_onsession( gdp_pdu_t *rpdu, gdp_session *curSession ) 
 {
 	int				t_rval, chval;
@@ -1647,6 +1670,8 @@ struct ac_token* check_actoken( gdp_buf_t *inBuf )
 	newToken = read_token_from_buf( inBuf ); 
 	if(newToken == NULL ) return NULL;
 
+	printf(" >> Pass reading token \n" );
+
 	if( verify_actoken( newToken ) ) {
 		// Pass the verification 
 		newToken->info = _gdp_gclmd_deserialize( newToken->dbuf );
@@ -1657,11 +1682,15 @@ struct ac_token* check_actoken( gdp_buf_t *inBuf )
 		newToken->dlen = 0;
 		newToken->siglen = 0;
 
+		printf(" >> Pass verifying token \n" );
+
 		return newToken;
 
 	} else {
 		// Fail the verification 
-		if( newToken != NULL ) free_token( newToken );
+		printf(" >> Fail to verify token \n" );
+
+		if( newToken != NULL ) free_token( &newToken );
 		return NULL;
 	}
 
@@ -1670,17 +1699,25 @@ struct ac_token* check_actoken( gdp_buf_t *inBuf )
 
 bool verify_actoken( struct ac_token *inToken )
 {
+	uint8_t				*tdata = NULL;
 	EP_STAT				estat ;
 	EP_CRYPTO_MD		*md = NULL;
 
 
+
+	printf(" crypto new before... \n"); 
 	md = ep_crypto_vrfy_new( rs_pubkey, inToken->md_alg_id );
 	if( md == NULL ) return false;
 
-	estat = ep_crypto_vrfy_update( md, inToken->dbuf, inToken->dlen ); 
+	printf(" crypto update before ... \n"); 
+	tdata = gdp_buf_getptr( inToken->dbuf, inToken->dlen );
+	estat = ep_crypto_vrfy_update( md, (void *)tdata, inToken->dlen ); 
 	if( EP_STAT_ISOK( estat ) == false ) goto fail0;
 
-	estat = ep_crypto_vrfy_final( md, inToken->sigbuf, inToken->siglen ); 
+	printf(" crypto final before ... \n"); 
+	estat = ep_crypto_vrfy_final( md, (void *)(inToken->sigbuf), 
+										inToken->siglen ); 
+	printf(" crypto final after ... \n"); 
 	if( EP_STAT_ISOK( estat ) )  {
 		ep_crypto_vrfy_free( md ) ; 
 		return true;

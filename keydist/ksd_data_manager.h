@@ -129,7 +129,7 @@ typedef struct ac_log_data {
 	// NEED_INIT / NEED_SUBSCRIBE / DOING_INIT / DONE_INIT 
 	char				state;	  
 	time_t				ref_time;
-
+	time_t				last_time;
 
 	// Flags. 
 	bool				isAvailable;
@@ -268,13 +268,13 @@ int			request_key_ts(     KSD_info *, gdp_datum_t *, gdp_gclmd_t * );
 int			request_recno_for_ts(KSD_info *, gdp_datum_t * );
 int			get_last_keyrec(     KSD_info * );
 int			refresh_ks_info_file( ); 
-void		notify_elapse_time( );
+void		notify_elapse_time( EP_TIME_SPEC );
 void		notify_rule_change_toKey( ACL_info *, bool );
 void		notify_change_info_toKS( KSD_info *, bool, RKEY_1 * );
 EP_STAT		advertise_all_ksd(gdp_buf_t *, void *, int);
 void		kds_advertise_one(gdp_name_t, int );
 EP_STAT		kds_advertise_all(int );
-void		check_info_state( );
+void		check_info_state( EP_TIME_SPEC );
 void		reflect_lost_channel( );
 
 

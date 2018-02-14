@@ -141,11 +141,13 @@ KSD_info* get_new_ks_data( size_t a_len, char *a_name )
 	newInfo->state = NEED_INIT;
 	newInfo->isDuplicated = false;
 
+// hsmoon_start
 	ep_thr_mutex_init( &newInfo->mutex, EP_THR_MUTEX_DEFAULT );
 	ep_thr_mutex_setorder( &newInfo->mutex, GDP_MUTEX_LORDER_KSD );
 
 	return newInfo;
 }
+// hsmoon_end
 
 
 
@@ -194,6 +196,7 @@ ACL_info* get_new_ac_data( size_t a_len, char *a_name )
 	newInfo->acrules	= NULL;
 
 
+// hsmoon_start
 	ep_thr_mutex_init( &newInfo->mutex, EP_THR_MUTEX_DEFAULT );
 	ep_thr_mutex_setorder( &newInfo->mutex, GDP_MUTEX_LORDER_KSD );
 
@@ -202,6 +205,7 @@ ACL_info* get_new_ac_data( size_t a_len, char *a_name )
 	// LATER update
 	return newInfo;
 }
+// hsmoon_end
 
 
 void free_ksdinfo( void *a_val ) 
@@ -1139,10 +1143,12 @@ int init_ks_info_before_chopen()
 	// Read the file and initialize hash table, ac list, and key log list.  
 	exit_stat = init_ks_info_from_file();
 
+// hsmoon_start
 	init_session_manager( );
 
 	return exit_stat;
 }
+// hsmoon_end
 
 
 /*
@@ -1737,19 +1743,17 @@ void notify_change_info_toKS( KSD_info *ksData, bool isDenyRule,
 }
 
 
-void notify_elapse_time( ) 
+void notify_elapse_time( EP_TIME_SPEC tnow ) 
 {
 	char			keygen_flag = 0;
 	RKEY_1			*newKey		= NULL;
 	hs_lnode		*curKeyNode = NULL;
 	LKEY_info		*keyInfo	= NULL;
 	KSD_info		*ksData		= NULL;
-	EP_TIME_SPEC	tnow;
 
 
 
-	ep_time_now( &tnow );	
-	ep_time_print( &tnow, stdout, EP_TIME_FMT_HUMAN);
+	// ep_time_print( &tnow, stdout, EP_TIME_FMT_HUMAN);
 
 	curKeyNode = kloglist;
 	while( curKeyNode != NULL ) {
@@ -1788,17 +1792,14 @@ step1:
 }
 
 
-void check_info_state( )
+void check_info_state( EP_TIME_SPEC tnow )
 {
 	int					pre_recn = 0;
 	hs_lnode			*curNode = NULL;
 	ACL_info			*acInfo  = NULL;	
 	LKEY_info			*keyInfo  = NULL;	
-	EP_TIME_SPEC		tnow;
 
 
-
-	ep_time_now( &tnow );
 
 	// CHECK ac info 
 	curNode = aclist;
@@ -1852,6 +1853,7 @@ void check_info_state( )
 			load_ac_rules( acInfo ); 
 		}
 
+		// RE-CHECK DOING-INIT state: holding next entry 
 step1:
 		curNode = curNode->next;
 	}

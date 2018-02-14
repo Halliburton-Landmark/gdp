@@ -132,6 +132,18 @@ void kdc_exit( )
 }
 
 
+// hsmoon_start
+/*
+** Store the information needed to prepare & start the key distribution service 
+**		for special log (indicated by first argu). 
+** 1'st argu: log name assigned to key distribution service 
+** 2'nd argu: AC log name applied for the log 
+** 3'rd argu: key log name for the distirubiton key for the log 
+** 4'th argu: key distribution service mode: 
+**				r(distribution only), w(gen+distribution)
+** 5'th argu: device ID 
+** return value: object to contain the stored information 
+*/
 gdp_gclmd_t* set_ksinfo( gdp_pname_t dlogname, gdp_pname_t alogname, 
 					gdp_pname_t klogname, char rw_mode, gdp_pname_t wdid) 
 {
@@ -140,9 +152,9 @@ gdp_gclmd_t* set_ksinfo( gdp_pname_t dlogname, gdp_pname_t alogname,
 	EP_STAT				estat; 
 
 
-
 	// Error check 
 	if( isAllowedReqMode( rw_mode ) == false )  return NULL;
+
 
 	dlen = strlen( dlogname );
 	alen = strlen( alogname );
@@ -155,10 +167,10 @@ gdp_gclmd_t* set_ksinfo( gdp_pname_t dlogname, gdp_pname_t alogname,
 	sInfo = gdp_gclmd_new( 0 );
 	if( sInfo == NULL ) return NULL;
 
-
 	// Fill the key service information in sInfo 
 	estat =	gdp_gclmd_add( sInfo, GDP_GCLMD_DLOG, dlen, dlogname );
 	if( !EP_STAT_ISOK( estat ) ) goto fail0;
+
 
 	estat =	gdp_gclmd_add( sInfo, GDP_GCLMD_ACLOG, alen, alogname );
 	if( !EP_STAT_ISOK( estat ) ) goto fail0;
@@ -182,9 +194,12 @@ fail0:
 	return NULL;
 
 }
+// hsmoon_end 
 
 
-
+/*
+** 
+*/
 // LATER 
 // return value :exit_status 
 // gmd already includes the dname, aname, kname, mode 
@@ -226,6 +241,8 @@ EP_STAT kds_service_request( gdp_pname_t ksname, char cmd,
 	estat = _kdc_gcl_create( ksl_iname, ksdname, sinfo, _GdpChannel, 
 					GDP_REQ_ALLOC_RID, &gcl );
 
+	printf(" after kdc_gcl_create  ... [%s : %s] \n", ksname, pname );
+
 	kdc_gcl_close( gcl, mode );
 
 	if( EP_STAT_ISOK( estat ) == false ) goto fail0;
@@ -242,6 +259,8 @@ step1:
 		estat = KDS_STAT_WRONG_INPUT;
 		goto fail0;
 	}
+	printf(" before kdc_gcl_open  ... \n");
+
 	datum = gdp_datum_new();
 	put_kgenparam_to_buf( kinfo, datum );
 

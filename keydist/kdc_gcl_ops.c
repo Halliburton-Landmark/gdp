@@ -75,14 +75,16 @@ _gdp_gcl_newname(gdp_gcl_t *gcl)
 }
 */
 
-/*
-**	_GDP_GCL_CREATE --- create a new GCL
-**
-**		Creation is a bit tricky, since we don't start with an existing
-**		GCL, and we address the message to the desired daemon instead
-**		of to the GCL itself.  Some magic needs to occur.
-*/
 
+// hsmoon_start
+/*
+**	_KDC_GCL_CREATE --- create a new GCL
+**
+**	Creation means to create the key service instance for the specific log. 
+**	Unlike the other command sent to the key service instant for the log, 
+**  creation command is sent to the key distribution server. 
+**  On current version, this command is not sent through secure channel. 
+*/
 EP_STAT
 _kdc_gcl_create(gdp_name_t kslname, gdp_name_t ksdname, gdp_gclmd_t *sInfo, 
 				gdp_chan_t *chan, uint32_t reqflags, gdp_gcl_t **pgcl )
@@ -100,12 +102,14 @@ _kdc_gcl_create(gdp_name_t kslname, gdp_name_t ksdname, gdp_gclmd_t *sInfo,
 		gdp_pname_t gxname, dxname;
 
 		ep_dbg_cprintf(Dbg, 17,
-				"_kdc_gcl_create: gcl=%s\n\tlogd=%s\n",
-				kslname == NULL ? "none" : gdp_printable_name(kslname, gxname),
-				gdp_printable_name(ksdname, dxname));
+			"_kdc_gcl_create: gcl=%s\n\tlogd=%s\n",
+			kslname == NULL ? "none" : gdp_printable_name(kslname, gxname),
+			gdp_printable_name(ksdname, dxname));
 	}
 
-	// create a new pseudo-GCL for the daemon so we can correlate the results
+	// create a new pseudo-GCL for the daemon 
+	// so we can correlate the results
+	// NEED check gclname: kslname vs. ksdname 
 	estat = _gdp_gcl_newhandle( ksdname, &gcl );
 	EP_STAT_CHECK(estat, goto fail0);
 
@@ -118,13 +122,14 @@ _kdc_gcl_create(gdp_name_t kslname, gdp_name_t ksdname, gdp_gclmd_t *sInfo,
 
 	// 
 	//  Part A. Fill the CMD_CREATE pdu 
-	// 
+	//  already inserted : in gdp_req_new 
 	//	src: my GUID / dst: KDS_SERVICE 
 	memcpy(req->cpdu->src, _GdpMyRoutingName, sizeof req->cpdu->src);
 	memcpy(req->cpdu->dst, ksdname, sizeof req->cpdu->dst);
 
 	//	buf 1>  ksname ... 
 	gdp_buf_write(req->cpdu->datum->dbuf, kslname, sizeof (gdp_name_t));
+// hsmoon_end 
 
 	//	buf 2> access token in this device  
 	rval = insert_mytoken( req->cpdu->datum->dbuf );

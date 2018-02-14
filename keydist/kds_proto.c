@@ -308,6 +308,7 @@ cmd_create(gdp_req_t *req)
 	gdp_gclmd_t			*gmd = NULL;
 	struct ac_token		*token = NULL;
 
+	printf("RCV create command ... \n");
 
 	// error handling 1
 	if (!GDP_NAME_SAME(req->cpdu->dst, _GdpMyRoutingName))
@@ -374,7 +375,7 @@ cmd_create(gdp_req_t *req)
 		req->rpdu->cmd = GDP_NAK_C_UNAUTH;
 		goto fail0;
 	}
-
+	printf(" ... pass : checking actoken \n");
 
 	// 
 	// 3. Get the basic info for key distribution service 
@@ -398,6 +399,7 @@ cmd_create(gdp_req_t *req)
 		req->rpdu->cmd = GDP_NAK_C_BADREQ;
 		goto fail0;
 	}
+	printf(" ... pass : parsing ksd info \n");
 
 
 	// 
@@ -413,6 +415,7 @@ cmd_create(gdp_req_t *req)
 		goto fail0;
 	}
 
+	printf(" ... pass : creating ksd handle \n");
 
 
 	// update the KSD data object 
@@ -437,6 +440,8 @@ cmd_create(gdp_req_t *req)
 			req->rpdu->cmd = GDP_NAK_S_INTERNAL;
 			goto fail0;
 		}
+			printf(" ... pass : update ac node (key_data NULL) \n");
+
 		if( update_key_node(tksData, kname, klen, rw_mode) != EX_OK ) {
 			cancel_ksd_handle( tksData, true );
 			estat = kds_gcl_error(gclname,
@@ -445,6 +450,7 @@ cmd_create(gdp_req_t *req)
 			req->rpdu->cmd = GDP_NAK_S_INTERNAL;
 			goto fail0;
 		}
+			printf(" ... pass : update key node (key_data NULL) \n");
 
 		if( tksData->ac_data != NULL ) {
 			LIST_INSERT_HEAD( &(((ACL_info *)(tksData->ac_data->nval))->skeys), 
@@ -454,6 +460,7 @@ cmd_create(gdp_req_t *req)
 
 		exit_status = EX_OK; 
 
+		// check where this routine here... 
 		if( exit_status != EX_OK ) {
 			cancel_ksd_handle( tksData, true );
 			estat = GDP_STAT_INTERNAL_ERROR;
@@ -472,6 +479,7 @@ cmd_create(gdp_req_t *req)
 			req->rpdu->cmd = GDP_NAK_C_BADREQ;
 			goto fail0;
 		}
+			printf(" ... pass : load ac rules (key_data NULL) \n");
 
 		tksData->state = DONE_INIT;
 
@@ -488,10 +496,12 @@ cmd_create(gdp_req_t *req)
 				req->rpdu->cmd = GDP_NAK_S_INTERNAL;
 				goto fail0;
 			}
+			printf(" ... pass : create key log (key_data NULL) \n");
 
 			tksData->state = DOING_INIT;
 
 		} else if( exit_status != EX_OK ) {
+			printf(" ... ERR : existing key log (key_data NULL) \n");
 			//Not avaiable key log 
 			cancel_ksd_handle( tksData, true );
 			estat = GDP_STAT_GCL_NOT_OPEN;
@@ -502,6 +512,7 @@ cmd_create(gdp_req_t *req)
 
 		refresh_ks_info_file();
 
+			printf(" ... pass : load key log -> reflect ks file(key_data NULL) \n");
 	} else tksData->isDuplicated = true;
 
 
@@ -511,6 +522,7 @@ cmd_create(gdp_req_t *req)
 	// 
 
 	if( tksData->gcl != NULL ) {
+		printf(" ... ??? : EXISTING GCL \n");
 		gcl = tksData->gcl;
 		req->rpdu->cmd = GDP_ACK_SUCCESS;
 		req->gcl = gcl;
@@ -554,6 +566,7 @@ cmd_create(gdp_req_t *req)
 	gcl->flags |= GCLF_DEFER_FREE;
 	_gdp_gcl_decref(&req->gcl);
 
+	printf(" ... pass : prepare GCL \n");
 
 	// exit routine of this function 
 fail0:
@@ -563,7 +576,7 @@ fail0:
 
 	if( req->rpdu->cmd != GDP_ACK_CREATED ) {
 		// error case 
-		free_token( token );
+		free_token( &token );
 
 	}
 
@@ -707,7 +720,7 @@ fail0:
 	ep_thr_mutex_unlock(&req->rpdu->datum->mutex);
 	_gdp_gcl_decref(&req->gcl);
 
-	if( token != NULL ) free_token( token );
+	if( token != NULL ) free_token( &token );
 
 	return estat;
 }

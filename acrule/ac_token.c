@@ -72,14 +72,28 @@ struct ac_token* make_new_token( )
 }
 
 
-void free_token( struct ac_token	*token )
+// hsmoon_start
+/*
+** Free memory allocated for token 
+*/
+void free_token( struct ac_token	**intoken )
 {
+	struct ac_token		*token = (*intoken);
+
 	if( token == NULL ) return ;
 
 	if( token->info   != NULL ) gdp_gclmd_free( token->info ); 
 	if( token->dbuf   != NULL ) gdp_buf_free( token->dbuf );
 	if( token->sigbuf != NULL ) ep_mem_free( token->sigbuf );
+
+	token->info = NULL;
+	token->dbuf = NULL;
+	token->sigbuf = NULL;
+
+	ep_mem_free( token );
+	*intoken = NULL;
 }
+// hsmoon_end
 
 
 int add_token_field( struct ac_token *token, gdp_gclmd_id_t id, 
@@ -226,7 +240,12 @@ fail0:
 }
 
 
-// rfp :: rb mode open
+// hsmoon_start
+/*
+** Read the token info from the file (indicated by 1'st argu (rb mode option))
+** Convert the read token info into the ac_token data structure 
+** Return the converted ac_token data 
+*/ 
 struct ac_token* read_token_from_file( FILE *rfp )
 {
 	size_t				rval;
@@ -268,9 +287,17 @@ struct ac_token* read_token_from_file( FILE *rfp )
 	// LATER: With optional md alg, need error check 
 	rval = fread( dbuf, sizeof(uint8_t), newToken->siglen, rfp ); 
 	if( rval != newToken->siglen ) goto fail0;
-	
 
-	newToken->info = _gdp_gclmd_deserialize( newToken->dbuf );
+/* 
+	// debugging routine 
+	{
+		gdp_buf_peek( newToken->dbuf, dbuf, newToken->dlen );
+		printf("Token data: \n");
+		ep_print_hexstr( stdout, "", newToken->dlen, dbuf );
+	}
+*/ 
+
+	//newToken->info = _gdp_gclmd_deserialize( newToken->dbuf );
 
 	return newToken;
 
@@ -278,12 +305,16 @@ struct ac_token* read_token_from_file( FILE *rfp )
 fail0:
 	ep_dbg_printf( "Fail to write : rval %zu \n", rval);
 
-	if( newToken != NULL ) free_token( newToken );
+	if( newToken != NULL ) free_token( &newToken );
 	return NULL;
 }
 
 
-// Read token and Write it into dbuf & sigbuf of token  
+/*
+** Read token contents in gdp_buf (indicated by first argu). 
+** Convert the read contents into the ac_token type. 
+**  Return converted ac_token. 
+*/
 struct ac_token* read_token_from_buf( gdp_buf_t *inBuf )
 {
 	int					tval; 
@@ -292,14 +323,12 @@ struct ac_token* read_token_from_buf( gdp_buf_t *inBuf )
 	struct ac_token		*newToken = NULL;
 
 
-	newToken = ep_mem_zalloc( sizeof(struct ac_token) );
+	printf("In buf length: %zu \n",  gdp_buf_getlength(inBuf) ); 
+	newToken = make_new_token( );
 	if( newToken == NULL ) {
 		ep_dbg_printf( "Fail to get memory for token\n" );
 		return newToken; 
 	}
-
-	// Cur: fixed  : LATER: selective 
-	newToken->md_alg_id	= EP_CRYPTO_MD_SHA256; 
 
 	// Read the access token in inBuf 
 	//  access  token in buf:  [dlen][siglen][[token_data][signature]] 
@@ -318,18 +347,31 @@ struct ac_token* read_token_from_buf( gdp_buf_t *inBuf )
 		ep_dbg_printf( "Fail to get memory for token sig\n" );
 		goto fail0;	
 	}
-
 	printf("dlen: %d, slen: %d \n", newToken->dlen, newToken->siglen );
-
+// hsmoon_end 
 
 	newToken->dbuf = gdp_buf_new();
-	tval = gdp_buf_move( newToken->dbuf, inBuf, dlen ); 
+	tval = gdp_buf_move( newToken->dbuf, inBuf, newToken->dlen ); 
 	if( tval == -1 ) goto fail0; 
 
 
+	{
+		// debugging routine
+		unsigned char *tbuf = NULL;
+
+		tbuf = gdp_buf_getptr( newToken->dbuf, newToken->dlen );
+		printf("read tokenfrom buf: newToken dbuf data: \n");
+		ep_print_hexstr( stdout, "", newToken->dlen, tbuf );
+	}
+
+	printf(".. Pass to read dbuf \n");
+	printf("In buf R length: %zu \n",  gdp_buf_getlength(inBuf) ); 
+
 	tval = gdp_buf_read( inBuf, newToken->sigbuf, newToken->siglen );
+	printf(".. reading sig: %d vs %d \n", tval, newToken->siglen );
 	if( tval != newToken->siglen ) goto fail0;
 	newToken->sigbuf[newToken->siglen] = '\0'; 
+	printf("In buf R length: %zu \n",  gdp_buf_getlength(inBuf) ); 
 
 	//newToken->info = _gdp_gclmd_deserialize( newToken->dbuf );
 
@@ -338,40 +380,55 @@ struct ac_token* read_token_from_buf( gdp_buf_t *inBuf )
 
 fail0:
 	ep_dbg_printf("[ERROR] in Reading access token in dbuf \n" );
-	free_token( newToken );
+	free_token( &newToken );
 	return NULL;
 
 }
 
 
+// hsmoon_start
+/*
+**  Put the token (indicated by first argu) 
+**		in the gdp buffer indicated by second argu. 
+*/ 
 // Write token into buffer  
 int write_token_tobuf( struct ac_token *curToken, gdp_buf_t *outBuf )
 {
-	uint32_t			wlen;
-
+	unsigned char	*tbuf = NULL;
 
 	if( curToken == NULL || outBuf == NULL ) return EX_NOINPUT; 
 	if( curToken->dbuf == NULL ||  curToken->sigbuf == NULL ) return EX_NOINPUT;
 
 
-	// write dlen 
-	wlen = htonl( curToken->dlen );	
-	gdp_buf_put_uint32( outBuf, wlen ); 
+	// write dlen :put* function uses htonl to send dlen  
+	gdp_buf_put_uint32( outBuf, curToken->dlen ); 
 
 	// write slen  
-	wlen = htonl( curToken->siglen );	
-	gdp_buf_put_uint32( outBuf, wlen ); 
+	gdp_buf_put_uint32( outBuf, curToken->siglen ); 
 
+	printf("TOKEN: dlen: %u, siglen: %u\n", 
+				curToken->dlen, curToken->siglen );
 
 	// write token   
-	gdp_buf_write( outBuf, curToken->dbuf, curToken->dlen );
+	tbuf = gdp_buf_getptr( curToken->dbuf, curToken->dlen );
+	gdp_buf_write( outBuf, tbuf, curToken->dlen );
 
+/*
+	{
+		// debugging routine
+
+		tbuf = gdp_buf_getptr( curToken->dbuf, curToken->dlen );
+		printf("write token: dbuf data: \n");
+		ep_print_hexstr( stdout, "", curToken->dlen, tbuf );
+	}
+*/
 
 	// write sig
 	gdp_buf_write( outBuf, curToken->sigbuf, curToken->siglen );
 
 	return EX_OK;
 }
+// hsmoon_end 
 
 
 
@@ -395,7 +452,7 @@ int write_token_fromFile_tobuf( char *inName, gdp_buf_t *outBuf )
 	dlen = ntohl( rlen );
 
 	// write dlen  
-	gdp_buf_put_uint32( outBuf, rlen ); 
+	gdp_buf_put_uint32( outBuf, dlen ); 
 
 
 	rval = fread( &rlen, sizeof rlen, 1, rfp ); 
@@ -403,7 +460,7 @@ int write_token_fromFile_tobuf( char *inName, gdp_buf_t *outBuf )
 	slen = ntohl( rlen );
 
 	// write slen  
-	gdp_buf_put_uint32( outBuf, rlen ); 
+	gdp_buf_put_uint32( outBuf, slen ); 
 
 
 	if( dlen>1024 || slen>1024 ) {

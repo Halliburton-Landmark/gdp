@@ -63,7 +63,9 @@ ep_print_hexstr( FILE *outfp, char *prefix, int inlen, uint8_t *indata)
 
 	fprintf( outfp, "%s", prefix );
 	for( ti=0; ti< inlen; ti++ ) {
-		fprintf( outfp, "%02X", indata[ti] );
+		fprintf( outfp, "%02X ", indata[ti] );
+
+		if( ti%16==15 ) fprintf( outfp, "\n" );
 	}
 	fprintf( outfp, "\n" );
 }

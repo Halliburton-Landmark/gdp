@@ -507,8 +507,8 @@ LKEY_info* get_new_klinfo( size_t a_len, char *a_name,
 		}
 	}
 
+// hsmoon_start
 	LIST_INIT( &(newInfo->shlogs) );
-
 
 	ep_thr_mutex_init( &newInfo->mutex, EP_THR_MUTEX_DEFAULT );
 	ep_thr_mutex_setorder( &newInfo->mutex, GDP_MUTEX_LORDER_KSD );
@@ -516,6 +516,7 @@ LKEY_info* get_new_klinfo( size_t a_len, char *a_name,
 
 	return newInfo;
 }
+// hsmoon_end
 
 
 

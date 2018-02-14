@@ -44,6 +44,7 @@
 
 #include <ep/ep_sd.h>
 #include <ep/ep_thr.h>
+#include <ep/ep_time.h>
 #include <ep/ep_assert.h>
 
 
@@ -54,7 +55,7 @@
 #include "kds_pubsub.h"
 
 
-static EP_DBG	Dbg = EP_DBG_INIT("kdistd.main", 
+static EP_DBG	Dbg = EP_DBG_INIT("keydistd.main", 
 									"Key Distribution Service Daemon");
 
 
@@ -114,13 +115,16 @@ void work_periodically(int fd, short what, void *u)
 {
 	int				max_val    =  adv_index * sch_index ; 
 	static int		time_index = 0;
-	time_index++;
+	EP_TIME_SPEC	tnow;
 
+
+	time_index++;
+	ep_time_now( &tnow );
 
 	// 
 	// 1. check key generation  
 	// 
-	notify_elapse_time( );
+	notify_elapse_time( tnow );
 
 
 
@@ -131,7 +135,7 @@ void work_periodically(int fd, short what, void *u)
 
 	if( time_index % sch_index == 0 ) {
 		// re check ksd related info  
-		check_info_state( );
+		check_info_state( tnow );
 	}
 
 	if( time_index == max_val ) time_index = 0;
@@ -171,7 +175,6 @@ ksd_shutdown(void)
 
 
 	exit_ks_info_manager(); 
-	exit_session_manager(); 
 }
 
 

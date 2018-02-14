@@ -143,7 +143,7 @@ int main(int argc, char **argv)
 	argv += optind;
 
 
-	if (show_usage || argc <= 0  )
+	if (show_usage || argc < 0  )
 		usage();
 
 	// initialize the GDP library
@@ -187,6 +187,7 @@ int main(int argc, char **argv)
 
 		if( ex_mode != 'c' && ex_mode != 's' ) continue;
 
+// hsmoon_start
 		scan_nonzerochars( "Input the log name for key service: ", 
 											dlname, GDP_GCL_PNAME_LEN-4 );
 
@@ -229,6 +230,7 @@ int main(int argc, char **argv)
 		if( tmpIn == 'y' ) {
 			// LATER : input the detailed key parameter values. 
 		}
+// hsmoon_end
 
 		kinfo = get_new_kgen_param( NULL, NULL, 0 );
 		if( kinfo == NULL ) {
