@@ -64,15 +64,16 @@ static IORESULT_T
 styled_write(void *cookie, const char *buf, IOBLOCK_T size)
 {
 	struct styleinfo *sinf = (struct styleinfo *) cookie;
+	IORESULT_T result;
 
 	flockfile(sinf->underlying);
 	if (sinf->so != NULL)
 		fputs(sinf->so, sinf->underlying);
-	fwrite(buf, 1, size, sinf->underlying);
+	result = fwrite(buf, 1, size, sinf->underlying);
 	if (sinf->si != NULL)
 		fputs(sinf->si, sinf->underlying);
 	funlockfile(sinf->underlying);
-	return size;
+	return result;
 }
 
 static int
@@ -94,6 +95,7 @@ ep_fopen_styled(FILE *underlying,
 		const char *so,
 		const char *si)
 {
+	FILE *fp;
 	struct styleinfo *sinf = (struct styleinfo *) ep_mem_zalloc(sizeof *sinf);
 	if (sinf == NULL)
 		return NULL;
@@ -106,7 +108,7 @@ ep_fopen_styled(FILE *underlying,
 #if __FreeBSD__ || __APPLE__
 	{
 		// BSD/MacOS
-		return funopen(sinf, NULL, &styled_write, NULL, &styled_close);
+		fp = funopen(sinf, NULL, &styled_write, NULL, &styled_close);
 	}
 #elif __linux__
 	{
@@ -118,7 +120,9 @@ ep_fopen_styled(FILE *underlying,
 			NULL,
 			&styled_close
 		};
-		return fopencookie(sinf, "w", iof);
+		fp = fopencookie(sinf, "w", iof);
 	}
 #endif
+	setlinebuf(fp);
+	return fp;
 }
