@@ -338,29 +338,34 @@ _gdp_datum_dump(const gdp_datum_t *datum,
 }
 
 
+/*
+**  Convert internal datum structure to protobuf-encoded datum.
+**  Assumes the protobuf version is empty on entry.
+*/
+
 void
 _gdp_datum_to_pb(const gdp_datum_t *datum,
 				GdpMessage *msg,
-				GdpDatum *pb)
+				GdpDatum *pbd)
 {
-	pb->recno = datum->recno;
+	pbd->recno = datum->recno;
 	if (EP_TIME_IS_VALID(&datum->ts))
 	{
-		if (pb->ts == NULL)
+		if (pbd->ts == NULL)
 		{
-			pb->ts = (GdpTimestamp *) ep_mem_zalloc(sizeof *pb->ts);
-			gdp_timestamp__init(pb->ts);
+			pbd->ts = (GdpTimestamp *) ep_mem_zalloc(sizeof *pbd->ts);
+			gdp_timestamp__init(pbd->ts);
 		}
-		pb->ts->sec = datum->ts.tv_sec;
-		pb->ts->nsec = datum->ts.tv_nsec;
-		pb->ts->accuracy = datum->ts.tv_accuracy;
+		pbd->ts->sec = datum->ts.tv_sec;
+		pbd->ts->nsec = datum->ts.tv_nsec;
+		pbd->ts->accuracy = datum->ts.tv_accuracy;
 	}
 	if (datum->dbuf != NULL && gdp_buf_getlength(datum->dbuf) > 0)
 	{
 		size_t l = gdp_buf_getlength(datum->dbuf);
-		pb->data.data = (uint8_t *) ep_mem_malloc(l);
-		memcpy(pb->data.data, gdp_buf_getptr(datum->dbuf, l), l);
-		pb->data.len = l;
+		pbd->data.data = (uint8_t *) ep_mem_malloc(l);
+		memcpy(pbd->data.data, gdp_buf_getptr(datum->dbuf, l), l);
+		pbd->data.len = l;
 	}
 
 	//TODO: GdpSignature sig;
@@ -368,20 +373,24 @@ _gdp_datum_to_pb(const gdp_datum_t *datum,
 }
 
 
+/*
+**  Convert protobuf-encoded datum to internal datum structure.
+*/
+
 void
 _gdp_datum_from_pb(gdp_datum_t *datum,
 				const GdpMessage *msg,
-				const GdpDatum *pb)
+				const GdpDatum *pbd)
 {
 	// recno
-	datum->recno = pb->recno;
+	datum->recno = pbd->recno;
 
 	// timestamp
-	if (pb->ts != NULL)
+	if (pbd->ts != NULL)
 	{
-		datum->ts.tv_sec = pb->ts->sec;
-		datum->ts.tv_nsec = pb->ts->nsec;
-		datum->ts.tv_accuracy = pb->ts->accuracy;
+		datum->ts.tv_sec = pbd->ts->sec;
+		datum->ts.tv_nsec = pbd->ts->nsec;
+		datum->ts.tv_accuracy = pbd->ts->accuracy;
 	}
 	else
 	{
@@ -391,7 +400,7 @@ _gdp_datum_from_pb(gdp_datum_t *datum,
 	// data
 	if (datum->dbuf == NULL)
 		datum->dbuf = gdp_buf_new();
-	gdp_buf_write(datum->dbuf, pb->data.data, pb->data.len);
+	gdp_buf_write(datum->dbuf, pbd->data.data, pbd->data.len);
 
 	// signature
 	if (msg->sig != NULL)

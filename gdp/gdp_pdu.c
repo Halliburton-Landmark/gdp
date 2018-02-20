@@ -275,7 +275,7 @@ _gdp_pdu_in(
 		goto fail1;
 	}
 
-	ep_dbg_cprintf(DbgIn, 30, "\n\t>>>>>  _gdp_pdu_in  >>>>>\n");
+	ep_dbg_cprintf(DbgIn, 30, "\n\t>>>>>  _gdp_pdu_in(%zd)  >>>>>\n", plen);
 
 	// unpack Protobuf into local data structure
 	mbuf = gdp_buf_getptr(pbuf, plen);

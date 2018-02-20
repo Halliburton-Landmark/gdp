@@ -119,7 +119,7 @@ renew_advertisements(int fd, short what, void *_chan)
 void
 shutdown_req(gdp_req_t *req)
 {
-	if (ep_dbg_test(Dbg, 59))
+	if (ep_dbg_test(Dbg, 49))
 	{
 		ep_dbg_printf("shutdown_req: ");
 		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
@@ -138,7 +138,7 @@ shutdown_req(gdp_req_t *req)
 								&pubreq);
 		if (EP_STAT_ISOK(estat))
 		{
-			sub_send_message_notification(pubreq, req);
+			sub_send_message_notification(pubreq->rpdu, req);
 		}
 		else
 		{
@@ -193,7 +193,12 @@ sigabort(int sig)
 	ep_sd_notifyf("STOPPING=1\nSTATUS=Aborting on signal %d\n", sig);
 	ep_log(EP_STAT_ABORT, "Aborting on signal %d", sig);
 	_gdp_dump_state(GDP_PR_DETAILED);
-	kill(getpid(), sig);		// this will not do cleanup
+
+	// for whatever reason, this doesn't give a core dump on MacOS
+	//kill(getpid(), sig);		// this will not do cleanup
+	abort();
+	char *p = NULL;
+	*p = 0;
 }
 
 

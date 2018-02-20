@@ -645,12 +645,11 @@ _gdp_req_dump(const gdp_req_t *req, FILE *fp, int detail, int indent)
 	flockfile(fp);
 	fprintf(fp, "req@%p:\n", req);
 	fprintf(fp, "%snextrec=%" PRIgdp_recno ", numrecs=%" PRIu32 ", chan=%p\n"
-			"    postproc=%p, sub_cbfunc=%p, sub_cbarg=%p\n"
-			"    gin=%p, state=%s, stat=%s\n",
-			_gdp_pr_indent(indent),
-			req->nextrec, req->numrecs, req->chan,
-			req->postproc, req->sub_cbfunc, req->sub_cbarg,
-			req->gin, statestr(req),
+			"%spostproc=%p, sub_cbfunc=%p, sub_cbarg=%p\n"
+			"%sgin=%p, state=%s, stat=%s\n",
+			_gdp_pr_indent(indent), req->nextrec, req->numrecs, req->chan,
+			_gdp_pr_indent(indent), req->postproc, req->sub_cbfunc, req->sub_cbarg,
+			_gdp_pr_indent(indent), req->gin, statestr(req),
 			ep_stat_tostr(req->stat, ebuf, sizeof ebuf));
 	fprintf(fp, "%sact_ts=", _gdp_pr_indent(indent));
 	ep_time_print(&req->act_ts, fp, EP_TIME_FMT_HUMAN);

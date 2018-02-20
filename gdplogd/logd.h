@@ -153,7 +153,7 @@ extern void		logd_advertise_one(
 						int cmd);
 
 extern void		sub_send_message_notification(
-						gdp_req_t *pubreq,
+						gdp_pdu_t *pdu,
 						gdp_req_t *req);
 
 /*

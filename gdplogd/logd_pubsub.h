@@ -33,8 +33,9 @@
 #ifndef _GDPD_PUBSUB_H_
 #define _GDPD_PUBSUB_H_
 
-// notify all subscribers that new data is available (or shutdown required)
-void			sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd);
+// notify all subscribers of a new message
+void			sub_notify_all_subscribers(
+						gdp_req_t *pubreq);
 
 // terminate a subscription
 void			sub_end_subscription(gdp_req_t *req);

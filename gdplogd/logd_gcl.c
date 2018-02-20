@@ -167,6 +167,14 @@ do_physical_open(gdp_gob_t *gob, void *open_info_)
 }
 
 
+/*
+**  Make sure GOB in req->gob is filled in.
+**
+**		It must correspond to the address in req->cpdu->dst.
+**		If req->gob is filled in (i.e., it was NULL on entry), the GOB
+**			reference count will be bumped; otherwise it is untouched..
+*/
+
 EP_STAT
 get_open_handle(gdp_req_t *req)
 {

@@ -724,7 +724,7 @@ _gdp_gob_cache_shutdown(void (*shutdownfunc)(gdp_req_t *))
 {
 	gdp_gob_t *g1, *g2;
 
-	ep_dbg_cprintf(Dbg, 30, "\n_gdp_gob_shutdown\n");
+	ep_dbg_cprintf(Dbg, 30, "\n_gdp_gob_cache_shutdown\n");
 
 	// free all GOBs and all reqs linked to them
 	// can give locking errors in some circumstances

@@ -189,6 +189,7 @@ _gdp_msg_new(gdp_cmd_t cmd, gdp_rid_t rid, gdp_seqno_t seqno)
 		break;
 	}
 
+	ep_dbg_cprintf(Dbg, 49, "_gdp_msg_new => %p\n", msg);
 	return msg;
 }
 
@@ -308,19 +309,22 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 		break;
 
 	case GDP_MESSAGE__BODY_CMD_READ_BY_HASH:
-		fprintf(fp, "cmd_read_by_hash: UNIMPLEMENTED\n");
+		fprintf(fp, "cmd_read_by_hash: (printing unimplemented)\n");
 		break;
 
 	case GDP_MESSAGE__BODY_CMD_SUBSCRIBE_BY_RECNO:
-		fprintf(fp, "cmd_subscribe_by_recno: UNIMPLEMENTED\n");
+		fprintf(fp, "cmd_subscribe_by_recno: start %"PRIgdp_recno
+					" nrecs %"PRIu64 "\n",
+					msg->cmd_subscribe_by_recno->start,
+					msg->cmd_subscribe_by_recno->nrecs);
 		break;
 
 	case GDP_MESSAGE__BODY_CMD_SUBSCRIBE_BY_TS:
-		fprintf(fp, "cmd_subscribe_by_hash: UNIMPLEMENTED\n");
+		fprintf(fp, "cmd_subscribe_by_hash: (printing unimplemented)\n");
 		break;
 
 	case GDP_MESSAGE__BODY_CMD_SUBSCRIBE_BY_HASH:
-		fprintf(fp, "cmd_subscribe_by_hash: UNIMPLEMENTED\n");
+		fprintf(fp, "cmd_subscribe_by_hash: (printing unimplemented)\n");
 		break;
 
 	case GDP_MESSAGE__BODY_CMD_UNSUBSCRIBE:

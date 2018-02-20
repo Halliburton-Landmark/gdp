@@ -689,7 +689,6 @@ nopubkey:
 }
 
 
-
 /*
 **  CMD_APPEND --- append a datum to a GOB
 **
@@ -830,40 +829,49 @@ cmd_append(gdp_req_t *req)
 		}
 	}
 
-
-	// create the message
+	// make sure timestamp in payload is up to date
 	{
-		gdp_datum_t *datum = gdp_datum_new();
-		datum->recno = payload->datum->recno;
+		EP_TIME_SPEC now;
+		estat = ep_time_now(&now);
+
 		if (payload->datum->ts == NULL)
 		{
 			payload->datum->ts = (GdpTimestamp *)
 						ep_mem_zalloc(sizeof *payload->datum->ts);
 			gdp_timestamp__init(payload->datum->ts);
 		}
-		else
-		{
-			_gdp_datum_from_pb(datum, req->cpdu->msg, payload->datum);
-		}
 
-		// make sure the timestamp is current
-		estat = ep_time_now(&datum->ts);
-		payload->datum->ts->sec = datum->ts.tv_sec;
+		payload->datum->ts->sec = now.tv_sec;
 		payload->datum->ts->has_nsec = true;
-		payload->datum->ts->nsec = datum->ts.tv_nsec;
-		if (datum->ts.tv_accuracy != 0.0)
+		payload->datum->ts->nsec = now.tv_nsec;
+		if (now.tv_accuracy != 0.0)
 			payload->datum->ts->has_accuracy = true;
-		payload->datum->ts->accuracy = datum->ts.tv_accuracy;
+		payload->datum->ts->accuracy = now.tv_accuracy;
+	}
 
+	// append to disk file and send to subscribers
+	{
+		gdp_datum_t *datum = gdp_datum_new();
+		_gdp_datum_from_pb(datum, req->cpdu->msg, payload->datum);
+
+		// do the physical append to disk
 		estat = req->gob->x->physimpl->append(req->gob, datum);
+		if (EP_STAT_ISOK(estat))
+		{
+			// send the new datum to any and all subscribers
+			gdp_msg_t *msg = _gdp_msg_new(GDP_ACK_CONTENT,
+									req->cpdu->msg->rid, req->cpdu->msg->seqno);
+			_gdp_datum_to_pb(datum, msg, msg->ack_content->datum);
+			EP_ASSERT(req->rpdu == NULL);
+			req->rpdu = _gdp_pdu_new(msg, req->cpdu->dst, req->cpdu->src);
+			sub_notify_all_subscribers(req);
+			_gdp_pdu_free(&req->rpdu);
+		}
 		gdp_datum_free(datum);
 	}
 
 	if (EP_STAT_ISOK(estat))
 	{
-		// send the new data to any subscribers
-		sub_notify_all_subscribers(req, GDP_ACK_CONTENT);
-
 		// update the server's view of the number of records
 		req->gob->nrecs++;
 
@@ -914,15 +922,15 @@ post_subscribe(gdp_req_t *req)
 
 	EP_ASSERT_ELSE(req != NULL, return);
 	EP_ASSERT_ELSE(req->state != GDP_REQ_FREE, return);
+	EP_ASSERT_ELSE(req->gob != NULL, return);
 	ep_dbg_cprintf(Dbg, 38,
-			"post_subscribe: numrecs = %d, nextrec = %"PRIgdp_recno"\n",
-			req->numrecs, req->nextrec);
+			"post_subscribe: numrecs %d, nextrec = %"PRIgdp_recno
+			" gob->nrecs %"PRIgdp_recno "\n",
+			req->numrecs, req->nextrec, req->gob->nrecs);
 
 	datum = gdp_datum_new();
 	while (req->numrecs >= 0)
 	{
-		EP_ASSERT_ELSE(req->gob != NULL, break);
-
 		// see if data pre-exists in the GOB
 		if (req->nextrec > req->gob->nrecs)
 		{

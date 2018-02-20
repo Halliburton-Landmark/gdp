@@ -801,7 +801,6 @@ chan_open_helper(
 	// error cleanup and return
 	if (!EP_STAT_ISOK(estat))
 	{
-fail0:
 		if (ep_dbg_test(Dbg, 2))
 		{
 			char ebuf[80];

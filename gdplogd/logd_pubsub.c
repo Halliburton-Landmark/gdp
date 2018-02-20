@@ -53,37 +53,27 @@ extern EP_HASH	*_OpenGOBCache;		// associative cache
 */
 
 void
-sub_send_message_notification(gdp_req_t *pubreq, gdp_req_t *req)
+sub_send_message_notification(gdp_pdu_t *pdu, gdp_req_t *req)
 {
 	EP_STAT estat;
 
 	if (ep_dbg_test(Dbg, 33))
 	{
 		ep_dbg_printf("sub_send_message_notification: ");
-		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+		_gdp_pdu_dump(pdu, NULL, 1);
+		ep_dbg_printf("    ");
+		_gdp_req_dump(req, NULL, GDP_PR_BASIC, 1);
 	}
 
 	// sanity checks
-	if (!EP_ASSERT(req->cpdu != NULL) || !EP_ASSERT(req->cpdu->msg != NULL))
-		_gdp_req_dump(req, NULL, GDP_PR_BASIC, 0);
-	if (!EP_ASSERT(pubreq->cpdu != NULL) ||
-			!EP_ASSERT(pubreq->cpdu->msg != NULL) ||
-			!EP_ASSERT(pubreq->cpdu->msg->cmd_append != NULL))
-		_gdp_req_dump(pubreq, NULL, GDP_PR_BASIC, 0);
+	EP_ASSERT(pdu != NULL);
+	EP_ASSERT(pdu->msg != NULL);
 
-	gdp_msg_t *msg = _gdp_msg_new(GDP_ACK_CONTENT,
-							req->cpdu->msg->rid, req->cpdu->msg->seqno);
-	GdpDatum *pubdatum = pubreq->cpdu->msg->cmd_append->datum;
-	GdpDatum *subdatum = msg->ack_content->datum;
-
-	// cheat here: two pointers to one memory area
-	msg->ack_content->datum = pubdatum;
-
-	gdp_pdu_t *pdu = _gdp_pdu_new(msg, req->cpdu->dst, req->cpdu->src);
+	pdu->msg->has_rid = req->cpdu->msg->has_rid;
+	pdu->msg->rid = req->cpdu->msg->rid;
+	memcpy(pdu->dst, req->cpdu->src, sizeof pdu->dst);
+	memcpy(pdu->src, req->cpdu->dst, sizeof pdu->src);
 	estat = _gdp_pdu_out(pdu, req->chan, NULL);
-
-	// undo the cheat so we don't double-free
-	msg->ack_content->datum = subdatum;
 
 	if (!EP_STAT_ISOK(estat))
 	{
@@ -102,23 +92,22 @@ sub_send_message_notification(gdp_req_t *pubreq, gdp_req_t *req)
 /*
 **  SUB_NOTIFY_ALL_SUBSCRIBERS --- send something to all interested parties
 **
-**		Both pubreq and pubreq->pdu->datum should be locked when
-**			this is called.
+**		pubreq should be locked when this is called.
 */
 
 void
-sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
+sub_notify_all_subscribers(gdp_req_t *pubreq)
 {
 	gdp_req_t *req;
 	gdp_req_t *nextreq;
 	EP_TIME_SPEC sub_timeout;
 
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&pubreq->mutex);
 	GDP_GOB_ASSERT_ISLOCKED(pubreq->gob);
 
 	if (ep_dbg_test(Dbg, 32))
 	{
-		ep_dbg_printf("sub_notify_all_subscribers(%s) of pub",
-				_gdp_proto_cmd_name(cmd));
+		ep_dbg_printf("sub_notify_all_subscribers of pub");
 		_gdp_req_dump(pubreq, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
@@ -161,7 +150,7 @@ sub_notify_all_subscribers(gdp_req_t *pubreq, int cmd)
 		}
 		else if (!ep_time_before(&req->act_ts, &sub_timeout))
 		{
-			sub_send_message_notification(pubreq, req);
+			sub_send_message_notification(pubreq->rpdu, req);
 		}
 		else
 		{
