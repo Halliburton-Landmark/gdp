@@ -222,9 +222,9 @@ ep_dbg_vprintf(const char *fmt, va_list av)
 		ep_dbg_init();
 
 	flockfile(EpDebugFileP);
-	fprintf(EpDebugFileP, "%s", EpVid->vidfgyellow);
+	//fprintf(EpDebugFileP, "%s", EpVid->vidfgyellow);	// OLD
 	vfprintf(EpDebugFileP, fmt, av);
-	fprintf(EpDebugFileP, "%s", EpVid->vidnorm);
+	//fprintf(EpDebugFileP, "%s", EpVid->vidnorm);		// OLD
 	if (FlushDebugFile)
 		fflush(EpDebugFileP);		// XXX ??? performance issues?
 	funlockfile(EpDebugFileP);
@@ -266,33 +266,32 @@ ep_dbg_setfile(
 		(void) fclose(EpDebugFileP);
 
 	// if fp is NULL, switch to the default
-	if (fp != NULL)
-	{
-		EpDebugFileP = fp;
-	}
-	else
+	if (fp == NULL)
 	{
 		const char *dfile;
 
 		dfile = ep_adm_getstrparam("libep.dbg.file", "stderr");
 		if (strcmp(dfile, "stderr") == 0)
-			EpDebugFileP = stderr;
+			fp = stderr;
 		else if (strcmp(dfile, "stdout") == 0)
-			EpDebugFileP = stdout;
+			fp = stdout;
 		else
 		{
-			EpDebugFileP = fopen(dfile, "a");
-			if (EpDebugFileP == NULL)
+			fp = fopen(dfile, "a");
+			if (fp == NULL)
 			{
 				ep_app_warn("Cannot open debug file %s",
 						dfile);
-				EpDebugFileP = stderr;
+				fp = stderr;
 			}
 		}
-		setlinebuf(EpDebugFileP);
+		setlinebuf(fp);
 	}
 
-	FlushDebugFile = EpDebugFileP == stderr;
+	// this looks like the wrong heuristic...
+	FlushDebugFile = fp == stderr;
+	EpDebugFileP = ep_fopen_styled(fp, EpVid->vidfgyellow, EpVid->vidnorm);
+	//EpDebugFileP = fp;		// OLD
 }
 
 
