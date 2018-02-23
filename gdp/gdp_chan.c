@@ -571,7 +571,8 @@ chan_do_close(gdp_chan_t *chan, int what)
 	ep_thr_cond_broadcast(&chan->cond);
 	if (chan->ioevent_cb != NULL)
 		(*chan->ioevent_cb)(chan, what);
-	bufferevent_free(chan->bev);
+	if (chan->bev != NULL)
+		bufferevent_free(chan->bev);
 	chan->bev = NULL;
 	if (chan->router_addr != NULL)
 		ep_mem_free(chan->router_addr);
@@ -933,6 +934,12 @@ send_helper(gdp_chan_t *chan,
 			ep_hexdump(gdp_buf_getptr(payload, payload_len), payload_len,
 					ep_dbg_getfile(), EP_HEXDUMP_ASCII, 0);
 		}
+	}
+
+	if (chan->bev == NULL)
+	{
+		ep_dbg_cprintf(Dbg, 1, "send_helper: no channel\n");
+		return GDP_STAT_DEAD_DAEMON;
 	}
 
 	// build the header in memory
