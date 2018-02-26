@@ -63,6 +63,7 @@ static EP_DBG	DbgOut = EP_DBG_INIT("gdp.pdu.out", "GDP PDU outgoing traffic");
 void
 _gdp_pdu_dump(const gdp_pdu_t *pdu, FILE *fp, int indent)
 {
+	indent++;
 	if (fp == NULL)
 		fp = ep_dbg_getfile();
 	flockfile(fp);
@@ -77,7 +78,7 @@ _gdp_pdu_dump(const gdp_pdu_t *pdu, FILE *fp, int indent)
 	fprintf(fp, "\n%ssrc=", _gdp_pr_indent(indent));
 	gdp_print_name(pdu->src, fp);
 	fprintf(fp, "\n%s", _gdp_pr_indent(indent));
-	_gdp_msg_dump(pdu->msg, fp, indent + 1);
+	_gdp_msg_dump(pdu->msg, fp, indent);
 
 done:
 	funlockfile(fp);
@@ -174,6 +175,9 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 		int istat;
 		struct evbuffer_iovec v[1];
 
+		pdu->msg->has_rid = (pdu->msg->rid != GDP_PDU_NO_RID);
+		pdu->msg->has_seqno = (pdu->msg->seqno != GDP_PDU_NO_SEQNO);
+
 		// *__get_packed_size has no error returns
 		pb_len = gdp_message__get_packed_size(pdu->msg);
 		ep_dbg_cprintf(Dbg, 24,
@@ -229,7 +233,7 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 	if (ep_dbg_test(DbgOut, 22))
 	{
 		ep_dbg_printf("%s", _gdp_pr_indent(1));
-		_gdp_pdu_dump(pdu, ep_dbg_getfile(), 2);
+		_gdp_pdu_dump(pdu, ep_dbg_getfile(), 1);
 	}
 
 fail1:
@@ -314,7 +318,10 @@ fail1:
 		ep_dbg_printf("_gdp_pdu_in(%s) => %s\n", cmdname,
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		if (ep_dbg_test(DbgIn, 22))
-			_gdp_pdu_dump(pdu, ep_dbg_getfile(), 0);
+		{
+			ep_dbg_printf("%s", _gdp_pr_indent(1));
+			_gdp_pdu_dump(pdu, ep_dbg_getfile(), 1);
+		}
 		funlockfile(ep_dbg_getfile());
 	}
 

@@ -125,30 +125,28 @@ shutdown_req(gdp_req_t *req)
 		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
+	EP_ASSERT_ELSE(req != NULL, return);
+	EP_ASSERT_ELSE(req->cpdu != NULL, return);
+	EP_ASSERT_ELSE(req->cpdu->msg != NULL, return);
+
 	if (EP_UT_BITSET(GDP_REQ_SRV_SUBSCR, req->flags))
 	{
-		gdp_req_t *pubreq = NULL;
+		gdp_msg_t *msg = _gdp_msg_new(GDP_NAK_S_LOSTSUB,
+									req->cpdu->msg->rid,
+									req->cpdu->msg->seqno);
+		gdp_pdu_t *pdu = _gdp_pdu_new(msg, req->gob->name, req->cpdu->src);
+		gdp_pdu_t *save_pdu = req->rpdu;
+		req->rpdu = pdu;
 
-		EP_STAT estat = _gdp_req_new(
-								GDP_NAK_S_LOSTSUB,
-								req->gob,
-								_GdpChannel,
-								NULL,
-								0,
-								&pubreq);
-		if (EP_STAT_ISOK(estat))
-		{
-			sub_send_message_notification(pubreq->rpdu, req);
-		}
-		else
-		{
-			char ebuf[80];
-			ep_dbg_cprintf(Dbg, 1,
-						"shutdown_req: cannot send notification: %s\n",
-						ep_stat_tostr(estat, ebuf, sizeof ebuf));
-		}
-		if (pubreq != NULL)
-			_gdp_req_free(&pubreq);
+//		EP_STAT estat = _gdp_req_new(
+//								GDP_NAK_S_LOSTSUB,
+//								req->gob,
+//								_GdpChannel,
+//								pdu,
+//								0,
+//								&pubreq);
+		sub_send_message_notification(req);
+		req->rpdu = save_pdu;
 	}
 }
 

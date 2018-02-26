@@ -1112,7 +1112,7 @@ cmd_subscribe_by_recno(gdp_req_t *req)
 		if (ep_dbg_test(Dbg, 50))
 		{
 			ep_dbg_printf("cmd_subscribe_by_recno: starting ");
-			_gdp_req_dump(req, NULL, 0, 0);
+			_gdp_req_dump(req, NULL, GDP_PR_BASIC, 0);
 		}
 		for (r1 = LIST_FIRST(&gob->reqs); r1 != NULL;
 				r1 = LIST_NEXT(r1, goblist))
@@ -1122,9 +1122,9 @@ cmd_subscribe_by_recno(gdp_req_t *req)
 			if (ep_dbg_test(Dbg, 50))
 			{
 				ep_dbg_printf("cmd_subscribe: comparing to ");
-				_gdp_req_dump(r1, NULL, 0, 0);
+				_gdp_req_dump(r1, NULL, GDP_PR_BASIC, 0);
 			}
-			if (GDP_NAME_SAME(r1->cpdu->dst, req->cpdu->dst) &&
+			if (GDP_NAME_SAME(r1->cpdu->src, req->cpdu->src) &&
 					r1->cpdu->msg->rid == req->cpdu->msg->rid)
 			{
 				ep_dbg_cprintf(Dbg, 20, "cmd_subscribe: refreshing sub\n");

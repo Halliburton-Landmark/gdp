@@ -148,6 +148,7 @@ _gdp_gin_dump(
 		int detail)
 {
 	extern EP_PRFLAGS_DESC _GdpGobFlags[];	// defined in gdp_gob_mgmt.c
+	int indent = 1;
 
 	if (fp == NULL)
 		fp = ep_dbg_getfile();
@@ -173,18 +174,20 @@ _gdp_gin_dump(
 				fprintf(fp, "%s\n", gob->pname);
 			VALGRIND_HG_ENABLE_CHECKING(gob, sizeof *gob);
 		}
-		fprintf(fp, "\tflags = ");
+		fprintf(fp, "%sflags = ", _gdp_pr_indent(indent));
 		ep_prflags(gin->flags, _GdpGobFlags, fp);
 
 		if (detail >= GDP_PR_BASIC)
 		{
-			fprintf(fp, "\n\tgob = %p, iomode = %d", gob,  gin->iomode);
+			fprintf(fp, "\n%sgob = %p, iomode = %d",
+					_gdp_pr_indent(indent), gob,  gin->iomode);
 			if (detail >= GDP_PR_DETAILED)
 			{
 				fprintf(fp, ", closefunc = %p\n"
-						"\tapndfilter = %p, apndfpriv = %p,"
+						"%sapndfilter = %p, apndfpriv = %p,"
 						" readfilter = %p, readfpriv = %p",
 						gin->closefunc,
+						_gdp_pr_indent(indent),
 						gin->apndfilter, gin->apndfpriv,
 						gin->readfilter, gin->readfpriv);
 			}

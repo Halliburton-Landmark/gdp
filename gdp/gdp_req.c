@@ -656,16 +656,16 @@ _gdp_req_dump(const gdp_req_t *req, FILE *fp, int detail, int indent)
 	fprintf(fp, "\n%sflags=", _gdp_pr_indent(indent));
 	ep_prflags(req->flags, ReqFlags, fp);
 	fprintf(fp, "\n%s", _gdp_pr_indent(indent));
-	_gdp_gob_dump(req->gob, fp, detail, indent + 1);
+	_gdp_gob_dump(req->gob, fp, detail, indent);
 	if (req->cpdu != NULL)
 	{
 		fprintf(fp, "%sc", _gdp_pr_indent(indent));
-		_gdp_pdu_dump(req->cpdu, fp, indent + 1);
+		_gdp_pdu_dump(req->cpdu, fp, indent);
 	}
 	if (req->rpdu != NULL)
 	{
 		fprintf(fp, "%sr", _gdp_pr_indent(indent));
-		_gdp_pdu_dump(req->rpdu, fp, indent + 1);
+		_gdp_pdu_dump(req->rpdu, fp, indent);
 	}
 	funlockfile(fp);
 	VALGRIND_HG_ENABLE_CHECKING(req, sizeof *req);

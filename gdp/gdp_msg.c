@@ -236,6 +236,7 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 	if (fp == NULL)
 		fp = ep_dbg_getfile();
 	flockfile(fp);
+	indent++;
 	fprintf(fp, "msg@%p: ", msg);
 	if (msg == NULL)
 	{

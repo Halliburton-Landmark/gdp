@@ -234,6 +234,7 @@ _gdp_gob_dump(
 	if (detail >= GDP_PR_BASIC)
 		fprintf(fp, "GOB@%p: ", gob);
 	VALGRIND_HG_DISABLE_CHECKING(gob, sizeof *gob);
+	indent++;
 	if (gob == NULL)
 	{
 		fprintf(fp, "NULL\n");
@@ -252,10 +253,10 @@ _gdp_gob_dump(
 		if (detail >= GDP_PR_BASIC)
 		{
 			fprintf(fp, "%srefcnt = %d, reqs = %p, nrecs = %" PRIgdp_recno
-					"\n\tflags = ",
+					"\n%sflags = ",
 					_gdp_pr_indent(indent),
-					gob->refcnt, LIST_FIRST(&gob->reqs),
-					gob->nrecs);
+					gob->refcnt, LIST_FIRST(&gob->reqs), gob->nrecs,
+					_gdp_pr_indent(indent));
 			ep_prflags(gob->flags, _GdpGobFlags, fp);
 			fprintf(fp, "\n");
 			if (detail >= GDP_PR_DETAILED)

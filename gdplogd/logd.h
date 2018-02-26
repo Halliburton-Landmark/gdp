@@ -152,8 +152,7 @@ extern void		logd_advertise_one(
 						gdp_name_t name,
 						int cmd);
 
-extern void		sub_send_message_notification(
-						gdp_pdu_t *pdu,
+extern EP_STAT	sub_send_message_notification(
 						gdp_req_t *req);
 
 /*

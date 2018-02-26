@@ -52,28 +52,26 @@ extern EP_HASH	*_OpenGOBCache;		// associative cache
 **		Assumes req is locked.
 */
 
-void
-sub_send_message_notification(gdp_pdu_t *pdu, gdp_req_t *req)
+EP_STAT
+sub_send_message_notification(gdp_req_t *req)
 {
 	EP_STAT estat;
 
 	if (ep_dbg_test(Dbg, 33))
 	{
 		ep_dbg_printf("sub_send_message_notification: ");
-		_gdp_pdu_dump(pdu, NULL, 1);
-		ep_dbg_printf("    ");
-		_gdp_req_dump(req, NULL, GDP_PR_BASIC, 1);
+		_gdp_req_dump(req, NULL, GDP_PR_BASIC, 0);
 	}
 
 	// sanity checks
-	EP_ASSERT(pdu != NULL);
-	EP_ASSERT(pdu->msg != NULL);
+	EP_ASSERT(req->rpdu != NULL);
+	EP_ASSERT(req->cpdu != NULL);
+	EP_ASSERT(req->rpdu->msg != NULL);
 
-	pdu->msg->has_rid = req->cpdu->msg->has_rid;
-	pdu->msg->rid = req->cpdu->msg->rid;
-	memcpy(pdu->dst, req->cpdu->src, sizeof pdu->dst);
-	memcpy(pdu->src, req->cpdu->dst, sizeof pdu->src);
-	estat = _gdp_pdu_out(pdu, req->chan, NULL);
+	memcpy(req->rpdu->dst, req->cpdu->src, sizeof req->rpdu->dst);
+	req->rpdu->msg->rid = req->cpdu->msg->rid;
+	req->rpdu->msg->seqno = req->cpdu->msg->seqno;
+	estat = _gdp_pdu_out(req->rpdu, req->chan, NULL);
 
 	if (!EP_STAT_ISOK(estat))
 	{
@@ -81,11 +79,8 @@ sub_send_message_notification(gdp_pdu_t *pdu, gdp_req_t *req)
 				"sub_send_message_notification: couldn't write PDU!\n");
 	}
 
-	// XXX: This won't really work in case of holes.
-	req->nextrec++;
 
-	if (req->numrecs > 0 && --req->numrecs <= 0)
-		sub_end_subscription(req);
+	return estat;
 }
 
 
@@ -100,27 +95,37 @@ sub_notify_all_subscribers(gdp_req_t *pubreq)
 {
 	gdp_req_t *req;
 	gdp_req_t *nextreq;
+	long timeout;
 	EP_TIME_SPEC sub_timeout;
 
 	EP_THR_MUTEX_ASSERT_ISLOCKED(&pubreq->mutex);
 	GDP_GOB_ASSERT_ISLOCKED(pubreq->gob);
-
-	if (ep_dbg_test(Dbg, 32))
-	{
-		ep_dbg_printf("sub_notify_all_subscribers of pub");
-		_gdp_req_dump(pubreq, ep_dbg_getfile(), GDP_PR_BASIC, 0);
-	}
+	EP_ASSERT_ELSE(pubreq->rpdu != NULL, return);
+	EP_ASSERT_ELSE(pubreq->rpdu->msg != NULL, return);
 
 	// set up for subscription timeout
 	{
 		EP_TIME_SPEC sub_delta;
-		long timeout = ep_adm_getlongparam("swarm.gdplogd.subscr.timeout", 0);
+		timeout = ep_adm_getlongparam("swarm.gdplogd.subscr.timeout", 0);
 
 		if (timeout == 0)
 			timeout = ep_adm_getlongparam("swarm.gdp.subscr.timeout",
 									GDP_SUBSCR_TIMEOUT_DEF);
 		ep_time_from_nsec(-timeout SECONDS, &sub_delta);
 		ep_time_deltanow(&sub_delta, &sub_timeout);
+	}
+
+	if (ep_dbg_test(Dbg, 32))
+	{
+		EP_TIME_SPEC now;
+		char tbuf[100];
+
+		ep_time_now(&now);
+		ep_dbg_printf("sub_notify_all_subscribers(timeout=%ld, now=%s)\n",
+					timeout,
+					ep_time_format(&now, tbuf, sizeof tbuf, EP_TIME_FMT_HUMAN));
+		ep_dbg_printf("%spub", _gdp_pr_indent(1));
+		_gdp_req_dump(pubreq, ep_dbg_getfile(), GDP_PR_BASIC, 1);
 	}
 
 	pubreq->gob->flags |= GCLF_KEEPLOCKED;
@@ -146,20 +151,42 @@ sub_notify_all_subscribers(gdp_req_t *pubreq)
 		// notify subscribers
 		if (!EP_UT_BITSET(GDP_REQ_SRV_SUBSCR, req->flags))
 		{
-			ep_dbg_cprintf(Dbg, 59, "   ... not a subscription (flags = 0x%x)\n", req->flags);
+			ep_dbg_cprintf(Dbg, 59,
+					"   ... not a subscription (flags = 0x%x)\n",
+					req->flags);
 		}
 		else if (!ep_time_before(&req->act_ts, &sub_timeout))
 		{
-			sub_send_message_notification(pubreq->rpdu, req);
+			EP_STAT estat;
+			EP_ASSERT_ELSE(req->cpdu != NULL, continue);
+			EP_ASSERT_ELSE(req->cpdu->msg != NULL, continue);
+			gdp_pdu_t *save_pdu = req->rpdu;
+			req->rpdu = pubreq->rpdu;
+			estat = sub_send_message_notification(req);
+			req->rpdu = save_pdu;
+			if (EP_STAT_ISOK(estat))
+			{
+				// XXX: This won't really work in case of holes.
+				req->nextrec++;
+
+				if (req->numrecs > 0 && --req->numrecs <= 0)
+					sub_end_subscription(req);
+			}
 		}
 		else
 		{
 			// this subscription seems to be dead
 			if (ep_dbg_test(Dbg, 18))
 			{
-				ep_dbg_printf("sub_notify_all_subscribers: subscription timeout: ");
-				_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
-				_gdp_gob_dump(req->gob, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+				char tbuf[100];
+				ep_time_format(&sub_timeout, tbuf, sizeof tbuf,
+							EP_TIME_FMT_HUMAN);
+				ep_dbg_printf("sub_notify_all_subscribers: "
+						"subscription timeout (%s):\n%s",
+						tbuf, _gdp_pr_indent(1));
+				_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 1);
+				ep_dbg_printf("%s", _gdp_pr_indent(1));
+				_gdp_gob_dump(req->gob, ep_dbg_getfile(), GDP_PR_BASIC, 1);
 			}
 
 			// actually remove the subscription

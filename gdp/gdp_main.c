@@ -177,7 +177,7 @@ process_cmd(void *cpdu_)
 	if (ep_dbg_test(Dbg, 59))
 	{
 		ep_dbg_printf("process_cmd: after dispatch, ");
-		_gdp_req_dump(req, ep_dbg_getfile(), 0, 0);
+		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
 	// make sure request or GOB haven't gotten fubared
