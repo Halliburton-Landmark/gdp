@@ -156,6 +156,7 @@ struct gdp_chan
 #define GDP_TOS_ADVERTISE	0x90	// name advertisement
 #define GDP_TOS_WITHDRAW	0x98	// name withdrawal
 #define GDP_TOS_NOROUTE		0xF0	// no route / name unknown
+#define GDP_TOS_ROUTE_ACK	0xF8	// transmission ack (router-to-router only)
 
 //XXX following needs to be changed if ADDR_FMT != 0
 // magic, hdrlen, tos, rsvd, paylen, dst, src, pad
