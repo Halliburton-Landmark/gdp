@@ -996,7 +996,7 @@ EP_STAT
 gdp_gcl_subscribe_by_recno(gdp_gcl_t *gin,
 		gdp_recno_t start,
 		int32_t numrecs,
-		EP_TIME_SPEC *timeout,
+		gdp_sub_qos_t *qos,
 		gdp_event_cbfunc_t cbfunc,
 		void *cbarg)
 {
@@ -1007,7 +1007,7 @@ gdp_gcl_subscribe_by_recno(gdp_gcl_t *gin,
 	EP_STAT_CHECK(estat, return estat);
 
 	estat = _gdp_gcl_subscribe(gin, GDP_CMD_SUBSCRIBE_BY_RECNO, start, numrecs,
-							timeout, cbfunc, cbarg);
+							qos, cbfunc, cbarg);
 
 	unlock_gin_and_gob(gin, "gdp_gcl_subscribe_by_recno");
 	prstat(estat, gin, "gdp_gcl_subscribe_by_recno");
@@ -1023,7 +1023,7 @@ EP_STAT
 gdp_gcl_subscribe_by_ts(gdp_gcl_t *gin,
 		EP_TIME_SPEC *start,
 		int32_t numrecs,
-		EP_TIME_SPEC *timeout,
+		gdp_sub_qos_t *qos,
 		gdp_event_cbfunc_t cbfunc,
 		void *cbarg)
 {

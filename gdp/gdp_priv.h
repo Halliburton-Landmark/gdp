@@ -353,7 +353,7 @@ EP_STAT			_gdp_gcl_subscribe(			// subscribe to data
 						gdp_cmd_t cmd,
 						gdp_recno_t start,
 						int32_t numrecs,
-						EP_TIME_SPEC *timeout,
+						gdp_sub_qos_t *qos,
 						gdp_event_cbfunc_t cbfunc,
 						void *cbarg);
 

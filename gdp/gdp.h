@@ -64,6 +64,9 @@ typedef uint32_t			gdp_gclmd_id_t;
 // additional information when opening logs (e.g., keys, qos, hints)
 typedef struct gdp_gcl_open_info	gdp_gcl_open_info_t;
 
+// quality of service information for subscriptions
+typedef struct gdp_sub_qos			gdp_sub_qos_t;
+
 /**********************************************************************
 **	Other data types
 */
@@ -284,7 +287,7 @@ extern EP_STAT	gdp_gcl_subscribe_by_recno(
 					gdp_gcl_t *gcl,			// readable GCL handle
 					gdp_recno_t start,		// starting record number
 					int32_t nrecs,			// number of records to retrieve
-					EP_TIME_SPEC *timeout,	// timeout
+					gdp_sub_qos_t *qos,		// quality of service info
 					gdp_event_cbfunc_t cbfunc,
 											// callback function for next datum
 					void *cbarg);			// argument passed to callback
@@ -294,7 +297,7 @@ extern EP_STAT	gdp_gcl_subscribe_by_ts(
 					gdp_gcl_t *gcl,			// readable GCL handle
 					EP_TIME_SPEC *ts,		// starting timestamp
 					int32_t nrecs,			// number of records to retrieve
-					EP_TIME_SPEC *timeout,	// timeout
+					gdp_sub_qos_t *qos,		// quality of service info
 					gdp_event_cbfunc_t cbfunc,
 											// callback function for next datum
 					void *cbarg);			// argument passed to callback
@@ -399,14 +402,6 @@ extern EP_STAT gdp_gcl_read_async(
 
 // subscribe by timestamp
 #define gdp_gcl_subscribe_ts	gdp_gcl_subscribe_by_ts
-extern EP_STAT	gdp_gcl_subscribe_ts(
-					gdp_gcl_t *gcl,			// readable GCL handle
-					EP_TIME_SPEC *start,	// first record to retrieve
-					int32_t nrecs,			// number of records to retrieve
-					EP_TIME_SPEC *timeout,	// timeout
-					gdp_event_cbfunc_t cbfunc,
-											// callback function for next datum
-					void *cbarg);			// argument passed to callback
 
 // read multiple records (no subscriptions)
 #if 0	//XXX OBSOLETE (???)
