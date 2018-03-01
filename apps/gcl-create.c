@@ -405,7 +405,6 @@ main(int argc, char **argv)
 		gdp_gclmd_add(gmd, GDP_GCLMD_CID, strlen(cname), cname);
 	}
 
-
 	/**************************************************************
 	**  Do cryptographic setup (e.g., generating keys)
 	*/

@@ -146,6 +146,10 @@ show_metadata(int nmds, FILE *dfp, size_t *foffp, int plev)
 					printf(" (external id)\n    %s\n", mdata);
 					break;
 
+				case GDP_GCLMD_UUID:
+					printf(" (uuid)\n    %s\n", mdata);
+					break;
+
 				case GDP_GCLMD_CTIME:
 					printf(" (creation time)\n    %s\n", mdata);
 					break;

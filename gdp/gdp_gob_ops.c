@@ -35,6 +35,7 @@
 #include <ep/ep_dbg.h>
 #include <ep/ep_hash.h>
 #include <ep/ep_prflags.h>
+#include <ep/ep_uuid.h>
 
 #include "gdp.h"
 #include "gdp_chan.h"		// for PUT64
@@ -95,6 +96,43 @@ _gdp_gob_create(gdp_name_t gobname,
 				"_gdp_gob_create: gob=%s\n\tlogd=%s\n",
 				gobname == NULL ? "none" : gdp_printable_name(gobname, gxname),
 				gdp_printable_name(logdname, dxname));
+	}
+
+	// add UUID to guarantee that the name will be unique
+	size_t mlen;
+	const void *mdata;
+	if (!EP_STAT_ISOK(gdp_gclmd_find(gmd, GDP_GCLMD_UUID, &mlen, &mdata)))
+	{
+		EP_UUID uuid;
+		EP_UUID_STR uustr;
+
+		estat = ep_uuid_generate(&uuid);
+		if (!EP_STAT_ISOK(estat))
+		{
+			char ebuf[100];
+			ep_dbg_cprintf(Dbg, 1,
+						"_gdp_gob_create: ep_uuid_generate: %s\n",
+						ep_stat_tostr(estat, ebuf, sizeof ebuf));
+			return estat;
+		}
+
+		estat = ep_uuid_tostr(&uuid, uustr);
+		if (!EP_STAT_ISOK(estat))
+		{
+			char ebuf[100];
+			ep_dbg_cprintf(Dbg, 1, "_gdp_gob_create: ep_uuid_tostr: %s\n",
+						ep_stat_tostr(estat, ebuf, sizeof ebuf));
+			return estat;
+		}
+		ep_dbg_cprintf(Dbg, 17, "_gdp_gob_create: added UUID %s\n", uustr);
+		estat = gdp_gclmd_add(gmd, GDP_GCLMD_UUID, strlen(uustr), uustr);
+		if (!EP_STAT_ISOK(estat))
+		{
+			char ebuf[100];
+			ep_dbg_cprintf(Dbg, 1, "_gdp_gob_create: gdp_gclmd_add(UUID): %s\n",
+						ep_stat_tostr(estat, ebuf, sizeof ebuf));
+			return estat;
+		}
 	}
 
 	// create a new pseudo-GOB for the daemon so we can correlate the results
