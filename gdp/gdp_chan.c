@@ -141,8 +141,15 @@ struct gdp_chan
 **					PDU.
 **			0x90	Payload contains an advertisement.
 **			0x98	Payload contains a withdrawal.
+**			0xE0	(Router-to-client) Some data was not delivered
+**					(e.g., a fragment was lost in the network layer).
+**					This is a clue to the client that it might need
+**					to retransmit a commmand.
 **			0xF0	(Router-to-client) Indicates a "name not found"
 **					(or "no route") error.
+**			0xF8	(Router-to-router) Used by the routing layer to
+**					encode acknowledgements.  Should never be seen by
+**					the network client.
 **		Question: should the PDU have a "protocol" field (a la IPv4
 **			packets) with a special value of GDP_in_GDP, by analogy
 **			with IP's IP_in_IP, rather than using a FORWARD bit?
@@ -155,8 +162,9 @@ struct gdp_chan
 #define GDP_TOS_FORWARD		0x80	// forward to another address
 #define GDP_TOS_ADVERTISE	0x90	// name advertisement
 #define GDP_TOS_WITHDRAW	0x98	// name withdrawal
-#define GDP_TOS_NOROUTE		0xF0	// no route / name unknown
-#define GDP_TOS_ROUTE_ACK	0xF8	// transmission ack (router-to-router only)
+#define GDP_TOS_NOROUTE		0xf0	// no route / name unknown
+#define GDP_TOS_ROUTE_ACK	0xf8	// transmission ack (router-to-router only)
+#define GDP_TOS_ROUTE_NAK	0xe0	// some data was not delivered
 
 //XXX following needs to be changed if ADDR_FMT != 0
 // magic, hdrlen, tos, rsvd, paylen, dst, src, pad
@@ -340,9 +348,10 @@ read_header(gdp_chan_t *chan,
 		}
 		else
 		{
-			ep_dbg_cprintf(Dbg, 1, "read_header: PDU router tos = %0xd\n",
+			ep_dbg_cprintf(Dbg, 1, "read_header: PDU router tos = %02x\n",
 					flags & GDP_TOS_ROUTERMASK);
-			estat = GDP_STAT_PDU_CORRUPT;
+//			estat = GDP_STAT_PDU_CORRUPT;	// no, ignore router status
+			estat = GDP_STAT_KEEP_READING;
 			goto done;
 		}
 	}
