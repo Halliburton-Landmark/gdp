@@ -176,16 +176,19 @@ layer, e.g., Quality of Service.  These are for future use.  Note
 that options are included in the header size, so routers that do
 not support options can skip this part without additional processing.
 
-Each Option starts with a single octet of option id.  If the high
-order bit of that option id is zero, the bottom four bits encode the
-length of the option value (excluding the option id), otherwise the
-following octet contains the length.
+Each Option starts with a single octet of option id.  The bottom
+three bits of the option id also contains the length of the option
+value as a power of two (e.g., a value of zero means zero bytes, one
+one means one octet, two means two octets, four means eight octets,
+etc.).  If the bottom three bits are 0x7 then the length is taken
+from the octet immediately following the id without scaling (that
+is, a value of five means five octets, not 2^5 = 32).
 If the length is encoded in in the option id octet, that length is
-part of the option id.  For example, option 0x10 and 0x14 are
+part of the option id.  For example, option 0x10 and 0x13 are
 different options, the former of length zero and the latter of length
-four.  In comparison, the size of option 0x82 is contained in the
+four.  In comparison, the size of option 0x87 is contained in the
 following octet, and the size is not part of the option id, so
-0x82 0x00 and 0x82 0x04 are the same option, with values of length
+0x87 0x00 and 0x87 0x04 are the same option, with values of length
 zero and four respectively.
 
 Unrecognized options must be ignored (but passed on).
