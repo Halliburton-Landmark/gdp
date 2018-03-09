@@ -51,6 +51,10 @@
 
 // leverage the existing code (not all used, of course)
 #define LOG_CHECK	1
+#include <db.h>
+#ifndef DB_VERSION_MAJOR
+# define DB_VERSION_MAJOR	1
+#endif
 #define ep_log		log_override
 #define ep_logv		logv_override
 #define Dbg			DbgLogdGcl
@@ -962,7 +966,6 @@ check_record(
 {
 	EP_STAT estat = EP_STAT_OK;
 	EP_STAT return_stat = EP_STAT_OK;
-	gob_physinfo_t *phys = GETPHYS(gob);
 
 	// do some sanity checking on the record header; if it isn't good
 	// we'll just report the record and skip it for rebuilding
@@ -1022,7 +1025,9 @@ check_record(
 	if (EP_STAT_SEVERITY(estat) > EP_STAT_SEVERITY(return_stat))
 		return_stat = estat;
 
+#if GDP_USE_TIDX
 	// check timestamp to record number index
+	gob_physinfo_t *phys = GETPHYS(gob);
 	if (phys->tidx.db != NULL)
 	{
 		tidx_key_t tkey;
@@ -1075,6 +1080,7 @@ check_record(
 			goto fail0;
 		}
 	}
+#endif // GDP_USE_TIDX
 
 	// keep track of record numbers to detect dups and holes
 	recseq_add_recno(rec->recno, ctx);
@@ -1085,6 +1091,8 @@ fail0:
 	return return_stat;
 }
 
+
+#if GDP_USE_TIDX
 
 EP_STAT
 check_tidx_db(gdp_gob_t *gob, struct ctx *ctx, const char **phasep)
@@ -1130,6 +1138,8 @@ fail1:
 	return estat;
 }
 
+#endif // GDP_USE_TIDX
+
 
 EP_STAT
 do_check(gdp_gob_t *gob, struct ctx *ctx)
@@ -1147,6 +1157,7 @@ do_check(gdp_gob_t *gob, struct ctx *ctx)
 	estat = ridx_open(gob, GCL_RIDX_SUFFIX, O_RDONLY);
 	EP_STAT_CHECK(estat, goto fail0);
 
+#if GDP_USE_TIDX
 	// check timestamp database
 	phase = "tidx_check";
 	estat = check_tidx_db(gob, ctx, &phase);
@@ -1156,6 +1167,7 @@ do_check(gdp_gob_t *gob, struct ctx *ctx)
 	phase = "tidx_open";
 	estat = tidx_open(gob, GCL_TIDX_SUFFIX, O_RDONLY);
 	EP_STAT_CHECK(estat, goto fail0);
+#endif // GDP_USE_TIDX
 
 	phase = NULL;
 	estat = scan_recs(gob, check_segment, check_record, ctx);
@@ -1239,13 +1251,17 @@ rebuild_record(
 		estat1 = ridx_put(gob, rec->recno, seg->segno, offset);
 	}
 
+#if GDP_USE_TIDX
 	// output info to tidx
 	EP_STAT estat2 = tidx_put(gob,
 					rec->timestamp.tv_sec, rec->timestamp.tv_nsec,
 					rec->recno);
+#endif
 
 	EP_STAT_CHECK(estat1, return estat1);
+#if GDP_USE_TIDX
 	EP_STAT_CHECK(estat2, return estat2);
+#endif
 	return EP_STAT_OK;
 }
 
@@ -1278,8 +1294,10 @@ remove_temp_files(gdp_gob_t *gob)
 		unlink(temp_path);
 	}
 
+#if GDP_USE_TIDX
 	get_gob_path(gob, -1, ".tmptidx", temp_path, sizeof temp_path);
 	unlink(temp_path);
+#endif
 }
 
 
@@ -1291,9 +1309,11 @@ do_rebuild(gdp_gob_t *gob, struct ctx *ctx)
 	gob_physinfo_t *phys = GETPHYS(gob);
 	bool install_new_files = Flags.force;
 
+#if GDP_USE_TIDX
 	// check the tidx database (this is just to see if we need to reinstall)
 	estat = check_tidx_db(gob, ctx, &phase);
 	EP_STAT_CHECK(estat, install_new_files = true);
+#endif
 
 	if (!Flags.tidx_only)
 	{
@@ -1303,10 +1323,12 @@ do_rebuild(gdp_gob_t *gob, struct ctx *ctx)
 		EP_STAT_CHECK(estat, goto fail0);
 	}
 
+#if GDP_USE_TIDX
 	// create temporary timestamp index
 	phase = "create tidx temp";
 	estat = tidx_create(gob, ".tmptidx", FLAG_TMPFILE);
 	EP_STAT_CHECK(estat, goto fail1);
+#endif
 
 	// do the actual scan
 	phase = "rebuild";
@@ -1318,6 +1340,7 @@ do_rebuild(gdp_gob_t *gob, struct ctx *ctx)
 		fclose(phys->ridx.fp);
 		phys->ridx.fp = NULL;
 	}
+#if GDP_USE_TIDX
 	bdb_close(phys->tidx.db);
 	phys->tidx.db = NULL;
 
@@ -1354,6 +1377,7 @@ do_rebuild(gdp_gob_t *gob, struct ctx *ctx)
 		}
 
 	}
+#endif // GDP_USE_TIDX
 
 	if (install_new_files || EP_STAT_ISWARN(estat))
 	{
@@ -1393,11 +1417,13 @@ do_rebuild(gdp_gob_t *gob, struct ctx *ctx)
 			rename(temp_path, real_path);
 		}
 
+#if GDP_USE_TIDX
 		get_gob_path(gob, -1, GCL_TIDX_SUFFIX, real_path, sizeof real_path);
 		get_gob_path(gob, -1, ".oldtidx", save_path, sizeof save_path);
 		get_gob_path(gob, -1, ".tmptidx", temp_path, sizeof temp_path);
 		rename(real_path, save_path);
 		rename(temp_path, real_path);
+#endif
 	}
 	else
 	{
@@ -1406,7 +1432,9 @@ do_rebuild(gdp_gob_t *gob, struct ctx *ctx)
 
 	if (false)
 	{
+#if GDP_USE_TIDX
 fail1:
+#endif
 		if (phys->ridx.fp != NULL)
 		{
 			fclose(phys->ridx.fp);

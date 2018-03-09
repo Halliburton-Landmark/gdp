@@ -32,7 +32,9 @@
 #define _GDPLOGD_DISKLOG_H_		1
 
 #include "logd.h"
-#include <db.h>
+#if GDP_USE_TIDX
+# include <db.h>
+#endif
 
 /*
 **	Headers for the physical log implementation.
@@ -58,7 +60,9 @@
 #define GCL_RIDX_MAXVERS	UINT32_C(20160101)		// highest readable version
 #define GCL_RIDX_SUFFIX		".gdpndx"
 
+#if GDP_USE_TIDX
 #define GCL_TIDX_SUFFIX		".gdptidx"
+#endif
 
 #define GCL_READ_BUFFER_SIZE 4096			// size of I/O buffers
 
@@ -210,6 +214,7 @@ typedef struct ridx_header
 #define SIZEOF_RIDX_RECORD		(sizeof(ridx_entry_t))
 
 
+#if GDP_USE_TIDX
 /*
 **  On-disk timestamp index record format
 **
@@ -237,6 +242,7 @@ typedef struct tidx_value
 	gdp_recno_t		recno;			// the primary key
 } tidx_value_t;
 
+#endif // GDP_USE_TIDX
 
 /*
 **  The in-memory cache of the physical index data.
@@ -306,7 +312,9 @@ struct physinfo
 
 	// info regarding the indices
 	struct recno_index	ridx;					// index by recno
+#if GDP_USE_TIDX
 	struct ts_index		tidx;					// index by timestamp
+#endif
 };
 
 #define LOG_TIDX_HIDEFAILURE	0x00000001	// abandon a corrupt tidx database
