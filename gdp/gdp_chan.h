@@ -63,6 +63,7 @@
 #define GDP_TTL_DEFAULT			15		// hops left
 
 
+
 /*
 **  Prototypes for type declarations.  These are for the most part
 **  opaque, so the structure itself is defined where the datatype
@@ -73,6 +74,74 @@
 typedef struct gdp_chan_x		gdp_chan_x_t;		// for chan private "udata"
 typedef struct gdp_target		gdp_target_t;		//XXX as yet undefined
 typedef struct gdp_adcert		gdp_adcert_t;		// advertising cert
+
+
+/*
+**  On-the-Wire PDU Format
+**
+**		This is for client layer to routing layer communications.
+**		It may, in some modified form, also be used for router to
+**		router communications, but that's beyond the scope of this
+**		header file.
+**
+**		off	len	meaning
+**		---	---	-------
+**		0	1	version (must be 4) [1]
+**		1	1	header length in units of 32 bits (= H / 4)
+**		2	1	type / flags / address format [2]
+**		4	4	payload (SDU) length (= P)
+**		8	4	flow id
+**		8	32	destination address
+**		40	32	source address
+**		?	?	for future use (probably options)
+**		H	P	payload (SDU) (starts at offset given in octet 1)
+**
+**		[1] If the high order bit of the version is set, this is
+**			reserved for router-to-router communication.  When the
+**			client generates or sees a PDU, the high order bit must
+**			be zero.  The remainder of a router-to-router PDU is not
+**			defined here.
+**
+**		[2] The low-order three bits define the address fields.  If
+**			zero, there are two 32-byte (256-bit) addresses for
+**			destination and source respectively.  Other values are
+**			reserved.
+**
+**			The top three bits represent the PDU type:
+**				0: regular traffic
+**				1: forward this PDU to the destination, strip off
+**					the header, and re-interpret the payload as
+**					a new PDU.
+**				2: name advertisement
+**				3: name withdrawal
+**				4: "no route" NAK
+**				5: reserved
+**				6: "transmission NAK"
+**				7: "transmission ACK"
+**
+**			Types 1, 2, and 3 are client to routing layer only.
+**			Type 4 is routing layer to client only.
+**			Types 6 and 7 are reserved to the routing layer.
+*/
+
+// values for flags / router control / type of service field
+#define GDP_PKT_TYPE_ADDR_FMT		0x07	// indicates structure of addresses
+
+// flag bits
+#define GDP_PKT_TYPE_RELIABLE		0x08	// do extra work to ensure delivery
+
+// type field
+#define GDP_PKT_TYPE_MASK			0xe0	// mask for the router command
+// (router commands)
+#define GDP_PKT_TYPE_REGULAR		0x00	// regular delivery
+#define GDP_PKT_TYPE_FORWARD		0x20	// forward to another address
+#define GDP_PKT_TYPE_ADVERTISE		0x40	// name advertisement
+#define GDP_PKT_TYPE_WITHDRAW		0x60	// name withdrawal
+// (router responses)
+#define GDP_PKT_TYPE_NAK_NOROUTE	0x80	// no route / name unknown
+// (internal (router-to-router only) responses)
+#define GDP_PKT_TYPE_NAK_PACKET		0xc0	// transmission nak
+#define GDP_PKT_TYPE_ACK_PACKET		0xe0	// transmission ack
 
 
 /*
@@ -153,7 +222,8 @@ EP_STAT			_gdp_chan_send(				// send data to channel
 						gdp_target_t *target,
 						gdp_name_t src,
 						gdp_name_t dst,
-						gdp_buf_t *payload);
+						gdp_buf_t *payload,
+						int tos);
 
 gdp_chan_x_t	*_gdp_chan_get_cdata(		// get user data from channel
 						gdp_chan_t *chan);

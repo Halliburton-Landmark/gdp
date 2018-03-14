@@ -242,7 +242,8 @@ fail1:
 	if (EP_STAT_ISOK(estat))
 	{
 		// actually send this all to the channel
-		_gdp_chan_send(chan, NULL, pdu->src, pdu->dst, obuf);
+		_gdp_chan_send(chan, NULL, pdu->src, pdu->dst, obuf,
+					GDP_PKT_TYPE_REGULAR);
 	}
 
 //fail0:

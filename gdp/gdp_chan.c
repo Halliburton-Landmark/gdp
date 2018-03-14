@@ -95,85 +95,8 @@ struct gdp_chan
 // Running over a Version 3 Transport Layer
 // PDU layout shown in gdp_pdu.h
 #define MIN_HEADER_LENGTH	(1+1+1+1+32+32+4+1+1+1+1+4)
-#else
-/*
-**  On-the-Wire PDU Format
-**
-**		This is for client layer to routing layer communications.
-**		It may, in some modified form, also be used for router to
-**		router communications, but that's beyond the scope of this
-**		header file.
-**
-**		off	len	meaning
-**		---	---	-------
-**		0	1	version (must be 4) [1]
-**		1	1	header length in units of 32 bits (= H / 4)
-**		2	1	flags / type of service [2]
-**		4	4	payload (SDU) length (= P)
-**		8	4	flow id
-**		8	32	destination address
-**		40	32	source address
-**		?	?	for future use (probably options)
-**		H	P	payload (SDU) (starts at offset given in octet 1)
-**
-**		[1] If the high order bit of the version is set, this is
-**			reserved for router-to-router communication.  When the
-**			client generates or sees a PDU, the high order bit must
-**			be zero.  The remainder of a router-to-router PDU is not
-**			defined here.
-**
-**		[2] The low-order three bits define the address fields.  If
-**			zero, there are two 32-byte (256-bit) addresses for
-**			destination and source respectively.  Other values are
-**			reserved.
-**
-**			If the high order bit of flags/type of service is set,
-**			this is a client-to-router interaction (e.g.,
-**			advertise) and the low order bits are a specific
-**			command (see below).
-**
-**			It is likely that router-to-router commands will want
-**			to re-use this field as a command.
-**
-**		Special flag values (masked with 0xF8) are:
-**			0x80	Forward this PDU to the destination, strip off the
-**					header, and re-interpret the payload as a new
-**					PDU.
-**			0x90	Payload contains an advertisement.
-**			0x98	Payload contains a withdrawal.
-**			0xE0	(Router-to-client) Some data was not delivered
-**					(e.g., a fragment was lost in the network layer).
-**					This is a clue to the client that it might need
-**					to retransmit a commmand.
-**			0xF0	(Router-to-client) Indicates a "name not found"
-**					(or "no route") error.
-**			0xF8	(Router-to-router) Used by the routing layer to
-**					encode acknowledgements.  Should never be seen by
-**					the network client.
-**		Question: should the PDU have a "protocol" field (a la IPv4
-**			packets) with a special value of GDP_in_GDP, by analogy
-**			with IP's IP_in_IP, rather than using a FORWARD bit?
-*/
-
-// values for flags / router control / type of service field
-#define GDP_TOS_ADDR_FMT	0x07	// indicates structure of addresses
-#define GDP_TOS_ROUTER		0x80	// router should interpret this PDU
-#define GDP_TOS_ROUTERMASK	0xf8	// mask for the router command
-#define GDP_TOS_FORWARD		0x80	// forward to another address
-#define GDP_TOS_ADVERTISE	0x90	// name advertisement
-#define GDP_TOS_WITHDRAW	0x98	// name withdrawal
-#define GDP_TOS_NOROUTE		0xf0	// no route / name unknown
-#define GDP_TOS_ROUTE_ACK	0xf8	// transmission ack (router-to-router only)
-#define GDP_TOS_ROUTE_NAK	0xe0	// some data was not delivered
-
-//XXX following needs to be changed if ADDR_FMT != 0
-// magic, hdrlen, tos, rsvd, paylen, dst, src, pad
-#define MIN_HEADER_LENGTH	(1 + 1 + 1 + 1 + 2 + 32 + 32 + 2)
-#endif	// PROTOCOL_L4_V3
-#define MAX_HEADER_LENGTH	(255 * 4)
 
 //XXX obsolete
-#if PROTOCOL_L4_V3
 static uint8_t	RoutingLayerAddr[32] =
 	{
 		0xff, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff, 0x00,
@@ -181,7 +104,12 @@ static uint8_t	RoutingLayerAddr[32] =
 		0xff, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff, 0x00,
 		0xff, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff, 0x00,
 	};
-#endif // PROTOCOL_L4_V3
+#else
+//XXX following needs to be changed if ADDR_FMT != 0
+// magic, hdrlen, type, rsvd, paylen, dst, src, pad
+#define MIN_HEADER_LENGTH	(1 + 1 + 1 + 1 + 2 + 32 + 32 + 2)
+#endif	// PROTOCOL_L4_V3
+#define MAX_HEADER_LENGTH	(255 * 4)
 
 
 /*
@@ -311,7 +239,7 @@ read_header(gdp_chan_t *chan,
 		goto done;
 	}
 	GET16(payload_len);
-	if ((flags & GDP_TOS_ADDR_FMT) == 0)
+	if ((flags & GDP_PKT_TYPE_ADDR_FMT) == 0)
 	{
 		memcpy(dst, pbp, sizeof (gdp_name_t));
 		pbp += sizeof (gdp_name_t);
@@ -322,7 +250,7 @@ read_header(gdp_chan_t *chan,
 	{
 		ep_dbg_cprintf(Dbg, 1,
 				"read_header: unknown address format 0x%02x\n",
-				flags & GDP_TOS_ADDR_FMT);
+				flags & GDP_PKT_TYPE_ADDR_FMT);
 		estat = GDP_STAT_PDU_CORRUPT;
 		goto done;
 	}
@@ -338,22 +266,18 @@ read_header(gdp_chan_t *chan,
 				gdp_printable_name(*dst, dst_p));
 	}
 
-	// check for router meta-commands (tos)
-	if (EP_UT_BITSET(GDP_TOS_ROUTER, flags))
+	// check for router meta-commands (type)
+	if ((flags & GDP_PKT_TYPE_MASK) == GDP_PKT_TYPE_NAK_NOROUTE)
 	{
-		if ((flags & GDP_TOS_ROUTERMASK) == GDP_TOS_NOROUTE)
-		{
-			estat = GDP_STAT_NAK_NOROUTE;
-			goto done;
-		}
-		else
-		{
-			ep_dbg_cprintf(Dbg, 1, "read_header: PDU router tos = %02x\n",
-					flags & GDP_TOS_ROUTERMASK);
-//			estat = GDP_STAT_PDU_CORRUPT;	// no, ignore router status
-			estat = GDP_STAT_KEEP_READING;
-			goto done;
-		}
+		estat = GDP_STAT_NAK_NOROUTE;
+		goto done;
+	}
+	else if ((flags & GDP_PKT_TYPE_MASK) != GDP_PKT_TYPE_REGULAR)
+	{
+		ep_dbg_cprintf(Dbg, 1, "read_header: PDU router type = %02x\n",
+					flags & GDP_PKT_TYPE_MASK);
+		estat = GDP_STAT_PDU_CORRUPT;
+		goto done;
 	}
 #endif	// PROTOCOL_L4_V3
 
@@ -372,7 +296,9 @@ read_header(gdp_chan_t *chan,
 
 done:
 	if (EP_STAT_ISOK(estat))
+	{
 		estat = EP_STAT_FROM_INT(payload_len);
+	}
 	else
 	{
 		ep_dbg_cprintf(Dbg, 19, "read_header: draining %zd on error\n",
@@ -1026,7 +952,8 @@ _gdp_chan_send(gdp_chan_t *chan,
 			gdp_target_t *target,
 			gdp_name_t src,
 			gdp_name_t dst,
-			gdp_buf_t *payload)
+			gdp_buf_t *payload,
+			int tos)
 {
 	if (ep_dbg_test(Dbg, 32))
 	{
@@ -1035,7 +962,7 @@ _gdp_chan_send(gdp_chan_t *chan,
 		ep_dbg_printf("_gdp_chan_send: sending PDU:\n");
 		ep_hexdump(p, l, ep_dbg_getfile(), EP_HEXDUMP_ASCII, 0);
 	}
-	return send_helper(chan, target, src, dst, payload, 0);
+	return send_helper(chan, target, src, dst, payload, tos);
 }
 
 
@@ -1070,7 +997,7 @@ _gdp_chan_advertise(
 //							 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 	estat = send_helper(chan, NULL, _GdpMyRoutingName, gname,
-						NULL, GDP_TOS_ADVERTISE);
+						NULL, GDP_PKT_TYPE_ADVERTISE);
 #endif
 
 	if (ep_dbg_test(Dbg, 21))
