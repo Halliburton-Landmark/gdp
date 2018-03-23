@@ -32,7 +32,6 @@
 #define _EP_UUID_H_
 __BEGIN_DECLS
 
-#if EP_OSCF_HAS_BSD_UUID
 // manifest constants
 #define EP_UUID_INTERNAL	0	// use internal algorithm
 #define EP_UUID_OSSP		1	// use OSSP interface
