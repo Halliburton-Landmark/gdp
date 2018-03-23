@@ -120,6 +120,7 @@ case "$OS" in
 	then
 		package systemd-dev
 	fi
+	package uuid-devel
 	warn "Yum doesn't support Pandoc: install by hand"
 	;;
 

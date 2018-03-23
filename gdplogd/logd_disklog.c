@@ -72,10 +72,6 @@ static bool			DiskInitialized = false;
 static const char	*GclDir;			// the gob data directory
 static int			GOBfilemode;		// the file mode on create
 static uint32_t		DefaultLogFlags;	// as indicated
-static bool			BdbSyncBeforeClose;	// do db_sync before db_close?
-static bool			BdbSyncAfterPut;	// do db->sync after db->put?
-static uint32_t		BdbPageSize;		// Berkeley DB page size in bytes
-static uint32_t		BdbCacheSize;		// Berkeley DB cache size in units of 1k
 
 #define GETPHYS(gob)	((gob)->x->physinfo)
 
@@ -125,14 +121,22 @@ posix_error(int _errno, const char *fmt, ...)
 	return estat;
 }
 
+#ifdef DB_VERSION_MAJOR
 /*
 **  Berkeley DB compatibility routines
 */
 
 #define DB_VERSION_THRESHOLD	4	// XXX not clear the number is right
+
+static bool			BdbSyncBeforeClose;	// do db_sync before db_close?
+static bool			BdbSyncAfterPut;	// do db->sync after db->put?
+
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
 
-DB_ENV		*DbEnv;
+DB_ENV				*DbEnv;
+static uint32_t		BdbPageSize;		// Berkeley DB page size in bytes
+static uint32_t		BdbCacheSize;		// Berkeley DB cache size in units of 1k
+static bool			BdbUseAutoCommit;
 
 static void
 bdb_error(const DB_ENV *dbenv, const char *errpfx, const char *msg)
@@ -203,14 +207,16 @@ bdb_init(const char *db_home, bool use_auto_commit)
 {
 	EP_STAT estat = EP_STAT_OK;
 
-	BdbCacheSize = ep_adm_getlongparam("swarm.gdplogd.gob.bdb.cachesize", 0);
-	BdbPageSize = ep_adm_getlongparam("swarm.gdplogd.gob.bdb.pagesize", 0);
 	BdbSyncBeforeClose =
 		ep_adm_getboolparam("swarm.gdplogd.gob.bdb.sync-before-close", false);
 	BdbSyncAfterPut =
 		ep_adm_getboolparam("swarm.gdplogd.gob.bdb.sync-after-put", false);
 
 #if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
+	BdbUseAutoCommit = use_auto_commit;
+	BdbCacheSize = ep_adm_getlongparam("swarm.gdplogd.gob.bdb.cachesize", 0);
+	BdbPageSize = ep_adm_getlongparam("swarm.gdplogd.gob.bdb.pagesize", 0);
+
 	int dbstat;
 	const char *phase;
 
@@ -234,7 +240,7 @@ bdb_init(const char *db_home, bool use_auto_commit)
 						DB_INIT_LOCK |
 						DB_INIT_LOG |
 						DB_INIT_MPOOL ;
-		if (use_auto_commit)
+		if (BdbUseAutoCommit)
 			dbenv_flags |= DB_AUTO_COMMIT;
 		if (ep_adm_getboolparam("swarm.gdplogd.gob.bdb.private", true))
 			dbenv_flags |= DB_PRIVATE;
@@ -326,7 +332,9 @@ bdb_open(const char *filename,
 	}
 
 	phase = "db->open";
-	dbflags |= DB_AUTO_COMMIT | DB_THREAD;
+	dbflags |= DB_THREAD;
+	if (BdbUseAutoCommit)
+		dbflags |= DB_AUTO_COMMIT;
 	dbstat = db->open(db, NULL, filename, NULL, dbtype, dbflags, filemode);
 	if (dbstat != 0)
 	{
@@ -374,11 +382,11 @@ bdb_close(DB *db)
 	int dbstat = 0;
 
 	ep_thr_mutex_lock(&BdbMutex);
+#if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
 	if (BdbSyncBeforeClose)
 	{
 		dbstat = db->sync(db, 0);
 	}
-#if DB_VERSION_MAJOR >= DB_VERSION_THRESHOLD
 	if (dbstat != 0)
 		DbEnv->err(DbEnv, dbstat, "bdb_close(sync)");
 	dbstat = db->close(db, 0);
@@ -396,6 +404,7 @@ bdb_close(DB *db)
 }
 
 
+#if GDP_USE_TIDX
 #if LOG_CHECK
 static EP_STAT
 bdb_get(DB *db,
@@ -475,6 +484,7 @@ bdb_get_first_after_key(DB *db,
 	return estat;
 }
 
+#endif // GDP_USE_TIDX
 
 #if LOG_CHECK
 
@@ -565,6 +575,8 @@ bdb_put(DB *db,
 	return estat;
 }
 
+#endif // DB_VERSION_MAJOR
+
 
 
 /*
@@ -602,8 +614,10 @@ disk_init_internal(bool use_auto_commit)
 	if (ep_adm_getboolparam("swarm.gdplogd.disklog.log-posix-errors", false))
 		DefaultLogFlags |= LOG_POSIX_ERRORS;
 
+#ifdef DB_VERSION_MAJOR
 	// initialize berkeley DB (must be done while single threaded)
 	estat = bdb_init(GclDir, use_auto_commit);
+#endif
 
 	DiskInitialized = true;
 	ep_dbg_cprintf(Dbg, 8, "disk_init: log dir = %s, mode = 0%o\n",
@@ -1226,6 +1240,7 @@ physinfo_free(gob_physinfo_t *phys)
 		phys->ridx.fp = NULL;
 	}
 
+#if GDP_USE_TIDX
 	if (phys->tidx.db != NULL)
 	{
 		EP_STAT estat;
@@ -1237,6 +1252,7 @@ physinfo_free(gob_physinfo_t *phys)
 			ep_log(estat, "physinfo_free: cannot close tidx db");
 		phys->tidx.db = NULL;
 	}
+#endif
 
 	for (segno = 0; segno < phys->nsegments; segno++)
 	{
@@ -1661,6 +1677,7 @@ fail0:
 }
 
 
+#if GDP_USE_TIDX
 /*
 **  Create timestamp index
 */
@@ -1811,6 +1828,8 @@ fail0:
 	return estat;
 }
 
+#endif // GDP_USE_TIDX
+
 
 /*
 **  DISK_CREATE --- create a brand new GOB on disk
@@ -1849,9 +1868,11 @@ disk_create(gdp_gob_t *gob, gdp_gclmd_t *gmd)
 	estat = ridx_cache_create(phys);
 	EP_STAT_CHECK(estat, goto fail0);
 
+#if GDP_USE_TIDX
 	// create a database for the timestamp index
 	estat = tidx_create(gob, GCL_TIDX_SUFFIX, 0);
 	EP_STAT_CHECK(estat, goto fail0);
+#endif
 
 	// success!
 	phys->min_recno = 1;
@@ -1986,6 +2007,7 @@ disk_open(gdp_gob_t *gob)
 		EP_STAT_CHECK(estat, goto fail0);
 	}
 
+#if GDP_USE_TIDX
 	/*
 	**  Open timestamp index (tidx)
 	*/
@@ -1993,6 +2015,7 @@ disk_open(gdp_gob_t *gob)
 	phase = "tidx_open";
 	estat = tidx_open(gob, GCL_TIDX_SUFFIX, O_RDWR);
 	EP_STAT_CHECK(estat, goto fail0);
+#endif
 
 	/*
 	**  Set per-log flags
@@ -2345,6 +2368,7 @@ static EP_STAT
 disk_ts_to_recno(gdp_gob_t *gob,
 		gdp_datum_t *datum)
 {
+#if GDP_USE_TIDX
 	EP_STAT estat = EP_STAT_OK;
 	tidx_key_t tkey;
 	DBT tkey_dbt;
@@ -2409,7 +2433,11 @@ fail0:
 			datum->recno,
 			ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	return estat;
+#else // GDP_USE_TIDX
+	return GDP_STAT_NOT_IMPLEMENTED;
+#endif // GDP_USE_TIDX
 }
+
 
 
 /*
@@ -2506,6 +2534,7 @@ disk_append(gdp_gob_t *gob,
 	EP_STAT_CHECK(estat, goto fail0);
 	seg->max_offset += record_size;
 
+#if GDP_USE_TIDX
 	// write timestamp index record
 	if (phys->tidx.db != NULL)
 	{
@@ -2513,6 +2542,7 @@ disk_append(gdp_gob_t *gob,
 						datum->recno);
 		EP_STAT_CHECK(estat, goto fail0);
 	}
+#endif // GDP_USE_TIDX
 
 fail0:
 	ep_thr_rwlock_unlock(&phys->lock);

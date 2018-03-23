@@ -119,3 +119,39 @@ _ep_crypto_error(EP_STAT def_stat, const char *msg, ...)
 
 	return estat;
 }
+
+
+#if !EP_OSCF_HAS_ARC4RANDOM
+# include "ep_assert.h"
+# include <fcntl.h>
+# include <string.h>
+#endif
+
+void
+ep_crypto_random_buf(void *buf, size_t n)
+{
+#if EP_OSCF_HAS_ARC4RANDOM
+	arc4random_buf(buf, n);
+#else
+	const char *randfile = "/dev/random";
+	int rfd = open(randfile, O_RDONLY);
+	if (rfd < 0)
+	{
+		randfile = "/dev/urandom";
+		rfd = open(randfile, O_RDONLY);
+	}
+	if (rfd < 0)
+	{
+		EP_ASSERT_FAILURE("ep_crypto_random_buf: cannot open %s: %s",
+					randfile, strerror(errno));
+		abort();
+	}
+	if (read(rfd, buf, n) < n)
+	{
+		EP_ASSERT_FAILURE("ep_crypto_random_buf: cannot read %s: %s",
+					randfile, strerror(errno));
+		abort();
+	}
+	close(rfd);
+#endif
+}

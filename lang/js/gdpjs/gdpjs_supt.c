@@ -136,7 +136,9 @@ gdp_datum_print_stdout(
 char *
 gdp_get_pname_from_gclh( const gdp_gcl_t *gclh )
 {
-    return (char *) (gclh->pname);
+	if (gclh->gob == NULL)
+		return "(none)";			// better than a seg fault
+    return (char *) (gclh->gob->pname);
 }
 //
 // TBD: this routine doesn't work yet -- fix it or delete it.

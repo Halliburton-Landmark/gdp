@@ -7,68 +7,38 @@ There are some other interfaces to the GDP, generally referred to
 as CAAPIs (Common Access APIs).  For the most part these are lightly
 documented.
 
-The REST Interface
-------------------
+The RESTful Interface
+---------------------
 
-The REST interface has not been maintained in some time.  This guide
-is incomplete and possibly simply incorrect.
+The RESTful interface was implemented and deployed in support of the
+Signposts Project, which was demonstrated at the TerraSwarm Annual
+Meeting held in October, 2017. In addition to the Signposts, several
+other TerraSwarm demonstrations made and continue to make use of the
+RESTful GDP Gateway deployment.
 
-(In these instructions, _gcl-name_ is a URI-base\-64-encoded
-string of length 43 characters.  A _recno_ is a positive
-non-zero integer.  Note that for the moment the RESTful interface
-is not being maintained due to lack of use.)
+If you want to use the deployed RESTful GDP Gateway, please browse to
+the https://gdp-rest-01.eecs.berkeley.edu/ home page, which will
+present hotlinks to the RESTful API (`doc/gdp-rest-interface.html`)
+and to python client usage example(s). Be advised that gdp-rest-01
+will not respond to non-SSL-protected (http://) traffic, and requires
+basic client authentication when executing RESTful actions. Please
+contact the Swarm Lab for inquires regarding basic client credentials.
+In addition to programmatic access, you can do GETs from inside a
+browser such as Firefox or Chrome, but not POSTs.  To use other
+methods you'll have to use Chrome.  Install the "postman" extension to
+enable sending of arbitrary methods such as POST and PUT.
 
-1.	Do the "Getting Started" steps described above.
+If you want to set up your own RESTful GDP Gateway, please review the
+gdp-rest-01 server configuration details as documented on the GDP
+redmine wiki. The production deployment uses a lighttpd server running
+on Ubuntu 16.04, integrated with an SCGI backend. The gdp-rest daemon
+handles requests from SCGI, and leverages gcl-create for GCL creation.
 
-2.	The instructions for SCGI configuration for lighttpd are totally
-	wrong.  The configuration file you actually need is:
-
-		server.modules += ( "mod_scgi" )
-
-		scgi.server = (
-			"/gdp/v1/" =>
-				( "gdp" =>
-					( "host"  => "127.0.0.1",
-					  "port" => 8001,
-					  "check-local" => "disable",
-					)
-				)
-			)
-
-	(Normally in `/usr/local/etc/lighttpd/conf.c/scgi.conf`) This will
-	tell lighttpd to connect to an SCGI server on the local machine,
-	port 8001.  You'll also need to make sure the line
-	"`include conf.d/scgi.conf`" in `/usr/local/etc/lighttpd/modules.conf`
-	is not commented out.  The rest of the lighttpd setup should be
-	off the shelf.  I've set up instance of lighttpd to listen on
-	port 8080 instead of the default port 80, and the rest of these
-	instructions will reflect that.
-
-3.	Start up the GDP RESTful interface server in `apps/gdp-rest`.
-	It will run in foreground and spit out some debugging
-	information.  For even more, use `-D\*=20` on the command
-	line.  This sets all debug flags to level 20.  The backslash
-	is just to keep the Unix shell from trying to glob the
-	asterisk.
-
-4.	Start the lighttpd server, for example using:
-
-		lighttpd -f /usr/local/etc/lighttpd/lighttpd.conf -D
-
-	This assumes that your configuration is in
-	`/usr/local/etc/lighttpd`.  The `-D` says to run in foreground
-	and you can skip it if you want.  You may want to turn on
-	some debugging inside the daemon to help you understand the
-	interactions.  See ...`/etc/lighttpd/conf.d/debug.conf`.
-
-5.	The actual URIs and methods used by the REST interface are
-	described in `doc/gdp-rest-interface.html`.  See that file for
-	details.
-
-You can do GETs from inside a browser such as Firefox or
-Chrome, but not POSTs.  To use other methods you'll have to
-use Chrome.  Install the "postman" extension to enable
-sending of arbitrary methods such as POST and PUT.
+The RESTful GDP Gateway is limited to a RESTful-compatible subset of
+GDP capabilities, though it provides an easy and rapid way to begin
+using the GDP. A Web Socket Interface (`gdp-ws') has been deployed on
+gdp-rest-01 to support access to some non-RESTful GDP functionality
+(e.g. GCL subscriptions) in web browser environments.
 
 Python Key-Value Store
 ----------------------

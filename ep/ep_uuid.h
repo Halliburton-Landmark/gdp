@@ -30,25 +30,59 @@
 
 #ifndef _EP_UUID_H_
 #define _EP_UUID_H_
-#include <ep/ep.h>
 __BEGIN_DECLS
 
 #if EP_OSCF_HAS_BSD_UUID
+// manifest constants
+#define EP_UUID_INTERNAL	0	// use internal algorithm
+#define EP_UUID_OSSP		1	// use OSSP interface
+#define EP_UUID_BSD		2	// use BSD interface
+#define EP_UUID_TSO		3	// use Ted T'so interface
+
+#include <ep/ep.h>
+
+#ifdef __FreeBSD__
+# define EP_OSCF_UUID_TYPE	EP_UUID_BSD
+#endif
+#ifdef __APPLE__
+# define EP_OSCF_UUID_TYPE	EP_UUID_TSO
+#endif
+#if defined(__linux__) && defined(__has_include)
+# if __has_include("uuid/uuid.h")
+#  define EP_OSCF_UUID_TYPE	EP_UUID_TSO
+# endif
+#endif
+
+#ifndef EP_OSCF_UUID_TYPE
+# define EP_OSCF_UUID_TYPE	EP_UUID_INTERNAL
+#endif
+
+#if EP_OSCF_UUID_TYPE == EP_UUID_BSD || EP_OSCF_UUID_TYPE == EP_UUID_OSSP
 # include <uuid.h>
-#else
+#elif EP_OSCF_UUID_TYPE == EP_UUID_TSO
 # include <uuid/uuid.h>
+#else	// internal
+# include <ep/ep_crypto.h>
+typedef uint8_t		uuid_t[16];
 #endif
 
 
 struct ep_uuid
 {
+#if EP_OSCF_UUID_TYPE == EP_UUID_OSSP
+	uuid_t		*uu;			// system UUID representation
+#else
 	uuid_t		uu;			// system UUID representation
+#endif
 };
 
+#define EP_UUID_STR_LEN		37		// external representation len
 typedef struct ep_uuid	EP_UUID;		// internal (16 octet) format
-typedef char		EP_UUID_STR[37];	// string representation
+typedef char		EP_UUID_STR[EP_UUID_STR_LEN];	// string representation
 
 extern EP_STAT	ep_uuid_generate(		// generate new UUID
+			EP_UUID *uu);
+extern EP_STAT	ep_uuid_destroy(		// free UUID memory
 			EP_UUID *uu);
 extern EP_STAT	ep_uuid_tostr(			// make printable UUID
 			EP_UUID *uu,

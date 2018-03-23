@@ -77,7 +77,11 @@ __BEGIN_DECLS
 # define EP_CRYPTO_MAX_DER	(1024 * 8)	//XXX should add a slop factor
 
 
-void		ep_crypto_init(uint32_t flags);
+void			ep_crypto_init(uint32_t flags);
+
+void			ep_crypto_random_buf(	// return random data
+				void *buf,		// into buf
+				size_t n);		// this many bytes
 
 
 /*

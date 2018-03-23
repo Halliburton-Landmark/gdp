@@ -28,4 +28,8 @@ try_lib() {
 try_lib db
 try_lib execinfo
 try_lib systemd
-try_lib uuid
+if ! [ -e /etc/redhat-release ]
+then
+	# for some reason this breaks on redhat
+	try_lib uuid
+fi

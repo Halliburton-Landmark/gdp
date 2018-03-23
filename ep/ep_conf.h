@@ -36,8 +36,6 @@
 **  that needs tweaks.
 **
 **  Possible options:
-**	EP_OSCF_HAS_BSD_UUID
-**		Use BSD-style UUID implementation
 **	EP_OSCF_HAS_INTTYPES_H
 **		Set if <inttypes.h> exists
 **	EP_OSCF_HAS_STDBOOL_H
@@ -60,6 +58,8 @@
 **		Set if strlcpy(3) is available
 **	EP_OSCF_HAS_GETPROGNAME
 **		Set if getprogname(3) is available
+**	EP_OSCF_HAS_ARC4RANDOM
+**		Set if arc4random(3) exists
 **	EP_OSCF_MEM_PAGESIZE
 **		Memory page size; defaults to getpagesize()
 **	EP_OSCF_MEM_ALIGNMENT
@@ -116,9 +116,9 @@
 #  if __FreeBSD_version >= 440000
 #   define EP_OSCF_HAS_GETPROGNAME	1	// does getprogname(3) exist?
 #  endif
+#  define EP_OSCF_HAS_ARC4RANDOM	1	// does arc4random(3) exist?
 #  define EP_OSCF_NEED_OPTRESET		1	// optreset needed in getopt(3)
 #  define EP_OSCF_HAS_BACKTRACE		0	// no backtrace(3) call
-#  define EP_OSCF_HAS_BSD_UUID		1	// use BSD-style UUID
 # endif // __FreeBSD__
 
 # ifdef __APPLE__
@@ -127,6 +127,7 @@
 #  define EP_OSCF_HAS_STRLCPY		1	// does strlcat exist?
 #  define EP_OSCF_HAS_LSTAT		1	// does lstat(2) exist?
 #  define EP_OSCF_HAS_GETPROGNAME	1	// does getprogname(3) exist?
+#  define EP_OSCF_HAS_ARC4RANDOM	1	// does arc4random(3) exist?
 #  define EP_OSCF_SYSTEM_VALLOC		valloc	// aligned memory allocator
 #  ifndef EP_OSCF_USE_GETDATE
 #   define EP_OSCF_USE_GETDATE		1	// does getdate(3) exist?
@@ -146,7 +147,14 @@
 #  endif
 # define EP_OSCF_HAS_SYS_GETTID		1	// has syscall(SYS_gettid)
 # endif
-
+# ifdef __has_include				// XXX warning: bad hack
+#  if __has_include("uuid/uuid.h")
+#   define EP_OSCF_HAS_TSO_UUID		1	// Ted T'so style UUID
+#  endif
+# endif
+# ifndef EP_OSCF_HAS_TSO_UUID
+#  define EP_OSCF_HAS_OSSP_UUID		1	// OSSP (Redhat/CentOS) UUID
+# endif
 # define _BSD_SOURCE			1	// needed to compile on Linux
 # define _POSIX_C_SOURCE		200809L	// specify a modern environment
 #endif
