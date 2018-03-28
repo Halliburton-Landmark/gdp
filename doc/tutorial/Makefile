@@ -1,6 +1,26 @@
 # Needs pandoc to be installed. 
-all: pandoc.css gdp-tutorial-part1.md gdp-tutorial-part2.md
-	pandoc -s -S --toc --toc-depth=5 -c pandoc.css gdp-tutorial-part1.md -o gdp-tutorial-part1.html
-	# pandoc -s -S --toc --toc-depth=5 -c pandoc.css gdp-tutorial-part1.md -o gdp-tutorial-part1.pdf
-	pandoc -s -S --toc --toc-depth=5 -c pandoc.css gdp-tutorial-part2.md -o gdp-tutorial-part2.html
-	# pandoc -s -S --toc --toc-depth=5 -c pandoc.css gdp-tutorial-part2.md -o gdp-tutorial-part2.pdf
+#
+
+ALL_HTML=	gdp-tutorial-part1.html gdp-tutorial-part2.html
+ALL_PDF=	gdp-tutorial-part1.pdf gdp-tutorial-part2.pdf
+CSS=		pandoc.css
+
+#all: html pdf
+all: html
+
+html: gdp-tutorial-part1.html gdp-tutorial-part2.html
+
+pdf: gdp-tutorial-part1.pdf gdp-tutorial-part2.pdf
+
+${ALL_HTML} ${ALL_PDF}: ${CSS}
+
+.SUFFIXES: .md .html .pdf
+
+PANDOC=		pandoc
+PANFLAGS=	-sS -c ${CSS} --self-contained --toc --toc-depth=5
+
+.md.html:
+	${PANDOC} ${PANFLAGS} -o $@ $<
+
+.md.pdf:
+	${PANDOC} ${PANFLAGS} -o $@ $<
