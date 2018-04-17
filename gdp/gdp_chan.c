@@ -196,7 +196,7 @@ read_header(gdp_chan_t *chan,
 
 		// for lack of anything better, flush the entire input buffer
 		gdp_buf_drain(ibuf, gdp_buf_getlength(ibuf));
-		goto done;
+		goto fail0;
 	}
 #if PROTOCOL_L4_V3
 	GET8(b);				// time to live (ignored by non-routing layer)
@@ -307,6 +307,7 @@ done:
 		payload_len = 0;
 	}
 
+fail0:
 	{
 		char ebuf[100];
 		ep_dbg_cprintf(Dbg, 32, "read_header: hdr %zd pay %zd stat %s\n",
