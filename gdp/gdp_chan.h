@@ -84,15 +84,21 @@ typedef struct gdp_adcert		gdp_adcert_t;		// advertising cert
 **		router communications, but that's beyond the scope of this
 **		header file.
 **
+**		All multi-byte fields are in network byte order (big-
+**		endian).
+**
 **		off	len	meaning
 **		---	---	-------
 **		0	1	version (must be 4) [1]
-**		1	1	header length in units of 32 bits (= H / 4)
-**		2	1	type / flags / address format [2]
-**		4	4	payload (SDU) length (= P)
-**		8	4	flow id
-**		8	32	destination address
-**		40	32	source address
+**		1	1	reserved / header length in units of 32 bits (= H / 4) [2]
+**		2	1	type / flags / address format [3]
+**		3	1	time to live [4]
+**		4	4	sequence number, "more fragments" bit, frag offset [5]
+**		8	2	fragment length (= F) [6]
+**		10	2	payload (SDU) length (= P) [6]
+**		12	4	flow id (optional) [7]
+**		12	32	destination address (optional) [7]
+**		44	32	source address (optional) [7]
 **		?	?	for future use (probably options)
 **		H	P	payload (SDU) (starts at offset given in octet 1)
 **
@@ -102,16 +108,23 @@ typedef struct gdp_adcert		gdp_adcert_t;		// advertising cert
 **			be zero.  The remainder of a router-to-router PDU is not
 **			defined here.
 **
-**		[2] The low-order three bits define the address fields.  If
+**		[2]	Only the bottom six bits are used to encode H.  The
+**			top two bits are reserved.  They must be ignored when
+**			reading the PDU and set to zero when generating it.
+**
+**		[3] The low-order three bits define the address fields.  If
 **			zero, there are two 32-byte (256-bit) addresses for
 **			destination and source respectively.  Other values are
 **			reserved.
+**
+**			The next two bits are flag bits, as defined in the
+**			#defines below.
 **
 **			The top three bits represent the PDU type:
 **				0: regular traffic
 **				1: forward this PDU to the destination, strip off
 **					the header, and re-interpret the payload as
-**					a new PDU.
+**					a new PDU (i.e., do source routing).
 **				2: name advertisement
 **				3: name withdrawal
 **				4: "no route" NAK
@@ -122,6 +135,27 @@ typedef struct gdp_adcert		gdp_adcert_t;		// advertising cert
 **			Types 1, 2, and 3 are client to routing layer only.
 **			Type 4 is routing layer to client only.
 **			Types 6 and 7 are reserved to the routing layer.
+**
+**		[4]	TTL is only bottom six bits; the remainder of the octet
+**			is reserved.  Any code changing or reading the TTL should
+**			mask off the reserved bits; when creating a PDU, these
+**			bits should be zero.
+**
+**		[5]	The top bit indicates that there are more fragments to
+**			this PDU.  The next 15 bits are the sequence number, which
+**			should start as a random number which can wrap back to
+**			zero; after that it should be incremented on each PDU.
+**			The bottom 16 bits are the fragment offset; if the PDU is
+**			not fragmented it will be zero.
+**
+**		[6]	The SDU length (P) is the length of the entire reassembled
+**			payload.  The fragment length (F) is the size of this
+**			fragment.  If transmitting over TCP, F is ignored.
+**
+**		[7]	The addresses included in the PDU are defined by the
+**			the bottom three bits of octet 2.  The intent is that
+**			once a flow is initialized, only that four octet field
+**			will be sent.
 */
 
 // values for flags / router control / type of service field
@@ -129,6 +163,7 @@ typedef struct gdp_adcert		gdp_adcert_t;		// advertising cert
 
 // flag bits
 #define GDP_PKT_TYPE_RELIABLE		0x08	// do extra work to ensure delivery
+#define GDP_PKT_TYPE_SSEQ			0x10	// reset sequence number
 
 // type field
 #define GDP_PKT_TYPE_MASK			0xe0	// mask for the router command

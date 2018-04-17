@@ -183,7 +183,7 @@ read_header(gdp_chan_t *chan,
 		ep_hexdump(pbp, MIN_HEADER_LENGTH, ep_dbg_getfile(), EP_HEXDUMP_HEX, 0);
 	}
 
-	GET8(b);				// PDU version number
+	GET8(b);				// PDU version number (offset 0)
 #if PROTOCOL_L4_V3
 	if (b != 2 && b != 3)
 #else
@@ -215,6 +215,7 @@ read_header(gdp_chan_t *chan,
 	GET32(payload_len);			// data length
 #else
 	GET8(hdr_len);			// header length / 4
+	hdr_len &= 0x3F;		// top two bits reserved
 	hdr_len *= 4;
 	if (hdr_len < MIN_HEADER_LENGTH)
 	{
@@ -230,15 +231,17 @@ read_header(gdp_chan_t *chan,
 		return GDP_STAT_KEEP_READING;
 
 	int flags;
-	GET8(flags);			// flags/type of service (ignored)
-	GET8(b);				// reserved (MBZ)
-	if (b != 0)				//DEBUG: really shouldn't test for zero here
-	{
-		ep_dbg_cprintf(Dbg, 1, "read_header: reserved (MBZ) = 0x%02x\n", b);
-		estat = GDP_STAT_PDU_CORRUPT;
-		goto done;
-	}
-	GET16(payload_len);
+	GET8(flags);			// type of service/flags/address format
+	int ttl;
+	GET8(ttl);				// time to live (ignored by endpoints)
+	ttl &= 0x3f;
+	uint32_t seq_mf_foff;
+	GET32(seq_mf_foff);		// seqno, more frags bit, and frag offset
+	uint16_t seqno = (seq_mf_foff >> 16) & 0x7fff;
+	uint16_t frag_off = seq_mf_foff & 0xffff;
+	uint16_t frag_len;
+	GET16(frag_len);		// fragment length
+	GET16(payload_len);		// length of opaque payload (reassembled)
 	if ((flags & GDP_PKT_TYPE_ADDR_FMT) == 0)
 	{
 		memcpy(dst, pbp, sizeof (gdp_name_t));
@@ -851,6 +854,7 @@ send_helper(gdp_chan_t *chan,
 	EP_STAT estat = EP_STAT_OK;
 	int i;
 	size_t payload_len = 0;
+	uint16_t seqno = 0;			//FIXME
 
 	if (payload != NULL)
 		payload_len = gdp_buf_getlength(payload);
@@ -901,13 +905,16 @@ send_helper(gdp_chan_t *chan,
 	PUT8(GDP_CHAN_PROTO_VERSION);		// version number
 	PUT8(MIN_HEADER_LENGTH / 4);		// header length (= 72 / 4)
 	PUT8(tos);							// flags / type of service
-	PUT8(0);							// reserved
-	PUT16(payload_len);
-	memcpy(pbp, dst, sizeof (gdp_name_t));
+	PUT8(GDP_TTL_DEFAULT);				// time to live
+	uint32_t seq_mf_foff = (seqno & 0x7fff) < 16;
+	PUT32(seq_mf_foff);					// more frag bit, seqno, frag offset
+	uint16_t frag_len = 0;
+	PUT16(frag_len);					// length of this fragment
+	PUT16(payload_len);					// length of opaque payload
+	memcpy(pbp, dst, sizeof (gdp_name_t));	// destination address
 	pbp += sizeof (gdp_name_t);
-	memcpy(pbp, src, sizeof (gdp_name_t));
+	memcpy(pbp, src, sizeof (gdp_name_t));	// source address
 	pbp += sizeof (gdp_name_t);
-	PUT16(0);							// padding
 #endif
 
 	// now write header to the socket
