@@ -79,10 +79,10 @@ typedef struct gdp_adcert		gdp_adcert_t;		// advertising cert
 /*
 **  On-the-Wire PDU Format
 **
-**		This is for client layer to routing layer communications.
-**		It may, in some modified form, also be used for router to
-**		router communications, but that's beyond the scope of this
-**		header file.
+**		Portions of this packet are not used for the client-to-router
+**		TCP interface, but are used in the router-to-router UDP
+**		interface, and will be needed when the client-to-router
+**		path switches to UDP.
 **
 **		All multi-byte fields are in network byte order (big-
 **		endian).
@@ -148,18 +148,31 @@ typedef struct gdp_adcert		gdp_adcert_t;		// advertising cert
 **			The bottom 16 bits are the fragment offset; if the PDU is
 **			not fragmented it will be zero.
 **
+**			This field is unused in the TCP interface.
+**
 **		[6]	The SDU length (P) is the length of the entire reassembled
-**			payload.  The fragment length (F) is the size of this
+**			opaque payload.  The fragment length (F) is the size of this
 **			fragment.  If transmitting over TCP, F is ignored.
 **
 **		[7]	The addresses included in the PDU are defined by the
 **			the bottom three bits of octet 2.  The intent is that
 **			once a flow is initialized, only that four octet field
-**			will be sent.
+**			will be sent.  However, the flowid compression is not
+**			implemented yet.
+**
+**		Any additional octets in the header are interpreted as options.
 */
 
-// values for flags / router control / type of service field
-#define GDP_PKT_TYPE_ADDR_FMT		0x07	// indicates structure of addresses
+/*** values for header length field (octet 1) ***/
+#define GDP_PKT_HDR_LEN_MASK		0x3f	// mask for header length
+
+// no flags defined in this octet yet
+#define GDP_PKT_HDR_LEN_UNUSED		0xc0	// reserved
+
+/*** values for flags / router control / type of service field (octet 2) ***/
+// address format
+#define GDP_PKT_ADDR_TYPE_MASK		0x07	// indicates structure of addresses
+#define GDP_PKT_ADDR_TYPE_2FULL		0x00	// two 256-bit addresses
 
 // flag bits
 #define GDP_PKT_TYPE_RELIABLE		0x08	// do extra work to ensure delivery
@@ -167,16 +180,28 @@ typedef struct gdp_adcert		gdp_adcert_t;		// advertising cert
 
 // type field
 #define GDP_PKT_TYPE_MASK			0xe0	// mask for the router command
-// (router commands)
+// (client-to-router commands)
 #define GDP_PKT_TYPE_REGULAR		0x00	// regular delivery
 #define GDP_PKT_TYPE_FORWARD		0x20	// forward to another address
 #define GDP_PKT_TYPE_ADVERTISE		0x40	// name advertisement
 #define GDP_PKT_TYPE_WITHDRAW		0x60	// name withdrawal
-// (router responses)
+// (router-to-client responses)
 #define GDP_PKT_TYPE_NAK_NOROUTE	0x80	// no route / name unknown
 // (internal (router-to-router only) responses)
 #define GDP_PKT_TYPE_NAK_PACKET		0xc0	// transmission nak
 #define GDP_PKT_TYPE_ACK_PACKET		0xe0	// transmission ack
+
+/*** values for time to live field (octet 3) ***/
+#define GDP_PKT_TTL_MASK			0x3f	// mask for time to live
+#define GDP_PKT_TTL_UNUSED			0xc0	// reserved
+
+// no flags defined in this octet yet
+
+/*** values for sequence_number, frag offset field (octets 4-7) ***/
+#define GDP_PKT_SEQNO_SHIFT			16		// the number of bits to shift
+#define GDP_PKT_SEQNO_MASK			0x7fff	// the sequence number mask
+#define GDP_PKT_SEQNO_MF			0x80000000	// more fragments bit
+#define GDP_PKT_SEQNO_FOFF_MASK		0xffff	// fragment offset mask
 
 
 /*

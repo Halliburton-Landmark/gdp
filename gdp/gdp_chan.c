@@ -237,12 +237,12 @@ read_header(gdp_chan_t *chan,
 	ttl &= 0x3f;
 	uint32_t seq_mf_foff;
 	GET32(seq_mf_foff);		// seqno, more frags bit, and frag offset
-	uint16_t seqno = (seq_mf_foff >> 16) & 0x7fff;
-	uint16_t frag_off = seq_mf_foff & 0xffff;
+	uint16_t seqno = (seq_mf_foff >> GDP_PKT_SEQNO_SHIFT) & GDP_PKT_SEQNO_MASK;
+	uint16_t frag_off = seq_mf_foff & GDP_PKT_SEQNO_FOFF_MASK;
 	uint16_t frag_len;
 	GET16(frag_len);		// fragment length
 	GET16(payload_len);		// length of opaque payload (reassembled)
-	if ((flags & GDP_PKT_TYPE_ADDR_FMT) == 0)
+	if ((flags & GDP_PKT_ADDR_TYPE_MASK) == 0)
 	{
 		memcpy(dst, pbp, sizeof (gdp_name_t));
 		pbp += sizeof (gdp_name_t);
@@ -253,7 +253,7 @@ read_header(gdp_chan_t *chan,
 	{
 		ep_dbg_cprintf(Dbg, 1,
 				"read_header: unknown address format 0x%02x\n",
-				flags & GDP_PKT_TYPE_ADDR_FMT);
+				flags & GDP_PKT_ADDR_TYPE_MASK);
 		estat = GDP_STAT_PDU_CORRUPT;
 		goto done;
 	}
@@ -906,7 +906,7 @@ send_helper(gdp_chan_t *chan,
 	PUT8(MIN_HEADER_LENGTH / 4);		// header length (= 72 / 4)
 	PUT8(tos);							// flags / type of service
 	PUT8(GDP_TTL_DEFAULT);				// time to live
-	uint32_t seq_mf_foff = (seqno & 0x7fff) < 16;
+	uint32_t seq_mf_foff = (seqno & GDP_PKT_SEQNO_MASK) < GDP_PKT_SEQNO_SHIFT;
 	PUT32(seq_mf_foff);					// more frag bit, seqno, frag offset
 	uint16_t frag_len = 0;
 	PUT16(frag_len);					// length of this fragment
