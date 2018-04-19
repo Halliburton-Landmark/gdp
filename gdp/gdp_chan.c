@@ -106,8 +106,8 @@ static uint8_t	RoutingLayerAddr[32] =
 	};
 #else
 //XXX following needs to be changed if ADDR_FMT != 0
-// magic, hdrlen, type, rsvd, paylen, dst, src, pad
-#define MIN_HEADER_LENGTH	(1 + 1 + 1 + 1 + 2 + 32 + 32 + 2)
+// magic, hdrlen, type, ttl, seq_mf_foff, fraglen, paylen, dst, src
+#define MIN_HEADER_LENGTH	(1 + 1 + 1 + 1 + 4 + 2 + 2 + 32 + 32)
 #endif	// PROTOCOL_L4_V3
 #define MAX_HEADER_LENGTH	(255 * 4)
 
