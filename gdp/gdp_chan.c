@@ -906,7 +906,7 @@ send_helper(gdp_chan_t *chan,
 	PUT8(MIN_HEADER_LENGTH / 4);		// header length (= 72 / 4)
 	PUT8(tos);							// flags / type of service
 	PUT8(GDP_TTL_DEFAULT);				// time to live
-	uint32_t seq_mf_foff = (seqno & GDP_PKT_SEQNO_MASK) < GDP_PKT_SEQNO_SHIFT;
+	uint32_t seq_mf_foff = (seqno & GDP_PKT_SEQNO_MASK) << GDP_PKT_SEQNO_SHIFT;
 	PUT32(seq_mf_foff);					// more frag bit, seqno, frag offset
 	uint16_t frag_len = 0;
 	PUT16(frag_len);					// length of this fragment
