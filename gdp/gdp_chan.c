@@ -165,7 +165,7 @@ read_header(gdp_chan_t *chan,
 {
 	uint8_t *pbp = gdp_buf_getptr(ibuf, MIN_HEADER_LENGTH);
 	int b;
-	size_t hdr_len;
+	size_t hdr_len = 0;
 	size_t payload_len = 0;
 	EP_STAT estat = EP_STAT_OK;
 
