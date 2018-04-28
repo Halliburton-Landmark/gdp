@@ -171,7 +171,13 @@ struct gob_phys_stats
 struct gob_phys_impl
 {
 	EP_STAT		(*init)(void);
+	EP_STAT		(*read_by_hash)(
+						gdp_gob_t *gob,
+						gdp_datum_t *datum);
 	EP_STAT		(*read_by_recno)(
+						gdp_gob_t *gob,
+						gdp_datum_t *datum);
+	EP_STAT		(*read_by_timestamp)(
 						gdp_gob_t *gob,
 						gdp_datum_t *datum);
 	EP_STAT		(*create)(
@@ -187,8 +193,6 @@ struct gob_phys_impl
 	EP_STAT		(*getmetadata)(
 						gdp_gob_t *gob,
 						gdp_gclmd_t **gmdp);
-	EP_STAT		(*newsegment)(
-						gdp_gob_t *gob);
 	EP_STAT		(*remove)(
 						gdp_gob_t *gob);
 	EP_STAT		(*foreach)(
@@ -199,16 +203,13 @@ struct gob_phys_impl
 	void		(*getstats)(
 						gdp_gob_t *gob,
 						struct gob_phys_stats *stats);
-	EP_STAT		(*ts_to_recno)(
-						gdp_gob_t *gob,
-						gdp_datum_t *datum);
 	bool		(*recno_exists)(
 						gdp_gob_t *gob,
 						gdp_recno_t recno);
 };
 
 // known implementations
-extern struct gob_phys_impl		GdpDiskImpl;
+extern struct gob_phys_impl		GdpSqliteImpl;
 
 
 __END_DECLS

@@ -77,7 +77,7 @@ size_t			_gdp_gclmd_serialize(
 
 // deserialize a network buffer to an internal data structure
 gdp_gclmd_t		*_gdp_gclmd_deserialize(
-					uint8_t *smd,				// serialized metadata
+					const uint8_t *smd,			// serialized metadata
 					size_t smd_len);			// length of smd
 
 // bulk load data into a metadata structure using existing names & lengths

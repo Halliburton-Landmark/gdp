@@ -116,7 +116,7 @@ bad_gin(const gdp_gin_t *gin, const char *where, const char *xtra)
 	if (gin == NULL)
 		estat = GDP_STAT_NULL_GCL;
 	else
-		estat = GDP_STAT_GCL_NOT_OPEN;
+		estat = GDP_STAT_LOG_NOT_OPEN;
 	prstat(estat, gin, where);
 	return estat;
 }

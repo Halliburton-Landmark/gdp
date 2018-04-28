@@ -89,6 +89,7 @@ LIBEVENT2=	-levent -levent_pthreads -pthread
 LIBCRYPTO=	-lcrypto
 LIBPROTO_C=	-lprotobuf-c
 LIBAVAHI=	-lavahi-client -lavahi-common
+LIBSQLITE=	-lsqlite3
 LIBADD=		`sh ../adm/add-libs.sh gdplogd`
 INCS=		${INCSEARCH} ${INCGDP} ${INCEP}
 LDFLAGS+=	${LIBSEARCH}
@@ -98,6 +99,7 @@ LDLIBS=		${LIBGDP} \
 		${LIBCRYPTO} \
 		${LIBPROTO_C} \
 		${LIBAVAHI} \
+		${LIBSQLITE} \
 		${LIBADD}
 CC=		cc
 PG=
@@ -113,7 +115,7 @@ OBJS=	\
 		logd.o \
 		logd_admin.o \
 		logd_adv.o \
-		logd_disklog.o \
+		logd_sqlite.o \
 		logd_gcl.o \
 		logd_proto.o \
 		logd_pubsub.o \
@@ -122,7 +124,7 @@ OBJS=	\
 HDEPS=	\
 		logd.h \
 		logd_admin.h \
-		logd_disklog.h \
+		logd_sqlite.h \
 		logd_pubsub.h \
 		${INCROOT}/gdp/gdp.h \
 		${INCROOT}/gdp/gdp_pdu.h \

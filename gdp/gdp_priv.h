@@ -114,6 +114,18 @@ LIST_HEAD(req_head, gdp_req);
 
 
 /*
+**  Basic data types
+*/
+
+struct gdp_hash
+{
+	gdp_buf_t			*buf;
+};
+
+#define gdp_sig_t		gdp_buf_t	//FIXME
+
+
+/*
 **	 Datums
 **		These are the underlying data unit that is passed through a GCL.
 **
@@ -132,6 +144,8 @@ struct gdp_datum
 	gdp_buf_t			*sig;			// signature (may be NULL)
 	uint16_t			sigmdalg;		// message digest algorithm
 	uint16_t			siglen;			// signature length;
+	gdp_hash_t			*hash;			// hash of this record		//FIXME
+	gdp_hash_t			*prevhash;		// hash of previous record
 };
 
 #define GDP_DATUM_ISGOOD(datum)											\
@@ -404,7 +418,7 @@ EP_STAT			_gdp_gob_fwd_append(		// forward APPEND (replication)
 				if (!EP_ASSERT((gin) != NULL))							\
 						return GDP_STAT_NULL_GCL;						\
 				if (!EP_ASSERT(EP_UT_BITSET(GCLF_INUSE, (gin)->flags)))	\
-						return GDP_STAT_GCL_NOT_OPEN;					\
+						return GDP_STAT_LOG_NOT_OPEN;					\
 			} while (false)
 #define GDP_GIN_CHECK_RETURN_NULL(gin)									\
 			do															\

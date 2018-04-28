@@ -61,7 +61,7 @@ gob_alloc(gdp_name_t gob_name, gdp_iomode_t iomode, gdp_gob_t **pgob)
 	gob->x->gob = gob;
 
 	//XXX for now, assume all GOBs are on disk
-	gob->x->physimpl = &GdpDiskImpl;
+	gob->x->physimpl = &GdpSqliteImpl;
 
 	// make sure that if this is freed it gets removed from GclsByUse
 	gob->freefunc = gob_close;
@@ -144,7 +144,7 @@ do_physical_open(gdp_gob_t *gob, void *open_info_)
 	gob->x->gob = gob;
 
 	//XXX for now, assume all GOBs are on disk
-	gob->x->physimpl = &GdpDiskImpl;
+	gob->x->physimpl = &GdpSqliteImpl;
 
 	// make sure that if this is freed it gets removed from GclsByUse
 	gob->freefunc = gob_close;

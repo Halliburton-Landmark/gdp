@@ -59,7 +59,7 @@ EP_STAT
 _gdp_gob_newname(gdp_gob_t *gob)
 {
 	if (!GDP_GOB_ISGOOD(gob))
-		return GDP_STAT_GCL_NOT_OPEN;
+		return GDP_STAT_LOG_NOT_OPEN;
 	_gdp_newname(gob->name, gob->gclmd);
 	gdp_printable_name(gob->name, gob->pname);
 	return EP_STAT_OK;
@@ -485,7 +485,7 @@ append_common(gdp_gob_t *gob,
 	errno = 0;				// avoid spurious messages
 
 	if (!GDP_GOB_ISGOOD(gob))
-		return GDP_STAT_GCL_NOT_OPEN;
+		return GDP_STAT_LOG_NOT_OPEN;
 	if (!GDP_DATUM_ISGOOD(datum))
 		return GDP_STAT_DATUM_REQUIRED;
 	EP_ASSERT_POINTER_VALID(datum);
@@ -678,7 +678,7 @@ _gdp_gob_read_by_recno(gdp_gob_t *gob,
 
 	// sanity checks
 	if (!GDP_GOB_ISGOOD(gob))
-		return GDP_STAT_GCL_NOT_OPEN;
+		return GDP_STAT_LOG_NOT_OPEN;
 	if (!GDP_DATUM_ISGOOD(datum))
 		return GDP_STAT_DATUM_REQUIRED;
 	EP_ASSERT_ELSE(datum->inuse, return EP_STAT_ASSERT_ABORT);
@@ -749,7 +749,7 @@ _gdp_gob_read_by_recno_async(
 
 	// sanity checks
 	if (!GDP_GOB_ISGOOD(gob))
-		return GDP_STAT_GCL_NOT_OPEN;
+		return GDP_STAT_LOG_NOT_OPEN;
 
 	// create a new READ request (don't need a special command)
 	estat = _gdp_req_new(GDP_CMD_READ_BY_RECNO, gob, chan,
@@ -798,7 +798,7 @@ _gdp_gob_getmetadata(gdp_gob_t *gob,
 	gdp_msg_t *msg;
 
 	if (!GDP_GOB_ISGOOD(gob))
-		return GDP_STAT_GCL_NOT_OPEN;
+		return GDP_STAT_LOG_NOT_OPEN;
 
 	errno = 0;				// avoid spurious messages
 	estat = _gdp_req_new(GDP_CMD_GETMETADATA, gob, chan, NULL, reqflags, &req);
@@ -851,7 +851,7 @@ _gdp_gob_newsegment(gdp_gob_t *gob,
 	gdp_req_t *req;
 
 	if (!GDP_GOB_ISGOOD(gob))
-		return GDP_STAT_GCL_NOT_OPEN;
+		return GDP_STAT_LOG_NOT_OPEN;
 	estat = _gdp_req_new(GDP_CMD_NEWSEGMENT, gob, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
@@ -898,7 +898,7 @@ _gdp_gob_fwd_append(
 
 	// sanity checks
 	if (!GDP_GOB_ISGOOD(gob))
-		return GDP_STAT_GCL_NOT_OPEN;
+		return GDP_STAT_LOG_NOT_OPEN;
 	if (GDP_NAME_SAME(to_server, _GdpMyRoutingName))
 	{
 		// forwarding to ourselves: bad idea

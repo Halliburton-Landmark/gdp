@@ -85,7 +85,8 @@ typedef int64_t				gdp_recno_t;
 #define PRIgdp_recno		PRId64
 
 // a hash key
-typedef EP_CRYPTO_KEY		gdp_hash_t;
+typedef struct gdp_hash		gdp_hash_t;
+//typedef EP_CRYPTO_KEY		gdp_hash_t;		//XXX???
 
 /*
 **	I/O modes

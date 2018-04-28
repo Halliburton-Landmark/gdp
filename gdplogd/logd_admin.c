@@ -34,7 +34,7 @@
 */
 
 #include "logd_admin.h"
-#include "logd_disklog.h"
+#include "logd_sqlite.h"
 
 #include <gdp/gdp.h>
 #include <gdp/gdp_priv.h>
@@ -359,7 +359,7 @@ admin_probe_thread(void *ctx)
 		ep_dbg_cprintf(Dbg, 7, "admin_probe_thread: locked\n");
 		return;
 	}
-	GdpDiskImpl.foreach(post_one_log, ctx);
+	GdpSqliteImpl.foreach(post_one_log, ctx);
 	ep_thr_mutex_unlock(&AdminProbeMutex);
 }
 

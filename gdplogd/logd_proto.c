@@ -1348,6 +1348,7 @@ fail0:
 }
 
 
+#if 0
 EP_STAT
 cmd_newsegment(gdp_req_t *req)
 {
@@ -1381,6 +1382,7 @@ fail0:
 	return gdpd_nak_resp(req, GDP_NAK_S_INTERNAL,
 			"cmd_newsegment: cannot create new segment for", estat);
 }
+#endif
 
 
 /*
@@ -1463,7 +1465,7 @@ static struct cmdfuncs	CmdFuncs[] =
 //	{ GDP_CMD_SUBSCRIBE_BY_TS,		cmd_subscribe_by_ts		},
 //	{ GDP_CMD_SUBSCRIBE_BY_HASH,	cmd_subscribe_by_hash	},
 	{ GDP_CMD_GETMETADATA,			cmd_getmetadata			},
-	{ GDP_CMD_NEWSEGMENT,			cmd_newsegment			},
+//	{ GDP_CMD_NEWSEGMENT,			cmd_newsegment			},
 //	{ GDP_CMD_FWD_APPEND,			cmd_fwd_append			},
 	{ GDP_CMD_UNSUBSCRIBE,			cmd_unsubscribe			},
 	{ GDP_CMD_DELETE,				cmd_delete				},

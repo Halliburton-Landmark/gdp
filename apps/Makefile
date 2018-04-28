@@ -37,13 +37,13 @@ BINALL=		gcl-create \
 
 SBINALL_ZC= 	gdp-zcpublish
 SBINALL=	\
-		log-view \
 		gdp-find-xname \
 		gdp-log-check \
 		gdp-name-xlate \
 		gdp-newsegment \
 		gdp-delete \
 		$(SBINALL_ZC) \
+#		log-view \
 #		gdp-rest \
 
 MAN1ALL=	gdp-reader.1 \
@@ -60,7 +60,7 @@ MAN7ALL=
 MAN8ALL=	gcl-clone.8 \
 		gcl-create.8 \
 		gdp-log-check.8 \
-		log-view.8 \
+#		log-view.8 \
 
 MANALL=		${MAN1ALL} ${MAN3ALL} ${MAN5ALL} ${MAN7ALL} ${MAN8ALL}
 

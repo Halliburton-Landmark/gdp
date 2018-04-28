@@ -68,6 +68,10 @@ extern bool	ep_time_before(
 				EP_TIME_SPEC *a,
 				EP_TIME_SPEC *b);
 
+// create a scalar number of nanoseconds from a time
+extern int64_t	ep_time_to_nsec(
+				EP_TIME_SPEC *tv);
+
 // create a time from a scalar number of nanoseconds
 extern void	ep_time_from_nsec(
 				int64_t delta,

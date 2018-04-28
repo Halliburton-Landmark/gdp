@@ -125,7 +125,7 @@ struct batch
 
 
 
-#define STAT_LOST_RESPONSE	EP_STAT_NEW(ERROR, EP_REGISTRY_USER, 0, 1)
+#define STAT_LOST_RESPONSE	EP_STAT_NEW(EP_STAT_SEV_ERROR, EP_REGISTRY_USER, 0, 1)
 
 static struct ep_stat_to_string	UserStats[] =
 {
