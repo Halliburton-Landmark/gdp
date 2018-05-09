@@ -188,6 +188,7 @@ typedef struct gdp_adcert		gdp_adcert_t;		// advertising cert
 // (router-to-client responses)
 #define GDP_PKT_TYPE_NAK_NOROUTE	0x80	// no route / name unknown
 // (internal (router-to-router only) responses)
+#define GDP_PKT_TYPE_SEQ_PACKET		0xa0	// sequence notification
 #define GDP_PKT_TYPE_NAK_PACKET		0xc0	// transmission nak
 #define GDP_PKT_TYPE_ACK_PACKET		0xe0	// transmission ack
 
