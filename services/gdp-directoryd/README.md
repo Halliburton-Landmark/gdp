@@ -52,19 +52,26 @@ Database changed
 MariaDB [blackbox]> GRANT ALL PRIVILEGES ON blackbox.* TO 'gdpr'@'127.0.0.1' IDENTIFIED BY 'testblackbox' WITH GRANT OPTION;
 Query OK, 0 rows affected (0.00 sec)
 
-MariaDB [blackbox]> CREATE TABLE gdpd ( dguid BINARY(32) NOT NULL, eguid BINARY(32) NOT NULL );
-Query OK, 0 rows affected (0.27 sec)
+MariaDB [blackbox]> CREATE TABLE gdpd ( dguid BINARY(32) NOT NULL, eguid BINARY(32) NOT NULL, ts TIMESTAMP );
+Query OK, 0 rows affected (0.20 sec)
 
 #
 # Sample dump of blackbox.gdpd table after adding one entry
 #
 
-MariaDB [blackbox]> select hex(dguid), hex(eguid) from blackbox.gdpd;
-+------------------------------------------------------------------+------------------------------------------------------------------+
-| hex(dguid)                                                       | hex(eguid)                                                       |
-+------------------------------------------------------------------+------------------------------------------------------------------+
-| DE7429240AA7B4140A4FA1A9105E5B5AE7D0827132F6906334DDDDEB9301A0EE | AF5195931CC107721ED3406C0341D3BDE8E799B8DD392D27A3D6F51CCFE3C69D |
-+------------------------------------------------------------------+------------------------------------------------------------------+
+MariaDB [blackbox]> select hex(dguid), hex(eguid), ts from blackbox.gdpd;
+Empty set (0.00 sec)
+
+MariaDB [blackbox]> select hex(dguid), hex(eguid), ts from blackbox.gdpd;
++------------------------------------------------------------------+------------------------------------------------------------------+---------------------+
+| hex(dguid)                                                       | hex(eguid)                                                       | ts                  |
++------------------------------------------------------------------+------------------------------------------------------------------+---------------------+
+| D65A93F45F8C7FA3AD37E88D565DAD3214151CA8F8491734ECA0662CA44A6C74 | DDC128C2064AC6335EF450C31E7B9A1794329CA53007469A67C1B801EBC96C2E | 2018-05-09 13:40:51 |
++------------------------------------------------------------------+------------------------------------------------------------------+---------------------+
 1 row in set (0.00 sec)
 
-MariaDB [blackbox]> 
+#
+# delete rows after test runs
+#
+MariaDB [blackbox]> delete from blackbox.gdpd;
+Query OK, 1 row affected (0.09 sec)

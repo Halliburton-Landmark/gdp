@@ -43,7 +43,7 @@
 			fprintf(stderr, fmt, ##__VA_ARGS__); \
 	} while (0)
 
-// #define TESTING
+//#define TESTING
 #ifndef TESTING
 
 // PRODUCTION SETTINGS
