@@ -52,14 +52,17 @@ char eguid_s[GDP_NAME_HEX_STRING];
 
 char query_replace_prefix[] = "replace into blackbox.gdpd values (x'";
 char query_replace_mid[] = "', x'";
-char query_replace_sep[] = "'), (x'";
-char query_replace_end[] = "');";
+char query_replace_sep[] = "', NULL), (x'";
+char query_replace_end[] = "', CURRENT_TIMESTAMP);";
 
 char query_delete_prefix[] =
-	"delete from blackbox.gdpd where (dguid,eguid) in ((x'";
+	"delete from blackbox.gdpd where (dguid,eguid,ts) in ((x'";
 char query_delete_mid[] = "', x'";
 char query_delete_sep[] = "'), (x'";
-char query_delete_end[] = "'));";
+char query_delete_end[] = "'), (NULL));";
+
+char query_expire[] = "delete from blackbox.gdpd "
+	"where (ts) < DATE_SUB(NOW(), INTERVAL 5 MINUTE);";
 
 char query_find_prefix[] =
 	"select eguid from blackbox.gdpd where dguid = x'";
@@ -81,6 +84,7 @@ void fail(MYSQL *con, char *s)
 
 int main(int argc, char **argv)
 {
+	struct timeval tv = { .tv_sec = 60, .tv_usec = 0 };
 	struct sockaddr_in si_loc;
 	struct sockaddr_in si_rem;
 	socklen_t si_rem_len = sizeof(si_rem);
@@ -102,8 +106,12 @@ int main(int argc, char **argv)
 	// blocking sockets are sufficient for this simple/temp directory service
 	// fcntl(fd_listen, F_SETFL, O_NONBLOCK);
 	fcntl(fd_listen, F_SETFD, FD_CLOEXEC);
-	setsockopt(fd_listen, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(int));
-
+	assert(0 <=
+		   setsockopt(fd_listen, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(int)));
+	// periodically remove inactive guids
+	assert(0 <=
+		   setsockopt(fd_listen, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)));
+	
 	si_loc.sin_family = AF_INET;
 	si_loc.sin_port = htons(PORT);
 	si_loc.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -124,10 +132,23 @@ int main(int argc, char **argv)
 		otw_dir_len = recvfrom(fd_listen, (uint8_t *) &otw_dir.ver,
 							   sizeof(otw_dir), 0,
 							   (struct sockaddr *)&si_rem, &si_rem_len);
+		if (otw_dir_len < 0 && errno == EAGAIN)
+		{
+			debug(INFO, "\nprocess expired rows");
+			if (mysql_query(mysql_con, query_expire))
+			{
+				fprintf(stderr, "Error: query %s\n", mysql_error(mysql_con));
+				fail(mysql_con, query_expire);
+			}
+			debug(INFO, " = %llu", mysql_affected_rows(mysql_con));
+			continue;
+		}
 
 		// handle timeouts along with obviously short packets
 		if (otw_dir_len < offsetof(otw_dir_t, oguid))
+		{
 			continue;
+		}
 
 		// currently, directory services are identical for v3 and v4 gdp
 		if (otw_dir.ver != GDP_CHAN_PROTO_VERSION_4 &&
@@ -378,11 +399,15 @@ int main(int argc, char **argv)
 		}
 
 		if (otw_dir_len < 0)
+		{
 			debug(ERR, "Error: id(0x%x) send len %d error %s\n",
 				  ntohs(otw_dir.id), otw_dir_len, strerror(errno));
+		}
 		else
+		{
 			debug(INFO, "id(0x%x) send len %d\n",
 				  ntohs(otw_dir.id), otw_dir_len);
+		}
 	}
 
 	// unreachable at the moment, but leave as a reminder to future expansion
