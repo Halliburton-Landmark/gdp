@@ -169,9 +169,10 @@ _gdp_msg_new(gdp_cmd_t cmd, gdp_rid_t rid, gdp_seqno_t seqno)
 		msg->ack_content = (GdpMessage__AckContent *)
 					ep_mem_zalloc(sizeof *msg->ack_content);
 		gdp_message__ack_content__init(msg->ack_content);
-		msg->ack_content->datum = (GdpDatum *)
-					ep_mem_zalloc(sizeof *msg->ack_content->datum);
-		gdp_datum__init(msg->ack_content->datum);
+		// individual datums need to be allocated and initialized when set
+//		msg->ack_content->datum = (GdpDatum *)
+//					ep_mem_zalloc(sizeof *msg->ack_content->datum);
+//		gdp_datum__init(msg->ack_content->datum);
 		break;
 
 	default:
@@ -211,7 +212,14 @@ print_pb_ts(const GdpTimestamp *ts, FILE *fp)
 	else if (ts->sec == EP_TIME_NOTIME)
 		fprintf(fp, "(notime)");
 	else
-		fprintf(fp, "%" PRIu64, ts->sec);
+	{
+		EP_TIME_SPEC tv;
+
+		tv.tv_sec = ts->sec;
+		tv.tv_nsec = ts->nsec;
+		tv.tv_accuracy = ts->accuracy;
+		ep_time_print(&tv, fp, EP_TIME_FMT_HUMAN | EP_TIME_FMT_SIGFIG6);
+	}
 }
 
 
@@ -222,6 +230,16 @@ print_pb_datum(const GdpDatum *d, FILE *fp, int indent)
 	fprintf(fp, "%srecno %" PRIgdp_recno ", ts ",
 			_gdp_pr_indent(indent), d->recno);
 	print_pb_ts(d->ts, fp);
+	if (d->has_prevhash)
+	{
+		fprintf(fp, "\n%sprevhash[%zd]=",
+				_gdp_pr_indent(indent), d->prevhash.len);
+		ep_hexdump(d->prevhash.data, d->prevhash.len, fp, EP_HEXDUMP_TERSE, 0);
+	}
+	else
+	{
+		fprintf(fp, "\n%shash=(none)", _gdp_pr_indent(indent));
+	}
 	fprintf(fp, " data[%zd]=\n", d->data.len);
 	ep_hexdump(d->data.data, d->data.len, fp, EP_HEXDUMP_ASCII, 0);
 }
@@ -260,24 +278,20 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 	fprintf(fp, "\n%sbody=", _gdp_pr_indent(indent));
 	switch (msg->body_case)
 	{
+		int dno;
+
 	case GDP_MESSAGE__BODY__NOT_SET:
 		fprintf(fp, "(not set)\n");
 		break;
 
 	case GDP_MESSAGE__BODY_CMD_CREATE:
-		fprintf(fp, "cmd_create:\n%slogname=%s\n%smetadata=",
+		fprintf(fp, "cmd_create:\n%slogname=%s\n%smetadata=\n",
 				_gdp_pr_indent(indent),
 				gdp_printable_name(msg->cmd_create->logname.data, pname),
 				_gdp_pr_indent(indent + 1));
-		if (!msg->cmd_create->has_metadata)
-			fprintf(fp, "(none)\n");
-		else
-		{
-			fprintf(fp, "\n");
-			ep_hexdump(msg->cmd_create->metadata.data,
-						msg->cmd_create->metadata.len,
-						fp, EP_HEXDUMP_ASCII, 0);
-		}
+		ep_hexdump(msg->cmd_create->metadata->data.data,
+					msg->cmd_create->metadata->data.len,
+					fp, EP_HEXDUMP_ASCII, 0);
 		break;
 
 	case GDP_MESSAGE__BODY_CMD_OPEN:
@@ -290,7 +304,11 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 
 	case GDP_MESSAGE__BODY_CMD_APPEND:
 		fprintf(fp, "cmd_append: ");
-		print_pb_datum(msg->cmd_append->datum, fp, indent + 1);
+		for (dno = 0; dno < msg->cmd_append->n_datums; dno++)
+		{
+			fprintf(fp, "[%d] ", dno);
+			print_pb_datum(msg->cmd_append->datums[dno], fp, indent + 1);
+		}
 		break;
 
 	case GDP_MESSAGE__BODY_CMD_READ_BY_RECNO:
@@ -336,10 +354,6 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 		fprintf(fp, "cmd_get_metadata: (no payload)\n");
 		break;
 
-	case GDP_MESSAGE__BODY_CMD_NEW_SEGMENT:
-		fprintf(fp, "cmd_new_segment: (no payload)\n");
-		break;
-
 	case GDP_MESSAGE__BODY_CMD_DELETE:
 		fprintf(fp, "cmd_delete: (no payload)\n");
 		break;
@@ -374,7 +388,11 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 
 	case GDP_MESSAGE__BODY_ACK_CONTENT:
 		fprintf(fp, "ack_content: ");
-		print_pb_datum(msg->ack_content->datum, fp, indent + 1);
+		for (dno = 0; dno < msg->ack_content->n_datums; dno++)
+		{
+			fprintf(fp, "[%d] ", dno);
+			print_pb_datum(msg->ack_content->datums[dno], fp, indent + 1);
+		}
 		break;
 
 	case GDP_MESSAGE__BODY_NAK:
@@ -425,15 +443,6 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 					msg->sig->sig_type,
 					msg->sig->sig.len,
 					msg->sig->sig.data);
-	if (msg->has_hash)
-	{
-		fprintf(fp, "%shash[%zd]=", _gdp_pr_indent(indent), msg->hash.len);
-		ep_hexdump(msg->hash.data, msg->hash.len, fp, EP_HEXDUMP_TERSE, 0);
-	}
-	else
-	{
-		fprintf(fp, "%shash=(none)\n", _gdp_pr_indent(indent));
-	}
 done:
 	funlockfile(fp);
 }

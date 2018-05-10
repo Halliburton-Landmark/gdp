@@ -389,16 +389,31 @@ ack_data_content(gdp_req_t *req)
 	EP_ASSERT_ELSE(req->rpdu->msg->body_case ==
 						GDP_MESSAGE__BODY_ACK_CONTENT,
 				return EP_STAT_ASSERT_ABORT);
+	GdpMessage__AckContent *payload = req->rpdu->msg->ack_content;
+
+	// if we returned zero content, handle specially
+	if (payload->n_datums != 1)
+	{
+		if (ep_dbg_test(Dbg, 1))
+		{
+			ep_dbg_printf("ack_data_content: %s datums in ",
+					payload->n_datums <= 0 ? "no" : "multiple");
+			_gdp_req_dump(req, NULL, GDP_PR_BASIC, 0);
+		}
+		if (payload->n_datums < 1)
+			return GDP_STAT_RECORD_MISSING;		//XXX better choice?
+		//XXX should we return an error here?
+	}
+	GdpDatum *datum = payload->datums[payload->n_datums - 1];
 
 	// hack to try to "self heal" in case we get out of sync
-	GdpMessage__AckContent *payload = req->rpdu->msg->ack_content;
-	if (payload->datum->recno > 0 &&
-			((gdp_recno_t) req->gob->nrecs) < payload->datum->recno)
-		req->gob->nrecs = payload->datum->recno;
+	if (datum->recno > 0 &&
+			((gdp_recno_t) req->gob->nrecs) < datum->recno)
+		req->gob->nrecs = datum->recno;
 
 	// keep track of how many more records we expect
 	if (req->numrecs > 0)
-		req->numrecs--;
+		req->numrecs--;			//XXX payload->n_datums?
 
 #if 0 //TODO: IMPLEMENT ME
 	// do read filtering if requested

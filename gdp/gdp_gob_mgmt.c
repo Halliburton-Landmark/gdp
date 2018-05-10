@@ -114,9 +114,20 @@ _gdp_gob_new(gdp_name_t gob_name, gdp_gob_t **pgob)
 	gob->nrecs = 0;
 	NGobsAllocated++;
 
+	// determine the digest algorithm for hashes and signatures
+	{
+		const char *mdalg = ep_adm_getstrparam("swarm.gdp.gob.mdalg", "sha256");
+		gob->mdalg = ep_crypto_md_alg_byname(mdalg);
+		if (gob->mdalg < 0)
+		{
+			ep_dbg_cprintf(Dbg, 1, "_gdp_gob_new: unknown mdalg %s\n", mdalg);
+			gob->mdalg = EP_CRYPTO_MD_SHA256;
+		}
+	}
+
 	// create a name if we don't have one passed in
 	if (gob_name == NULL || !gdp_name_is_valid(gob_name))
-		_gdp_newname(gob->name, gob->gclmd);	//XXX bogus: gob->gclmd isn't set yet
+		_gdp_newname(gob->name, gob->gclmd);	//FIXME: gob->gclmd isn't set yet
 	else
 		memcpy(gob->name, gob_name, sizeof gob->name);
 	gdp_printable_name(gob->name, gob->pname);
@@ -402,25 +413,26 @@ _gdp_mutex_check_isunlocked(
 
 #undef _gdp_gob_incref
 
-void
+gdp_gob_t *
 _gdp_gob_incref(gdp_gob_t *gob)
 {
-	_gdp_gob_incref_trace(gob, __FILE__, __LINE__, "gob");
+	return _gdp_gob_incref_trace(gob, __FILE__, __LINE__, "gob");
 }
 
-void
+gdp_gob_t *
 _gdp_gob_incref_trace(
 		gdp_gob_t *gob,
 		const char *file,
 		int line,
 		const char *id)
 {
-	EP_ASSERT_ELSE(GDP_GOB_ISGOOD(gob), return);
+	EP_ASSERT_ELSE(GDP_GOB_ISGOOD(gob), return gob);
 	GDP_GOB_ASSERT_ISLOCKED(gob);
 
 	gob->refcnt++;
 	ep_dbg_cprintf(Dbg, 51, "_gdp_gob_incref(%p): %d [%s %s:%d]\n",
 				gob, gob->refcnt, id, file, line);
+	return gob;
 }
 
 

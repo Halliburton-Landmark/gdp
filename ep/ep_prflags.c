@@ -29,6 +29,7 @@
 ***********************************************************************/
 
 #include <ep.h>
+#include <ep_dbg.h>
 #include <ep_prflags.h>
 #include <stdio.h>
 
@@ -53,6 +54,8 @@ ep_prflags(
 {
 	bool firsttime = true;
 
+	if (out == NULL)
+		out = ep_dbg_getfile();
 	if (flagword == 0)
 	{
 		fprintf(out, "0");

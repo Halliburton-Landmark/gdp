@@ -354,7 +354,7 @@ main(int argc, char **argv)
 
 	{
 		// we need a place to buffer the input
-		gdp_datum_t *datum = gdp_datum_new();
+		gdp_datum_t *datum = gdp_datum_new(gcl);
 
 		if (one_record)
 		{

@@ -446,10 +446,12 @@ _gdp_event_add_from_req(gdp_req_t *req)
 	gev->stat = req->stat;
 	gev->udata = req->sub_cbarg;
 	gev->cb = req->sub_cbfunc;
-	gev->datum = gdp_datum_new();
+	gev->datum = gdp_datum_new(NULL);
+	gev->datum->gob = _gdp_gob_incref(req->gob);
 	if (msg->cmd == GDP_ACK_CONTENT)
 	{
-		_gdp_datum_from_pb(gev->datum, msg, msg->ack_content->datum);
+		EP_ASSERT(msg->ack_content->n_datums == 1);		//FIXME
+		_gdp_datum_from_pb(gev->datum, msg, msg->ack_content->datums[0]);
 	}
 
 	// schedule the event for delivery

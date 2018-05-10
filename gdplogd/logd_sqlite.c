@@ -73,14 +73,23 @@ static uint32_t		DefaultLogFlags;	// as indicated
 
 #define FLAG_TMPFILE		0x00000001	// this is a temporary file
 
+
+/*
+**  The database schema for logs.
+**
+**		FIXME: This discards the "accuracy" field of the timestamp.
+**		FIXME: Changing this would require breaking this into two
+**				columns: ts_nsec INTEGER12 and ts_accuracy FLOAT4.
+*/
+
 static const char *LogSchema =
 				"CREATE TABLE log_entry (\n"
 				"	hash BLOB(32) PRIMARY KEY,\n"
 				"	recno INTEGER,\n"
 				"	timestamp INTEGER,\n"	// 64 bit, nanoseconds since 1/1/70
 				"	prevhash BLOB(32),\n"
-				"	sig BLOB,\n"
-				"	value BLOB);\n"
+				"	value BLOB,\n"
+				"	sig BLOB);\n"
 				"CREATE INDEX recno_index\n"
 				"	ON log_entry(recno);\n"
 				"CREATE INDEX timestamp_index\n"
@@ -91,6 +100,7 @@ static const char *LogSchema =
 **  FSIZEOF --- return the size of a file
 */
 
+#if 0		// currently unused
 static off_t
 fsizeof(FILE *fp)
 {
@@ -107,6 +117,7 @@ fsizeof(FILE *fp)
 
 	return st.st_size;
 }
+#endif
 
 
 /*
@@ -188,6 +199,13 @@ sqlite_error(int rc, const char *where, const char *phase)
 }
 
 
+static void
+sqlite_logger(void *unused, int rc, const char *msg)
+{
+	ep_dbg_printf("SQLite error %d: %s\n", rc, msg);
+}
+
+
 /*
 **  Initialize the physical I/O module
 **
@@ -213,8 +231,12 @@ sqlite_init(void)
 	// find the file creation mode
 	GOBfilemode = ep_adm_getintparam("swarm.gdplogd.gob.mode", 0600);
 
-	if (ep_adm_getboolparam("swarm.gdplogd.disklog.log-posix-errors", false))
+	if (ep_adm_getboolparam("swarm.gdplogd.sqlite.log-posix-errors", false))
 		DefaultLogFlags |= LOG_POSIX_ERRORS;
+
+	// arrange to log SQLite errors
+	if (ep_adm_getboolparam("swarm.gdplogd.sqlite.log-sqlite-errors", true))
+		sqlite3_config(SQLITE_CONFIG_LOG, sqlite_logger, NULL);
 
 	sqlite3_config(SQLITE_CONFIG_SERIALIZED);	// fully threadable
 	sqlite3_initialize();
@@ -234,9 +256,9 @@ sqlite_init(void)
 static int
 sql_bind_hash(sqlite3_stmt *stmt, int index, gdp_hash_t *hash)
 {
-	size_t hashlen = gdp_buf_getlength(hash->buf);
-	int rc = sqlite3_bind_blob(stmt, index, gdp_buf_getptr(hash->buf, hashlen),
-						hashlen, BLOB_DESTRUCTOR);
+	size_t hashlen;
+	void *hashptr = gdp_hash_getptr(hash, &hashlen);
+	int rc = sqlite3_bind_blob(stmt, index, hashptr, hashlen, BLOB_DESTRUCTOR);
 	return rc;
 }
 
@@ -260,9 +282,10 @@ static int
 sql_bind_signature(sqlite3_stmt *stmt, int index, gdp_datum_t *datum)
 {
 	//FIXME: need sigmdalg and siglen fields
-	size_t siglen = gdp_buf_getlength(datum->sig);
-	int rc = sqlite3_bind_blob(stmt, index, gdp_buf_getptr(datum->sig, siglen),
-						siglen, BLOB_DESTRUCTOR);
+	size_t siglen;
+	void *sigptr = gdp_sig_getptr(datum->sig, &siglen);
+
+	int rc = sqlite3_bind_blob(stmt, index, sigptr, siglen, BLOB_DESTRUCTOR);
 	return rc;
 }
 
@@ -472,20 +495,19 @@ sqlite_create(gdp_gob_t *gob, gdp_gclmd_t *gmd)
 	CHECK_RC(rc, goto fail1);
 
 	// tweak database header using PRAGMAs
-	phase = "sqlite pragmas";
+	phase = "pragma prepare";
 	{
-		//FIXME
 		// https://www.sqlite.org/pragma.html
+		char qbuf[200];
+
+		snprintf(qbuf, sizeof qbuf,
+				"PRAGMA application_id = %d;\n"
+				"PRAGMA user_version = %d;\n",
+				GLOG_MAGIC, GLOG_VERSION);
 		sqlite3_stmt *stmt;
-		rc = sqlite3_prepare_v2(phys->db,
-					"PRAGMA schema.application_id = ?;\n"
-					"PRAGMA schema.user_version = ?;\n",
-					-1, &stmt, NULL);
+		rc = sqlite3_prepare_v2(phys->db, qbuf, -1, &stmt, NULL);
 		CHECK_RC(rc, goto fail1);
-		rc = sqlite3_bind_int(stmt, 1, GLOG_MAGIC);
-		CHECK_RC(rc, goto fail1);
-		rc = sqlite3_bind_int(stmt, 2, GLOG_VERSION);
-		CHECK_RC(rc, goto fail1);
+		phase = "pragma step";
 		while ((rc = sqlite3_step(stmt)) != SQLITE_DONE)
 		{
 			ep_dbg_cprintf(Dbg, 7, "create(%s), pragma setting => %s\n",
@@ -494,9 +516,6 @@ sqlite_create(gdp_gob_t *gob, gdp_gclmd_t *gmd)
 		sqlite3_finalize(stmt);
 		phys->ver = GLOG_VERSION;
 	}
-
-	//XXX should probably use Write Ahead Logging
-	// http://www.sqlite.org/wal.html
 
 	phase = "create schema";
 	{
@@ -507,27 +526,35 @@ sqlite_create(gdp_gob_t *gob, gdp_gclmd_t *gmd)
 		CHECK_RC(rc, goto fail1);
 	}
 
+	//XXX should probably use Write Ahead Logging
+	// http://www.sqlite.org/wal.html
+
 	// write metadata to log
-	phase = "metadata write";
 	uint8_t *obuf;
 	size_t mdsize = _gdp_gclmd_serialize(gmd, &obuf);
 	if (obuf != NULL)
 	{
 		sqlite3_stmt *stmt;
+		//FIXME: need values for hash, prevhash
+
+		phase = "metadata prepare";
 		rc = sqlite3_prepare_v2(phys->db,
 					"INSERT INTO log_entry"
-					"	(hash, recno, timestamp, prevhash, obuf)"
-					"	VALUES (?, 0, XXX, ?, ?);",
+					"	(hash, recno, value)"
+					"	VALUES (?, 0, ?);",
 					-1, &stmt, NULL);
 		CHECK_RC(rc, goto fail3);
-//FIXME:		rc = sqlite3_bind_blob(stmt, 1, HASH, sizeof HASH, BLOB_DESTRUCTOR);
+		phase = "metadata bind 1";
+		rc = sqlite3_bind_blob(stmt, 1, gob->name, sizeof gob->name,
+							SQLITE_STATIC);
 		CHECK_RC(rc, goto fail3);
-//FIXME:		rc = sqlite3_bind_blob(stmt, 1, TS, sizeof TS, BLOB_DESTRUCTOR);
+		phase = "metadata bind 2";
+		//rc = sqlite3_bind_blob(stmt, 2, TS, sizeof TS, BLOB_DESTRUCTOR);
+		//CHECK_RC(rc, goto fail3);
+		phase = "metadata bind 3";
+		rc = sqlite3_bind_blob(stmt, 2, obuf, mdsize, ep_mem_free);
 		CHECK_RC(rc, goto fail3);
-//FIXME:		rc = sqlite3_bind_blob(stmt, 1, PHASH, sizeof PHASH, BLOB_DESTRUCTOR);
-		CHECK_RC(rc, goto fail3);
-		rc = sqlite3_bind_blob(stmt, 1, obuf, mdsize, ep_mem_free);
-		CHECK_RC(rc, goto fail3);
+		phase = "metadata step";
 		rc = sqlite3_step(stmt);
 		if (rc != SQLITE_DONE)
 		{
@@ -612,6 +639,11 @@ sqlite_open(gdp_gob_t *gob)
 
 	phase = "sqlite3_open_v2";
 	rc = sqlite3_open_v2(db_path, &phys->db, SQLITE_OPEN_READWRITE, NULL);
+	if (rc != SQLITE_OK)
+		goto fail1;
+
+	phase = "sqlite3_extended_result_codes";
+	rc = sqlite3_extended_result_codes(phys->db, 1);
 	if (rc != SQLITE_OK)
 		goto fail1;
 
@@ -828,29 +860,40 @@ read_blob(sqlite3_stmt *stmt, int index, gdp_buf_t **blobp)
 		gdp_buf_write(*blobp, blob, bloblen);
 }
 
+//FIXME: this should deal with hash length and type
 static void
 read_hash(sqlite3_stmt *stmt, int index, gdp_hash_t **hashp)
 {
-	//FIXME: this should deal with hash length and type
+	int mdalg = EP_CRYPTO_MD_NULL;		//FIXME
 	if (*hashp == NULL)
-		*hashp = ep_mem_zalloc(sizeof **hashp);
-	read_blob(stmt, index, &(*hashp)->buf);
+		*hashp = gdp_hash_new(mdalg);
+	else
+		gdp_hash_reset(*hashp);
+	gdp_buf_t *buf = _gdp_hash_getbuf(*hashp);
+	read_blob(stmt, index, &buf);
 }
 
+//FIXME: this should deal with signature length and type
 static void
 read_signature(sqlite3_stmt *stmt, int index, gdp_sig_t **sigp)
 {
-	//FIXME: this should deal with signature length and type
-	read_blob(stmt, index, sigp);
+	int mdalg = EP_CRYPTO_MD_NULL;		//FIXME
+	if (*sigp == NULL)
+		*sigp = gdp_sig_new(mdalg);
+	else
+		gdp_sig_reset(*sigp);
+	gdp_buf_t *buf = _gdp_sig_getbuf(*sigp);
+	read_blob(stmt, index, &buf);
 }
 
 static void
 process_row(sqlite3_stmt *stmt, gdp_datum_t *datum)
 {
 	// hash value of this record
-	{
-		read_hash(stmt, 0, &datum->hash);
-	}
+	//XXX unneeded except to validate the data
+//	{
+//		read_hash(stmt, 0, &datum->hash);
+//	}
 
 	// record number
 	{
@@ -868,14 +911,14 @@ process_row(sqlite3_stmt *stmt, gdp_datum_t *datum)
 		read_hash(stmt, 3, &datum->prevhash);
 	}
 
-	// signature (if it exists)
-	{
-		read_signature(stmt, 4, &datum->sig);
-	}
-
 	// the actual value
 	{
-		read_blob(stmt, 5, &datum->dbuf);
+		read_blob(stmt, 4, &datum->dbuf);
+	}
+
+	// signature (if it exists)
+	{
+		read_signature(stmt, 5, &datum->sig);
 	}
 }
 
@@ -909,7 +952,7 @@ sqlite_read_by_hash(gdp_gob_t *gob,
 	EP_ASSERT_POINTER_VALID(gob);
 	gdp_buf_reset(datum->dbuf);
 	if (datum->sig != NULL)
-		gdp_buf_reset(datum->sig);
+		gdp_sig_reset(datum->sig);
 
 	ep_dbg_cprintf(Dbg, 44, "sqlite_read_by_hash(%s %" PRIgdp_recno "): ",
 			gob->pname, datum->recno);
@@ -920,7 +963,7 @@ sqlite_read_by_hash(gdp_gob_t *gob,
 	{
 		phase = "prepare";
 		rc = sqlite3_prepare_v2(phys->db,
-						"SELECT hash, recno, timestamp, prevhash, sig, value"
+						"SELECT hash, recno, timestamp, prevhash, value, sig"
 						"	FROM log_entry"
 						"	WHERE recno = ?;",
 						-1, &phys->read_by_hash_stmt, NULL);
@@ -967,7 +1010,7 @@ sqlite_read_by_recno(gdp_gob_t *gob,
 	EP_ASSERT_POINTER_VALID(gob);
 	gdp_buf_reset(datum->dbuf);
 	if (datum->sig != NULL)
-		gdp_buf_reset(datum->sig);
+		gdp_sig_reset(datum->sig);
 
 	ep_dbg_cprintf(Dbg, 44, "sqlite_read_by_recno(%s %" PRIgdp_recno "): ",
 			gob->pname, datum->recno);
@@ -978,7 +1021,7 @@ sqlite_read_by_recno(gdp_gob_t *gob,
 	{
 		phase = "prepare";
 		rc = sqlite3_prepare_v2(phys->db,
-						"SELECT hash, recno, timestamp, prevhash, sig, value"
+						"SELECT hash, recno, timestamp, prevhash, value, sig"
 						"	FROM log_entry"
 						"	WHERE recno = ?;",
 						-1, &phys->read_by_recno_stmt, NULL);
@@ -1025,7 +1068,7 @@ sqlite_read_by_timestamp(gdp_gob_t *gob,
 	EP_ASSERT_POINTER_VALID(gob);
 	gdp_buf_reset(datum->dbuf);
 	if (datum->sig != NULL)
-		gdp_buf_reset(datum->sig);
+		gdp_sig_reset(datum->sig);
 
 	if (ep_dbg_test(Dbg, 44))
 	{
@@ -1042,7 +1085,7 @@ sqlite_read_by_timestamp(gdp_gob_t *gob,
 	{
 		phase = "prepare";
 		rc = sqlite3_prepare_v2(phys->db,
-						"SELECT hash, recno, timestamp, prevhash, sig, value"
+						"SELECT hash, recno, timestamp, prevhash, value, sig"
 						"	FROM log_entry"
 						"	WHERE timestamp >= ?"
 						"	ORDER BY timestamp"
@@ -1077,6 +1120,7 @@ fail2:
 **  SQLITE_RECNO_EXISTS --- determine if a record number already exists
 */
 
+#if 0			// currently unused
 static int
 sqlite_recno_exists(gdp_gob_t *gob, gdp_recno_t recno)
 {
@@ -1115,6 +1159,7 @@ fail1:
 	ep_thr_rwlock_unlock(&phys->lock);
 	return rval;
 }
+#endif
 
 
 /*
@@ -1145,18 +1190,20 @@ sqlite_append(gdp_gob_t *gob,
 	ep_thr_rwlock_wrlock(&phys->lock);
 
 	//FIXME: bind datum values into SQL
+	gdp_hash_t *hash = NULL;
 	{
 		sqlite3_stmt *stmt;
 		phase = "append prepare";
 		rc = sqlite3_prepare_v2(phys->db,
 					"INSERT INTO log_records"
-					"	(hash, recno, timestamp, prevhash, sig, value)"
+					"	(hash, recno, timestamp, prevhash, value, sig)"
 					"	VALUES(?, ?, ?, ?, ?, ?);",
 					-1, &stmt, NULL);
 		CHECK_RC(rc, goto fail3);
 
 		phase = "append bind 1";
-		rc = sql_bind_hash(stmt, 1, datum->hash);
+		hash = gdp_datum_hash(datum);
+		rc = sql_bind_hash(stmt, 1, hash);
 		CHECK_RC(rc, goto fail3);
 
 		phase = "append bind 2";
@@ -1172,11 +1219,11 @@ sqlite_append(gdp_gob_t *gob,
 		CHECK_RC(rc, goto fail3);
 
 		phase = "append bind 5";
-		rc = sql_bind_signature(stmt, 5, datum);
+		rc = sql_bind_buf(stmt, 6, datum->dbuf);
 		CHECK_RC(rc, goto fail3);
 
 		phase = "append bind 6";
-		rc = sql_bind_buf(stmt, 6, datum->dbuf);
+		rc = sql_bind_signature(stmt, 5, datum);
 		CHECK_RC(rc, goto fail3);
 
 		phase = "append step";
@@ -1185,6 +1232,8 @@ sqlite_append(gdp_gob_t *gob,
 		{
 fail3:
 			estat = sqlite_error(rc, "sqlite_append", phase);
+			if (hash != NULL)
+				gdp_hash_free(hash);
 		}
 		sqlite3_finalize(stmt);
 	}

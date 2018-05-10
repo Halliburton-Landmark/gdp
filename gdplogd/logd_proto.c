@@ -308,7 +308,8 @@ cmd_create(gdp_req_t *req)
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// collect metadata, if any
-	gmd = _gdp_gclmd_deserialize(payload->metadata.data, payload->metadata.len);
+	gmd = _gdp_gclmd_deserialize(payload->metadata->data.data,
+							payload->metadata->data.len);
 
 	// have to get lock ordering right here.
 	// safe because no one else can have a handle on this req.
@@ -545,7 +546,7 @@ static EP_STAT
 cmd_read_helper(gdp_req_t *req)
 {
 	EP_STAT estat;
-	gdp_datum_t *datum = gdp_datum_new();
+	gdp_datum_t *datum = _gdp_datum_new_gob(req->gob);
 
 	datum->recno = req->nextrec;
 	CMD_TRACE(req->cpdu->msg->cmd, "%s %" PRIgdp_recno,
@@ -556,7 +557,8 @@ cmd_read_helper(gdp_req_t *req)
 	{
 		gdpd_ack_resp(req, GDP_ACK_CONTENT);
 		GdpMessage__AckContent *resp = req->rpdu->msg->ack_content;
-		_gdp_datum_to_pb(datum, req->cpdu->msg, resp->datum);
+		GdpDatum *pbd = resp->datums[0];	//FIXME
+		_gdp_datum_to_pb(datum, req->cpdu->msg, pbd);
 	}
 	else
 	{
@@ -709,12 +711,13 @@ cmd_append(gdp_req_t *req)
 
 	GdpMessage__CmdAppend *payload;
 	GET_PAYLOAD(req, cmd_append, CMD_APPEND);
+	GdpDatum *pbd = payload->datums[0];		//FIXME
 
 	CMD_TRACE(req->cpdu->msg->cmd, "%s %" PRIgdp_recno,
-			req->gob->pname, payload->datum->recno);
+			req->gob->pname, pbd->recno);
 
 	// validate record number
-	if (payload->datum->recno <= 0)
+	if (pbd->recno <= 0)
 	{
 		estat = gdpd_nak_resp(req, GDP_NAK_C_BADOPT,
 						"cmd_append: recno must be > 0",
@@ -722,7 +725,7 @@ cmd_append(gdp_req_t *req)
 		goto fail0;
 	}
 
-	if (payload->datum->recno != (gdp_recno_t) (req->gob->nrecs + 1))
+	if (pbd->recno != (gdp_recno_t) (req->gob->nrecs + 1))
 	{
 		bool random_order_ok = EP_UT_BITSET(FORGIVE_LOG_GAPS, GdplogdForgive) &&
 							EP_UT_BITSET(FORGIVE_LOG_DUPS, GdplogdForgive);
@@ -732,35 +735,35 @@ cmd_append(gdp_req_t *req)
 						"cmd_append: record out of sequence: got %"
 						PRIgdp_recno ", expected %" PRIgdp_recno "\n"
 						"\ton log %s\n",
-						payload->datum->recno, req->gob->nrecs + 1,
+						pbd->recno, req->gob->nrecs + 1,
 						req->gob->pname);
 
-		if (payload->datum->recno <= (gdp_recno_t) req->gob->nrecs)
+		if (pbd->recno <= (gdp_recno_t) req->gob->nrecs)
 		{
 			// may be a duplicate append, or just filling in a gap
 			// (should probably see if duplicates are the same data)
 
 			if (!EP_UT_BITSET(FORGIVE_LOG_DUPS, GdplogdForgive) &&
 				req->gob->x->physimpl->recno_exists(
-									req->gob, payload->datum->recno))
+									req->gob, pbd->recno))
 			{
 				char mbuf[100];
 				snprintf(mbuf, sizeof mbuf,
 						"cmd_append: duplicate record number %" PRIgdp_recno,
-						payload->datum->recno);
+						pbd->recno);
 				estat = gdpd_nak_resp(req, GDP_NAK_C_CONFLICT,
 						mbuf, GDP_STAT_RECORD_DUPLICATED);
 				goto fail0;
 			}
 		}
-		else if (payload->datum->recno > (gdp_recno_t) (req->gob->nrecs + 1) &&
+		else if (pbd->recno > (gdp_recno_t) (req->gob->nrecs + 1) &&
 				!EP_UT_BITSET(FORGIVE_LOG_GAPS, GdplogdForgive))
 		{
 			// gap in record numbers
 			char mbuf[100];
 			snprintf(mbuf, sizeof mbuf,
 					"cmd_append: record number %" PRIgdp_recno " missing",
-					payload->datum->recno);
+					pbd->recno);
 			estat = gdpd_nak_resp(req, GDP_NAK_C_FORBIDDEN,
 					mbuf, GDP_STAT_RECNO_SEQ_ERROR);
 			goto fail0;
@@ -776,6 +779,9 @@ cmd_append(gdp_req_t *req)
 	}
 
 	// check the signature in the PDU
+	gdp_datum_t *datum = _gdp_datum_new_gob(req->gob);
+	_gdp_datum_from_pb(datum, req->cpdu->msg, pbd);
+
 	if (req->gob->digest == NULL)
 	{
 		// error (maybe): no public key
@@ -799,17 +805,10 @@ cmd_append(gdp_req_t *req)
 	else
 	{
 		// check the signature
-		uint8_t recnobuf[8];		// 64 bits
-		uint8_t *pbp = recnobuf;
 		size_t len;
 		EP_CRYPTO_MD *md = ep_crypto_md_clone(req->gob->digest);
 
-		recnobuf[0] = req->cpdu->msg->cmd;
-		ep_crypto_vrfy_update(md, &recnobuf[0], 1);
-		PUT64(payload->datum->recno);
-		ep_crypto_vrfy_update(md, &recnobuf, sizeof recnobuf);
-		len = payload->datum->data.len;
-		ep_crypto_vrfy_update(md, payload->datum->data.data, len);
+		_gdp_datum_digest(datum, md);	//FIXME
 		len = req->cpdu->msg->sig->sig.len;
 		estat = ep_crypto_vrfy_final(md, req->cpdu->msg->sig->sig.data, len);
 		ep_crypto_md_free(md);
@@ -834,26 +833,22 @@ cmd_append(gdp_req_t *req)
 		EP_TIME_SPEC now;
 		estat = ep_time_now(&now);
 
-		if (payload->datum->ts == NULL)
+		if (pbd->ts == NULL)
 		{
-			payload->datum->ts = (GdpTimestamp *)
-						ep_mem_zalloc(sizeof *payload->datum->ts);
-			gdp_timestamp__init(payload->datum->ts);
+			pbd->ts = (GdpTimestamp *) ep_mem_zalloc(sizeof *pbd->ts);
+			gdp_timestamp__init(pbd->ts);
 		}
 
-		payload->datum->ts->sec = now.tv_sec;
-		payload->datum->ts->has_nsec = true;
-		payload->datum->ts->nsec = now.tv_nsec;
+		pbd->ts->sec = now.tv_sec;
+		pbd->ts->has_nsec = true;
+		pbd->ts->nsec = now.tv_nsec;
 		if (now.tv_accuracy != 0.0)
-			payload->datum->ts->has_accuracy = true;
-		payload->datum->ts->accuracy = now.tv_accuracy;
+			pbd->ts->has_accuracy = true;
+		pbd->ts->accuracy = now.tv_accuracy;
 	}
 
 	// append to disk file and send to subscribers
 	{
-		gdp_datum_t *datum = gdp_datum_new();
-		_gdp_datum_from_pb(datum, req->cpdu->msg, payload->datum);
-
 		// do the physical append to disk
 		estat = req->gob->x->physimpl->append(req->gob, datum);
 		if (EP_STAT_ISOK(estat))
@@ -861,7 +856,8 @@ cmd_append(gdp_req_t *req)
 			// send the new datum to any and all subscribers
 			gdp_msg_t *msg = _gdp_msg_new(GDP_ACK_CONTENT,
 									req->cpdu->msg->rid, req->cpdu->msg->seqno);
-			_gdp_datum_to_pb(datum, msg, msg->ack_content->datum);
+			GdpDatum *pbd = msg->ack_content->datums[0];	//FIXME
+			_gdp_datum_to_pb(datum, msg, pbd);
 			EP_ASSERT(req->rpdu == NULL);
 			req->rpdu = _gdp_pdu_new(msg, req->cpdu->dst, req->cpdu->src);
 			sub_notify_all_subscribers(req);
@@ -878,8 +874,8 @@ cmd_append(gdp_req_t *req)
 		gdpd_ack_resp(req, GDP_ACK_SUCCESS);
 		GdpMessage__AckSuccess *resp = req->rpdu->msg->ack_success;
 		resp->recno = req->gob->nrecs;
-		resp->ts = payload->datum->ts;
-		payload->datum->ts = NULL;		// avoid double free
+		resp->ts = pbd->ts;
+		pbd->ts = NULL;		// avoid double free
 	}
 	else
 	{
@@ -928,7 +924,7 @@ post_subscribe(gdp_req_t *req)
 			" gob->nrecs %"PRIgdp_recno "\n",
 			req->numrecs, req->nextrec, req->gob->nrecs);
 
-	datum = gdp_datum_new();
+	datum = _gdp_datum_new_gob(req->gob);
 	while (req->numrecs >= 0)
 	{
 		// see if data pre-exists in the GOB
@@ -946,7 +942,8 @@ post_subscribe(gdp_req_t *req)
 			// OK, the next record exists: send it
 			gdpd_ack_resp(req, GDP_ACK_CONTENT);
 			GdpMessage__AckContent *resp = req->rpdu->msg->ack_content;
-			_gdp_datum_to_pb(datum, req->rpdu->msg, resp->datum);
+			GdpDatum *pbd = resp->datums[0];		//FIXME
+			_gdp_datum_to_pb(datum, req->rpdu->msg, pbd);
 		}
 		else if (EP_STAT_IS_SAME(estat, GDP_STAT_RECORD_MISSING))
 		{
@@ -1228,7 +1225,7 @@ cmd_multiread(gdp_req_t *req)
 	if (ep_dbg_test(Dbg, 14))
 	{
 		ep_dbg_printf("cmd_multiread: first = %" PRIgdp_recno ", numrecs = %d\n  ",
-				payload->datum->recno, req->numrecs);
+				pbd->recno, req->numrecs);
 		_gdp_gob_dump(req->gob, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
@@ -1346,43 +1343,6 @@ fail1:
 fail0:
 	return estat;
 }
-
-
-#if 0
-EP_STAT
-cmd_newsegment(gdp_req_t *req)
-{
-	EP_STAT estat;
-	char ebuf[60];
-
-	estat = get_open_handle(req);
-	EP_STAT_CHECK(estat, goto fail0);
-
-	if (req->gob->x->physimpl->newsegment == NULL)
-		return gdpd_nak_resp(req, GDP_NAK_C_METHNOTALLOWED,
-				"cmd_newsegment: segments not defined for this type",
-				GDP_STAT_NAK_METHNOTALLOWED);
-	estat = req->gob->x->physimpl->newsegment(req->gob);
-	if (EP_STAT_ISOK(estat))
-	{
-		gdpd_ack_resp(req, GDP_ACK_CREATED);
-	}
-	else
-	{
-		gdpd_nak_resp(req, GDP_NAK_S_INTERNAL,
-					"cannot create new log segment", estat);
-	}
-	admin_post_stats(ADMIN_LOG_EXIST, "newsegment",
-			"log-name", req->gob->pname,
-			"status", ep_stat_tostr(estat, ebuf, sizeof ebuf),
-			NULL, NULL);
-	return estat;
-
-fail0:
-	return gdpd_nak_resp(req, GDP_NAK_S_INTERNAL,
-			"cmd_newsegment: cannot create new segment for", estat);
-}
-#endif
 
 
 /*

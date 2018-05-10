@@ -206,10 +206,7 @@ process_cmd(void *cpdu_)
 
 	// cmd_open and cmd_create can return a new GOB in the req
 	if (gob == NULL && req->gob != NULL)
-	{
-		gob = req->gob;
-		_gdp_gob_incref(gob);
-	}
+		gob = _gdp_gob_incref(req->gob);
 
 	// figure out potential response code
 	// we compute even if unused so we can log server errors

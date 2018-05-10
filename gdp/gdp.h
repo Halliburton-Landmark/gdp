@@ -55,11 +55,16 @@
 */
 
 // an open handle on a GCL object instance
-typedef struct gdp_gin		gdp_gcl_t;
+typedef struct gdp_gin		gdp_gin_t;
+#define gdp_gcl_t			gdp_gin_t		// back compat
 
 // GCL metadata
 typedef struct gdp_gclmd	gdp_gclmd_t;
 typedef uint32_t			gdp_gclmd_id_t;
+
+// hash functions and signatures
+typedef struct gdp_buf		gdp_hash_t;		//XXX is this right?
+typedef struct gdp_buf		gdp_sig_t;		//XXX is this right?
 
 // additional information when opening logs (e.g., keys, qos, hints)
 typedef struct gdp_gcl_open_info	gdp_gcl_open_info_t;
@@ -83,10 +88,6 @@ typedef char				gdp_pname_t[GDP_GCL_PNAME_LEN + 1];
 // a GCL record number
 typedef int64_t				gdp_recno_t;
 #define PRIgdp_recno		PRId64
-
-// a hash key
-typedef struct gdp_hash		gdp_hash_t;
-//typedef EP_CRYPTO_KEY		gdp_hash_t;		//XXX???
 
 /*
 **	I/O modes
@@ -497,13 +498,22 @@ void			gdp_gclmd_print(
 */
 
 // allocate a new message datum
-gdp_datum_t		*gdp_datum_new(void);
+gdp_datum_t		*gdp_datum_new(const gdp_gin_t *gin);
 
 // free a message datum
 void			gdp_datum_free(gdp_datum_t *);
 
 // reset a datum to clean state
 void			gdp_datum_reset(gdp_datum_t *);
+
+// copy contents of one datum into another
+extern void		gdp_datum_copy(
+					gdp_datum_t *to,
+					const gdp_datum_t *from);
+
+// compute hash of a datum
+gdp_hash_t		*gdp_datum_hash(
+						gdp_datum_t *datum);
 
 // print out data record
 extern void		gdp_datum_print(
@@ -535,16 +545,91 @@ extern gdp_buf_t *gdp_datum_getbuf(
 					const gdp_datum_t *datum);
 
 // get the signature from a datum
-extern gdp_buf_t *gdp_datum_getsig(
+extern gdp_sig_t *gdp_datum_getsig(
 					const gdp_datum_t *datum);
 
-// get the signature digest algorithm from a datum
-extern short	gdp_datum_getsigmdalg(
+// get the message digest algorithm from a datum
+extern short	gdp_datum_getmdalg(
 					const gdp_datum_t *datum);
 
-// copy contents of one datum into another
-extern void		gdp_datum_copy(
-					gdp_datum_t *to,
-					const gdp_datum_t *from);
+
+/*
+**  Hashes
+*/
+
+// create a new empty hash structure
+extern gdp_hash_t	*gdp_hash_new(
+						int alg);
+
+// free a hash structure
+extern void			gdp_hash_free(
+						gdp_hash_t *hash);
+
+// reset a hash structure
+extern void			gdp_hash_reset(
+						gdp_hash_t *hash);
+
+extern void			gdp_hash_set(
+						gdp_hash_t *hash,
+						void *hashbytes,
+						size_t hashlen);
+
+// get the length of a hash
+extern size_t		gdp_hash_getlength(
+						gdp_hash_t *hash);
+
+// get the actual hash value (and length)
+extern void			*gdp_hash_getptr(
+						gdp_hash_t *hash,
+						size_t *hashlen_ptr);
+
+// compare two hash structures
+extern bool			gdp_hash_equal(
+						gdp_hash_t *a,
+						gdp_hash_t *b);
+
+
+/*
+**  Signatures
+*/
+
+// create a new empty signature structure
+extern gdp_sig_t	*gdp_sig_new(
+						int alg);
+
+// free a signature structure
+extern void			gdp_sig_free(
+						gdp_sig_t *sig);
+
+// reset a signature structure
+extern void			gdp_sig_reset(
+						gdp_sig_t *sig);
+
+// set a signature
+extern void			gdp_sig_set(
+						gdp_sig_t *sig,
+						void *sigbuf,
+						size_t siglen);
+
+// copy on signature into another
+extern void			gdp_sig_copy(
+						gdp_sig_t *from,
+						gdp_sig_t *to);
+
+// duplicate a signature into a new structure
+extern gdp_sig_t	*gdp_sig_dup(
+						gdp_sig_t *sig);
+
+// get the length of a signature (not the number of key bits!)
+extern size_t		gdp_sig_getlength(
+						gdp_sig_t *sig);
+
+// get the actual signature (and length)
+extern void			*gdp_sig_getptr(
+						gdp_sig_t *sig,
+						size_t *siglen_ptr);
+
+
+
 
 #endif // _GDP_H_

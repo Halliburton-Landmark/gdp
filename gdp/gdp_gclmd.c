@@ -317,7 +317,7 @@ gdp_gclmd_t *
 _gdp_gclmd_deserialize(const uint8_t *smd, size_t smd_len)
 {
 	int nmd;				// number of metadata entries
-	uint8_t *pbp = smd;
+	const uint8_t *pbp = smd;
 
 	// get the number of metadata entries
 	if (smd_len < 2)

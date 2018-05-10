@@ -633,6 +633,7 @@ EP_STAT
 gdp_gcl_append(gdp_gcl_t *gin, gdp_datum_t *datum)
 {
 	EP_STAT estat;
+	gdp_hash_t *prevhash = NULL;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_append\n");
 	if (!GDP_DATUM_ISGOOD(datum))
@@ -642,7 +643,8 @@ gdp_gcl_append(gdp_gcl_t *gin, gdp_datum_t *datum)
 	if (gin->apndfilter != NULL)
 		estat = gin->apndfilter(datum, gin->apndfpriv);
 	if (EP_STAT_ISOK(estat))
-		estat = _gdp_gob_append(gin->gob, datum, _GdpChannel, 0);
+		estat = _gdp_gob_append(gin->gob, 1, &datum, prevhash,
+								_GdpChannel, 0);
 	gdp_datum_reset(datum);
 	unlock_gin_and_gob(gin, "gdp_gcl_append");
 	prstat(estat, gin, "gdp_gcl_append");
@@ -661,11 +663,13 @@ gdp_gcl_append_async(gdp_gcl_t *gin,
 			void *udata)
 {
 	EP_STAT estat;
+	gdp_hash_t *prevhash = NULL;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_append_async\n");
 	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_append_async");
 	EP_STAT_CHECK(estat, return estat);
-	estat = _gdp_gob_append_async(gin->gob, datum, cbfunc, udata, _GdpChannel, 0);
+	estat = _gdp_gob_append_async(gin->gob, 1, &datum, prevhash,
+							cbfunc, udata, _GdpChannel, 0);
 	unlock_gin_and_gob(gin, "gdp_gcl_append_async");
 	prstat(estat, gin, "gdp_gcl_append_async");
 	return estat;
@@ -1040,28 +1044,6 @@ gdp_gcl_getmetadata(gdp_gcl_t *gin,
 	estat = _gdp_gob_getmetadata(gin->gob, gmdp, _GdpChannel, 0);
 	unlock_gin_and_gob(gin, "gdp_gcl_getmetadata");
 	prstat(estat, gin, "gdp_gcl_getmetadata");
-	return estat;
-}
-
-
-/*
-**  GDP_GCL_NEWSEGMENT --- create new segment for GCL
-**
-**		This should only be invoked by a service and with appropriate
-**		authorization.
-*/
-
-EP_STAT
-gdp_gcl_newsegment(gdp_gcl_t *gin)
-{
-	EP_STAT estat;
-
-	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gcl_newsegment\n");
-	estat = check_and_lock_gin_and_gob(gin, "gdp_gcl_newsegment");
-	EP_STAT_CHECK(estat, return estat);
-	estat = _gdp_gob_newsegment(gin->gob, _GdpChannel, 0);
-	unlock_gin_and_gob(gin, "gdp_gcl_newsegment");
-	prstat(estat, gin, "gdp_gcl_newsegment");
 	return estat;
 }
 

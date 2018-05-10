@@ -161,9 +161,8 @@ _gdp_gob_create(gdp_name_t gobname,
 			uint8_t *mdbuf;
 			size_t mdlen;
 			mdlen = _gdp_gclmd_serialize(gmd, &mdbuf);
-			payload->metadata.len = mdlen;
-			payload->metadata.data = mdbuf;
-			payload->has_metadata = true;
+			payload->metadata->data.len = mdlen;
+			payload->metadata->data.data = mdbuf;
 		}
 
 		// send command and wait for results
@@ -216,7 +215,7 @@ find_secret_key(gdp_gob_t *gob,
 	// to find the secret to match it.
 	size_t pkbuflen;
 	const uint8_t *pkbuf;
-	int md_alg;
+	int md_alg_id;
 	EP_CRYPTO_KEY *secretkey = NULL;
 	bool my_secretkey = false;
 	EP_STAT estat;
@@ -230,7 +229,7 @@ find_secret_key(gdp_gob_t *gob,
 		return EP_STAT_OK;
 	}
 
-	md_alg = pkbuf[0];
+	md_alg_id = pkbuf[0];
 
 	// get the secret key if needed
 	if (open_info != NULL)
@@ -281,7 +280,7 @@ find_secret_key(gdp_gob_t *gob,
 	}
 
 	// set up the message digest context
-	gob->digest = ep_crypto_sign_new(secretkey, md_alg);
+	gob->digest = ep_crypto_sign_new(secretkey, md_alg_id);
 
 	// we can release the key now
 	if (my_secretkey)
@@ -467,16 +466,26 @@ _gdp_gob_delete(gdp_gob_t *gob,
 /*
 **  APPEND_COMMON --- common code for sync and async appends
 **
-**		datum should be locked when called.
+**		This produces a filled-in APPEND request.  Can append
+**		multiple records on each call.
+**
+**		datums should be locked when called.
 **		req will be locked upon return.
+**
+**		The caller must provide the hash of the previous record in
+**		the chain.  The individual records will be linked into the
+**		hash chain.  The final record in this call will be signed.
 */
 
 static EP_STAT
-append_common(gdp_gob_t *gob,
-		gdp_datum_t *datum,
-		gdp_chan_t *chan,
-		uint32_t reqflags,
-		gdp_req_t **reqp)
+append_common(
+		gdp_gob_t *gob,				// the receiving GOB
+		int n_datums,				// number of datums in this chain
+		gdp_datum_t **datums,		// the actual datums
+		gdp_hash_t *prevhash,		// hash of record -1
+		gdp_chan_t *chan,			// the I/O channel on which to send
+		uint32_t reqflags,			// special flags to tweak operations
+		gdp_req_t **reqp)			// O: the new request
 {
 	EP_STAT estat = GDP_STAT_BAD_IOMODE;
 	gdp_req_t *req;
@@ -486,17 +495,51 @@ append_common(gdp_gob_t *gob,
 
 	if (!GDP_GOB_ISGOOD(gob))
 		return GDP_STAT_LOG_NOT_OPEN;
-	if (!GDP_DATUM_ISGOOD(datum))
+	if (!EP_ASSERT(n_datums > 0))
+	{
+		ep_dbg_cprintf(Dbg, 1, "append_common: need at least one datum\n");
 		return GDP_STAT_DATUM_REQUIRED;
-	EP_ASSERT_POINTER_VALID(datum);
+	}
+	EP_ASSERT_POINTER_VALID(datums);
+
+	// set up datums with appropriate back links
+	datums[0]->prevhash = prevhash;
+	int dno;
+	gdp_recno_t recno = gob->nrecs + 1;
+	gdp_datum_t *datum;
+	for (dno = 0; dno < n_datums; dno++)
+	{
+		datum = datums[dno];
+		if (!GDP_DATUM_ISGOOD(datum))
+		{
+			ep_dbg_cprintf(Dbg, 1, "append_common: datum %d invalid\n", dno);
+			return GDP_STAT_DATUM_REQUIRED;
+		}
+		// assumes records are written in order with no gaps
+		datum->recno = recno++;
+		if (dno > 1)
+		{
+			if (datum->dhash != NULL)
+				gdp_hash_free(datum->dhash);
+//				gdp_hash_reset(datum->dhash);
+//			else
+//				datum->dhash = gdp_hash_new();
+			datum->dhash = gdp_datum_hash(datums[dno - 1]);
+		}
+	}
+
+	// compute the signature on the final record in the chain
+	// (secret key and initial digest is already in the gob)
+	if (gob->digest != NULL)
+	{
+		estat = _gdp_datum_sign(datum, gob);
+		//FIXME: check estat
+	}
 
 	// create a new request structure
 	estat = _gdp_req_new(GDP_CMD_APPEND, gob, chan, NULL, reqflags, reqp);
 	EP_STAT_CHECK(estat, goto fail0);
 	req = *reqp;
-
-	// assumes records are written in order with no gaps
-	datum->recno = gob->nrecs + 1;
 
 	// set up the message content
 	msg = req->cpdu->msg;
@@ -505,9 +548,15 @@ append_common(gdp_gob_t *gob,
 		GdpMessage__CmdAppend *payload = msg->cmd_append;
 		EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
 
-		payload->datum = (GdpDatum *) ep_mem_zalloc(sizeof *payload->datum);
-		gdp_datum__init(payload->datum);
-		_gdp_datum_to_pb(datum, msg, payload->datum);
+		payload->n_datums = n_datums;
+		payload->datums = (GdpDatum **) ep_mem_zalloc(n_datums * sizeof *datums);
+		int dno;
+		for (dno = 0; dno < n_datums; dno++)
+		{
+			payload->datums[dno] = (GdpDatum *) ep_mem_zalloc(sizeof (GdpDatum));
+			gdp_datum__init(payload->datums[dno]);
+			_gdp_datum_to_pb(datums[dno], msg, payload->datums[dno]);
+		}
 
 		// set up for signing (req->digest will be updated with data part)
 		req->digest = gob->digest;
@@ -518,12 +567,15 @@ append_common(gdp_gob_t *gob,
 			size_t len;
 			EP_CRYPTO_MD *md = ep_crypto_md_clone(req->digest);
 
+			// only sign the last datum in the set
+			GdpDatum *pbdatum = payload->datums[dno - 1];
+
 			recnobuf[0] = msg->cmd;
 			ep_crypto_sign_update(md, &recnobuf[0], 1);
 			PUT64(datum->recno);
 			ep_crypto_sign_update(md, recnobuf, sizeof recnobuf);
-			len = payload->datum->data.len;
-			ep_crypto_sign_update(md, payload->datum->data.data, len);
+			len = pbdatum->data.len;
+			ep_crypto_sign_update(md, pbdatum->data.data, len);
 			if (msg->sig == NULL)
 			{
 				msg->sig = (GdpSignature *) ep_mem_zalloc(sizeof *msg->sig);
@@ -563,15 +615,18 @@ fail0:
 */
 
 EP_STAT
-_gdp_gob_append(gdp_gob_t *gob,
-			gdp_datum_t *datum,
+_gdp_gob_append(
+			gdp_gob_t *gob,
+			int n_datums,
+			gdp_datum_t **datums,
+			gdp_hash_t *prevhash,
 			gdp_chan_t *chan,
 			uint32_t reqflags)
 {
 	EP_STAT estat = GDP_STAT_BAD_IOMODE;
 	gdp_req_t *req = NULL;
 
-	estat = append_common(gob, datum, chan, reqflags, &req);
+	estat = append_common(gob, n_datums, datums, prevhash, chan, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// send the request to the log server
@@ -586,7 +641,9 @@ fail0:
 	if (ep_dbg_test(Dbg, 42))
 	{
 		ep_dbg_printf("_gdp_gob_append: returning ");
-		gdp_datum_print(datum, ep_dbg_getfile(), GDP_DATUM_PRDEBUG);
+		int dno;
+		for (dno = 0; dno < n_datums; dno++)
+			gdp_datum_print(datums[dno], ep_dbg_getfile(), GDP_DATUM_PRDEBUG);
 	}
 	return estat;
 }
@@ -603,7 +660,9 @@ fail0:
 EP_STAT
 _gdp_gob_append_async(
 			gdp_gob_t *gob,
-			gdp_datum_t *datum,
+			int n_datums,
+			gdp_datum_t **datums,
+			gdp_hash_t *prevhash,
 			gdp_event_cbfunc_t cbfunc,
 			void *cbarg,
 			gdp_chan_t *chan,
@@ -614,7 +673,7 @@ _gdp_gob_append_async(
 
 	// deliver results asynchronously
 	reqflags |= GDP_REQ_ASYNCIO;
-	estat = append_common(gob, datum, chan, reqflags, &req);
+	estat = append_common(gob, n_datums, datums, prevhash, chan, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// arrange for responses to appear as events or callbacks
@@ -622,9 +681,13 @@ _gdp_gob_append_async(
 
 	estat = _gdp_req_send(req);
 
-	gdp_buf_reset(datum->dbuf);
-	if (datum->sig != NULL)
-		gdp_buf_reset(datum->sig);
+	int dno;
+	for (dno = 0; dno < n_datums; dno++)
+	{
+		gdp_buf_reset(datums[dno]->dbuf);
+		if (datums[dno]->sig != NULL)
+			gdp_sig_reset(datums[dno]->sig);
+	}
 
 	// cleanup and return
 	if (!EP_STAT_ISOK(estat))
@@ -700,14 +763,21 @@ _gdp_gob_read_by_recno(gdp_gob_t *gob,
 	EP_STAT_CHECK(estat, goto fail1);
 
 	// parse the response payload
-	{
-		gdp_msg_t *msg = req->rpdu->msg;
-		EP_ASSERT_ELSE(msg != NULL, return EP_STAT_ASSERT_ABORT);
-		GdpMessage__AckContent *payload = msg->ack_content;
-		EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
+	gdp_msg_t *msg = req->rpdu->msg;
+	EP_ASSERT_ELSE(msg != NULL, return EP_STAT_ASSERT_ABORT);
+	GdpMessage__AckContent *payload = msg->ack_content;
+	EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
 
+	// make sure there really is a record there
+	if (payload->n_datums < 1)
+	{
+		ep_dbg_cprintf(Dbg, 1, "_gdp_gob_read_by_recno: no data\n");
+		estat = GDP_STAT_RECORD_MISSING;
+	}
+	else
+	{
 		// ok, done!  pass the datum contents to the caller and free the request
-		_gdp_datum_from_pb(datum, msg, payload->datum);
+		_gdp_datum_from_pb(datum, msg, payload->datums[0]);
 	}
 
 fail1:
@@ -838,31 +908,6 @@ fail0:
 }
 
 
-/*
-**  _GDP_GOB_NEWSEGMENT --- create a new physical segment for a log
-*/
-
-EP_STAT
-_gdp_gob_newsegment(gdp_gob_t *gob,
-		gdp_chan_t *chan,
-		uint32_t reqflags)
-{
-	EP_STAT estat;
-	gdp_req_t *req;
-
-	if (!GDP_GOB_ISGOOD(gob))
-		return GDP_STAT_LOG_NOT_OPEN;
-	estat = _gdp_req_new(GDP_CMD_NEWSEGMENT, gob, chan, NULL, reqflags, &req);
-	EP_STAT_CHECK(estat, goto fail0);
-
-	estat = _gdp_invoke(req);
-
-	_gdp_req_free(&req);
-fail0:
-	return estat;
-}
-
-
 /***********************************************************************
 **  Client side implementations for commands used internally only.
 ***********************************************************************/
@@ -927,7 +972,7 @@ _gdp_gob_fwd_append(
 	gdp_buf_write(req->cpdu->datum->dbuf, gdp_buf_getptr(datum->dbuf, l), l);
 	req->cpdu->datum->recno = datum->recno;
 	req->cpdu->datum->ts = datum->ts;
-	req->cpdu->datum->sigmdalg = datum->sigmdalg;
+	req->cpdu->datum->mdalg = datum->mdalg;
 	req->cpdu->datum->siglen = datum->siglen;
 	if (req->cpdu->datum->sig != NULL)
 		gdp_buf_free(req->cpdu->datum->sig);

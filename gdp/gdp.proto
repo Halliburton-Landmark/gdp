@@ -3,9 +3,26 @@
 /*
 **  These represent messages that approximately correspond to
 **  Layer 5 (Session Layer) in the OSI model.
+**  For information about Layer 4 (Transport), see gdp/gdp_chan.h.
 */
 
-// More-or-less corresponds to gdp_pdu_t.
+/*
+**  GdpMessage more-or-less corresponds to an in-memory gdp_pdu_t.
+**  > cmd is the GDP command or response (e.g., APPEND, ACK_SUCCESS,
+**    NAK_CONFLICT, etc.).
+**	> rid is a tag to make requests unique.  Responses always contain
+**    the same rid as the corresponding command.  For example, if there
+**    are two READs in process at one time, different rids will
+**    allow the responses to be paired with the command.  They can
+**    be re-used once a command is complete.
+**  > seqno increases over time, and can be used to impose
+**    ordering constraints.  [They need not be the same between
+**    commands and responses]?
+**  > body contains the semantic payload.
+**  > sig is a signature over cmd, rid, and body.  This signs the
+**    command, not the data.
+*/
+
 message GdpMessage
 {
 	required GdpMsgCode		cmd = 1;		// command or ack/nak
@@ -25,7 +42,6 @@ message GdpMessage
 		CmdSubscribeByHash	cmd_subscribe_by_hash	= 77;
 		CmdUnsubscribe		cmd_unsubscribe			= 78;
 		CmdGetMetadata		cmd_get_metadata		= 79;
-		CmdNewSegment		cmd_new_segment			= 80;
 		CmdDelete			cmd_delete				= 81;
 
 		AckSuccess			ack_success				= 128;
@@ -35,58 +51,70 @@ message GdpMessage
 		NakGeneric			nak						= 192;
 		NakConflict			nak_conflict			= 201;
 	}
-	optional GdpSignature	sig = 4;			// signature
-	optional bytes			hash = 5;			// hash of previous record
+	optional GdpSignature	sig = 4;			// commmand/response signature
 
+	/*
+	**  Individual command syntaxes.  These do not include the name of
+	**  the log upon which they are acting since that's given in the
+	**  destination field of the enclosing Layer 4 packet.
+	*/
+
+	//XXX This really doesn't belong here: it is in Layer 4 now
 	message CmdAdvertise
 	{
 		required bytes			adname = 1;			// name to advertise
 	}
 
-	/*
-	**  Log metadata must be independently serialized (i.e., not using
-	**  protobufs) since it has to stand on its own when creating a log.
-	**  We could serialize it as a protobuf, but that might not survive
-	**  software updates.  Thus, it's just listed as "bytes" for the type.
-	*/
-
+	// Create a new log
+	// This is addressed to the log server, not the log itself.
+	//  ... logname will ultimately just be the hash of the metadata,
+	//		at which point it can go away.
 	message CmdCreate
 	{
-		required bytes			logname = 1;		// name of new log
-		optional bytes			metadata = 2;		// log metadata
+		required GdpMetadata	metadata = 1;		// log metadata
+		optional bytes			logname = 2;		// name of new log
 	}
 
+	// Open a log.  Someday this may need to have access information.
 	message CmdOpen
 	{
 	}
 
+	// Close a log.
 	message CmdClose
 	{
 	}
 
+	// Append a datum to a log.  Note that the signature inside the datum
+	// applies to the datum itself, not the PDU.  Presumably the PDU
+	// signature would not be required if the datum is already signed.
 	message CmdAppend
 	{
-		required GdpDatum		datum = 1;			// data to append
+		repeated GdpDatum		datums = 1;			// data to append
 	}
 
+	// Read a record based on the record number.  Returns a set.
 	message CmdReadByRecno
 	{
 		required uint64			recno = 1;			// record number
 		optional int32			nrecs = 2;			// number of records
 	}
 
+	// Read a record based on the timestamp.
 	message CmdReadByTs
 	{
 		required GdpTimestamp	timestamp = 1;		// timestamp
 		optional int32			nrecs = 2;			// number of records
 	}
 
+	// Read a record based on the hash of the data.  Should always be unique.
 	message CmdReadByHash
 	{
 		required bytes			hash = 1;			// hash value
 		optional int32			nrecs = 2;			// number of records
 	}
 
+	// Subscribe to a log starting from a given record number.
 	message CmdSubscribeByRecno
 	{
 		optional uint64			start = 1;			// starting record number
@@ -94,6 +122,7 @@ message GdpMessage
 		optional GdpTimestamp	timeout = 3;		// timeout
 	}
 
+	// Subscribe to a log starting from a particular timestamp.
 	message CmdSubscribeByTs
 	{
 		required GdpTimestamp	timestamp = 1;		// timestamp
@@ -101,6 +130,9 @@ message GdpMessage
 		optional GdpTimestamp	timeout = 3;		// timeout
 	}
 
+	// Subscribe to a lot starting from a given datum hash.
+	//XXX	It isn't clear how subscriptions work in the presence of
+	//		data forks.
 	message CmdSubscribeByHash
 	{
 		required bytes			hash = 1;			// hash value
@@ -108,22 +140,22 @@ message GdpMessage
 		optional GdpTimestamp	timeout = 3;		// timeout
 	}
 
+	// Cancel a subscription.
 	message CmdUnsubscribe
 	{
 	}
 
+	// Get the metadata for a given log.
 	message CmdGetMetadata
 	{
 	}
 
-	message CmdNewSegment
-	{
-	}
-
+	// Delete a log.  Someday, maybe.
 	message CmdDelete
 	{
 	}
 
+	// Generic success acknowledgement (shared).
 	message AckSuccess
 	{
 		optional uint64			recno = 1;
@@ -137,11 +169,14 @@ message GdpMessage
 		required uint64			recno = 1;
 	};
 
+	// Data content; used for READ and SUBSCRIBE results.
+	// Note: can return a set if there are duplicate recnos.
 	message AckContent
 	{
-		required GdpDatum		datum = 1;			// returned data
+		repeated GdpDatum		datums = 1;			// returned data
 	}
 
+	// Generic failure (shared).
 	message NakGeneric
 	{
 		optional uint32			ep_stat = 1;
@@ -149,6 +184,7 @@ message GdpMessage
 		optional uint64			recno = 3;
 	}
 
+	// Unclear why this doesn't just share NakGeneric.
 	message NakConflict
 	{
 		optional uint32			ep_stat = 1;
@@ -161,8 +197,8 @@ enum GdpMsgCode
 {
 	// 0-63		Blind commands (no response)
 	CMD_NONE =					0;			// no command (can use as keepalive)
-	CMD_ADVERTISE =				1;			// XXX move to L4?
-	CMD_WITHDRAW =				2;			// XXX move to L4?
+	CMD_ADVERTISE =				1;			//XXX moved to L4
+	CMD_WITHDRAW =				2;			//XXX moved to L4
 
 	// 64-127	Acknowledged commands
 	CMD_PING =					64;
@@ -181,16 +217,15 @@ enum GdpMsgCode
 	CMD_SUBSCRIBE_BY_HASH =		77;
 	CMD_UNSUBSCRIBE =			78;
 	CMD_GETMETADATA =			79;
-	CMD_NEWSEGMENT =			80;
 	CMD_DELETE =				81;
-//	CMD_FWD_APPEND =			127;		//XXX probably moved to L4
+//	CMD_FWD_APPEND =			127;		//XXX moved to L4
 
 	// 128-191	Positive Acks
 	ACK_SUCCESS =				128;		// HTTP 200
 	ACK_CREATED =				129;		// HTTP 201
 	ACK_DELETED =				130;		// HTTP 202
 	ACK_VALID =					131;		// HTTP 203
-	ACK_CHANGED =				132;		// HTTP 204
+	ACK_CHANGED =				132;		// no direct HTTP equiv XXX used???
 	ACK_CONTENT =				133;		// no direct HTTP equivalent
 
 	// 192-233	Negative acks, client side (CoAP, HTTP 400-431)
@@ -224,13 +259,26 @@ enum GdpMsgCode
 }
 
 
-// More-or-less corresponds to gdp_datum_t.
+/*
+**  GdpDatum more-or-less corresponds to gdp_datum_t.
+**  This is the portion that gets signed by writers or has the
+**  signature verified for readers.
+**
+**  The signature is over logname, recno, ts, prevhash, and H(data).
+*/
+
 message GdpDatum
 {
 	required int64			recno = 1;			// record number
 	optional GdpTimestamp	ts = 2;				// timestamp
-	required bytes			data = 3;			// actual content
+	optional bytes			prevhash = 3;		// hash of previous record
+	required bytes			data = 4;			// actual content
+	optional GdpSignature	sig = 5;			// signature over rest of datum
 }
+
+/*
+**  GdpTimestamp is the on-the wire representation of a EP_TIME_SPEC.
+*/
 
 message GdpTimestamp
 {
@@ -240,13 +288,33 @@ message GdpTimestamp
 	optional float			accuracy = 3;
 }
 
-message GdpTrailer
+/*
+**  Log metadata must be independently serialized (i.e., not using
+**  protobufs) since it has to stand on its own when creating a log.
+**  We could serialize it as a protobuf, but that might not survive
+**  software updates.  Thus, it's just listed as "bytes" for the type.
+**  See gdp/gdp_gclmd.[ch] for details.
+*/
+
+message GdpMetadata
 {
-	optional GdpSignature	sig = 1;
+	required bytes			data = 1;
+	optional GdpSignature	sig = 2;			// needed?
 }
+
+/*
+**  Signatures can include a type, e.g., RSA-1024.
+**  Used to sign both PDUs and datums.
+**  Could be used to transmit HMAC using other sig_types.
+*/
 
 message GdpSignature
 {
 	required uint32			sig_type = 1;
 	required bytes			sig = 2;
 }
+
+//message GdpTrailer
+//{
+//	optional GdpSignature	sig = 1;
+//}

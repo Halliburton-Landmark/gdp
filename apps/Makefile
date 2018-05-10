@@ -38,13 +38,13 @@ BINALL=		gcl-create \
 SBINALL_ZC= 	gdp-zcpublish
 SBINALL=	\
 		gdp-find-xname \
-		gdp-log-check \
 		gdp-name-xlate \
-		gdp-newsegment \
 		gdp-delete \
 		$(SBINALL_ZC) \
-#		log-view \
+#		gdp-log-check \
+#		gdp-newsegment \
 #		gdp-rest \
+#		log-view \
 
 MAN1ALL=	gdp-reader.1 \
 		gdp-writer.1 \

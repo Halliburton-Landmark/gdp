@@ -117,12 +117,21 @@ LIST_HEAD(req_head, gdp_req);
 **  Basic data types
 */
 
-struct gdp_hash
-{
-	gdp_buf_t			*buf;
-};
+// hashes
+//struct gdp_hash
+//{
+//	int					alg;		// hash algorithm to use
+//	gdp_buf_t			*buf;		// the hash value itself
+//};
+gdp_buf_t		*_gdp_hash_getbuf(gdp_hash_t *hash);
 
-#define gdp_sig_t		gdp_buf_t	//FIXME
+
+// signatures
+//struct gdp_sig
+//{
+//	XXX;
+//};
+gdp_buf_t		*_gdp_sig_getbuf(gdp_sig_t *sig);
 
 
 /*
@@ -131,21 +140,25 @@ struct gdp_hash
 **
 **		The timestamp here is the database commit timestamp; any sample
 **		timestamp must be added by the sensor itself as part of the data.
+**
+**		dhash = H(dbuf)
+**		datum hash = H(recno || ts || prevhash || dhash)
+**		prevhash = hash of previous datum
 */
 
 struct gdp_datum
 {
 	EP_THR_MUTEX		mutex;			// locking mutex (mostly for dbuf)
 	struct gdp_datum	*next;			// next in free list
+	gdp_gob_t			*gob;			// associated GOB
 	bool				inuse:1;		// the datum is in use (for debugging)
 	gdp_recno_t			recno;			// the record number
 	EP_TIME_SPEC		ts;				// commit timestamp
 	gdp_buf_t			*dbuf;			// data buffer
-	gdp_buf_t			*sig;			// signature (may be NULL)
-	uint16_t			sigmdalg;		// message digest algorithm
-	uint16_t			siglen;			// signature length;
-	gdp_hash_t			*hash;			// hash of this record		//FIXME
-	gdp_hash_t			*prevhash;		// hash of previous record
+	gdp_hash_t			*dhash;			// hash of dbuf
+	gdp_sig_t			*sig;			// signature (may be NULL)
+	gdp_hash_t			*prevhash;		// hash of previous datum
+	uint16_t			mdalg;			// message digest algorithm
 };
 
 #define GDP_DATUM_ISGOOD(datum)											\
@@ -153,9 +166,23 @@ struct gdp_datum
 				 (datum)->dbuf != NULL &&									\
 				 (datum)->inuse)
 
+gdp_datum_t		*_gdp_datum_new_gob(	// generate new datum from GOB
+						gdp_gob_t *gob);
+
+gdp_datum_t		*gdp_datum_dup(			// duplicate a datum
+						const gdp_datum_t *datum);
+
 void			_gdp_datum_dump(		// dump data record (for debugging)
 						const gdp_datum_t *datum,	// message to print
 						FILE *fp);					// file to print it to
+
+bool			gdp_datum_hash_equal(	// check that a hash matches the datum
+						const gdp_datum_t *datum,	// the datum to check
+						gdp_hash_t *hash);			// the hash to check against
+
+void			_gdp_datum_digest(		// add datum to existing digest
+						gdp_datum_t *datum,			// the datum to include
+						EP_CRYPTO_MD *md);			// the existing digest
 
 void			_gdp_datum_to_pb(		// convert datum to protobuf form
 						const gdp_datum_t *datum,
@@ -167,8 +194,9 @@ void			_gdp_datum_from_pb(		// convert protobuf form to datum
 						const GdpMessage *msg,
 						const GdpDatum *pb);
 
-gdp_datum_t		*gdp_datum_dup(		// duplicate a datum
-						const gdp_datum_t *datum);
+EP_STAT			_gdp_datum_sign(		// sign a datum
+						gdp_datum_t *datum,			// the datum to sign
+						gdp_gob_t *gob);			// the object storing it
 
 
 
@@ -227,6 +255,7 @@ struct gdp_gob
 	gdp_name_t			name;			// the internal name
 	gdp_pname_t			pname;			// printable name (for debugging)
 	uint16_t			flags;			// flag bits, see below
+	uint16_t			mdalg;			// message digest (hash) algorithm
 	int					refcnt;			// reference counter
 	void				(*freefunc)(gdp_gob_t *);
 										// called when this is freed
@@ -285,7 +314,7 @@ void			_gdp_gob_unlock_trace(		// unlock the GCL mutex
 						int line,
 						const char *id);
 
-void			_gdp_gob_incref_trace(		// increase reference count (trace)
+gdp_gob_t		*_gdp_gob_incref_trace(		// increase reference count (trace)
 						gdp_gob_t *gob,
 						const char *file,
 						int line,
@@ -350,13 +379,17 @@ EP_STAT			_gdp_gob_read_by_recno_async(	// read asynchronously
 
 EP_STAT			_gdp_gob_append(			// append a record (gdpd shared)
 						gdp_gob_t *gob,
-						gdp_datum_t *datum,
+						int n_datums,
+						gdp_datum_t **datums,
+						gdp_hash_t *prevhash,
 						gdp_chan_t *chan,
 						uint32_t reqflags);
 
 EP_STAT			_gdp_gob_append_async(		// append asynchronously
 						gdp_gob_t *gob,
-						gdp_datum_t *datum,
+						int n_datums,
+						gdp_datum_t **datums,
+						gdp_hash_t *prevhash,
 						gdp_event_cbfunc_t cbfunc,
 						void *cbarg,
 						gdp_chan_t *chan,
@@ -839,7 +872,7 @@ gdp_cmd_t		_gdp_acknak_from_estat(		// produce acknak code from status
 EP_CRYPTO_KEY	*_gdp_crypto_skey_read(		// read a secret key
 						const char *basename,
 						const char *ext);
-void			_gdp_sign_md(				// sign the metadata
+void			_gdp_sign_metadata(			// sign the metadata
 						gdp_gcl_t *gcl);
 
 
@@ -872,6 +905,97 @@ const char		*_gdp_pr_indent(			// return indenting for debug output
 #define MICROSECONDS	* INT64_C(1000)
 #define MILLISECONDS	* INT64_C(1000000)
 #define SECONDS			* INT64_C(1000000000)
+
+
+/*
+**  Low level support for cracking protocol, computing hashes, etc.
+*/
+
+#define PUT8(v) \
+		{ \
+			*pbp++ = ((v) & 0xff); \
+		}
+#define PUT16(v) \
+		{ \
+			*pbp++ = ((v) >> 8) & 0xff; \
+			*pbp++ = ((v) & 0xff); \
+		}
+#define PUT24(v) \
+		{ \
+			*pbp++ = ((v) >> 16) & 0xff; \
+			*pbp++ = ((v) >> 8) & 0xff; \
+			*pbp++ = ((v) & 0xff); \
+		}
+#define PUT32(v) \
+		{ \
+			*pbp++ = ((v) >> 24) & 0xff; \
+			*pbp++ = ((v) >> 16) & 0xff; \
+			*pbp++ = ((v) >> 8) & 0xff; \
+			*pbp++ = ((v) & 0xff); \
+		}
+#define PUT48(v) \
+		{ \
+			*pbp++ = ((v) >> 40) & 0xff; \
+			*pbp++ = ((v) >> 32) & 0xff; \
+			*pbp++ = ((v) >> 24) & 0xff; \
+			*pbp++ = ((v) >> 16) & 0xff; \
+			*pbp++ = ((v) >> 8) & 0xff; \
+			*pbp++ = ((v) & 0xff); \
+		}
+#define PUT64(v) \
+		{ \
+			*pbp++ = ((v) >> 56) & 0xff; \
+			*pbp++ = ((v) >> 48) & 0xff; \
+			*pbp++ = ((v) >> 40) & 0xff; \
+			*pbp++ = ((v) >> 32) & 0xff; \
+			*pbp++ = ((v) >> 24) & 0xff; \
+			*pbp++ = ((v) >> 16) & 0xff; \
+			*pbp++ = ((v) >> 8) & 0xff; \
+			*pbp++ = ((v) & 0xff); \
+		}
+
+#define GET8(v) \
+		{ \
+				v  = *pbp++; \
+		}
+#define GET16(v) \
+		{ \
+				v  = *pbp++ << 8; \
+				v |= *pbp++; \
+		}
+#define GET24(v) \
+		{ \
+				v  = *pbp++ << 16; \
+				v |= *pbp++ << 8; \
+				v |= *pbp++; \
+		}
+#define GET32(v) \
+		{ \
+				v  = *pbp++ << 24; \
+				v |= *pbp++ << 16; \
+				v |= *pbp++ << 8; \
+				v |= *pbp++; \
+		}
+#define GET48(v) \
+		{ \
+				v  = ((uint64_t) *pbp++) << 40; \
+				v |= ((uint64_t) *pbp++) << 32; \
+				v |= ((uint64_t) *pbp++) << 24; \
+				v |= ((uint64_t) *pbp++) << 16; \
+				v |= ((uint64_t) *pbp++) << 8; \
+				v |= ((uint64_t) *pbp++); \
+		}
+#define GET64(v) \
+		{ \
+				v  = ((uint64_t) *pbp++) << 56; \
+				v |= ((uint64_t) *pbp++) << 48; \
+				v |= ((uint64_t) *pbp++) << 40; \
+				v |= ((uint64_t) *pbp++) << 32; \
+				v |= ((uint64_t) *pbp++) << 24; \
+				v |= ((uint64_t) *pbp++) << 16; \
+				v |= ((uint64_t) *pbp++) << 8; \
+				v |= ((uint64_t) *pbp++); \
+		}
 
 
 #endif // _GDP_PRIV_H_
