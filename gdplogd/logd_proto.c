@@ -276,11 +276,18 @@ cmd_create(gdp_req_t *req)
 	GdpMessage__CmdCreate *payload;
 	GET_PAYLOAD(req, cmd_create, CMD_CREATE);
 
+	//XXX for now, insist that the client specify the internal name;
+	//XXX ultimately this should be ILLEGAL: name is hash of metadata
 	if (payload->logname.len != sizeof gobname ||
 			!gdp_name_is_valid(payload->logname.data))
 	{
 		// bad log name
-		ep_dbg_cprintf(Dbg, 2, "cmd_create: improper log name\n");
+		if (ep_dbg_test(Dbg, 2))
+		{
+			ep_dbg_printf("cmd_create: improper log name, len %zd (expected %zd)\n",
+						payload->logname.len, sizeof gobname);
+			ep_dbg_printf("\tpname %s\n", payload->logname.data);
+		}
 		estat = gdpd_nak_resp(req, GDP_NAK_C_BADREQ,
 						"cmd_create: improper log name",
 						GDP_STAT_GCL_NAME_INVALID);
@@ -347,22 +354,18 @@ fail1:
 	{
 		gdpd_ack_resp(req, GDP_ACK_CREATED);
 	}
+	char ebuf[60];
 	if (gob != NULL)
 	{
-		char ebuf[60];
-
 		admin_post_stats(ADMIN_LOG_EXIST, "log-create",
 				"log-name", gob->pname,
 				"status", ep_stat_tostr(estat, ebuf, sizeof ebuf),
 				NULL, NULL);
 	}
 
-	if (ep_dbg_test(Dbg, 9))
-	{
-		char ebuf[100];
-		ep_dbg_printf("<<< cmd_create(%s): %s\n", gob->pname,
-					ep_stat_tostr(estat, ebuf, sizeof ebuf));
-	}
+	ep_dbg_cprintf(Dbg, 9, "<<< cmd_create(%s): %s\n",
+				gob != NULL ? gob->pname : "NULL",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 
 	return estat;
 }

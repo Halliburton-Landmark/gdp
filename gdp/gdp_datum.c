@@ -58,7 +58,10 @@ static EP_THR_MUTEX		DatumFreeListMutex EP_THR_MUTEX_INITIALIZER2(GDP_MUTEX_LORD
 gdp_datum_t *
 gdp_datum_new(const gdp_gin_t *gin)
 {
-	return _gdp_datum_new_gob(gin->gob);
+	_gdp_gob_lock(gin->gob);
+	gdp_datum_t *datum = _gdp_datum_new_gob(gin->gob);
+	_gdp_gob_unlock(gin->gob);
+	return datum;
 }
 
 gdp_datum_t *
@@ -520,7 +523,7 @@ _gdp_datum_to_pb(const gdp_datum_t *datum,
 		pbd->sig->sig.data = ep_mem_malloc(l);
 		memcpy(pbd->sig->sig.data, sigdata, l);
 	}
-	else
+	else if (pbd->sig != NULL)
 	{
 		gdp_signature__free_unpacked(pbd->sig, NULL);
 		pbd->sig = NULL;

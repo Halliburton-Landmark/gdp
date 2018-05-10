@@ -495,19 +495,33 @@ sqlite_create(gdp_gob_t *gob, gdp_gclmd_t *gmd)
 	CHECK_RC(rc, goto fail1);
 
 	// tweak database header using PRAGMAs
+	//XXX could these be done with sqlite3_exec?
 	phase = "pragma prepare";
 	{
 		// https://www.sqlite.org/pragma.html
 		char qbuf[200];
-
-		snprintf(qbuf, sizeof qbuf,
-				"PRAGMA application_id = %d;\n"
-				"PRAGMA user_version = %d;\n",
-				GLOG_MAGIC, GLOG_VERSION);
 		sqlite3_stmt *stmt;
+
+		// set up application ID (the GDP itself)
+		snprintf(qbuf, sizeof qbuf,
+				"PRAGMA application_id = %d;\n", GLOG_MAGIC);
 		rc = sqlite3_prepare_v2(phys->db, qbuf, -1, &stmt, NULL);
 		CHECK_RC(rc, goto fail1);
-		phase = "pragma step";
+		phase = "pragma step 1";
+		while ((rc = sqlite3_step(stmt)) != SQLITE_DONE)
+		{
+			ep_dbg_cprintf(Dbg, 7, "create(%s), pragma setting => %s\n",
+					db_path, sqlite3_errstr(rc));
+		}
+		sqlite3_finalize(stmt);
+
+		// set up a version code (we use privately)
+		snprintf(qbuf, sizeof qbuf,
+				"PRAGMA user_version = %d;\n", GLOG_VERSION);
+
+		rc = sqlite3_prepare_v2(phys->db, qbuf, -1, &stmt, NULL);
+		CHECK_RC(rc, goto fail1);
+		phase = "pragma step 2";
 		while ((rc = sqlite3_step(stmt)) != SQLITE_DONE)
 		{
 			ep_dbg_cprintf(Dbg, 7, "create(%s), pragma setting => %s\n",
@@ -700,7 +714,7 @@ sqlite_open(gdp_gob_t *gob)
 	{
 		sqlite3_stmt *stmt;
 		rc = sqlite3_prepare_v2(phys->db,
-						"SELECT value FROM log_table"
+						"SELECT value FROM log_entry"
 						"	WHERE recno = 0",
 						-1, &stmt, NULL);
 		CHECK_RC(rc, goto fail2);
@@ -1195,7 +1209,7 @@ sqlite_append(gdp_gob_t *gob,
 		sqlite3_stmt *stmt;
 		phase = "append prepare";
 		rc = sqlite3_prepare_v2(phys->db,
-					"INSERT INTO log_records"
+					"INSERT INTO log_entry"
 					"	(hash, recno, timestamp, prevhash, value, sig)"
 					"	VALUES(?, ?, ?, ?, ?, ?);",
 					-1, &stmt, NULL);
@@ -1214,17 +1228,23 @@ sqlite_append(gdp_gob_t *gob,
 		rc = sql_bind_timestamp(stmt, 3, &datum->ts);
 		CHECK_RC(rc, goto fail3);
 
-		phase = "append bind 4";
-		rc = sql_bind_hash(stmt, 4, datum->prevhash);
-		CHECK_RC(rc, goto fail3);
+		if (datum->prevhash != NULL)
+		{
+			phase = "append bind 4";
+			rc = sql_bind_hash(stmt, 4, datum->prevhash);
+			CHECK_RC(rc, goto fail3);
+		}
 
 		phase = "append bind 5";
 		rc = sql_bind_buf(stmt, 6, datum->dbuf);
 		CHECK_RC(rc, goto fail3);
 
-		phase = "append bind 6";
-		rc = sql_bind_signature(stmt, 5, datum);
-		CHECK_RC(rc, goto fail3);
+		if (datum->sig != NULL)
+		{
+			phase = "append bind 6";
+			rc = sql_bind_signature(stmt, 5, datum);
+			CHECK_RC(rc, goto fail3);
+		}
 
 		phase = "append step";
 		rc = sqlite3_step(stmt);

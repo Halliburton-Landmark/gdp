@@ -87,6 +87,9 @@ _gdp_msg_new(gdp_cmd_t cmd, gdp_rid_t rid, gdp_seqno_t seqno)
 		msg->cmd_create = (GdpMessage__CmdCreate *)
 					ep_mem_zalloc(sizeof *msg->cmd_create);
 		gdp_message__cmd_create__init(msg->cmd_create);
+		msg->cmd_create->metadata = (GdpMetadata *)
+					ep_mem_zalloc(sizeof *msg->cmd_create->metadata);
+		gdp_metadata__init(msg->cmd_create->metadata);
 		break;
 
 	case GDP_CMD_OPEN_AO:
@@ -285,13 +288,19 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 		break;
 
 	case GDP_MESSAGE__BODY_CMD_CREATE:
-		fprintf(fp, "cmd_create:\n%slogname=%s\n%smetadata=\n",
-				_gdp_pr_indent(indent),
-				gdp_printable_name(msg->cmd_create->logname.data, pname),
-				_gdp_pr_indent(indent + 1));
-		ep_hexdump(msg->cmd_create->metadata->data.data,
-					msg->cmd_create->metadata->data.len,
-					fp, EP_HEXDUMP_ASCII, 0);
+		{
+			char *logname = pname;
+			if (msg->cmd_create->logname.data != NULL)
+				gdp_printable_name(msg->cmd_create->logname.data, pname);
+			else
+				logname = "(NULL)";
+			fprintf(fp, "cmd_create:\n%slogname=%s\n%smetadata=\n",
+					_gdp_pr_indent(indent), logname,
+					_gdp_pr_indent(indent + 1));
+			ep_hexdump(msg->cmd_create->metadata->data.data,
+						msg->cmd_create->metadata->data.len,
+						fp, EP_HEXDUMP_ASCII, 0);
+		}
 		break;
 
 	case GDP_MESSAGE__BODY_CMD_OPEN:

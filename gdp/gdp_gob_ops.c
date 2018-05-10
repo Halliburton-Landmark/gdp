@@ -152,6 +152,7 @@ _gdp_gob_create(gdp_name_t gobname,
 		EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
 
 		// send the name of the log to be created in the payload
+		payload->has_logname = true;
 		payload->logname.len = sizeof (gdp_name_t);
 		payload->logname.data = (uint8_t *) ep_mem_zalloc(sizeof (gdp_name_t));
 		memcpy(payload->logname.data, gobname, sizeof (gdp_name_t));
