@@ -90,7 +90,7 @@ message GdpMessage
 	// signature would not be required if the datum is already signed.
 	message CmdAppend
 	{
-		repeated GdpDatum		datums = 1;			// data to append
+		required GdpDatumList	dl = 1;				// data list to append
 	}
 
 	// Read a record based on the record number.  Returns a set.
@@ -173,7 +173,7 @@ message GdpMessage
 	// Note: can return a set if there are duplicate recnos.
 	message AckContent
 	{
-		repeated GdpDatum		datums = 1;			// returned data
+		required GdpDatumList	dl = 1;				// returned data list
 	}
 
 	// Generic failure (shared).
@@ -312,6 +312,15 @@ message GdpSignature
 {
 	required uint32			sig_type = 1;
 	required bytes			sig = 2;
+}
+
+/*
+**  A list of datums; generally there will be at least one
+*/
+
+message GdpDatumList
+{
+	repeated GdpDatum		d = 1;				// the list of datums
 }
 
 //message GdpTrailer

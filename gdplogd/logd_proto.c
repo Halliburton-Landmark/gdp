@@ -560,8 +560,12 @@ cmd_read_helper(gdp_req_t *req)
 	{
 		gdpd_ack_resp(req, GDP_ACK_CONTENT);
 		GdpMessage__AckContent *resp = req->rpdu->msg->ack_content;
-		GdpDatum *pbd = resp->datums[0];	//FIXME
+		GdpDatum *pbd = ep_mem_zalloc(sizeof *pbd);
+		gdp_datum__init(pbd);
 		_gdp_datum_to_pb(datum, req->cpdu->msg, pbd);
+		resp->dl->d = ep_mem_malloc(sizeof pbd);
+		resp->dl->d[0] = pbd;
+		resp->dl->n_d = 1;
 	}
 	else
 	{
@@ -571,6 +575,9 @@ cmd_read_helper(gdp_req_t *req)
 		else if (EP_STAT_IS_SAME(estat, GDP_STAT_RECORD_MISSING))
 			gdpd_nak_resp(req, GDP_NAK_C_REC_MISSING,
 						"requested record is not available", estat);
+		else if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOTFOUND))
+			gdpd_nak_resp(req, GDP_NAK_C_NOTFOUND,
+						"record not found", estat);
 		else
 			gdpd_nak_resp(req, GDP_NAK_S_INTERNAL,
 						"unknown read failure", estat);
@@ -714,7 +721,7 @@ cmd_append(gdp_req_t *req)
 
 	GdpMessage__CmdAppend *payload;
 	GET_PAYLOAD(req, cmd_append, CMD_APPEND);
-	GdpDatum *pbd = payload->datums[0];		//FIXME
+	GdpDatum *pbd = payload->dl->d[0];		//FIXME
 
 	CMD_TRACE(req->cpdu->msg->cmd, "%s %" PRIgdp_recno,
 			req->gob->pname, pbd->recno);
@@ -859,8 +866,16 @@ cmd_append(gdp_req_t *req)
 			// send the new datum to any and all subscribers
 			gdp_msg_t *msg = _gdp_msg_new(GDP_ACK_CONTENT,
 									req->cpdu->msg->rid, req->cpdu->msg->seqno);
-			GdpDatum *pbd = msg->ack_content->datums[0];	//FIXME
+
+			GdpDatum *pbd = ep_mem_malloc(sizeof *pbd);
+			gdp_datum__init(pbd);
 			_gdp_datum_to_pb(datum, msg, pbd);
+
+			GdpDatumList *dl = msg->ack_content->dl;
+			dl->d = ep_mem_malloc(sizeof pbd);
+			dl->n_d = 1;
+			dl->d[0] = pbd;
+
 			EP_ASSERT(req->rpdu == NULL);
 			req->rpdu = _gdp_pdu_new(msg, req->cpdu->dst, req->cpdu->src);
 			sub_notify_all_subscribers(req);
@@ -945,7 +960,7 @@ post_subscribe(gdp_req_t *req)
 			// OK, the next record exists: send it
 			gdpd_ack_resp(req, GDP_ACK_CONTENT);
 			GdpMessage__AckContent *resp = req->rpdu->msg->ack_content;
-			GdpDatum *pbd = resp->datums[0];		//FIXME
+			GdpDatum *pbd = resp->dl->d[0];		//FIXME
 			_gdp_datum_to_pb(datum, req->rpdu->msg, pbd);
 		}
 		else if (EP_STAT_IS_SAME(estat, GDP_STAT_RECORD_MISSING))

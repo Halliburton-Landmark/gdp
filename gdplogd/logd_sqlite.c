@@ -84,7 +84,7 @@ static uint32_t		DefaultLogFlags;	// as indicated
 
 static const char *LogSchema =
 				"CREATE TABLE log_entry (\n"
-				"	hash BLOB(32) PRIMARY KEY,\n"
+				"	hash BLOB(32) PRIMARY KEY ON CONFLICT IGNORE,\n"
 				"	recno INTEGER,\n"
 				"	timestamp INTEGER,\n"	// 64 bit, nanoseconds since 1/1/70
 				"	prevhash BLOB(32),\n"
@@ -176,6 +176,7 @@ ep_stat_from_sqlite_result_code(int rc)
 		case SQLITE_ROW:
 		case SQLITE_DONE:
 			sev = EP_STAT_SEV_OK;
+			break;
 
 		case SQLITE_ABORT:
 			sev = EP_STAT_SEV_ABORT;
@@ -192,17 +193,22 @@ ep_stat_from_sqlite_result_code(int rc)
 static EP_STAT
 sqlite_error(int rc, const char *where, const char *phase)
 {
-	if (!sqlite_rc_success(rc))
-		ep_dbg_cprintf(Dbg, 1, "SQLite error (%s during %s): %s\n",
-				where, phase, sqlite3_errstr(rc));
-	return ep_stat_from_sqlite_result_code(rc);
+	EP_STAT estat = ep_stat_from_sqlite_result_code(rc);
+	if (rc != SQLITE_OK && ep_dbg_test(Dbg, 1))
+	{
+		char ebuf[100];
+		ep_dbg_cprintf(Dbg, 1, "SQLite status (%s during %s): %s\n\t%s\n",
+				where, phase, sqlite3_errstr(rc),
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
+	return estat;
 }
 
 
 static void
 sqlite_logger(void *unused, int rc, const char *msg)
 {
-	ep_dbg_printf("SQLite error %d: %s\n", rc, msg);
+	ep_dbg_printf("SQLite log %d: %s\n", rc, msg);
 }
 
 
@@ -558,17 +564,25 @@ sqlite_create(gdp_gob_t *gob, gdp_gclmd_t *gmd)
 					"	VALUES (?, 0, ?);",
 					-1, &stmt, NULL);
 		CHECK_RC(rc, goto fail3);
+
+		// bind log name
 		phase = "metadata bind 1";
 		rc = sqlite3_bind_blob(stmt, 1, gob->name, sizeof gob->name,
 							SQLITE_STATIC);
 		CHECK_RC(rc, goto fail3);
-		phase = "metadata bind 2";
+
+		// bind creation timestamp (needed???)
+		//phase = "metadata bind 2";
 		//rc = sqlite3_bind_blob(stmt, 2, TS, sizeof TS, BLOB_DESTRUCTOR);
 		//CHECK_RC(rc, goto fail3);
+
+		// bind metadata
 		phase = "metadata bind 3";
 		rc = sqlite3_bind_blob(stmt, 2, obuf, mdsize, ep_mem_free);
 		CHECK_RC(rc, goto fail3);
 		phase = "metadata step";
+
+		// do the hard work
 		rc = sqlite3_step(stmt);
 		if (rc != SQLITE_DONE)
 		{
@@ -940,13 +954,21 @@ static EP_STAT
 process_select_results(sqlite3_stmt *stmt, gdp_datum_t *datum)
 {
 	int rc;
+	EP_STAT estat = EP_STAT_OK;
 
 	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW)
 	{
 		process_row(stmt, datum);
 		break;		//TODO: allow multiple rows in one query
 	}
-	return sqlite_error(rc, "process_select_results", "step");
+	int reset_rc = sqlite3_reset(stmt);
+	if (reset_rc != SQLITE_OK)
+		estat = sqlite_error(reset_rc, "process_select_results", "reset");
+	else if (rc == SQLITE_DONE)
+		estat = GDP_STAT_NAK_NOTFOUND;
+	else
+		estat = sqlite_error(rc, "process_select_results", "step");
+	return estat;
 }
 
 
@@ -968,7 +990,7 @@ sqlite_read_by_hash(gdp_gob_t *gob,
 	if (datum->sig != NULL)
 		gdp_sig_reset(datum->sig);
 
-	ep_dbg_cprintf(Dbg, 44, "sqlite_read_by_hash(%s %" PRIgdp_recno "): ",
+	ep_dbg_cprintf(Dbg, 44, "sqlite_read_by_hash(%s %" PRIgdp_recno ")\n",
 			gob->pname, datum->recno);
 
 	ep_thr_rwlock_rdlock(&phys->lock);
@@ -979,7 +1001,7 @@ sqlite_read_by_hash(gdp_gob_t *gob,
 		rc = sqlite3_prepare_v2(phys->db,
 						"SELECT hash, recno, timestamp, prevhash, value, sig"
 						"	FROM log_entry"
-						"	WHERE recno = ?;",
+						"	WHERE hash = ?;",
 						-1, &phys->read_by_hash_stmt, NULL);
 		CHECK_RC(rc, goto fail2);
 	}
@@ -988,15 +1010,13 @@ sqlite_read_by_hash(gdp_gob_t *gob,
 	rc = sqlite3_bind_int64(phys->read_by_hash_stmt, 1, datum->recno);
 	CHECK_RC(rc, goto fail2);
 
-	phase = "step";
+	phase = "process results";
 	estat = process_select_results(phys->read_by_hash_stmt, datum);
 
-	if (!EP_STAT_ISOK(estat))
+	if (false)
 	{
 fail2:
-		ep_dbg_cprintf(Dbg, 1, "sqlite_read_by_hash: %s fread failed: %s\n",
-				phase, strerror(errno));
-		estat = ep_stat_from_errno(errno);
+		estat = sqlite_error(rc, "sqlite_read_by_hash", phase);
 	}
 	if (phys->read_by_hash_stmt != NULL)
 		sqlite3_clear_bindings(phys->read_by_hash_stmt);
@@ -1026,18 +1046,19 @@ sqlite_read_by_recno(gdp_gob_t *gob,
 	if (datum->sig != NULL)
 		gdp_sig_reset(datum->sig);
 
-	ep_dbg_cprintf(Dbg, 44, "sqlite_read_by_recno(%s %" PRIgdp_recno "): ",
+	ep_dbg_cprintf(Dbg, 44, "sqlite_read_by_recno(%s %" PRIgdp_recno ")\n",
 			gob->pname, datum->recno);
 
 	ep_thr_rwlock_rdlock(&phys->lock);
 
 	if (phys->read_by_recno_stmt == NULL)
 	{
+		const char *sql = "SELECT hash, recno, timestamp, prevhash, value, sig\n"
+						"	FROM log_entry\n"
+						"	WHERE recno = ?;\n";
 		phase = "prepare";
-		rc = sqlite3_prepare_v2(phys->db,
-						"SELECT hash, recno, timestamp, prevhash, value, sig"
-						"	FROM log_entry"
-						"	WHERE recno = ?;",
+		ep_dbg_cprintf(Dbg, 55, "preparing\n    %s", sql);
+		rc = sqlite3_prepare_v2(phys->db, sql,
 						-1, &phys->read_by_recno_stmt, NULL);
 		CHECK_RC(rc, goto fail2);
 	}
@@ -1046,15 +1067,13 @@ sqlite_read_by_recno(gdp_gob_t *gob,
 	rc = sqlite3_bind_int64(phys->read_by_recno_stmt, 1, datum->recno);
 	CHECK_RC(rc, goto fail2);
 
-	phase = "step";
+	phase = "process results";
 	estat = process_select_results(phys->read_by_recno_stmt, datum);
 
-	if (!EP_STAT_ISOK(estat))
+	if (false)
 	{
 fail2:
-		ep_dbg_cprintf(Dbg, 1, "sqlite_read_by_recno: %s fread failed: %s\n",
-				phase, strerror(errno));
-		estat = ep_stat_from_errno(errno);
+		estat = sqlite_error(rc, "sqlite_read_by_recno", phase);
 	}
 	if (phys->read_by_recno_stmt != NULL)
 		sqlite3_clear_bindings(phys->read_by_recno_stmt);
@@ -1112,15 +1131,13 @@ sqlite_read_by_timestamp(gdp_gob_t *gob,
 	rc = sqlite3_bind_int64(phys->read_by_timestamp_stmt, 1, datum->recno);
 	CHECK_RC(rc, goto fail2);
 
-	phase = "step";
+	phase = "process results";
 	estat = process_select_results(phys->read_by_timestamp_stmt, datum);
 
-	if (!EP_STAT_ISOK(estat))
+	if (false)
 	{
 fail2:
-		ep_dbg_cprintf(Dbg, 1, "sqlite_read_by_timestamp(%s) failed: %s\n",
-				phase, strerror(errno));
-		estat = ep_stat_from_errno(errno);
+		estat = sqlite_error(rc, "sqlite_read_by_timestamp", phase);
 	}
 	if (phys->read_by_timestamp_stmt != NULL)
 		sqlite3_clear_bindings(phys->read_by_timestamp_stmt);
@@ -1236,13 +1253,13 @@ sqlite_append(gdp_gob_t *gob,
 		}
 
 		phase = "append bind 5";
-		rc = sql_bind_buf(stmt, 6, datum->dbuf);
+		rc = sql_bind_buf(stmt, 5, datum->dbuf);
 		CHECK_RC(rc, goto fail3);
 
 		if (datum->sig != NULL)
 		{
 			phase = "append bind 6";
-			rc = sql_bind_signature(stmt, 5, datum);
+			rc = sql_bind_signature(stmt, 6, datum);
 			CHECK_RC(rc, goto fail3);
 		}
 

@@ -106,6 +106,9 @@ _gdp_msg_new(gdp_cmd_t cmd, gdp_rid_t rid, gdp_seqno_t seqno)
 		msg->cmd_append = (GdpMessage__CmdAppend *)
 					ep_mem_zalloc(sizeof *msg->cmd_append);
 		gdp_message__cmd_append__init(msg->cmd_append);
+		msg->cmd_append->dl = (GdpDatumList *)
+					ep_mem_zalloc(sizeof (GdpDatumList));
+		gdp_datum_list__init(msg->cmd_append->dl);
 		break;
 
 	case GDP_CMD_READ_BY_RECNO:
@@ -172,6 +175,9 @@ _gdp_msg_new(gdp_cmd_t cmd, gdp_rid_t rid, gdp_seqno_t seqno)
 		msg->ack_content = (GdpMessage__AckContent *)
 					ep_mem_zalloc(sizeof *msg->ack_content);
 		gdp_message__ack_content__init(msg->ack_content);
+		msg->ack_content->dl = (GdpDatumList *)
+					ep_mem_zalloc(sizeof (GdpDatumList));
+		gdp_datum_list__init(msg->ack_content->dl);
 		// individual datums need to be allocated and initialized when set
 //		msg->ack_content->datum = (GdpDatum *)
 //					ep_mem_zalloc(sizeof *msg->ack_content->datum);
@@ -313,10 +319,10 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 
 	case GDP_MESSAGE__BODY_CMD_APPEND:
 		fprintf(fp, "cmd_append: ");
-		for (dno = 0; dno < msg->cmd_append->n_datums; dno++)
+		for (dno = 0; dno < msg->cmd_append->dl->n_d; dno++)
 		{
 			fprintf(fp, "[%d] ", dno);
-			print_pb_datum(msg->cmd_append->datums[dno], fp, indent + 1);
+			print_pb_datum(msg->cmd_append->dl->d[dno], fp, indent + 1);
 		}
 		break;
 
@@ -397,10 +403,10 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 
 	case GDP_MESSAGE__BODY_ACK_CONTENT:
 		fprintf(fp, "ack_content: ");
-		for (dno = 0; dno < msg->ack_content->n_datums; dno++)
+		for (dno = 0; dno < msg->ack_content->dl->n_d; dno++)
 		{
 			fprintf(fp, "[%d] ", dno);
-			print_pb_datum(msg->ack_content->datums[dno], fp, indent + 1);
+			print_pb_datum(msg->ack_content->dl->d[dno], fp, indent + 1);
 		}
 		break;
 

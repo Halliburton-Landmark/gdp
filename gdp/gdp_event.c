@@ -450,8 +450,8 @@ _gdp_event_add_from_req(gdp_req_t *req)
 	gev->datum->gob = _gdp_gob_incref(req->gob);
 	if (msg->cmd == GDP_ACK_CONTENT)
 	{
-		EP_ASSERT(msg->ack_content->n_datums == 1);		//FIXME
-		_gdp_datum_from_pb(gev->datum, msg, msg->ack_content->datums[0]);
+		EP_ASSERT(msg->ack_content->dl->n_d == 1);		//FIXME
+		_gdp_datum_from_pb(gev->datum, msg, msg->ack_content->dl->d[0]);
 	}
 
 	// schedule the event for delivery

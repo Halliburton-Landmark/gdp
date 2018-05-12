@@ -549,14 +549,14 @@ append_common(
 		GdpMessage__CmdAppend *payload = msg->cmd_append;
 		EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
 
-		payload->n_datums = n_datums;
-		payload->datums = (GdpDatum **) ep_mem_zalloc(n_datums * sizeof *datums);
+		payload->dl->n_d = n_datums;
+		payload->dl->d = (GdpDatum **) ep_mem_zalloc(n_datums * sizeof *datums);
 		int dno;
 		for (dno = 0; dno < n_datums; dno++)
 		{
-			payload->datums[dno] = (GdpDatum *) ep_mem_zalloc(sizeof (GdpDatum));
-			gdp_datum__init(payload->datums[dno]);
-			_gdp_datum_to_pb(datums[dno], msg, payload->datums[dno]);
+			payload->dl->d[dno] = (GdpDatum *) ep_mem_zalloc(sizeof (GdpDatum));
+			gdp_datum__init(payload->dl->d[dno]);
+			_gdp_datum_to_pb(datums[dno], msg, payload->dl->d[dno]);
 		}
 
 		// set up for signing (req->digest will be updated with data part)
@@ -569,7 +569,7 @@ append_common(
 			EP_CRYPTO_MD *md = ep_crypto_md_clone(req->digest);
 
 			// only sign the last datum in the set
-			GdpDatum *pbdatum = payload->datums[dno - 1];
+			GdpDatum *pbdatum = payload->dl->d[dno - 1];
 
 			recnobuf[0] = msg->cmd;
 			ep_crypto_sign_update(md, &recnobuf[0], 1);
@@ -770,7 +770,7 @@ _gdp_gob_read_by_recno(gdp_gob_t *gob,
 	EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
 
 	// make sure there really is a record there
-	if (payload->n_datums < 1)
+	if (payload->dl->n_d < 1)
 	{
 		ep_dbg_cprintf(Dbg, 1, "_gdp_gob_read_by_recno: no data\n");
 		estat = GDP_STAT_RECORD_MISSING;
@@ -778,7 +778,7 @@ _gdp_gob_read_by_recno(gdp_gob_t *gob,
 	else
 	{
 		// ok, done!  pass the datum contents to the caller and free the request
-		_gdp_datum_from_pb(datum, msg, payload->datums[0]);
+		_gdp_datum_from_pb(datum, msg, payload->dl->d[0]);
 	}
 
 fail1:
