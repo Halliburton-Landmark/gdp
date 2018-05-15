@@ -518,15 +518,18 @@ append_common(
 		}
 		// assumes records are written in order with no gaps
 		datum->recno = recno++;
+		if (!EP_TIME_IS_VALID(&datum->ts))
+			ep_time_now(&datum->ts);
+		if (datum->prevhash != NULL)
+			gdp_hash_free(datum->prevhash);
 		if (dno > 1)
 		{
 			if (datum->dhash != NULL)
 				gdp_hash_free(datum->dhash);
-//				gdp_hash_reset(datum->dhash);
-//			else
-//				datum->dhash = gdp_hash_new();
 			datum->dhash = gdp_datum_hash(datums[dno - 1]);
 		}
+		datum->prevhash = prevhash;
+		prevhash = gdp_datum_hash(datum);
 	}
 
 	// compute the signature on the final record in the chain

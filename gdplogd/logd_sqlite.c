@@ -43,7 +43,7 @@
 #include <gdp/gdp_gclmd.h>
 
 //#include <ep/ep_hash.h>
-//#include <ep/ep_hexdump.h>
+#include <ep/ep_hexdump.h>
 //#include <ep/ep_log.h>
 //#include <ep/ep_mem.h>
 #include <ep/ep_net.h>
@@ -197,8 +197,8 @@ sqlite_error(int rc, const char *where, const char *phase)
 	if (rc != SQLITE_OK && ep_dbg_test(Dbg, 1))
 	{
 		char ebuf[100];
-		ep_dbg_cprintf(Dbg, 1, "SQLite status (%s during %s): %s\n\t%s\n",
-				where, phase, sqlite3_errstr(rc),
+		ep_dbg_cprintf(Dbg, 1, "SQLite status (%s during %s): %s (%d)\n\t%s\n",
+				where, phase, sqlite3_errstr(rc), rc,
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 	return estat;
@@ -278,8 +278,10 @@ sql_bind_recno(sqlite3_stmt *stmt, int index, gdp_recno_t recno)
 static int
 sql_bind_timestamp(sqlite3_stmt *stmt, int index, EP_TIME_SPEC *ts)
 {
-	int64_t int_time = ts->tv_sec * (10 ^ 9);
-	int_time += ts->tv_nsec;
+	//FIXME: expand range on times, either by storing in microseconds
+	//		or including two fields in database
+	//FIXME: include accuracy in database
+	int64_t int_time = ts->tv_sec SECONDS + ts->tv_nsec;
 	int rc = sqlite3_bind_int64(stmt, index, int_time);
 	return rc;
 }
@@ -550,49 +552,67 @@ sqlite_create(gdp_gob_t *gob, gdp_gclmd_t *gmd)
 	// http://www.sqlite.org/wal.html
 
 	// write metadata to log
-	uint8_t *obuf;
-	size_t mdsize = _gdp_gclmd_serialize(gmd, &obuf);
-	if (obuf != NULL)
+	phase = "metadata prepare";
+	sqlite3_stmt *stmt;
+	rc = sqlite3_prepare_v2(phys->db,
+				"INSERT INTO log_entry"
+				"	(hash, recno, timestamp, value)"
+				"	VALUES (?, 0, ?, ?);",
+				-1, &stmt, NULL);
+	CHECK_RC(rc, goto fail3);
+
+	// bind log name
+	phase = "metadata bind 1";
+	rc = sqlite3_bind_blob(stmt, 1, gob->name, sizeof gob->name,
+						SQLITE_STATIC);
+	CHECK_RC(rc, goto fail3);
+
+	// bind creation timestamp
+	phase = "metadata bind 2";
 	{
-		sqlite3_stmt *stmt;
-		//FIXME: need values for hash, prevhash
+		EP_TIME_SPEC ts;
 
-		phase = "metadata prepare";
-		rc = sqlite3_prepare_v2(phys->db,
-					"INSERT INTO log_entry"
-					"	(hash, recno, value)"
-					"	VALUES (?, 0, ?);",
-					-1, &stmt, NULL);
+		ep_time_now(&ts);
+		rc = sql_bind_timestamp(stmt, 2, &ts);
 		CHECK_RC(rc, goto fail3);
-
-		// bind log name
-		phase = "metadata bind 1";
-		rc = sqlite3_bind_blob(stmt, 1, gob->name, sizeof gob->name,
-							SQLITE_STATIC);
-		CHECK_RC(rc, goto fail3);
-
-		// bind creation timestamp (needed???)
-		//phase = "metadata bind 2";
-		//rc = sqlite3_bind_blob(stmt, 2, TS, sizeof TS, BLOB_DESTRUCTOR);
-		//CHECK_RC(rc, goto fail3);
-
-		// bind metadata
-		phase = "metadata bind 3";
-		rc = sqlite3_bind_blob(stmt, 2, obuf, mdsize, ep_mem_free);
-		CHECK_RC(rc, goto fail3);
-		phase = "metadata step";
-
-		// do the hard work
-		rc = sqlite3_step(stmt);
-		if (rc != SQLITE_DONE)
-		{
-fail3:
-//FIXME: obuf doesn't get freed if one of the earlier binds fails first
-			estat = ep_stat_from_sqlite_result_code(rc);
-		}
-		sqlite3_finalize(stmt);
-		EP_STAT_CHECK(estat, goto fail1);
 	}
+
+	// bind metadata content
+	phase = "metadata bind 3";
+	{
+		uint8_t *obuf;
+		size_t mdsize = _gdp_gclmd_serialize(gmd, &obuf);
+		if (ep_dbg_test(Dbg, 34))
+		{
+			ep_dbg_printf("sqlite_create: gmd %p obuf %p mdsize %zd\n",
+					gmd, obuf, mdsize);
+			ep_hexdump(obuf, mdsize, ep_dbg_getfile(), EP_HEXDUMP_ASCII, 0);
+		}
+		if (gmd == NULL || mdsize == 0)
+		{
+			ep_dbg_cprintf(Dbg, 1,
+					"sqlite_create: no metadata (gmd %p)\n",
+					gmd);
+			estat = GDP_STAT_METADATA_REQUIRED;
+			goto fail0;
+		}
+		rc = sqlite3_bind_blob(stmt, 3, obuf, mdsize, SQLITE_TRANSIENT);
+		CHECK_RC(rc, goto fail3);
+	}
+
+	//FIXME: need values for prevhash
+
+	// do the hard work
+	phase = "metadata step";
+	rc = sqlite3_step(stmt);
+	if (rc != SQLITE_DONE)
+	{
+fail3:
+		//FIXME: obuf doesn't get freed if one of the earlier binds fails first
+		estat = ep_stat_from_sqlite_result_code(rc);
+	}
+	sqlite3_finalize(stmt);
+	EP_STAT_CHECK(estat, goto fail1);
 
 	phys->min_recno = 1;
 	phys->max_recno = 0;
@@ -733,7 +753,7 @@ sqlite_open(gdp_gob_t *gob)
 						-1, &stmt, NULL);
 		CHECK_RC(rc, goto fail2);
 		rc = sqlite3_step(stmt);
-		CHECK_RC(rc, goto fail2);
+		CHECK_RC(rc, goto fail4);
 		const uint8_t *md_blob;
 		size_t md_size = sqlite3_column_bytes(stmt, 0);
 		md_blob = sqlite3_column_blob(stmt, 0);
@@ -741,7 +761,28 @@ sqlite_open(gdp_gob_t *gob)
 		{
 			gob->gclmd = _gdp_gclmd_deserialize(md_blob, md_size);
 		}
+fail4:
 		sqlite3_finalize(stmt);
+		CHECK_RC(rc, goto fail2);
+	}
+
+	// read stats
+	{
+		sqlite3_stmt *stmt;
+		rc = sqlite3_prepare_v2(phys->db,
+						"SELECT min(recno), max(recno) FROM log_entry"
+						"    WHERE recno > 0;",
+						-1, &stmt, NULL);
+		CHECK_RC(rc, goto fail2);
+		rc = sqlite3_step(stmt);
+		if (rc == SQLITE_ROW)
+		{
+			phys->min_recno = sqlite3_column_int64(stmt, 0);
+			phys->max_recno = gob->nrecs = sqlite3_column_int64(stmt, 1);
+		}
+
+		sqlite3_finalize(stmt);
+		CHECK_RC(rc, goto fail2);
 	}
 
 	if (ep_dbg_test(Dbg, 20))
@@ -966,7 +1007,7 @@ process_select_results(sqlite3_stmt *stmt, gdp_datum_t *datum)
 		estat = sqlite_error(reset_rc, "process_select_results", "reset");
 	else if (rc == SQLITE_DONE)
 		estat = GDP_STAT_NAK_NOTFOUND;
-	else
+	else if (!sqlite_rc_success(rc))
 		estat = sqlite_error(rc, "process_select_results", "step");
 	return estat;
 }

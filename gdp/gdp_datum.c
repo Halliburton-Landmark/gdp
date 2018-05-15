@@ -161,8 +161,8 @@ gdp_datum_reset(gdp_datum_t *datum)
 	datum->mdalg = 0;
 	if (datum->sig != NULL)
 		gdp_sig_reset(datum->sig);
-//	datum->recno = GDP_PDU_NO_RECNO;
-//	EP_TIME_INVALIDATE(&datum->ts);
+	datum->recno = GDP_PDU_NO_RECNO;
+	EP_TIME_INVALIDATE(&datum->ts);
 }
 
 
@@ -474,7 +474,10 @@ _gdp_datum_to_pb(const gdp_datum_t *datum,
 				GdpMessage *msg,
 				GdpDatum *pbd)
 {
+	// recno
 	pbd->recno = datum->recno;
+
+	// timestamp
 	if (EP_TIME_IS_VALID(&datum->ts))
 	{
 		if (pbd->ts == NULL)
@@ -483,9 +486,19 @@ _gdp_datum_to_pb(const gdp_datum_t *datum,
 			gdp_timestamp__init(pbd->ts);
 		}
 		pbd->ts->sec = datum->ts.tv_sec;
+		pbd->ts->has_sec = true;
 		pbd->ts->nsec = datum->ts.tv_nsec;
+		pbd->ts->has_nsec = pbd->ts->nsec != 0;
 		pbd->ts->accuracy = datum->ts.tv_accuracy;
+		pbd->ts->has_accuracy = pbd->ts->accuracy != 0.0;
 	}
+	else if (pbd->ts != NULL)
+	{
+		gdp_timestamp__free_unpacked(pbd->ts, NULL);
+		pbd->ts = NULL;
+	}
+
+	// data payload
 	if (datum->dbuf != NULL && gdp_buf_getlength(datum->dbuf) > 0)
 	{
 		size_t l = gdp_buf_getlength(datum->dbuf);
@@ -494,6 +507,7 @@ _gdp_datum_to_pb(const gdp_datum_t *datum,
 		memcpy(pbd->data.data, gdp_buf_getptr(datum->dbuf, l), l);
 	}
 
+	// hash of previous record
 	if (datum->prevhash == NULL)
 		pbd->has_prevhash = false;
 	else
@@ -507,6 +521,7 @@ _gdp_datum_to_pb(const gdp_datum_t *datum,
 		memcpy(pbd->prevhash.data, gdp_hash_getptr(datum->prevhash, NULL), l);
 	}
 
+	// signature
 	if (datum->sig != NULL)
 	{
 		if (pbd->sig == NULL)

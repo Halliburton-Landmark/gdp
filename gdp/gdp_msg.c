@@ -235,7 +235,7 @@ print_pb_ts(const GdpTimestamp *ts, FILE *fp)
 static void
 print_pb_datum(const GdpDatum *d, FILE *fp, int indent)
 {
-	fprintf(fp, "datum@%p\n", d);
+	fprintf(fp, "pbdatum@%p\n", d);
 	fprintf(fp, "%srecno %" PRIgdp_recno ", ts ",
 			_gdp_pr_indent(indent), d->recno);
 	print_pb_ts(d->ts, fp);
@@ -247,9 +247,9 @@ print_pb_datum(const GdpDatum *d, FILE *fp, int indent)
 	}
 	else
 	{
-		fprintf(fp, "\n%shash=(none)", _gdp_pr_indent(indent));
+		fprintf(fp, "\n%sprevhash=(none)", _gdp_pr_indent(indent));
 	}
-	fprintf(fp, " data[%zd]=\n", d->data.len);
+	fprintf(fp, ", data[%zd]=\n", d->data.len);
 	ep_hexdump(d->data.data, d->data.len, fp, EP_HEXDUMP_ASCII, 0);
 }
 
@@ -318,10 +318,10 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 		break;
 
 	case GDP_MESSAGE__BODY_CMD_APPEND:
-		fprintf(fp, "cmd_append: ");
+		fprintf(fp, "cmd_append: ndatums %zd\n", msg->cmd_append->dl->n_d);
 		for (dno = 0; dno < msg->cmd_append->dl->n_d; dno++)
 		{
-			fprintf(fp, "[%d] ", dno);
+			fprintf(fp, "%s[%d] ", _gdp_pr_indent(indent), dno);
 			print_pb_datum(msg->cmd_append->dl->d[dno], fp, indent + 1);
 		}
 		break;
@@ -374,9 +374,9 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 		break;
 
 	case GDP_MESSAGE__BODY_ACK_SUCCESS:
-		fprintf(fp, "ack_success");
+		fprintf(fp, "ack_success, recno=");
 		if (msg->ack_success->has_recno)
-			fprintf(fp, ", recno=%" PRIgdp_recno "\n",
+			fprintf(fp, "%" PRIgdp_recno,
 						msg->ack_success->recno);
 		fprintf(fp, ", ts=");
 		print_pb_ts(msg->ack_success->ts, fp);
@@ -388,13 +388,16 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 						msg->ack_success->hash.len,
 						fp, EP_HEXDUMP_TERSE, 0);
 		}
+		fprintf(fp, "%smetadata=", _gdp_pr_indent(indent + 1));
 		if (msg->ack_success->has_metadata)
 		{
-			fprintf(fp, "%smetadata=\n", _gdp_pr_indent(indent + 1));
+			fprintf(fp, "\n");
 			ep_hexdump(msg->ack_success->metadata.data,
 						msg->ack_success->metadata.len,
 						fp, EP_HEXDUMP_ASCII, 0);
 		}
+		else
+			fprintf(fp, "(none)\n");
 		break;
 
 	case GDP_MESSAGE__BODY_ACK_CHANGED:

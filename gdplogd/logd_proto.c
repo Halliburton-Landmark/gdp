@@ -314,7 +314,14 @@ cmd_create(gdp_req_t *req)
 	estat = gob_alloc(gobname, GDP_MODE_AO, &gob);
 	EP_STAT_CHECK(estat, goto fail0);
 
-	// collect metadata, if any
+	// collect metadata
+	if (payload->metadata->data.len == 0)
+	{
+		estat = gdpd_nak_resp(req, GDP_NAK_C_BADOPT,
+						"cmd_create: metadata required",
+						GDP_STAT_METADATA_REQUIRED);
+		goto fail0;
+	}
 	gmd = _gdp_gclmd_deserialize(payload->metadata->data.data,
 							payload->metadata->data.len);
 
@@ -348,8 +355,8 @@ cmd_create(gdp_req_t *req)
 	// pass any creation info back to the caller
 	// (none at this point)
 
-fail0:
 fail1:
+fail0:
 	if (EP_STAT_ISOK(estat))
 	{
 		gdpd_ack_resp(req, GDP_ACK_CREATED);
@@ -838,6 +845,7 @@ cmd_append(gdp_req_t *req)
 		}
 	}
 
+#if 0	//XXX breaks signatures
 	// make sure timestamp in payload is up to date
 	{
 		EP_TIME_SPEC now;
@@ -856,6 +864,7 @@ cmd_append(gdp_req_t *req)
 			pbd->ts->has_accuracy = true;
 		pbd->ts->accuracy = now.tv_accuracy;
 	}
+#endif //XXX
 
 	// append to disk file and send to subscribers
 	{
@@ -1350,6 +1359,7 @@ cmd_getmetadata(gdp_req_t *req)
 		GdpMessage__AckSuccess *resp = req->rpdu->msg->ack_success;
 		resp->metadata.data = mdbuf;
 		resp->metadata.len = mdlen;
+		resp->has_metadata = true;
 	}
 	else
 	{

@@ -86,6 +86,7 @@ static struct ep_stat_to_string Stats[] =
 	{ GDP_STAT_INVOKE_TIMEOUT,			"GDP command timeout",				},
 	{ GDP_STAT_PDU_TOO_LONG,			"PDU too long",						},
 	{ GDP_STAT_CHAN_NOT_CONNECTED,		"cannot connect to router",			},
+	{ GDP_STAT_METADATA_REQUIRED,		"logs must have metadata",			},
 
 	{ GDP_STAT_NAK_BADREQ,				"400 bad request",					},
 	{ GDP_STAT_NAK_UNAUTH,				"401 unauthorized",					},
