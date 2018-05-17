@@ -396,9 +396,11 @@ process_resp(void *rpdu_)
 			rpdu, gdp_printable_name(rpdu->src, rpdu_pname), gob,
 			ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
-	// check estat here?
+
+	// check estat here, or is just checking gob enough?
 	if (gob == NULL)
 	{
+		// gob was not in cache
 		char ebuf[200];
 
 		estat = find_req_in_channel_list(rpdu, chan, &req);
@@ -449,12 +451,15 @@ process_resp(void *rpdu_)
 	}
 	else
 	{
+		// gob was found in cache
 		GDP_GOB_ASSERT_ISLOCKED(gob);
 
 		// find the corresponding request
 		ep_dbg_cprintf(DbgProcResp, 23,
 				"process_resp: searching gob %p for rid %" PRIgdp_rid "\n",
 				gob, rpdu->msg->rid);
+
+		// find request to which this PDU applies
 		req = _gdp_req_find(gob, rpdu->msg->rid);
 		if (ep_dbg_test(DbgProcResp, 51))
 		{
@@ -610,12 +615,11 @@ process_resp(void *rpdu_)
 	}
 
 	// free up resources
+	// use a shadow variable so req does not lose gob
 	gob = req->gob;
 	if (gob != NULL)
 	{
-		// use a shadow variable so req does not lose gob
-		GDP_GOB_ASSERT_ISLOCKED(gob);
-		_gdp_gob_decref(&gob, true);
+		_gdp_gob_decref(&gob, false);
 		gob = req->gob;
 	}
 
@@ -623,9 +627,6 @@ process_resp(void *rpdu_)
 		_gdp_req_unlock(req);
 	else
 		_gdp_req_free(&req);
-
-	if (gob != NULL)
-		_gdp_gob_unlock(gob);
 
 	ep_dbg_cprintf(DbgProcResp, 40, "process_resp <<< done\n");
 }

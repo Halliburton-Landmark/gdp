@@ -446,8 +446,7 @@ _gdp_event_add_from_req(gdp_req_t *req)
 	gev->stat = req->stat;
 	gev->udata = req->sub_cbarg;
 	gev->cb = req->sub_cbfunc;
-	gev->datum = gdp_datum_new(NULL);
-	gev->datum->gob = _gdp_gob_incref(req->gob);
+	gev->datum = gdp_datum_new(req->gin);
 	if (msg->cmd == GDP_ACK_CONTENT)
 	{
 		EP_ASSERT(msg->ack_content->dl->n_d == 1);		//FIXME

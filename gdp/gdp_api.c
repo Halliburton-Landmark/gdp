@@ -197,6 +197,13 @@ _gdp_gin_dump(
 	VALGRIND_HG_ENABLE_CHECKING(gin, sizeof *gin);
 }
 
+static void
+unlock_gin_and_gob(gdp_gin_t *gin, const char *where)
+{
+	_gdp_gob_unlock(gin->gob);
+	_gdp_gin_unlock(gin);
+}
+
 static EP_STAT
 check_and_lock_gin(gdp_gin_t *gin, const char *where)
 {
@@ -231,18 +238,8 @@ check_and_lock_gin_and_gob(gdp_gin_t *gin, const char *where)
 	else if (gin->gob->refcnt <= 0)
 		estat = bad_gin(gin, where, "gob bad refcnt");
 	if (!EP_STAT_ISOK(estat))
-	{
-		_gdp_gob_unlock(gin->gob);
-		_gdp_gin_unlock(gin);
-	}
+		unlock_gin_and_gob(gin, "check_and_lock_gin_and_gob");
 	return estat;
-}
-
-static void
-unlock_gin_and_gob(gdp_gin_t *gin, const char *where)
-{
-	_gdp_gob_unlock(gin->gob);
-	_gdp_gin_unlock(gin);
 }
 
 

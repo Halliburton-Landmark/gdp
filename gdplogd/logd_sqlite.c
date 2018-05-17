@@ -51,7 +51,7 @@
 //#include <ep/ep_thr.h>
 
 #include <dirent.h>
-//#include <errno.h>
+#include <errno.h>
 //#include <fcntl.h>
 //#include <inttypes.h>
 //#include <stdint.h>
