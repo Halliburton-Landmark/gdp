@@ -234,7 +234,7 @@ main(int argc, char **argv)
 		populate_info(json);
 
 		// write it out... get a datum and the I/O buffer...
-		gdp_datum_t *datum = gdp_datum_new(MonGcl);
+		gdp_datum_t *datum = gdp_datum_new();
 		gdp_buf_t *buf = gdp_datum_getbuf(datum);
 
 		// marshall the JSON to a string

@@ -167,7 +167,7 @@ struct gdp_datum
 				 (datum)->inuse)
 
 gdp_datum_t		*_gdp_datum_new_gob(	// generate new datum from GOB
-						gdp_gob_t *gob);
+						void);
 
 gdp_datum_t		*gdp_datum_dup(			// duplicate a datum
 						const gdp_datum_t *datum);

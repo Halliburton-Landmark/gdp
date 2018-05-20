@@ -357,7 +357,7 @@ gob_reclaim_subscriptions(gdp_gob_t *gob)
 		}
 		return;
 	}
-	gob->flags |= GCLF_ISLOCKED;
+	gob->flags |= GCLF_ISLOCKED;	// if trylock succeeded
 
 	nextreq = LIST_FIRST(&gob->reqs);
 	while ((req = nextreq) != NULL)

@@ -56,16 +56,7 @@ static EP_THR_MUTEX		DatumFreeListMutex EP_THR_MUTEX_INITIALIZER2(GDP_MUTEX_LORD
 */
 
 gdp_datum_t *
-gdp_datum_new(const gdp_gin_t *gin)
-{
-	_gdp_gob_lock(gin->gob);
-	gdp_datum_t *datum = _gdp_datum_new_gob(gin->gob);
-	_gdp_gob_unlock(gin->gob);
-	return datum;
-}
-
-gdp_datum_t *
-_gdp_datum_new_gob(gdp_gob_t *gob)
+gdp_datum_new(void)
 {
 	gdp_datum_t *datum;
 
@@ -87,7 +78,6 @@ _gdp_datum_new_gob(gdp_gob_t *gob)
 	datum->next = NULL;
 
 	EP_ASSERT(!datum->inuse);
-	datum->gob = _gdp_gob_incref(gob);
 
 	// initialize metadata
 	gdp_datum_reset(datum);
@@ -122,7 +112,8 @@ gdp_datum_free(gdp_datum_t *datum)
 		gdp_sig_free(datum->sig);
 		datum->sig = NULL;
 	}
-	_gdp_gob_decref(&datum->gob, true);
+	if (datum->gob != NULL)
+		_gdp_gob_decref(&datum->gob, true);
 
 	// make sure the datum is unlocked before putting on the free list
 	if (ep_thr_mutex_trylock(&datum->mutex) != 0)
@@ -303,6 +294,10 @@ gdp_datum_copy(gdp_datum_t *to, const gdp_datum_t *from)
 	to->ts = from->ts;
 	to->mdalg = from->mdalg;
 	to->inuse = from->inuse;
+	if (to->gob != NULL)
+		_gdp_gob_decref(&to->gob, true);
+	if (from->gob != NULL)
+		to->gob = _gdp_gob_incref(from->gob);
 	if (from->dbuf != NULL)
 	{
 		if (EP_ASSERT(to->dbuf != NULL))
@@ -325,8 +320,9 @@ gdp_datum_dup(const gdp_datum_t *datum)
 {
 	gdp_datum_t *ndatum;
 
-	ndatum = gdp_datum_new(NULL);
-	ndatum->gob = _gdp_gob_incref(datum->gob);
+	ndatum = gdp_datum_new();
+	if (datum->gob != NULL)
+		ndatum->gob = _gdp_gob_incref(datum->gob);
 	ndatum->recno = datum->recno;
 	ndatum->ts = datum->ts;
 	gdp_buf_copy(ndatum->dbuf, datum->dbuf);

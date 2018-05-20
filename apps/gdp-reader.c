@@ -130,7 +130,7 @@ do_simpleread(gdp_gcl_t *gcl,
 		int numrecs)
 {
 	EP_STAT estat = EP_STAT_OK;
-	gdp_datum_t *datum = gdp_datum_new(gcl);
+	gdp_datum_t *datum = gdp_datum_new();
 	bool first_record = true;
 
 	// change the "infinity" sentinel to make the loop easier

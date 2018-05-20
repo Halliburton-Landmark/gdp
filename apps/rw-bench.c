@@ -213,7 +213,7 @@ main(int argc, char *argv[])
 				start_time.tv_sec, start_time.tv_nsec);
 		for (i = 0; i < num_records; ++i)
 		{
-			gdp_datum_t *datum = gdp_datum_new();
+			gdp_datum_t *datum = gdp_datum_new(gcl_write);
 			size_t dlen = strlen(&data[(i * max_record_size)]);
 
 			datum->recno = i + 1;
@@ -237,7 +237,7 @@ main(int argc, char *argv[])
 				start_time.tv_sec, start_time.tv_nsec);
 		for (i = 0; i < num_records; ++i)
 		{
-			gdp_datum_t *datum = gdp_datum_new();
+			gdp_datum_t *datum = gdp_datum_new(gcl_read);
 
 			estat = gdp_gcl_read(gcl_read, i + 1, datum);
 			EP_STAT_CHECK(estat, goto fail2);

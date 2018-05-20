@@ -336,6 +336,7 @@ _gdp_gcl_unsubscribe(gdp_gin_t *gin,
 	estat = _gdp_req_new(GDP_CMD_UNSUBSCRIBE, gin->gob, _GdpChannel, NULL,
 						reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
+	req->gin = gin;
 
 	GDP_MSG_CHECK(req->cpdu, return EP_STAT_ASSERT_ABORT);
 

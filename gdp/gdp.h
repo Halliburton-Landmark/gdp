@@ -498,7 +498,7 @@ void			gdp_gclmd_print(
 */
 
 // allocate a new message datum
-gdp_datum_t		*gdp_datum_new(const gdp_gin_t *gin);
+gdp_datum_t		*gdp_datum_new(void);
 
 // free a message datum
 void			gdp_datum_free(gdp_datum_t *);
