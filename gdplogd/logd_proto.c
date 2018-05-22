@@ -33,7 +33,7 @@
 #include "logd_pubsub.h"
 
 #include <gdp/gdp_chan.h>		// for PUT64
-#include <gdp/gdp_gclmd.h>
+#include <gdp/gdp_md.h>
 #include <gdp/gdp_priv.h>
 
 #include <ep/ep_assert.h>
@@ -262,7 +262,7 @@ cmd_create(gdp_req_t *req)
 {
 	EP_STAT estat;
 	gdp_gob_t *gob = NULL;
-	gdp_gclmd_t *gmd;
+	gdp_md_t *gmd;
 	gdp_name_t gobname;
 
 	if (!GDP_NAME_SAME(req->cpdu->dst, _GdpMyRoutingName))
@@ -290,7 +290,7 @@ cmd_create(gdp_req_t *req)
 		}
 		estat = gdpd_nak_resp(req, GDP_NAK_C_BADREQ,
 						"cmd_create: improper log name",
-						GDP_STAT_GCL_NAME_INVALID);
+						GDP_STAT_GDP_NAME_INVALID);
 		goto fail0;
 	}
 	memcpy(gobname, payload->logname.data, sizeof gobname);
@@ -300,7 +300,7 @@ cmd_create(gdp_req_t *req)
 	{
 		estat = gdpd_nak_resp(req, GDP_NAK_C_FORBIDDEN,
 				"cmd_create: cannot create a log with same name as logd",
-				GDP_STAT_GCL_NAME_INVALID);
+				GDP_STAT_GDP_NAME_INVALID);
 		goto fail0;
 	}
 
@@ -322,7 +322,7 @@ cmd_create(gdp_req_t *req)
 						GDP_STAT_METADATA_REQUIRED);
 		goto fail0;
 	}
-	gmd = _gdp_gclmd_deserialize(payload->metadata->data.data,
+	gmd = _gdp_md_deserialize(payload->metadata->data.data,
 							payload->metadata->data.len);
 
 	// have to get lock ordering right here.
@@ -333,8 +333,8 @@ cmd_create(gdp_req_t *req)
 	_gdp_req_lock(req);
 
 	// do the physical create
-	gob->gclmd = gmd;
-	estat = gob->x->physimpl->create(gob, gob->gclmd);
+	gob->gob_md = gmd;
+	estat = gob->x->physimpl->create(gob, gob->gob_md);
 	if (!EP_STAT_ISOK(estat))
 	{
 		estat = gdpd_nak_resp(req, GDP_NAK_S_INTERNAL,
@@ -345,8 +345,8 @@ cmd_create(gdp_req_t *req)
 
 	// cache the open GOB Handle for possible future use
 	EP_ASSERT(gdp_name_is_valid(gob->name));
-	gob->flags |= GCLF_DEFER_FREE;
-	gob->flags &= ~GCLF_PENDING;
+	gob->flags |= GOBF_DEFER_FREE;
+	gob->flags &= ~GOBF_PENDING;
 	_gdp_gob_cache_add(gob);
 
 	// advertise this new GOB
@@ -404,13 +404,13 @@ cmd_open(gdp_req_t *req)
 	GdpMessage__AckSuccess *resp = req->rpdu->msg->ack_success;
 
 	gob = req->gob;
-	gob->flags |= GCLF_DEFER_FREE;
-	if (gob->gclmd != NULL)
+	gob->flags |= GOBF_DEFER_FREE;
+	if (gob->gob_md != NULL)
 	{
 		// send metadata as response payload
 		uint8_t *obuf;
 		size_t olen;
-		olen = _gdp_gclmd_serialize(gob->gclmd, &obuf);
+		olen = _gdp_md_serialize(gob->gob_md, &obuf);
 		resp->metadata.data = obuf;
 		resp->metadata.len = olen;
 		resp->has_metadata = true;
@@ -659,9 +659,9 @@ init_sig_digest(gdp_gob_t *gob)
 		return EP_STAT_OK;
 
 	// assuming we have a public key, set up the message digest context
-	if (gob->gclmd == NULL)
+	if (gob->gob_md == NULL)
 		goto nopubkey;
-	estat = gdp_gclmd_find(gob->gclmd, GDP_GCLMD_PUBKEY, &pklen,
+	estat = gdp_md_find(gob->gob_md, GDP_MD_PUBKEY, &pklen,
 					(const void **) &pkbuf);
 	if (!EP_STAT_ISOK(estat) || pklen < 5)
 		goto nopubkey;
@@ -683,7 +683,7 @@ init_sig_digest(gdp_gob_t *gob)
 	// and the metadata (re-serialized)
 	{
 		uint8_t *mdbuf;
-		size_t mdlen = _gdp_gclmd_serialize(gob->gclmd, &mdbuf);
+		size_t mdlen = _gdp_md_serialize(gob->gob_md, &mdbuf);
 		ep_crypto_vrfy_update(gob->digest, mdbuf, mdlen);
 		ep_mem_free(mdbuf);
 	}
@@ -1338,7 +1338,7 @@ cmd_unsubscribe(gdp_req_t *req)
 EP_STAT
 cmd_getmetadata(gdp_req_t *req)
 {
-	gdp_gclmd_t *gmd;
+	gdp_md_t *gmd;
 	EP_STAT estat;
 
 	estat = get_open_handle(req);
@@ -1357,7 +1357,7 @@ cmd_getmetadata(gdp_req_t *req)
 	if (EP_STAT_ISOK(estat))
 	{
 		uint8_t *mdbuf;
-		size_t mdlen = _gdp_gclmd_serialize(gmd, &mdbuf);
+		size_t mdlen = _gdp_md_serialize(gmd, &mdbuf);
 		gdpd_ack_resp(req, GDP_ACK_SUCCESS);
 		GdpMessage__AckSuccess *resp = req->rpdu->msg->ack_success;
 		resp->metadata.data = mdbuf;
@@ -1413,7 +1413,7 @@ cmd_fwd_append(gdp_req_t *req)
 		{
 			return gdpd_nak_resp(req, GDP_NAK_S_INTERNAL,
 								"cmd_fwd_append: gobname required",
-								GDP_STAT_GCL_NAME_INVALID);
+								GDP_STAT_GDP_NAME_INVALID);
 		}
 		memcpy(req->cpdu->dst, gobname, sizeof req->cpdu->dst);
 

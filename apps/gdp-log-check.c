@@ -644,7 +644,7 @@ find_segs(gdp_gob_t *gob)
 			break;
 		}
 
-		if (strncmp(dent->d_name, gob->pname, GDP_GCL_PNAME_LEN) != 0)
+		if (strncmp(dent->d_name, gob->pname, GDP_GOB_PNAME_LEN) != 0)
 		{
 			// not relevant
 			continue;
@@ -665,17 +665,17 @@ find_segs(gdp_gob_t *gob)
 
 		// drop the extension and check to make sure we have a full name
 		*p = '\0';
-		if (strlen(dent->d_name) < GDP_GCL_PNAME_LEN)
+		if (strlen(dent->d_name) < GDP_GOB_PNAME_LEN)
 			continue;
 
 		// if this length is that of a pname, assume old style
-		if (strlen(dent->d_name) == GDP_GCL_PNAME_LEN)
+		if (strlen(dent->d_name) == GDP_GOB_PNAME_LEN)
 		{
 			// looks like an old style name
 			pre_segment = true;
 			segno = 0;
 		}
-		else if (dent->d_name[GDP_GCL_PNAME_LEN] != '-')
+		else if (dent->d_name[GDP_GOB_PNAME_LEN] != '-')
 		{
 			// if not, next character should be a hyphen
 			continue;
@@ -684,7 +684,7 @@ find_segs(gdp_gob_t *gob)
 		}
 		else
 		{
-			long ssegno = atol(&dent->d_name[GDP_GCL_PNAME_LEN + 1]);
+			long ssegno = atol(&dent->d_name[GDP_GOB_PNAME_LEN + 1]);
 			if (ssegno > 0)
 				segno = ssegno;
 		}

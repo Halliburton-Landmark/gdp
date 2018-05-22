@@ -57,11 +57,11 @@ main(int argc, char **argv)
 	int opt;
 	bool show_usage = false;
 	EP_STAT estat;
-	gdp_gcl_t *igcl, *ogcl;
+	gdp_gin_t *igin, *ogin;
 	char *gdpd_addr = NULL;
 	const char *lname, *lmode;
 	gdp_recno_t nextrecno;
-	gdp_name_t gcliname;
+	gdp_name_t gdpiname;
 	gdp_event_t *gev;
 
 	while ((opt = getopt(argc, argv, "D:G:")) > 0)
@@ -101,30 +101,30 @@ main(int argc, char **argv)
 	// open target GCL (must already exist)
 	lname = argv[1];
 	lmode = "append";
-	gdp_parse_name(argv[1], gcliname);
-	estat = gdp_gcl_open(gcliname, GDP_MODE_AO, NULL, &ogcl);
+	gdp_parse_name(argv[1], gdpiname);
+	estat = gdp_gin_open(gdpiname, GDP_MODE_AO, NULL, &ogin);
 	EP_STAT_CHECK(estat, goto fail1);
-	nextrecno = gdp_gcl_getnrecs(ogcl) + 1;
+	nextrecno = gdp_gin_getnrecs(ogin) + 1;
 
 	// open a source GCL with the provided name
 	lname = argv[0];
 	lmode = "read";
-	gdp_parse_name(argv[0], gcliname);
-	estat = gdp_gcl_open(gcliname, GDP_MODE_RO, NULL, &igcl);
+	gdp_parse_name(argv[0], gdpiname);
+	estat = gdp_gin_open(gdpiname, GDP_MODE_RO, NULL, &igin);
 	EP_STAT_CHECK(estat, goto fail1);
 
 	// subscribe to input starting from the first recno target does not have
-	estat = gdp_gcl_subscribe(igcl, nextrecno, 0, NULL, NULL, NULL);
+	estat = gdp_gin_subscribe_by_recno(igin, nextrecno, 0, NULL, NULL, NULL);
 	EP_STAT_CHECK(estat, goto fail2);
 
 	// copy forever
-	while ((gev = gdp_event_next(igcl, NULL)) != NULL)
+	while ((gev = gdp_event_next(igin, NULL)) != NULL)
 	{
 		switch (gdp_event_gettype(gev))
 		{
 		 case GDP_EVENT_DATA:
 			// copy the record to the new log
-			estat = gdp_gcl_append(ogcl, gdp_event_getdatum(gev));
+			estat = gdp_gin_append(ogin, gdp_event_getdatum(gev), NULL);
 			EP_STAT_CHECK(estat, goto fail3);
 			break;
 

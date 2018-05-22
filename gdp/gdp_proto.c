@@ -348,7 +348,7 @@ ack_success(gdp_req_t *req)
 
 	// if this is an open response, the GOB is now fully open
 	if (gob != NULL)
-		gob->flags &= ~GCLF_PENDING;
+		gob->flags &= ~GOBF_PENDING;
 
 fail0:
 	return estat;

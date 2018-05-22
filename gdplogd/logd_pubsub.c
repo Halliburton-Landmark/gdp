@@ -128,7 +128,7 @@ sub_notify_all_subscribers(gdp_req_t *pubreq)
 		_gdp_req_dump(pubreq, ep_dbg_getfile(), GDP_PR_BASIC, 1);
 	}
 
-	pubreq->gob->flags |= GCLF_KEEPLOCKED;
+	pubreq->gob->flags |= GOBF_KEEPLOCKED;
 	for (req = LIST_FIRST(&pubreq->gob->reqs); req != NULL; req = nextreq)
 	{
 		_gdp_req_lock(req);
@@ -200,7 +200,7 @@ sub_notify_all_subscribers(gdp_req_t *pubreq)
 		if (req != NULL)
 			_gdp_req_unlock(req);
 	}
-	pubreq->gob->flags &= ~GCLF_KEEPLOCKED;
+	pubreq->gob->flags &= ~GOBF_KEEPLOCKED;
 }
 
 
@@ -267,9 +267,9 @@ sub_end_all_subscriptions(
 	}
 
 	GDP_GOB_ASSERT_ISLOCKED(gob);
-	if (EP_UT_BITSET(GCLF_KEEPLOCKED, gob->flags) && ep_dbg_test(Dbg, 1))
-		ep_dbg_printf("sub_end_all_subscriptions: GCLF_KEEPLOCKED on entry\n");
-	gob->flags |= GCLF_KEEPLOCKED;
+	if (EP_UT_BITSET(GOBF_KEEPLOCKED, gob->flags) && ep_dbg_test(Dbg, 1))
+		ep_dbg_printf("sub_end_all_subscriptions: GOBF_KEEPLOCKED on entry\n");
+	gob->flags |= GOBF_KEEPLOCKED;
 
 	do
 	{
@@ -299,7 +299,7 @@ sub_end_all_subscriptions(
 			_gdp_req_free(&req);
 		}
 	} while (!EP_STAT_ISOK(estat));
-	gob->flags &= ~GCLF_KEEPLOCKED;
+	gob->flags &= ~GOBF_KEEPLOCKED;
 	return estat;
 }
 
@@ -342,7 +342,7 @@ gob_reclaim_subscriptions(gdp_gob_t *gob)
 
 	// don't even try locked GOBs
 	// first check is to avoid extraneous errors
-	if (EP_UT_BITSET(GCLF_ISLOCKED, gob->flags))
+	if (EP_UT_BITSET(GOBF_ISLOCKED, gob->flags))
 	{
 		ep_dbg_cprintf(Dbg, 39, " ... skipping locked GOB\n");
 		return;
@@ -357,7 +357,7 @@ gob_reclaim_subscriptions(gdp_gob_t *gob)
 		}
 		return;
 	}
-	gob->flags |= GCLF_ISLOCKED;	// if trylock succeeded
+	gob->flags |= GOBF_ISLOCKED;	// if trylock succeeded
 
 	nextreq = LIST_FIRST(&gob->reqs);
 	while ((req = nextreq) != NULL)

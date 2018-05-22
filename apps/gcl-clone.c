@@ -89,7 +89,7 @@ main(int argc, char **argv)
 	gdp_name_t gcliname;			// internal name of GCL
 	const char *gclxname = NULL;	// external name of GCL
 	gdp_gcl_t *gcl = NULL;
-	gdp_gclmd_t *gmd = NULL;
+	gdp_gob_md_t *gmd = NULL;
 	int opt;
 	EP_STAT estat;
 	char *gdpd_addr = NULL;
@@ -189,7 +189,7 @@ main(int argc, char **argv)
 
 	// free metadata, if set
 	if (gmd != NULL)
-		gdp_gclmd_free(gmd);
+		gdp_gob_md_free(gmd);
 
 fail0:
 	// OK status can have values; hide that from the user

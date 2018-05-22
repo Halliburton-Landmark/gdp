@@ -124,7 +124,7 @@ printdatum(gdp_datum_t *datum, FILE *fp)
 */
 
 EP_STAT
-do_simpleread(gdp_gcl_t *gcl,
+do_simpleread(gdp_gin_t *gin,
 		gdp_recno_t firstrec,
 		const char *dtstr,
 		int numrecs)
@@ -145,7 +145,7 @@ do_simpleread(gdp_gcl_t *gcl,
 	if (dtstr == NULL)
 	{
 		// record number
-		estat = gdp_gcl_read(gcl, firstrec, datum);
+		estat = gdp_gin_read_by_recno(gin, firstrec, datum);
 	}
 	else
 	{
@@ -161,7 +161,7 @@ do_simpleread(gdp_gcl_t *gcl,
 			goto done;
 		}
 
-		estat = gdp_gcl_read_ts(gcl, &ts, datum);
+		estat = gdp_gin_read_by_ts(gin, &ts, datum);
 	}
 
 	// start reading data, one record at a time
@@ -183,7 +183,7 @@ do_simpleread(gdp_gcl_t *gcl,
 
 		// move to next record
 		recno = gdp_datum_getrecno(datum) + 1;
-		estat = gdp_gcl_read(gcl, recno, datum);
+		estat = gdp_gin_read_by_recno(gin, recno, datum);
 		first_record = false;
 	}
 
@@ -273,7 +273,7 @@ multiread_cb(gdp_event_t *gev)
 */
 
 EP_STAT
-do_multiread(gdp_gcl_t *gcl,
+do_multiread(gdp_gin_t *gin,
 		gdp_recno_t firstrec,
 		const char *dtstr,
 		int32_t numrecs,
@@ -304,21 +304,28 @@ do_multiread(gdp_gcl_t *gcl,
 	{
 		// start up a subscription
 		if (dtstr == NULL)
-			estat = gdp_gcl_subscribe(gcl, firstrec, numrecs, NULL, cbfunc, NULL);
+			estat = gdp_gin_subscribe_by_recno(gin, firstrec, numrecs,
+									NULL, cbfunc, NULL);
 		else
-			estat = gdp_gcl_subscribe_ts(gcl, &ts, numrecs, NULL, cbfunc, NULL);
+			estat = gdp_gin_subscribe_by_ts(gin, &ts, numrecs,
+									NULL, cbfunc, NULL);
 	}
 	else
 	{
+#if 0
 		// make the flags more user-friendly
 		if (firstrec == 0)
 			firstrec = 1;
 
 		// start up a multiread
 		if (dtstr == NULL)
-			estat = gdp_gcl_multiread(gcl, firstrec, numrecs, cbfunc, NULL);
+			estat = gdp_gin_multiread(gin, firstrec, numrecs, cbfunc, NULL);
 		else
-			estat = gdp_gcl_multiread_ts(gcl, &ts, numrecs, cbfunc, NULL);
+			estat = gdp_gin_multiread_ts(gin, &ts, numrecs, cbfunc, NULL);
+#else
+		ep_app_error("Multiread not implemented; use async read");
+		return GDP_STAT_NOT_IMPLEMENTED;
+#endif
 	}
 
 	// check to make sure the subscribe/multiread succeeded; if not, bail
@@ -372,7 +379,7 @@ do_multiread(gdp_gcl_t *gcl,
 */
 
 EP_STAT
-do_async_read(gdp_gcl_t *gcl,
+do_async_read(gdp_gin_t *gin,
 		gdp_recno_t firstrec,
 		int32_t numrecs,
 		bool use_callbacks)
@@ -387,7 +394,7 @@ do_async_read(gdp_gcl_t *gcl,
 	if (firstrec == 0)
 		firstrec = 1;
 	if (numrecs <= 0)
-		numrecs = gdp_gcl_getnrecs(gcl);
+		numrecs = gdp_gin_getnrecs(gin);
 	if (firstrec < 0)
 	{
 		firstrec += numrecs + 1;
@@ -399,11 +406,11 @@ do_async_read(gdp_gcl_t *gcl,
 	int n = 0;
 	while (EP_STAT_ISOK(estat) && n++ < numrecs)
 	{
-		estat = gdp_gcl_read_async(gcl, recno, cbfunc, NULL);
+		estat = gdp_gin_read_by_recno_async(gin, recno, numrecs, cbfunc, NULL);
 		if (!EP_STAT_ISOK(estat))
 		{
 			char ebuf[100];
-			ep_app_error("async_read: gdp_gcl_read_async error:\n\t%s",
+			ep_app_error("async_read: gdp_gin_read_by_recno_async error:\n\t%s",
 					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		}
 		else
@@ -448,19 +455,19 @@ do_async_read(gdp_gcl_t *gcl,
 */
 
 void
-print_metadata(gdp_gcl_t *gcl)
+print_metadata(gdp_gin_t *gin)
 {
 	EP_STAT estat;
-	gdp_gclmd_t *gmd;
+	gdp_md_t *gmd;
 	gdp_recno_t nrecs;
 
-	nrecs = gdp_gcl_getnrecs(gcl);
+	nrecs = gdp_gin_getnrecs(gin);
 	printf("Number of records: %" PRIgdp_recno "\n", nrecs);
-	estat = gdp_gcl_getmetadata(gcl, &gmd);
+	estat = gdp_gin_getmetadata(gin, &gmd);
 	EP_STAT_CHECK(estat, goto fail0);
 
-	gdp_gclmd_print(gmd, stdout, 5, 0);
-	gdp_gclmd_free(gmd);
+	gdp_md_print(gmd, stdout, 5, 0);
+	gdp_md_free(gmd);
 	return;
 
 fail0:
@@ -499,9 +506,9 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	gdp_gcl_t *gcl = NULL;
+	gdp_gin_t *gin = NULL;
 	EP_STAT estat;
-	gdp_name_t gclname;
+	gdp_name_t gobname;
 	int opt;
 	char *gdpd_addr = NULL;
 	bool subscribe = false;
@@ -649,7 +656,7 @@ main(int argc, char **argv)
 	ep_time_nanosleep(INT64_C(100000000));		// 100 msec
 
 	// parse the name (either base64-encoded or symbolic)
-	estat = gdp_parse_name(argv[0], gclname);
+	estat = gdp_parse_name(argv[0], gobname);
 	if (!EP_STAT_ISOK(estat))
 	{
 		ep_app_message(estat, "illegal GCL name syntax:\n\t%s", argv[0]);
@@ -659,14 +666,14 @@ main(int argc, char **argv)
 	// convert it to printable format and tell the user what we are doing
 	if (!Quiet)
 	{
-		gdp_pname_t gclpname;
+		gdp_pname_t gobpname;
 
-		gdp_printable_name(gclname, gclpname);
-		fprintf(stderr, "Reading GCL %s\n", gclpname);
+		gdp_printable_name(gobname, gobpname);
+		fprintf(stderr, "Reading GCL %s\n", gobpname);
 	}
 
 	// open the GCL; arguably this shouldn't be necessary
-	estat = gdp_gcl_open(gclname, open_mode, NULL, &gcl);
+	estat = gdp_gin_open(gobname, open_mode, NULL, &gin);
 	if (!EP_STAT_ISOK(estat))
 	{
 		ep_app_message(estat, "Cannot open GCL %s", argv[0]);
@@ -678,16 +685,16 @@ main(int argc, char **argv)
 		tzset();
 
 	if (showmetadata)
-		print_metadata(gcl);
+		print_metadata(gin);
 
 	// arrange to do the reading via one of the helper routines
 	if (async)
-		estat = do_async_read(gcl, firstrec, numrecs, use_callbacks);
+		estat = do_async_read(gin, firstrec, numrecs, use_callbacks);
 	else if (subscribe || multiread || use_callbacks)
-		estat = do_multiread(gcl, firstrec, dtstr, numrecs,
+		estat = do_multiread(gin, firstrec, dtstr, numrecs,
 						subscribe, use_callbacks);
 	else
-		estat = do_simpleread(gcl, firstrec, dtstr, numrecs);
+		estat = do_simpleread(gin, firstrec, dtstr, numrecs);
 
 fail0:
 	;				// silly compiler grammar
@@ -703,9 +710,9 @@ fail0:
 		exitstat = EX_UNAVAILABLE;
 
 	// might as well let the GDP know we're going away
-	if (gcl != NULL)
+	if (gin != NULL)
 	{
-		EP_STAT close_stat = gdp_gcl_close(gcl);
+		EP_STAT close_stat = gdp_gin_close(gin);
 		if (!EP_STAT_ISOK(close_stat))
 			ep_app_message(close_stat, "cannot close GCL");
 	}

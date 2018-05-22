@@ -3,7 +3,7 @@
 /*
 **  GDP-DELETE --- delete a GCL
 **
-**		This is only for debugging.  The gdp_gcl_delete call is intended
+**		This is only for debugging.  The gdp_gin_delete call is intended
 **		for use by an expiration service.
 **
 **	----- BEGIN LICENSE BLOCK -----
@@ -58,10 +58,10 @@ main(int argc, char **argv)
 	int opt;
 	bool show_usage = false;
 	EP_STAT estat;
-	gdp_gcl_t *gcl;
+	gdp_gin_t *gin;
 	char *gdpd_addr = NULL;
 	const char *lname;
-	gdp_name_t gcliname;
+	gdp_name_t gdpiname;
 	const char *phase;
 	int exitstat = EX_OK;
 
@@ -102,9 +102,9 @@ main(int argc, char **argv)
 
 	// open target GCL (must already exist)
 	lname = argv[0];
-	gdp_parse_name(lname, gcliname);
+	gdp_parse_name(lname, gdpiname);
 	phase = "open";
-	estat = gdp_gcl_open(gcliname, GDP_MODE_AO, NULL, &gcl);
+	estat = gdp_gin_open(gdpiname, GDP_MODE_AO, NULL, &gin);
 	if (!EP_STAT_ISOK(estat))
 	{
 		exitstat = EX_NOINPUT;
@@ -113,7 +113,7 @@ main(int argc, char **argv)
 
 	// delete and close log
 	phase = "delete";
-	estat = gdp_gcl_delete(gcl);
+	estat = gdp_gin_delete(gin);
 
 	if (!EP_STAT_ISOK(estat))
 	{

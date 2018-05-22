@@ -153,8 +153,8 @@ do_physical_open(gdp_gob_t *gob, void *open_info_)
 	estat = gob->x->physimpl->open(gob);
 	if (EP_STAT_ISOK(estat))
 	{
-		gob->flags |= GCLF_DEFER_FREE;
-		gob->flags &= ~GCLF_PENDING;
+		gob->flags |= GOBF_DEFER_FREE;
+		gob->flags &= ~GOBF_PENDING;
 	}
 	else
 	{
@@ -212,7 +212,7 @@ get_open_handle(gdp_req_t *req)
 		_gdp_req_unlock(req);
 		estat = _gdp_gob_cache_get(req->cpdu->dst, GGCF_CREATE, &req->gob);
 		_gdp_req_lock(req);
-		if (EP_STAT_ISOK(estat) && EP_UT_BITSET(GCLF_PENDING, req->gob->flags))
+		if (EP_STAT_ISOK(estat) && EP_UT_BITSET(GOBF_PENDING, req->gob->flags))
 			estat = do_physical_open(req->gob, NULL);
 		if (!EP_STAT_ISOK(estat) && req->gob != NULL)
 			_gdp_gob_decref(&req->gob, false);

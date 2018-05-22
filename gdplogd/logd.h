@@ -182,7 +182,7 @@ struct gob_phys_impl
 						gdp_datum_t *datum);
 	EP_STAT		(*create)(
 						gdp_gob_t *pgob,
-						gdp_gclmd_t *gmd);
+						gdp_md_t *gmd);
 	EP_STAT		(*open)(
 						gdp_gob_t *gob);
 	EP_STAT		(*close)(
@@ -192,7 +192,7 @@ struct gob_phys_impl
 						gdp_datum_t *datum);
 	EP_STAT		(*getmetadata)(
 						gdp_gob_t *gob,
-						gdp_gclmd_t **gmdp);
+						gdp_md_t **gmdp);
 	EP_STAT		(*remove)(
 						gdp_gob_t *gob);
 	EP_STAT		(*foreach)(

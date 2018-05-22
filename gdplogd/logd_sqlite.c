@@ -40,7 +40,7 @@
 #include "logd_sqlite.h"
 
 //#include <gdp/gdp_buf.h>
-#include <gdp/gdp_gclmd.h>
+#include <gdp/gdp_md.h>
 
 //#include <ep/ep_hash.h>
 #include <ep/ep_hexdump.h>
@@ -450,11 +450,11 @@ physinfo_dump(gob_physinfo_t *phys, FILE *fp)
 */
 
 static EP_STAT
-sqlite_create(gdp_gob_t *gob, gdp_gclmd_t *gmd)
+sqlite_create(gdp_gob_t *gob, gdp_md_t *gmd)
 {
 	EP_STAT estat = EP_STAT_OK;
 	gob_physinfo_t *phys;
-	const char *phase;
+	const char *phase = "init";
 	int rc;
 
 	EP_ASSERT_POINTER_VALID(gob);
@@ -581,7 +581,7 @@ sqlite_create(gdp_gob_t *gob, gdp_gclmd_t *gmd)
 	phase = "metadata bind 3";
 	{
 		uint8_t *obuf;
-		size_t mdsize = _gdp_gclmd_serialize(gmd, &obuf);
+		size_t mdsize = _gdp_md_serialize(gmd, &obuf);
 		if (ep_dbg_test(Dbg, 34))
 		{
 			ep_dbg_printf("sqlite_create: gmd %p obuf %p mdsize %zd\n",
@@ -744,7 +744,7 @@ sqlite_open(gdp_gob_t *gob)
 
 	// read metadata
 	phase = "metadata read";
-	if (gob->gclmd == NULL)
+	if (gob->gob_md == NULL)
 	{
 		sqlite3_stmt *stmt;
 		rc = sqlite3_prepare_v2(phys->db,
@@ -759,7 +759,7 @@ sqlite_open(gdp_gob_t *gob)
 		md_blob = sqlite3_column_blob(stmt, 0);
 		if (md_blob != NULL && md_size > 0)
 		{
-			gob->gclmd = _gdp_gclmd_deserialize(md_blob, md_size);
+			gob->gob_md = _gdp_md_deserialize(md_blob, md_size);
 		}
 fail4:
 		sqlite3_finalize(stmt);
@@ -886,7 +886,7 @@ sqlite_remove(gdp_gob_t *gob)
 
 		ep_dbg_cprintf(Dbg, 50, "  remove trial %s%s%s ",
 						EpChar->lquote, dent->d_name, EpChar->rquote);
-		if (strncmp(gob->pname, dent->d_name, GDP_GCL_PNAME_LEN) == 0)
+		if (strncmp(gob->pname, dent->d_name, GDP_GOB_PNAME_LEN) == 0)
 		{
 			char filenamebuf[GOB_PATH_MAX];
 
@@ -1325,7 +1325,7 @@ fail3:
 /*
 **  GOB_PHYSGETMETADATA --- read metadata from disk
 **
-**		This is depressingly similar to _gdp_gclmd_deserialize.
+**		This is depressingly similar to _gdp_md_deserialize.
 */
 
 #define STDIOCHECK(tag, targ, f)	\
@@ -1344,9 +1344,9 @@ fail3:
 
 static EP_STAT
 sqlite_getmetadata(gdp_gob_t *gob,
-		gdp_gclmd_t **gmdp)
+		gdp_md_t **gmdp)
 {
-//	gdp_gclmd_t *gmd;
+//	gdp_md_t *gmd;
 //	gob_physinfo_t *phys = GETPHYS(gob);
 	EP_STAT estat = EP_STAT_OK;
 

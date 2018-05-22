@@ -21,7 +21,7 @@ static EP_DBG	Dbg = EP_DBG_INIT("t_multimultiread", "GDP multiple multireader te
 */
 
 EP_STAT
-do_multiread(gdp_gcl_t *gcl,
+do_multiread(gdp_gin_t *gin,
 		gdp_recno_t firstrec,
 		int32_t numrecs,
 		void *udata)
@@ -36,7 +36,7 @@ do_multiread(gdp_gcl_t *gcl,
 		firstrec = 1;
 
 	// start up a multiread
-	estat = gdp_gcl_multiread(gcl, firstrec, numrecs, cbfunc, udata);
+	estat = gdp_gin_multiread(gin, firstrec, numrecs, cbfunc, udata);
 
 	// check to make sure the subscribe/multiread succeeded; if not, bail
 	if (!EP_STAT_ISOK(estat))
@@ -71,11 +71,11 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	gdp_gcl_t *gcl;
-	gdp_name_t gclname;
+	gdp_gin_t *gin;
+	gdp_name_t gdpname;
 	EP_STAT estat;
 	int opt;
-	char *gclxname = "x00";
+	char *gdpxname = "x00";
 	int nreaders = 2;
 	int maxrecs = 0;
 	bool show_usage = false;
@@ -108,23 +108,23 @@ main(int argc, char **argv)
 		usage();
 
 	if (argc > 0)
-		gclxname = argv[0];
+		gdpxname = argv[0];
 
 	estat = gdp_init(NULL);
 	test_message(estat, "gdp_init");
 
 	ep_time_nanosleep(INT64_C(100000000));
 
-	estat = gdp_parse_name(gclxname, gclname);
+	estat = gdp_parse_name(gdpxname, gdpname);
 	test_message(estat, "gdp_parse_name");
 
-	estat = gdp_gcl_open(gclname, GDP_MODE_RO, NULL, &gcl);
-	test_message(estat, "gdp_gcl_open");
+	estat = gdp_gin_open(gdpname, GDP_MODE_RO, NULL, &gin);
+	test_message(estat, "gdp_gin_open");
 
 	long i;
 	for (i = 1; i <= nreaders; i++)
 	{
-		estat = do_multiread(gcl, 1, maxrecs, (void *) i);
+		estat = do_multiread(gin, 1, maxrecs, (void *) i);
 		test_message(estat, "reader %ld", i);
 	}
 

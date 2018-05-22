@@ -36,7 +36,7 @@
 */
 
 
-gdp_gcl_t	*MonGcl;
+gdp_gin_t	*MonGin;
 unsigned int	SampleIntvl	= 60;
 
 
@@ -143,8 +143,8 @@ int
 main(int argc, char **argv)
 {
 	EP_STAT estat;
-	gdp_name_t gclname;
-	char *gclpname;
+	gdp_name_t gdpname;
+	char *gdpxname;
 	bool show_usage = false;
 	int opt;
 	char *hostname = NULL;
@@ -177,7 +177,7 @@ main(int argc, char **argv)
 	if (show_usage || argc != 1)
 		usage();
 
-	gclpname = argv[0];
+	gdpxname = argv[0];
 
 	if (hostname == NULL)
 	{
@@ -199,23 +199,23 @@ main(int argc, char **argv)
 	}
 
 	// convert the name to internal form
-	printf("Converting name %s to internal form:\n", gclpname);
-	estat = gdp_parse_name(gclpname, gclname);
+	printf("Converting name %s to internal form:\n", gdpxname);
+	estat = gdp_parse_name(gdpxname, gdpname);
 	if (!EP_STAT_ISOK(estat))
 	{
-		ep_app_error("Illegal GCL name syntax:\n\t%s",
-			gclpname);
+		ep_app_error("Illegal log name syntax:\n\t%s",
+			gdpxname);
 		exit(EX_NOINPUT);
 	}
 
 	// open the GCL for writing
-	printf("Opening GCL for writing:\n");
-	estat = gdp_gcl_open(gclname, GDP_MODE_AO, NULL, &MonGcl);
+	printf("Opening log for writing:\n");
+	estat = gdp_gin_open(gdpname, GDP_MODE_AO, NULL, &MonGin);
 	if (!EP_STAT_ISOK(estat))
 	{
 		char sbuf[100];
 
-		ep_app_error("Cannot open GCL:\n    %s",
+		ep_app_error("Cannot open log:\n    %s",
 			ep_stat_tostr(estat, sbuf, sizeof sbuf));
 		exit(EX_NOINPUT);
 	}
@@ -244,7 +244,7 @@ main(int argc, char **argv)
 		gdp_buf_printf(buf, "%s", p);
 
 		// append the datum to the log
-		estat = gdp_gcl_append(MonGcl, datum);
+		estat = gdp_gin_append(MonGin, datum, NULL);
 
 		// remember to free our resources
 		free(p);

@@ -80,7 +80,7 @@ struct datagen
 /*
 **  Log Controller
 **
-**		This pairs 1::1 with GCLs.  It is primarily responsible for
+**		This pairs 1::1 with logs.  It is primarily responsible for
 **		collecting responses to asynchronous writes.  We can't do
 **		this in the Batch Instance since multiple BIs might write a
 **		single log.
@@ -90,8 +90,8 @@ typedef struct logctl		logctl_t;
 struct logctl
 {
 	EP_THR_MUTEX	mutex;
-	const char		*gclxname;			// external name for log
-	gdp_gcl_t		*gcl;				// underlying log
+	const char		*gobxname;			// external name for log
+	gdp_gin_t		*gin;				// underlying log
 	long			n_out;				// number of records written
 	long			n_resp;				// number of responses read
 };
@@ -151,7 +151,7 @@ collect_async_results(logctl_t *lc, long timeout)
 {
 	int prflags = GDP_DATUM_PRTEXT;
 	int n_to_collect;
-	gdp_gcl_t *gcl;
+	gdp_gin_t *gin;
 	EP_TIME_SPEC event_timeout;
 	ep_time_from_nsec(timeout MILLISECONDS, &event_timeout);
 
@@ -159,12 +159,12 @@ collect_async_results(logctl_t *lc, long timeout)
 	{
 		// use some defaults (for final cleanup)
 		n_to_collect = 100;
-		gcl = NULL;
+		gin = NULL;
 	}
 	else
 	{
 		n_to_collect = lc->n_out - lc->n_resp;
-		gcl = lc->gcl;
+		gin = lc->gin;
 	}
 
 	while (n_to_collect > 0)
@@ -172,7 +172,7 @@ collect_async_results(logctl_t *lc, long timeout)
 		gdp_event_t *ev;
 
 		// poll to see if there are any events available
-		ev = gdp_event_next(gcl, &event_timeout);
+		ev = gdp_event_next(gin, &event_timeout);
 		if (ev == NULL)
 			break;
 
@@ -197,7 +197,7 @@ collect_async_results(logctl_t *lc, long timeout)
 
 		default:
 			printf("%s: ", bname);
-			gdp_event_print(ev, stdout, GDP_PR_BASIC + 2);
+			gdp_event_print(ev, stdout, GDP_PR_BASIC + 2, 0);
 			break;
 		}
 	}
@@ -237,7 +237,7 @@ write_batch_synchronous(batch_t *bi)
 	while (EP_STAT_ISOK(estat = (*dg->next)(dg, bi, datum)))
 	{
 		ep_thr_mutex_lock(&lc->mutex);
-		estat = gdp_gcl_append(lc->gcl, datum);
+		estat = gdp_gin_append(lc->gin, datum, NULL);
 		if (EP_STAT_ISOK(estat))
 		{
 			lc->n_out++;
@@ -247,7 +247,7 @@ write_batch_synchronous(batch_t *bi)
 		if (!EP_STAT_ISOK(estat))
 		{
 			char ebuf[100];
-			printf("gdp_gcl_append error: %s\n",
+			printf("gdp_gin_append error: %s\n",
 					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 			break;
 		}
@@ -282,8 +282,8 @@ write_batch_asynchronous(batch_t *bi)
 	while (EP_STAT_ISOK(estat = (*dg->next)(dg, bi, datum)))
 	{
 		ep_thr_mutex_lock(&lc->mutex);
-		estat = gdp_gcl_append_async(lc->gcl, datum,
-								NULL, (void *) bi->bname);
+		estat = gdp_gin_append_async(lc->gin, 1, &datum,
+								NULL, (void *) bi->bname, NULL);
 		if (EP_STAT_ISOK(estat))
 		{
 			lc->n_out++;
@@ -295,7 +295,7 @@ write_batch_asynchronous(batch_t *bi)
 		if (!EP_STAT_ISOK(estat))
 		{
 			char ebuf[100];
-			printf("gdp_gcl_append_async error: %s\n",
+			printf("gdp_gin_append_async error: %s\n",
 					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 			break;
 		}
@@ -349,7 +349,7 @@ read_batch_synchronous(batch_t *bi)
 	while (++n_read <= bi->batch_size)
 	{
 		ep_thr_mutex_lock(&lc->mutex);
-		estat = gdp_gcl_read(lc->gcl, n_read, datum);
+		estat = gdp_gin_read_by_recno(lc->gin, n_read, datum);
 		ep_thr_mutex_unlock(&lc->mutex);
 		if (!EP_STAT_ISOK(estat))
 			break;
@@ -376,7 +376,7 @@ read_batch_asynchronous(batch_t *bi)
 	while (++n_read <= bi->batch_size)
 	{
 		ep_thr_mutex_lock(&lc->mutex);
-		estat = gdp_gcl_read_async(lc->gcl, n_read,
+		estat = gdp_gin_read_by_recno_async(lc->gin, 0, n_read,
 								NULL, (void *) bi->bname);
 		if (EP_STAT_ISOK(estat))
 		{
@@ -389,7 +389,7 @@ read_batch_asynchronous(batch_t *bi)
 		if (!EP_STAT_ISOK(estat))
 		{
 			char ebuf[100];
-			printf("gdp_gcl_read_async error: %s\n",
+			printf("gdp_gin_read_by_recno_async error: %s\n",
 					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 			break;
 		}
@@ -424,7 +424,7 @@ read_batch_multiread(batch_t *bi)
 	logctl_t *lc = bi->lc;
 
 	ep_thr_mutex_lock(&lc->mutex);
-	estat = gdp_gcl_multiread(lc->gcl, -bi->batch_size, bi->batch_size,
+	estat = gdp_gin_multiread(lc->gin, -bi->batch_size, bi->batch_size,
 							NULL, (void *) bi->bname);
 	lc->n_out += bi->batch_size;
 	ep_thr_mutex_unlock(&lc->mutex);
@@ -432,7 +432,7 @@ read_batch_multiread(batch_t *bi)
 	if (!EP_STAT_ISOK(estat))
 	{
 		char ebuf[100];
-		printf("gdp_gcl_read_multiread error: %s\n",
+		printf("gdp__multiread error: %s\n",
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		goto fail0;
 	}
@@ -466,7 +466,7 @@ read_batch_subscribe(batch_t *bi)
 	logctl_t *lc = bi->lc;
 
 	ep_thr_mutex_lock(&lc->mutex);
-	estat = gdp_gcl_subscribe(lc->gcl, 0, bi->batch_size,
+	estat = gdp_gin_subscribe_by_recno(lc->gin, 0, bi->batch_size,
 							NULL, NULL, (void *) bi->bname);
 	lc->n_out += bi->batch_size;		// assume we'll get results for all
 	ep_thr_mutex_unlock(&lc->mutex);
@@ -474,7 +474,7 @@ read_batch_subscribe(batch_t *bi)
 	if (!EP_STAT_ISOK(estat))
 	{
 		char ebuf[100];
-		printf("gdp_gcl_subscribe error: %s\n",
+		printf("gdp_gin_subscribe_by_recno error: %s\n",
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		goto fail0;
 	}
@@ -662,16 +662,16 @@ get_logctl(const char *logtemplate, batch_t *bi, logctl_t **plc)
 		// create a new log controller
 		lc = ep_mem_zalloc(sizeof *lc);
 		ep_thr_mutex_init(&lc->mutex, EP_THR_MUTEX_DEFAULT);
-		lc->gclxname = logname;
+		lc->gobxname = logname;
 		ep_hash_insert(LogControllers, sizeof gname, gname, lc);
 	}
 	ep_thr_mutex_lock(&lc->mutex);
 
 	// if we are the initializing thread, get on with it
-	if (lc->gcl == NULL)
+	if (lc->gin == NULL)
 	{
 		// try to open the log
-		estat = gdp_gcl_open(gname, GDP_MODE_ANY, NULL, &lc->gcl);
+		estat = gdp_gin_open(gname, GDP_MODE_ANY, NULL, &lc->gin);
 
 		//XXX create it if it doesn't exist?
 

@@ -36,7 +36,7 @@
   <body>
     <h1>Global Data Plane Programmatic API </h1>
     <h4>Editor: Eric Allman, U.C. Berkeley Swarm Lab, eric@cs.berkeley.edu<br>
-      Version 0.8.0, 2017-07-27</h4>
+      Version 0.10.0, 2018-05-20</h4>
     <p>This document describes the procedural programmatic interface to the
       Global Data Plane.&nbsp; The native code is written in C for maximum
       flexibility and performance, but it is expected that most applications
@@ -56,7 +56,10 @@
       can return a positive integer as extra information. </p>
     <p>The code distribution includes an "apps" directory with two example
       programs: gdp-writer.c and gdp-reader.c, that show simple cases of how to
-      append to a GCL and read from a GCL (including subscriptions). </p>
+      append to a GOB and read from a GOB (including subscriptions). </p>
+    <p>This document corresponds to version 0.10 of the GDP library and
+      associated applications.&nbsp; Note that this interface is massively
+      incompatible with version 0.9.</p>
     <h2>1&nbsp; Terminology</h2>
     <dl>
       <dt>Datum</dt>
@@ -66,11 +69,36 @@
         distinct from the time that the data originated), an associated blob
         containing the data itself, which we expect to be encrypted, and in most
         cases a signature. </dd>
-      <dt>GDP Channel/Log</dt>
-      <dd>Global Data Plane Channel/Log.&nbsp; This represents an addressable
-        entity in the Global Data Plane, which may be a log or a service.</dd>
+      <dt>GDP Object (GOB) (previously GDP Channel/Log)</dt>
+      <dd>This represents an addressable entity in the Global Data Plane, which
+        may be a log or a service.&nbsp; It is always addressed with a
+        location-independent name.&nbsp; Applications interact with GOBs via GDP
+        Instances.</dd>
+      <dt>GOB Instance (GIN)</dt>
+      <dd>An instance of a Global Data Plane log.&nbsp; An application can have
+        multiple instances of a given GDP Object.&nbsp; It is the equivalent of
+        a Unix File Descriptor (as distinct from a Unix file) that is created by
+        <code>gdp_gin_open</code>.</dd>
+      <dt>GDP Name</dt>
+      <dd>The name of a Global Data Plane Object.&nbsp; This is a 256-bit,
+        opaque, globally unique number created as the SHA-256 hash of the
+        metadata of the object.</dd>
     </dl>
-    <h2> 2&nbsp; Theory of Operation, Data Types, and Initialization </h2>
+    <p> In earlier versions of the GDP, both GINs and GOBs were referred to as
+      GCLs. These names are now broken apart for clarity. For historic reasons,
+      some of the interfaces and most of the documentation still refer to GCLs.</p>
+    <p><i>A Note on Naming:</i> Function and type names are mostly intended to
+      map cleanly to class and method names, which occasionally leads to
+      somewhat tortured names.&nbsp; For example, <code>gdp_gin_read_by_recno</code>
+      is intended to map to a method "<code>gdp_gin.read_by_recno</code>" (i.e,
+      the operation <code>read_by_recno</code> on a variable of class <code>gdp_gin</code>),
+      <code>gdp_buf_getlength</code> maps to <code>gdp_buf.getlength</code>,
+      etc.&nbsp; In these cases the first argument of the function is what would
+      be <code>self</code> in some languages.&nbsp; In some cases these also
+      apply to what would be class methods; for example <code>gdp_gin_create</code>
+      would map to a class method <code>gdp_gin.create</code>, even though it
+      doesn't take the named data type as the first argument.</p>
+    <h2> 2&nbsp; Theory of Operation </h2>
     <p> GDP-based applications rely on three pieces: an in-process GDP library,
       a GDP Log Daemon, and the Routing Layer.&nbsp;&nbsp; This document
       describes the GDP library API. </p>
@@ -84,17 +112,17 @@
       Applications are free to create other threads as desired.&nbsp; The code
       has been written to do the locking as necessary, but stress tests have not
       been run, so you may find unhappy results. </p>
-    <p> The primary abstraction is the GDP Channel-Log (GCL). A GCL represents
-      the rendezvous point for communication in the data plane. It is not
-      directly tied to either a file or a network connection. On creation, a GCL
-      is assigned a 256-bit opaque name. A GCL is append-only to writers.&nbsp;
-      For the moment you can access the dataplane in one of two modes:
-      synchronous mode (using <code>gdp_gcl_read</code> for reading) an
-      asynchronous mode (using <code>gdp_gcl_subscribe</code> for reading). To
-      use it in asynchronous mode you must subscribe to any GCLs of interest and
-      then call <code>gdp_event_next</code> repeatedly to read the
-      results.&nbsp; These are described in more detail below. </p>
-    <p>All GCLs are named with an opaque, location independent, 256-bit number
+    <p> The primary abstraction is the GDP Object (GOB). A GOB represents the
+      rendezvous point for communication in the data plane. It is not directly
+      tied to either a file or a network connection. On creation, a GOB is
+      assigned a 256-bit opaque name. A GOB is append-only to writers.&nbsp; For
+      the moment you can access the dataplane in one of two modes: synchronous
+      mode (using <code>gdp_gin_read_by_*</code> for reading) an asynchronous
+      mode (using <code>gdp_gin_read_by_*_async</code> or <code>gdp_gin_subscribe</code>
+      for reading). To use it in asynchronous mode you must subscribe to any
+      GOBs of interest and then call <code>gdp_event_next</code> repeatedly to
+      read the results.&nbsp; These are described in more detail below. </p>
+    <p>All GOBs are named with an opaque, location independent, 256-bit number
       from a flat namespace.&nbsp; When printed it is shown as a base64-encoded
       value that is tweaked to be valid in a URI (that is, "+" and "/" are
       replaced with "&ndash;" and "_").&nbsp; Applications may choose to overlay
@@ -102,16 +130,20 @@
     <p>Applications using the GDP library should <code>#include
         &lt;gdp/gdp.h&gt;</code> for all the essential definitions.</p>
     <hr>
+    <h4> </h4>
+    <h2>3&nbsp; GDP Operations</h2>
+    <h3>3.1 Data Types and Initialization</h3>
+    <hr>
     <h4>Name</h4>
     <p>GDP data types and basic utilities</p>
     <h4>Synopsis</h4>
-    <pre>#include &lt;gdp/gdp.h&gt;<br><br>gdp_name_t	InternalGdpName;	// 256-bit number<br>gdp_pname_t	PrintableGdpName;	// base-64 encoded string<br>bool		GDP_NAME_SAME(gdp_name_t a, gdp_name_t b);<br>bool		gdp_name_is_valid(gdp_name_t gname);<br>char		*gdp_printable_name(const gdp_name_t Internal, gdp_pname_t Printable);<br>EP_STAT		gdp_internal_name(const gdp_pname_t Printable, gdp_name_t Internal);<br>EP_STAT		gdp_parse_name(const char *external, gdp_name_t Internal);<br><br>gdp_gcl_t	*GdpChannelLog;<br><br>gdp_datum_t	*GdpDatum;<br>gdp_recno_t	RecordNumber;<br>EP_TIME_SPEC	TimeStampSpec;</pre>
+    <pre>#include &lt;gdp/gdp.h&gt;<br><br>gdp_name_t	InternalGdpName;	// 256-bit number<br>gdp_pname_t	PrintableGdpName;	// base-64 encoded string<br>bool		GDP_NAME_SAME(gdp_name_t a, gdp_name_t b);<br>bool		gdp_name_is_valid(gdp_name_t gname);<br>char		*gdp_printable_name(const gdp_name_t Internal,<br>			gdp_pname_t Printable);<br>EP_STAT		gdp_internal_name(const gdp_pname_t Printable,<br>			gdp_name_t Internal);<br>EP_STAT		gdp_parse_name(const char *external,<br>			gdp_name_t Internal);<br><br>gdp_gin_t	*GdpInstance;<br><br>gdp_datum_t	*GdpDatum;<br>gdp_hash_t      *GdpHash;<br>gdp_recno_t	RecordNumber;<br>EP_TIME_SPEC	TimeStampSpec;</pre>
     <h4>Notes</h4>
     <ul>
       <li>Most of these are described in more detail below.</li>
     </ul>
     <h3> </h3>
-    <hr width="100%" size="2"><br>
+    <hr width="100%" size="2">
     <h4> Name</h4>
     gdp_init &mdash; Initialize the GDP library
     <h4> Synopsis</h4>
@@ -144,26 +176,26 @@
         is suitable for printing.</li>
     </ul>
     <hr>
-    <h2>3&nbsp; GCL Operations</h2>
-    <h3>3.1&nbsp; GCL Synchronous Operations</h3>
-    <p>Synchronous operations block until the operation is complete.&nbsp; They
-      are the easiest interface for simple programs. </p>
+    <h3>3.2&nbsp; GOB Management</h3>
+    <p>This section covers operations on GOBs as a whole, notably creating,
+      opening, and closing.</p>
+    <br>
     <hr width="100%" size="2">
     <h4> Name</h4>
-    gdp_gcl_create &mdash; Create an append-only GCL on a specified log daemon
-    node &nbsp; <span class="warning">[TEMPORARY INTERFACE]</span>
+    gdp_gin_create &mdash; Create an append-only GOB on a specified log daemon
+    node, returning a GIN &nbsp; <span class="warning">[TEMPORARY INTERFACE]</span>
     <div> </div>
     <h4> Synopsis</h4>
-    <pre>EP_STAT gdp_gcl_create(gdp_name_t gcl_name,
-		gdp_name_t logdname,<br>                gdp_gclmd_t *gmd,<br>                gdp_gcl_t **gclp)
+    <pre>EP_STAT gdp_gin_create(gdp_name_t gob_name,
+		gdp_name_t logdname,<br>                gdp_md_t *gmd,<br>                gdp_gin_t **ginp)
 </pre>
     <h4> Notes</h4>
     <ul>
-      <li> Creates a GCL with the given name on the indicated log server, both
+      <li> Creates a GOB with the given name on the indicated log server, both
         of which must be 256-bit values.</li>
-      <li>Metadata can be passed in that will be stored with the GCL.</li>
-      <li> Returns a GCL handle (indirectly through <code>*gclp</code>).</li>
-      <li> The returned GCL handle is an append-only object.&nbsp; <i>(Actually,
+      <li>Metadata can be passed in that will be stored with the GOB.</li>
+      <li> Returns a GOB instance (indirectly through <code>*ginp</code>).</li>
+      <li> The returned GIN handle is an append-only object.&nbsp; <i>(Actually,
 
 
 
@@ -173,10 +205,14 @@
 
           this is not enforced at this time).</i></li>
       <li><span class="warning">This interface <strong><em>will</em></strong>
-          be replaced or updated in the future.</span> </li>
+          be replaced or updated in the future&nbsp; In particular, the <code>gob_name</code>
+          parameter will go away when the name becomes a hash of the
+          metadata.&nbsp; Similarly, logdname will be replaced by requirements
+          for this GOB (e.g., locality), and a log creation service will
+          determine the actual log server(s) to host the GOB.</span> </li>
       <li> We probably need payment information, some way of specifying resource
         requirements, and so forth.</li>
-      <li> Palmer did not describe anything that explicitly creates a GCL. I
+      <li> Palmer did not describe anything that explicitly creates a GOB. I
         think explicit creation is important (because of Quality of Service),
         but the semantics could be automatic creation on first reference with
         default QoS.</li>
@@ -187,65 +223,71 @@
     <br>
     <hr width="100%" size="2">
     <h4> Name</h4>
-    gdp_gcl_open &mdash; Open an existing GCL
+    gdp_gin_open &mdash; Open an existing GOB, returning a GIN<br>
     <h4> Synopsis</h4>
-    <pre>EP_STAT gdp_gcl_open(gdp_name_t name,
-		gcl_iomode_t rw,
-                gdp_gcl_open_info_t *info,
-                gdp_gcl_t **gclp)
+    <pre>EP_STAT gdp_gin_open(gdp_name_t name,
+		gdp_iomode_t rw,
+                gdp_open_info_t *info,
+                gdp_gin_t **ginp)
 </pre>
     <h4> Notes</h4>
     <ul>
-      <li> Opens the GCL with the indicated name for the mode indicated by <code>rw</code>,
+      <li> Opens the GOB with the indicated name for the mode indicated by <code>rw</code>,
         which may be <code>GDP_MODE_RO</code> (read only), <code>GDP_MODE_AO</code>
-        (append only), or <code>GDP_MODE_RA</code> (read and append).</li>
+        (append only), or <code>GDP_MODE_RA</code> (read and append).&nbsp; It
+        returns an instance of that object.</li>
       <li>Open information is to pass in detailed information needed for the
         open as described below.&nbsp; In most cases it can be passed as
         NULL.&nbsp; Eventually it will be used to convey signing keys, quality
         of service requests, payment information, authorization tokens, etc.</li>
-      <li>The handle itself is returned indirectly through <code>*gclp</code>.</li>
-      <li>If a signing key associated with the GCL is found, all writes to this
-        GCL will automatically be signed.&nbsp; See the section on Signing and
+      <li>The handle itself is returned indirectly through <code>*ginp</code>.</li>
+      <li>If a signing key associated with the GOB is found, all writes to this
+        GOB will automatically be signed.&nbsp; See the section on Signing and
         Encryption below for details.</li>
     </ul>
     <hr>
     <h4>Name</h4>
-    gdp_gcl_open_info_new &mdash; Create a new open information data structure<br>
+    gdp_open_info_new &mdash; Create a new open information data structure<br>
     <h4>Synopsis</h4>
-    <pre>gdp_gcl_open_info_t *gdp_gcl_open_info_new(void)</pre>
+    <pre>gdp_open_info_t *gdp_open_info_new(void)</pre>
     <h4>Notes</h4>
     <ul>
       <li>Creates a new data structure to be used in the following routines.</li>
     </ul>
     <hr><br>
     <h4>Name</h4>
-    gdp_gcl_open_info_free &mdash; Free the open information structure<br>
+    gdp_open_info_free &mdash; Free the open information structure<br>
     <h4>Synopsis</h4>
-    <pre>void gdp_gcl_open_info_free(gdp_gcl_open_info_t *info)</pre>
+    <pre>void gdp_open_info_free(gdp_open_info_t *info)</pre>
     <h4>Notes</h4>
     <ul>
       <li>Frees the data structure pointed to by <code>info</code>.</li>
-      <li>This can be freed as soon as it has been used in <code>gdp_gcl_open</code>.</li>
+      <li>This can be freed as soon as it has been used in <code>gdp_open</code>.</li>
     </ul>
     <hr>
     <h4>Name</h4>
-    gdp_gcl_open_info_set_signing_key &mdash; Set signing key for an open GCL<br>
+    gdp_open_info_set_signing_key &mdash; Set signing key for an open GOB<br>
     <h4>Synopsis</h4>
-    <pre>EP_STAT gdp_gcl_open_info_set_signing_key(<br>&nbsp;&nbsp;&nbsp;             gdp_gcl_open_info_t *info,<br>&nbsp;&nbsp;&nbsp;             EP_CRYPTO_KEY *skey)</pre>
+    <pre>EP_STAT gdp_open_info_set_signing_key(<br>&nbsp;&nbsp;&nbsp;             gdp_open_info_t *info,<br>&nbsp;&nbsp;&nbsp;             EP_CRYPTO_KEY *skey)</pre>
     <h4>Notes</h4>
     <ul>
       <li>Sets the signing key to be used when appending data to a log.</li>
+      <li>If no signing key is specified, the library attempts to find the key
+        using a search path.</li>
+      <li>If the open <code>info</code> passed to <code>gdp_open</code> for a
+        GOB that has already been opened using a different key (that is, on a
+        different instance), the result is undefined.</li>
     </ul>
     <hr>
     <h4>Name</h4>
-    <p>gdp_gcl_open_info_set_signkey_cb &mdash; Set a callback function to read
-      a signing key</p>
+    <p>gdp_open_info_set_signkey_cb &mdash; Set a callback function to read a
+      signing key</p>
     <h4>Synopsis</h4>
-    <pre>EP_STAT gdp_gcl_open_info_set_signkey_cb(<br>                gdp_gcl_open_info_t *info,<br>                EP_STAT (*signkey_cb)(<br>                        gdp_name_t gname,<br>                        void *signkey_udata,<br>                        EP_CRYPTO_KEY **skey),<br>                void *signkey_udata)</pre>
+    <pre>EP_STAT gdp_open_info_set_signkey_cb(<br>                gdp_open_info_t *info,<br>                EP_STAT (*signkey_cb)(<br>                        gdp_name_t gname,<br>                        void *signkey_udata,<br>                        EP_CRYPTO_KEY **skey),<br>                void *signkey_udata)</pre>
     <h4>Notes</h4>
     <ul>
-      <li>If the <code>gdp_gcl_open</code> call requires a secret key, that
-        that key was not passed in using <code>gdp_gcl_open_info_set_signing_key</code>,
+      <li>If the <code>gdp_open</code> call requires a secret key, that that
+        key was not passed in using <code>gdp_open_info_set_signing_key</code>,
         the callback function <code>signkey_cb</code> is invoked to get a
         key.&nbsp; It will only be invoked if the key is required (notably
         because it isn't already cached).</li>
@@ -254,136 +296,94 @@
     </ul>
     <hr>
     <h4>Name</h4>
-    gdp_gcl_open_info_set_caching &mdash; set caching behavior<br>
+    gdp_open_info_set_caching &mdash; set caching behavior<br>
     <h4>Synopsis</h4>
-    <pre>EP_STAT gdp_gcl_open_info_set_caching(<br>&nbsp;&nbsp;            &nbsp; gdp_gcl_open_info_t *info,<br>&nbsp;&nbsp;            &nbsp; bool keep_in_cache)</pre>
+    <pre>EP_STAT gdp_open_info_set_caching(<br>&nbsp;&nbsp;            &nbsp; gdp_open_info_t *info,<br>&nbsp;&nbsp;            &nbsp; bool keep_in_cache)</pre>
     <h4>Notes</h4>
     <ul>
-      <li>Sets whether this GCL should be kept in the cache after <code>gdp_gcl_close</code>
+      <li>Sets whether this GOB should be kept in the cache after <code>gdp_gin_close</code>
         is called.</li>
       <li>If set, cached information will be reclaimed based on the last usage
-        time of the GCL.</li>
+        time of the GOB.</li>
       <li>Use of this call with <code>keep_in_cache</code> set to <code>TRUE</code>
         may cause a cleanup thread to be spawned.</li>
     </ul>
     <hr width="100%" size="2">
     <h4> Name</h4>
-    gdp_gcl_close &mdash; Close a GCL and release resources
+    gdp_gin_close &mdash; Close a GDP Instance (GIN) and release resources
     <h4> Synopsis</h4>
-    <pre>EP_STAT gdp_gcl_close(gdp_gcl_t *gcl)
+    <pre>EP_STAT gdp_gin_close(gdp_gin_t *gin)
 </pre>
     <h4> Notes</h4>
     <ul>
-      <li>Sends a hint to the log daemon that the associated resources are no
-        longer being used.</li>
-      <li>Releases the client-side resources (that is, memory) for this GCL
-        handle.</li>
-      <li><i>Should this interface say whether to preserve or drop the GCL
+      <li>Closes an open GDP Instance.</li>
+      <li>If this is the last open instance for a GOB in this process, sends a
+        hint to the log daemon that the associated resources are no longer
+        referenced.</li>
+      <li>Releases the client-side resources (that is, memory) for this GIN.</li>
+      <li><i>Should this interface say whether to preserve or drop the GIN
           (i.e., is it persistent, or for how long)?</i></li>
     </ul>
-    <br>
     <hr width="100%" size="2">
-    <h4> Name</h4>
-    gdp_gcl_getname &mdash; Return the name of a GCL
-    <h4> Synopsis</h4>
-    <pre>EP_STAT gdp_gcl_getname(gdp_gcl_t *gcl,
-		gdp_name_t namebuf)
-</pre>
-    <h4> Notes</h4>
-    <ul>
-      <li> Returns the name of the GCL referenced by <code>gcl</code> into <code>
-          namebuf</code>. </li>
-      <li> May not be necessary if the creator provides the name; really only
-        intended after <code>gdp_gcl_create</code> so that the name can be
-        shared to other nodes that want to <code>gdp_gcl_open</code> it.</li>
-    </ul>
-    <br>
-    <hr width="100%" size="2">
-    <h4> Name</h4>
-    gdp_gcl_getstat &mdash; Return information about a GCL&nbsp; <span class="warning">[NOT
-      YET IMPLEMENTED] </span>
-    <h4> Synopsis</h4>
-    <pre>EP_STAT gdp_gcl_getstat(gdp_name_t gclname,
-		gcl_stat_t *statbuf)
-</pre>
-    <h4> Notes</h4>
-    <ul>
-      <li> <i>What status is included? Size (or number of records/messages),
-          last access, &hellip;</i></li>
-    </ul>
-    <br>
-    <hr width="100%" size="2">
-    <h4> Name</h4>
-    gdp_gcl_print &mdash; print a GCL handle (for debugging)
-    <h4>Synopsis</h4>
-    <pre>void gdp_gcl_print(const gdp_gcl_t *gclh, FILE *fp)</pre>
-    <h4>Notes</h4>
-    <ul>
-      <li>Prints the GCL on the indicated file.</li>
-      <li>The output will contain internal information; it is not intended to
-        display information to end users. </li>
-    </ul>
-    <hr width="100%" size="2">
-    <h4> Name</h4>
-    gdp_gcl_append &mdash; Append a record to a writable GCL
-    <h4> Synopsis</h4>
-    <pre>EP_STAT gdp_gcl_append(gdp_gcl_t *gcl,
-		gdp_datum_t *datum)
-</pre>
-    <h4> Notes</h4>
-    <ul>
-      <li> Appends the indicated datum to the GCL.</li>
-      <li>Any subscribers get immediate updates about the new datum.</li>
-      <li>If a secret key is available for this GCL, the appends will be signed.</li>
-    </ul>
-    <br>
-    <hr width="100%" size="2">
-    <h4> Name</h4>
-    gdp_gcl_read_by_recno, gdp_gcl_read_by_ts &mdash; Read from a readable GCL
-    <h4> Synopsis</h4>
-    <pre>EP_STAT gdp_gcl_read_by_recno(gdp_gcl_t *gcl,
-		gdp_recno_t recno,
-		gdp_datum_t *datum)<br>EP_STAT gdp_gcl_read_by_ts(gdp_gcl_t *gcl,
-		EP_TIME_SPEC *ts,
-		gdp_datum_t *datum)<br> </pre>
-    <h4> Notes</h4>
-    <ul>
-      <li> <code>gdp_gcl_read_by_recno</code> reads the specified record number
-        and returns it in the user-supplied datum (see below).</li>
-      <li><code>gdp_gcl_read_by_ts</code> reads the record dated on or
-        immediately after the indicated timestamp.</li>
-      <li>Presents a message-oriented interface.</li>
-      <li> An OK stat includes the number of octets actually read. Probably
-        passed back in datum, so unneeded here.</li>
-      <li> The offset indicates a message number (sequential starting from one).
-        The value &ndash;1 indicates any new messages.</li>
-    </ul>
-    <hr width="100%" size="2">
+    <h3>3.3&nbsp; Synchronous Operations</h3>
+    <p>Synchronous operations block until the operation is complete.&nbsp; They
+      are the easiest interface for simple programs, but may not perform as well
+      as the asynchronous versions.&nbsp; The synchronous calls only read or
+      write single records at a time; to operate on many records in one call,
+      use the asynchronous versions.</p>
+    <p>If synchronous operations do not receive an acknowledgement, they will
+      attempt to re-send the request after a timeout.</p>
+    <hr>
     <h4>Name</h4>
-    gdp_parse_name &mdash; parse an external representation to internal
-    <h4>Synopsis</h4>
-    <pre>EP_STAT gdp_parse_name(const char *ext, gdp_name_t gcl_name)</pre>
-    <h4>Notes</h4>
+    gdp_gin_append &mdash; Append a record to a GOB
+    <h4> Synopsis</h4>
+    <pre>EP_STAT gdp_gin_append(gdp_gin_t *gin,
+		gdp_datum_t *datum,<br>                gdp_hash_t *prevhash)
+</pre>
+    <h4> Notes</h4>
     <ul>
-      <li>Converts an external string representation of a GCL name to an
-        internal 256-bit encoding.</li>
-      <li>If ext is a URI-base64-encoded string of the correct length, it is
-        converted directly to 256 bits.</li>
-      <li>Otherwise, it is hashed using sha256 to create the internal name.</li>
-      <li><span class="warning">[This functionality will disappear in the
-          future, after a Directory Service is defined and implemented.&nbsp; In
-          particular, it will not be possible for users to select the name of a
-          GCL.]</span> </li>
+      <li> Appends the indicated datum to the GOB.</li>
+      <li>Any subscribers get immediate updates about the new datum.</li>
+      <li>If a secret key is available for this GOB, the appends will be signed.</li>
+      <li>The <code>prevhash</code> parameter should be the hash of the
+        previous record.&nbsp; It is required to provide GDP security
+        guarantees.&nbsp; If <code>prevhash</code> is NULL, the GDP library
+        will attempt to fill in the appropriate value.</li>
+    </ul>
+    <br>
+    <hr width="100%" size="2">
+    <h4> Name</h4>
+    gdp_gin_read_by_recno, gdp_gin_read_by_ts, gdp_gin_read_by_hash &mdash; Read
+    from a readable GIN
+    <h4> Synopsis</h4>
+    <pre>EP_STAT gdp_gin_read_by_recno(gdp_gin_t *gin,
+		gdp_recno_t recno,
+		gdp_datum_t *datum)<br>EP_STAT gdp_gin_read_by_ts(gdp_gin_t *gin,
+		EP_TIME_SPEC *ts,
+		gdp_datum_t *datum)<br>EP_STAT gdp_gin_read_by_hash(gdp_gin_t *gin,<br>                gdp_hash_t *hash,<br>                gdp_datum_t *datum)<br> </pre>
+    <h4> Notes</h4>
+    <ul>
+      <li> <code>gdp_gin_read_by_recno</code> reads the specified record number
+        and returns it in the user-supplied datum (see below).</li>
+      <li><code>gdp_gin_read_by_ts</code> reads the record dated on or
+        immediately after the indicated timestamp.</li>
+      <li><code>gdp_gin_read_by_hash</code> returns the record with the
+        indicated hash.</li>
+      <li>Presents a message-oriented interface.</li>
+      <li> An OK stat includes the number of octets actually read. (This is
+        passed back in datum, so unneeded here.)</li>
+      <li> The offset indicates a message number (sequential starting from one).
+        The value &ndash;1 indicates the last message in the log.</li>
     </ul>
     <ul>
     </ul>
     <hr width="100%" size="2">
-    <h3>3.2&nbsp; GCL Asynchronous Operations (Asynchronous I/O, Subscriptions,
-      and Events) </h3>
+    <h3>3.4&nbsp; Asynchronous Operations (Asynchronous I/O, Subscriptions, and
+      Events) </h3>
     <p>Asynchronous operations allow an application to subscribe to one or more
-      GCLs and receive events as those GCLs see activity.&nbsp; The event
+      GOBs and receive events as those GOBs see activity.&nbsp; The event
       mechanism is intended to be extensible for possible future expansion. </p>
-    <p>Every event has a type, a pointer to the GCL handle, and a pointer to a
+    <p>Every event has a type, a pointer to the GIN handle, and a pointer to a
       datum.&nbsp; Applications could in principle define their own event types,
       but at the moment this functionality is not exposed.</p>
     <p>All asynchronous operations return status and/or data via either a
@@ -424,31 +424,131 @@
     </ul>
     <hr>
     <h4>Name</h4>
-    <p>gdp_gcl_read_async &mdash; Asynchronously read data from a GCL</p>
-    <h4>Synopsis</h4>
-    <pre>EP_STAT gdp_gcl_read_async(<br>                gdp_gcl_t *gcl,<br>                gdp_recno_t recno,<br>                gdp_event_cbfunc_t *cbfunc,<br>                void *udata)</pre>
-    <h4><span style="font-family: monospace;"><span style="font-family: serif;">Notes</span></span></h4>
+    gdp_gin_read_by_recno_async, gdp_gin_read_by_ts_async,
+    gdp_gin_read_by_hash_async &mdash; Asynchronously read records from a
+    readable GOB
+    <h4> Synopsis</h4>
+    <pre>typedef void (*gdp_event_cbfunc_t)(gdp_event_t *gev)
+<br>EP_STAT gdp_gin_read_by_recno_async(<br>		gdp_gin_t *gin,
+		gdp_recno_t start,<br>		int32_t numrecs,<br>		gdp_event_cbfunc_t cbfunc,<br>		void *udata)<br>EP_STAT gdp_gin_read_by_ts_async(<br>		gdp_gin_t *gin,
+		EP_TIME_SPEC *start,<br>		int32_t numrecs,<br>		gdp_event_cbfunc_t cbfunc,<br>		void *udata)<br>EP_STAT gdp_gin_read_by_hash_async(<br>                gdp_gin_t *gin,<br>                gdp_hash_t *hash,<br>		gdp_event_cbfunc_t cbfunc,<br>		void *udata)
+</pre>
+    <h4> Notes</h4>
     <ul>
-      <li>Initializes a read of the given record number.</li>
-      <li>This function returns before any result is read and thus does not
+      <li>Initializes an asynchronous read of data.</li>
+      <li>These functions return before any result is read and thus do not
         include the final status information.</li>
       <li>The return status will be <code>GDP_STAT_OK</code> if the read
         command is successfully sent, and a later callback or event will give
         the actual status; otherwise no callback or event will occur.</li>
       <li>Status is returned through the event interface (if <code>cbfunc</code>
         is <code>NULL</code>) or through <code>cbfunc</code>.</li>
-      <li>Exactly one event will be generated for each successful return.&nbsp;
-        Those events will be <code>GDP_EVENT_DATA</code> if the read succeeded
-        or an error event if the read failed.</li>
+      <li>Similar to a subscription, except data in the future is never read
+        (i.e., this is only for reading historic data).&nbsp; This is the
+        interface to use for asynchronous reads.</li>
+      <li>If a <code>cbfunc</code> is specified, arranges to call callback when
+        a message is generated on the <code>gin</code>.&nbsp; See below for the
+        definition of <code>gdp_event_t</code>. </li>
+      <li> The callback is not necessarily invoked instantly, and may or may not
+        be called in a separate thread.</li>
+      <li>It is the responsibility of the callback function to call <code>gdp_event_free(gev)</code>.<br>
+      </li>
+      <li>If no <code>cbfunc</code> is specified, subscription information is
+        available through the <code>gdp_event</code> interface (see below).</li>
+      <li> The <code>udata</code> is passed through untouched in generated
+        events.&nbsp; See below for the definition of <code>gdp_event_t</code>.</li>
+      <li>At most <code>numrecs</code> records are returned, after which the
+        read is terminated.&nbsp; If <code>numrecs</code> is 0 it reads to the
+        end of the data.&nbsp; Since hash values must be unique and are
+        unordered, <code>gdp_gin_read_by_hash_async</code> always returns at
+        most one record.</li>
+      <li> The <code>start</code> parameter tells when to start the
+        subscription (that is, the starting record number or timestamp).</li>
+      <li>For <code>gdp_gin_read_by_recno_async</code>, if <code>start</code>
+        is negative, returns the most recent &ndash;<code>start</code>
+        records.&nbsp; If a negative <code>start</code> indicates going back
+        more records than are available, it starts from the first record.&nbsp;
+        If <code>start</code> is zero, an error is returned. </li>
+      <li>If <code>start</code> specifies an existing record but there are
+        fewer than <code>numrecs</code> records available, only the existing
+        records are returned.</li>
+      <li>If there are multiple records matching a <code>recno</code> or <code>timestamp</code>,
+        all of them are returned.</li>
+      <li><em>Callbacks make binding to languages like Java particularly
+          difficult</em><em>, but fit more naturally in with languages such as
+          Javascript.</em><em>&nbsp; Note also that callbacks will generally run
+          in the GDP I/O thread (so no further GDP operations will run until the
+          callback completes) or in a separate thread (in which case several
+          instances of the callback may be run at once).</em></li>
+      <li>Example for <code>gdp_gin_read_by_recno_async</code>:&nbsp; suppose
+        there are 20 records already in a GOB.&nbsp; Then:</li>
+    </ul>
+    <table cellspacing="2" cellpadding="2" border="1" align="center" width="80%">
+      <tbody>
+        <tr>
+          <td valign="top">start </td>
+          <td valign="top">numrecs </td>
+          <td valign="top">Behavior </td>
+        </tr>
+        <tr>
+          <td valign="top">1 </td>
+          <td valign="top">10 </td>
+          <td valign="top">Returns records 1&ndash;10 immediately and terminates
+            the read. </td>
+        </tr>
+        <tr>
+          <td valign="top">&ndash;10 </td>
+          <td valign="top">10 </td>
+          <td valign="top">Returns records 11&ndash;20 immediately and
+            terminates the read. </td>
+        </tr>
+        <tr>
+          <td valign="top">0 </td>
+          <td valign="top">any </td>
+          <td valign="top">Returns "4.02 bad option" failure. </td>
+        </tr>
+        <tr>
+          <td valign="top">&ndash;10 </td>
+          <td valign="top">20 </td>
+          <td valign="top">Returns records 11&ndash;20. </td>
+        </tr>
+        <tr>
+          <td valign="top">1 </td>
+          <td valign="top">0</td>
+          <td valign="top">Returns records 1&ndash;20 immediately. </td>
+        </tr>
+        <tr>
+          <td valign="top">&ndash;30 </td>
+          <td valign="top">30 </td>
+          <td valign="top">Returns records 1&ndash;20 immediately. </td>
+        </tr>
+        <tr>
+          <td valign="top">30 </td>
+          <td valign="top">10 </td>
+          <td valign="top"><i>Currently undefined.&nbsp; Should probably wait
+              until 10 more records are added before starting to return the
+              data.</i> </td>
+        </tr>
+        <tr>
+          <td valign="top">any </td>
+          <td valign="top">&ndash;1 </td>
+          <td valign="top">Returns "4.02 bad option" failure. </td>
+        </tr>
+      </tbody>
+    </table>
+    <br>
+    <br>
+    <ul>
     </ul>
     <hr width="100%" size="2">
     <h4> Name</h4>
-    <p>gdp_gcl_append_async &mdash; Asynchronously append to a writable GCL</p>
+    <p>gdp_gin_append_async &mdash; Asynchronously append one or more records to
+      a writable GOB</p>
     <h4>Synopsis</h4>
-    <pre>EP_STAT gdp_gcl_append_async(<br>		gdp_gcl_t *gcl,<br>		gdp_datum_t *datum,<br>		gdp_event_cbfunc_t *cbfunc,<br>		void *udata)</pre>
+    <pre>EP_STAT gdp_gin_append_async(<br>		gdp_gin_t *gin,<br>                int32_t n_datums<br>		gdp_datum_t **datums,<br>		gdp_event_cbfunc_t *cbfunc,<br>		void *udata)</pre>
     <h4>Notes</h4>
     <ul>
-      <li>Appends the indicated <code>datum</code> to the GCL.</li>
+      <li>Appends the indicated <code>datum</code> to the GOB.</li>
       <li>This function returns before any result is read and thus does not
         include the final status information.</li>
       <li>The return status will be <code>GDP_STAT_OK</code> if the append
@@ -462,15 +562,15 @@
     </ul>
     <hr>
     <h4>Name</h4>
-    gdp_gcl_subscribe_by_* &mdash; Subscribe to a readable GCL
+    gdp_gin_subscribe_by_* &mdash; Subscribe to a readable GOB
     <h4> Synopsis</h4>
-    <pre>EP_STAT gdp_gcl_subscribe_by_recno(<br>		gdp_gcl_t *gcl,
-		gdp_recno_t start,<br>		int32_t numrecs,<br>		gdp_sub_qos_t *qos;<br>		gdp_event_cbfunc_t *cbfunc,<br>		void *udata)<br>EP_STAT gdp_gcl_subscribe_by_ts(<br>		gdp_gcl_t *gcl,
+    <pre>EP_STAT gdp_gin_subscribe_by_recno(<br>		gdp_gin_t *gin,
+		gdp_recno_t start,<br>		int32_t numrecs,<br>		gdp_sub_qos_t *qos;<br>		gdp_event_cbfunc_t *cbfunc,<br>		void *udata)<br>EP_STAT gdp_gin_subscribe_by_ts(<br>		gdp_gin_t *gin,
 		EP_TIME_SPEC *start,<br>		int32_t numrecs,<br>		gdp_sub_qos_t *qos;<br>		gdp_event_cbfunc_t *cbfunc,<br>		void *udata) </pre>
     <h4> Notes</h4>
     <ul>
       <li>If a <code>cbfunc</code> is specified, arranges to call callback when
-        a message is generated on the <code>gcl</code>.</li>
+        a message is generated on the <code>gin</code>.</li>
       <li> The callback is not necessarily invoked instantly, and may or may not
         be called in a separate thread.</li>
       <li>It is the responsibility of the callback function to call <code>gdp_event_free(gev)</code>.
@@ -479,16 +579,16 @@
         the subscription &mdash; for example, whether subscriptions should be
         reliable or best effort (default).</li>
       <li>If no <code>cbfunc</code> is specified, subscription information is
-        available through the <code>gdp_gcl_event</code> interface (see below).</li>
+        available through the <code>gdp_event</code> interface (see below).</li>
       <li> The <code>udata</code> is passed through untouched in generated
         events.&nbsp; See below for the definition of <code>gdp_event_t</code>.</li>
       <li>At most <code>numrecs</code> records are returned, after which the
         subscription is terminated.&nbsp; If <code>numrecs</code> is 0 it waits
         for data forever. </li>
       <li> The <code>start</code> parameter tells when to start the
-        subscription (that is, the starting record number for <code>gdp_gcl_subscribe_by_recno</code>
-        or the earliest time of interest for <code>gdp_gcl_subscribe_by_ts</code>).</li>
-      <li>In <code>gdp_gcl_subscribe_by_recno</code>, if <code>start</code> is
+        subscription (that is, the starting record number for <code>gdp_gin_subscribe_by_recno</code>
+        or the earliest time of interest for <code>gdp_gin_subscribe_by_ts</code>).</li>
+      <li>In <code>gdp_gin_subscribe_by_recno</code>, if <code>start</code> is
         negative, returns the most recent &ndash;<code>start</code>
         records.&nbsp; If a negative <code>start</code> indicates going back
         more records than are available, it starts from the first record. </li>
@@ -496,8 +596,8 @@
         fewer than <code>numrecs</code> records available, this returns the
         available records and then waits for the additional data to appear as it
         is published.</li>
-      <li>In <code>gdp_gcl_subscribe_by_recno</code>, if <code>start</code> is
-        zero, or in <code>gdp_gcl_subscribe_by_ts</code>, it points past the
+      <li>In <code>gdp_gin_subscribe_by_recno</code>, if <code>start</code> is
+        zero, or in <code>gdp_gin_subscribe_by_ts</code>, it points past the
         last record already in the log, no current records are returned (i.e.,
         it returns new records as they are published).</li>
       <li><em>Callbacks make binding to languages like Java particularly
@@ -506,10 +606,10 @@
           GDP I/O thread (so no further GDP operations will run until the
           callback completes) or in a separate thread (in which case several
           instances of the callback may be run at once). </em></li>
-      <li>Example:&nbsp; suppose there are 20 records already in a GCL.&nbsp;
+      <li>Example:&nbsp; suppose there are 20 records already in a GOB.&nbsp;
         Then:</li>
     </ul>
-    <table align="center" width="80%" cellspacing="2" cellpadding="2" border="1">
+    <table cellspacing="2" cellpadding="2" border="1" align="center" width="80%">
       <tbody>
         <tr>
           <td valign="top">start </td>
@@ -578,126 +678,24 @@
     <h4>Notes</h4>
     <hr>
     <h4>Name</h4>
-    <p>gdp_sub_qos_set_xyzzy &mdash; set xyzzy qos</p>
+    <p>gdp_sub_qos_set_<i>xyzzy</i> &mdash; set <i>xyzzy</i> qos</p>
     <h4>Synopsis</h4>
-    <pre>gdp_sub_qos_set_xyzzy(<br>		gdp_sub_qos_t *qos,<br>		xxx yyy)</pre>
+    <pre>gdp_sub_qos_set_<code>xyzzy</code>(<br>		gdp_sub_qos_t *qos,<br>		xxx yyy)</pre>
     <h4>Notes</h4>
-    <hr>
-    <p><br>
-    </p>
-    <h4>Name</h4>
-    gdp_gcl_multiread&mdash; Read multiple records from a readable GCL
+    <hr>Name gdp_gin_unsubscribe &mdash; Unsubscribe GIN from an associated GOB<span
+      class="warning"></span>
     <h4> Synopsis</h4>
-    <pre>EP_STAT gdp_gcl_multiread(<br>		gdp_gcl_t *gcl,
-		gdp_recno_t start,<br>		int32_t numrecs,<br>		gdp_event_cbfunc_t cbfunc,<br>		void *udata)<br>EP_STAT gdp_gcl_multiread_ts(<br>		gdp_gcl_t *gcl,
-		EP_TIME_SPEC *start,<br>		int32_t numrecs,<br>		gdp_event_cbfunc_t cbfunc,<br>		void *udata) void (*cbfunc)(gdp_event_t *gev)
-</pre>
-    <h4> Notes</h4>
-    <ul>
-      <li>Similar to a subscription, except data in the future is never read
-        (i.e., this is only for reading historic data).&nbsp; This is the
-        interface to use for asynchronous reads.</li>
-      <li>If a <code>cbfunc</code> is specified, arranges to call callback when
-        a message is generated on the <code>gcl</code>.&nbsp; See below for the
-        definition of gdp_event_t. </li>
-      <li> The callback is not necessarily invoked instantly, and may or may not
-        be called in a separate thread.</li>
-      <li>It is the responsibility of the callback function to call <code>gdp_event_free(gev)</code>.<br>
-      </li>
-      <li>If no <code>cbfunc</code> is specified, subscription information is
-        available through the <code>gdp_gcl_event</code> interface (see below).</li>
-      <li> The <code>udata</code> is passed through untouched in generated
-        events.&nbsp; See below for the definition of <code>gdp_event_t</code>.</li>
-      <li>At most <code>numrecs</code> records are returned, after which the
-        subscription is terminated.&nbsp; If <code>numrecs</code> is 0 it reads
-        to the end of the existing data. </li>
-      <li> The <code>start</code> parameter tells when to start the
-        subscription (that is, the starting record number).</li>
-      <li>If <code>start</code> is negative, returns the most recent &ndash;<code>start</code>
-        records.&nbsp; If a negative <code>start</code> indicates going back
-        more records than are available, it starts from the first record. </li>
-      <li>If <code>start</code> specifies an existing record but there are
-        fewer than <code>numrecs</code> records available, only the existing
-        records are returned.</li>
-      <li>If <code>start</code> is zero, an error is returned.</li>
-      <li><em>Callbacks make binding to languages like Java particularly
-          difficult</em><em>, but fit more naturally in with languages such as
-          Javascript.</em><em>&nbsp; Note also that callbacks will generally run
-          in the GDP I/O thread (so no further GDP operations will run until the
-          callback completes) or in a separate thread (in which case several
-          instances of the callback may be run at once).</em></li>
-      <li>Example:&nbsp; suppose there are 20 records already in a GCL.&nbsp;
-        Then:</li>
-    </ul>
-    <table align="center" width="80%" cellspacing="2" cellpadding="2" border="1">
-      <tbody>
-        <tr>
-          <td valign="top">start </td>
-          <td valign="top">numrecs </td>
-          <td valign="top">Behavior </td>
-        </tr>
-        <tr>
-          <td valign="top">1 </td>
-          <td valign="top">10 </td>
-          <td valign="top">Returns records 1&ndash;10 immediately and terminates
-            the read. </td>
-        </tr>
-        <tr>
-          <td valign="top">&ndash;10 </td>
-          <td valign="top">10 </td>
-          <td valign="top">Returns records 11&ndash;20 immediately and
-            terminates the read. </td>
-        </tr>
-        <tr>
-          <td valign="top">0 </td>
-          <td valign="top">any </td>
-          <td valign="top">Returns "4.02 bad option" failure. </td>
-        </tr>
-        <tr>
-          <td valign="top">&ndash;10 </td>
-          <td valign="top">20 </td>
-          <td valign="top">Returns records 11&ndash;20. </td>
-        </tr>
-        <tr>
-          <td valign="top">1 </td>
-          <td valign="top">0</td>
-          <td valign="top">Returns records 1&ndash;20 immediately. </td>
-        </tr>
-        <tr>
-          <td valign="top">&ndash;30 </td>
-          <td valign="top">30 </td>
-          <td valign="top">Returns records 1&ndash;20 immediately. </td>
-        </tr>
-        <tr>
-          <td valign="top">30 </td>
-          <td valign="top">10 </td>
-          <td valign="top"><i>Currently undefined.&nbsp; Should probably wait
-              until 10 more records are added before starting to return the
-              data.</i> </td>
-        </tr>
-        <tr>
-          <td valign="top">any </td>
-          <td valign="top">&ndash;1 </td>
-          <td valign="top">Returns "4.02 bad option" failure. </td>
-        </tr>
-      </tbody>
-    </table>
-    <br>
-    <hr width="100%" size="2">
-    <h4> Name</h4>
-    gdp_gcl_unsubscribe &mdash; Unsubscribe from a GCL<span class="warning"></span>
-    <h4> Synopsis</h4>
-    <pre>EP_STAT gdp_gcl_unsubscribe(gdp_gcl_t *gcl,
+    <pre>EP_STAT gdp_gin_unsubscribe(gdp_gin_t *gin,
 		gdp_event_cbfunc_t *cbfunc,
 		void *udata)
 </pre>
     <h4> Notes</h4>
     <ul>
-      <li> Deletes all subscriptions matching the given {gcl, cbfunc, udata}
+      <li> Deletes all subscriptions matching the given {gin, cbfunc, udata}
         tuple.</li>
       <li>If <code>cbfunc</code> and or <code>udata</code> is <code>NULL</code>
-        they are treated as wildcards.&nbsp; For example, "<code>gdp_gcl_unsubscribe(gcl,
-          NULL, NULL)</code>" deletes all subscriptions for the given GCL.</li>
+        they are treated as wildcards.&nbsp; For example, "<code>gdp_gin_unsubscribe(gin,
+          NULL, NULL)</code>" deletes all subscriptions for the given GIN.</li>
       <li>If there are multiple subscriptions matching this tuple, they will all
         be terminated.&nbsp; For example, this might happen in a multi-threaded
         application.</li>
@@ -709,11 +707,11 @@
     <h4> Name</h4>
     gdp_event_next &mdash; get next asynchronous event
     <h4> Synopsis</h4>
-    <pre>gdp_event_t *gdp_event_next(<br>		gdp_gcl_t *gcl,<br>		EP_TIME_SPEC *timeout)</pre>
+    <pre>gdp_event_t *gdp_event_next(<br>		gdp_gin_t *gin,<br>		EP_TIME_SPEC *timeout)</pre>
     <h4> Notes</h4>
     <ul>
-      <li> Returns the next asynchronous event on the specified GCL.&nbsp; If
-        gcl is NULL, returns the next event from any GCL.</li>
+      <li> Returns the next asynchronous event on the specified GIN.&nbsp; If
+        gin is NULL, returns the next event from any GIN.</li>
       <li>Returns <code>NULL</code> if the <code>timeout</code> expires.&nbsp;
         If <code>timeout</code> is <code>NULL</code>, it waits forever. </li>
       <li>Currently the only asynchronous events are data arriving as the result
@@ -730,7 +728,7 @@
     <ul>
       <li>The event types are as follows:</li>
     </ul>
-    <table align="center" width="80%" cellspacing="2" cellpadding="2" border="1">
+    <table cellspacing="2" cellpadding="2" border="1" align="center" width="80%">
       <tbody>
         <tr>
           <td style="width: 162.2px;" valign="top">Event Name </td>
@@ -783,8 +781,6 @@
     <ul>
       <li>Unrecognized events should be ignored. </li>
     </ul>
-    <ul>
-    </ul>
     <hr width="100%" size="2">
     <h4>Name</h4>
     <p>gdp_event_getstat &mdash; extract the detailed result status from the
@@ -799,12 +795,12 @@
     </ul>
     <hr>
     <h4>Name</h4>
-    gdp_event_getgcl &mdash; extract the GCL handle from the event
+    gdp_event_getgin &mdash; extract the GIN handle from the event
     <h4>Synopsis</h4>
-    <pre>gdp_gcl_t *gdp_event_getgcl(gdp_event_t *gev)</pre>
+    <pre>gdp_gin_t *gdp_event_getgin(gdp_event_t *gev)</pre>
     <h4>Notes</h4>
     <ul>
-      <li>Returns the GCL handle that triggered this event.</li>
+      <li>Returns the GIN handle that triggered this event.</li>
     </ul>
     <hr width="100%" size="2">
     <h4>Name</h4>
@@ -826,54 +822,74 @@
       <li>Returns user data associated with the event.&nbsp; The user data is
         from the call that initiated the asynchronous operation. </li>
     </ul>
+    <hr>
+    <h3> 3.6&nbsp; Utilities </h3>
     <hr width="100%" size="2">
-    <h3>3.3&nbsp; GCL Open Information</h3>
-    <p>There is potentially a huge amount of information that might be provided
-      when a GCL is opened.&nbsp; Because this set is open-ended, it is
-      abstracted out into a separate API.&nbsp; The <code class="datatype">gdp_gcl_open_info_t</code>
-      datastructure encapsulates this information and can be passed into <code
-        class="function">gdp_gcl_open</code>.</p>
-    <hr>
     <h4>Name</h4>
-    <p>gdp_gcl_open_info_new &mdash; create new open information datastructure</p>
+    gdp_parse_name, gdp_printable_name &mdash; parse an external representation
+    to internal, create printable version of name<br>
     <h4>Synopsis</h4>
-    <pre><span>gdp_gcl_open_info_t *gdp_gcl_open_info_new(void)</span></pre>
+    <pre>EP_STAT gdp_parse_name(const char *ext, gdp_name_t gob_name)<br><br>char *gdp_printable_name(const gdp_name_t gob_name,<br>		gdp_pname_t printable)</pre>
     <h4>Notes</h4>
     <ul>
-      <li>Allocates a new <code class="datatype">gdp_gcl_open_info_t</code>
-        datastructure.</li>
+      <li>The <code>gdp_parse_name</code> function converts an external string
+        representation of a GOB name to an internal 256-bit encoding.</li>
+      <li>If ext is a URI-base64-encoded string of the correct length, it is
+        converted directly to 256 bits.</li>
+      <li>Otherwise, it is hashed using sha256 to create the internal name.</li>
+      <li><span class="warning">[This functionality will disappear in the
+          future, after a Directory Service is defined and implemented.&nbsp; In
+          particular, it will not be possible for users to select the name of a
+          GOB.]</span></li>
+      <li>The <code>gdp_printable_name</code> function converts an internal
+        name to a URI-base64-encoded string.</li>
     </ul>
     <hr>
     <h4>Name</h4>
-    <p>gdp_gcl_open_info_free &mdash; free an existing open information
-      datastructure</p>
+    gdp_gin_getname &mdash; Return the name of a GOB from a GIN
+    <h4> Synopsis</h4>
+    <pre>EP_STAT gdp_gin_getname(gdp_gin_t *gin,
+		gdp_name_t namebuf)
+</pre>
+    <h4> Notes</h4>
+    <ul>
+      <li> Returns the internal name of the GOB referenced by <code>gin</code>
+        into <code> namebuf</code>. </li>
+      <li> May not be necessary if the creator provides the name; really only
+        intended after <code>gdp_gin_create</code> so that the name can be
+        shared to other nodes that want to <code>gdp_gin_open</code> it.</li>
+    </ul>
+    <br>
+    <hr width="100%" size="2">
+    <h4> Name</h4>
+    gdp_getstat &mdash; Return information about a GCL&nbsp; <span class="warning">[NOT
+      YET IMPLEMENTED] </span>
+    <h4> Synopsis</h4>
+    <pre>EP_STAT gdp_getstat(gdp_name_t gobname,
+		gob_stat_t *statbuf)
+</pre>
+    <h4> Notes</h4>
+    <ul>
+      <li> <i>What status is included? Size (or number of records/messages),
+          last access, &hellip;</i></li>
+    </ul>
+    <br>
+    <hr width="100%" size="2">
+    <h4> Name</h4>
+    gdp_gin_print &mdash; print a GIN and associated GOB (for debugging)
     <h4>Synopsis</h4>
-    <pre>void gdp_gcl_open_info_free(gdp_gcl_open_info_t *info)</pre>
+    <pre>void gdp_gin_print(const gdp_gin_t *gin, FILE *fp)</pre>
     <h4>Notes</h4>
     <ul>
-      <li>Frees an existing <code class="datatype">gdp_gcl_open_info_t</code>
-        datastructure.</li>
+      <li>Prints the GIN and GOB on the indicated file.</li>
+      <li>The output will contain internal information; it is not intended to
+        display information to end users.</li>
     </ul>
     <hr>
-    <h4>Name</h4>
-    <p>gdp_gcl_open_info_set_signing_key &mdash; set the signing key in an open
-      information datastructure</p>
-    <h4>Synopsis</h4>
-    <pre>EP_STAT gdp_gcl_open_info_set_signing_key(
-		gdp_gcl_open_info_t *info,
-		EP_CRYPTO_KEY *skey)</pre>
-    <h4>Notes</h4>
-    <ul>
-      <li>Uses the indicated secret signing key <code class="variable">skey</code>
-        to do the signing for any GCL opened using this datastructure.</li>
-      <li>When <code class="variable">info</code> is freed, the signing key
-        will be freed as well.</li>
-    </ul>
-    <hr><br>
     <p><br>
     </p>
     <h2>4&nbsp; Datums (Records)</h2>
-    <p>GCLs are represented as a series of records of type <code>gdp_datum_t</code>.&nbsp;
+    <p>GOBs are represented as a series of records of type <code>gdp_datum_t</code>.&nbsp;
       Each record has a record number, a commit timestamp, associated data, and
       possible signature information if the record was signed.&nbsp; Record
       numbers are of type <code>gdp_recno_t</code> and count up by one as
@@ -1064,7 +1080,7 @@ typedef struct
           class="variable">gcl-id</span>.pem</span>.&nbsp; Normally <span class="command">gcl-create</span>
       will encrypt the secret key with another key entered from the command
       line, although this can also be turned off.</p>
-    <p>When a GDP application attempts to open a log using <span class="function">gdp_gcl_open</span>,
+    <p>When a GDP application attempts to open a log using <span class="function">gdp_gin_open</span>,
       the library will attempt to find a secret key by searching the directories
       named in the <span class="admin-param">swarm.gdp.crypto.key.path</span>
       administrative parameter for a file having the same name as the log (with
@@ -1085,31 +1101,31 @@ typedef struct
     <h2>6&nbsp; Miscellaneous and Utilities</h2>
     <hr>
     <h4>Name</h4>
-    <p>gdp_gcl_getnrecs &mdash; return the number of records in an existing GCL</p>
+    <p>gdp_gin_getnrecs &mdash; return the number of records in an existing GOB</p>
     <h4>Synopsis</h4>
-    <p><code>gdp_recno_t gdp_gcl_getnrecs(gdp_gcl_t *gcl)</code></p>
+    <p><code>gdp_recno_t gdp_gin_getnrecs(gdp_gin_t *gin)</code></p>
     <h4>Notes</h4>
     <ul>
-      <li>Returns the number of records in a GCL.</li>
+      <li>Returns the number of records in a GOB.</li>
       <li>This does not check with the log server, i.e., the return value is
-        cached in the local process (and is updated each time the GCL is read or
+        cached in the local process (and is updated each time the GOB is read or
         written).&nbsp; This shouldn't be a problem for writers (since there
         should only be one writer), but may be for readers.&nbsp; Readers
         wanting to get the latest number of records can read the last record in
-        the GCL (using gdp_gcl_read) and check the record number in the returned
-        datum.</li>
+        the GOB (using <code>gdp_gin_read_by_recno</code>) and check the record
+        number in the returned datum.</li>
     </ul>
     <hr>
     <h4>Name</h4>
-    <p>gdp_gcl_set_append_filter &mdash; filter appended data</p>
+    <p>gdp_gin_set_append_filter &mdash; filter appended data</p>
     <h4>Synopsis</h4>
-    <code>void gdp_gcl_set_append_filter(gdp_gcl_t *gcl,<br>
+    <code>void gdp_gin_set_append_filter(gdp_gin_t *gin,<br>
       &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
       EP_STAT (*filter(gdp_datum_t *, void *),<br>
       &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; void *filterdata)</code><br>
     <h4>Notes</h4>
     <ul>
-      <li>All data appended to the named <span class="variable">gcl</span> are
+      <li>All data appended to the named <span class="variable">gin</span> are
         first run through the <span class="variable">filter</span>.&nbsp; The
         filter may modify the <span class="variable">datum</span> before it is
         sent.</li>
@@ -1119,15 +1135,15 @@ typedef struct
     <hr><br>
     <br>
     <h4>Name</h4>
-    <p>gdp_gcl_set_read_filter &mdash; filter read data</p>
+    <p>gdp_gin_set_read_filter &mdash; filter read data</p>
     <h4>Synopsis</h4>
-    <p><code>void gdp_gcl_set_read_filter(gdp_gcl_t *gcl,<br>
+    <p><code>void gdp_gin_set_read_filter(gdp_gin_t *gin,<br>
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
         EP_STAT (*filter(gdp_datum_t *, void *),<br>
         &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; void *filterdata)</code></p>
     <h4>Notes</h4>
     <ul>
-      <li>All data read from the named <span class="variable">gcl</span> are
+      <li>All data read from the named <span class="variable">gin</span> are
         passed through this filter before being returned.&nbsp; The filter may
         modify the <span class="variable">datum</span>.</li>
       <li>The <span class="variable">filterdata</span> parameter is passed as
@@ -1142,20 +1158,20 @@ typedef struct
     <h2>Appendix A:&nbsp; Examples</h2>
     <p>The following pseudo-code example excerpts from <tt>apps/gdp-writer.c</tt>.
     </p>
-    <pre>#include &lt;gdp/gdp.h&gt;<br>#include &lt;stdio.h&gt;<br>#include &lt;string.h&gt;<br><br>int main(int argc, char **argv)<br>{<br>	gdp_tcl_t *gcl;<br>	EP_STAT estat;<br>	gdp_name_t gcliname;	// internal name of GCL<br>	gdp_datum_t *d;<br><br>	// general startup and initialization<br>	if (argc &lt; 2)<br>		usage_error();<br>	estat = gdp_init();<br>	if (!EP_STAT_ISOK(estat))<br>		initialization_error(estat);<br>	d = gdp_datum_new();
-<br><br>	// parse command line name to internal format<br>	estat = gdp_gcl_parse_name(argv[1], gcliname);<br>	if (!EP_STAT_ISOK(estat))<br>		name_syntax_error();<br><br>	// attempt to create that name<br>	estat = gdp_gcl_create(gcliname, &amp;gcl);<br>	if (!EP_STAT_ISOK(estat))<br>		creation_error(estat);<br><br>	// read lines from standard input<br>	while (fgets(buf, sizeof buf, stdin) != NULL)<br>	{<br>		char *p = strchr(buf, '\n');<br>		if (p != NULL)<br>			*p = '\0';<br><br>		// write them to the dataplane<br>		if (gdp_buf_write(gdp_datum_getbuf(d), buf, strlen(buf)) &lt; 0)<br>                        estat = GDP_STAT_BUFFER_FAILURE;<br>                else<br>                        estat = gdp_gcl_append(gcl, d);<br>		EP_STAT_CHECK(estat, break);<br>	}<br><br>	// cleanup and exit<br>	gdp_gcl_close(gcl);<br>	exit(!EP_STAT_ISOK(estat));<br>}</pre>
+    <pre>#include &lt;gdp/gdp.h&gt;<br>#include &lt;stdio.h&gt;<br>#include &lt;string.h&gt;<br><br>int main(int argc, char **argv)<br>{<br>	gdp_gin_t *gin;<br>	EP_STAT estat;<br>	gdp_name_t gobiname;	// internal name of GOB<br>	gdp_datum_t *d;<br><br>	// general startup and initialization<br>	if (argc &lt; 2)<br>		usage_error();<br>	estat = gdp_init();<br>	if (!EP_STAT_ISOK(estat))<br>		initialization_error(estat);<br>	d = gdp_datum_new();
+<br><br>	// parse command line name to internal format<br>	estat = gdp_parse_name(argv[1], gobiname);<br>	if (!EP_STAT_ISOK(estat))<br>		name_syntax_error();<br><br>	// attempt to create that name<br>	estat = gdp_gin_create(gobiname, &amp;gin);<br>	if (!EP_STAT_ISOK(estat))<br>		creation_error(estat);<br><br>	// read lines from standard input<br>	while (fgets(buf, sizeof buf, stdin) != NULL)<br>	{<br>		char *p = strchr(buf, '\n');<br>		if (p != NULL)<br>			*p = '\0';<br><br>		// write them to the dataplane<br>		if (gdp_buf_write(gdp_datum_getbuf(d), buf, strlen(buf)) &lt; 0)<br>                        estat = GDP_STAT_BUFFER_FAILURE;<br>                else<br>                        estat = gdp_gin_append(gin, d);<br>		EP_STAT_CHECK(estat, break);<br>	}<br><br>	// cleanup and exit<br>	gdp_gin_close(gin);<br>	exit(!EP_STAT_ISOK(estat));<br>}</pre>
     <hr width="100%" size="2">
     <p>This example is a similar excerpt from apps/gdp-reader.c (without using
       subscriptions):</p>
-    <pre>#include &lt;gdp/gdp.h&gt;<br><br>int main(int argc, char **argv)<br>{<br>	gdp_gcl_t *gcl;<br>	EP_STAT estat;<br>	gdp_name_t gcliname;	// internal name of GCL<br>	gdp_datum_t *d;<br>	gdp_recno_t recno;<br><br>	// general startup and initialization<br>	if (argc &lt; 2)<br>		usage_error();<br>	estat = gdp_init();<br>	if (!EP_STAT_ISOK(estat))<br>		initialization_error(estat);<br>	d = gdp_datum_new();
-<br><br>	// parse command line name to internal format<br>	estat = gdp_gcl_parse_name(argv[1], gcliname);<br>	if (!EP_STAT_ISOK(estat))<br>		name_syntax_error();
-<br>	// attempt to open the GCL<br>	estat = gdp_gcl_open(gcliname, GDP_MODE_RO, &amp;gcl);<br>	if (!EP_STAT_ISOK(estat))<br>		open_error(estat, argv[1]);<br>
-&nbsp;	recno = 1;<br>	for (;;)<br>	{<br>		estat = gdp_gcl_read_by_recno(gcl, recno++, d);<br>		EP_STAT_CHECK(estat, break);<br>		gdp_datum_print(d, stdout);<br>	}<br>	exit(0);<br>}</pre>
+    <pre>#include &lt;gdp/gdp.h&gt;<br><br>int main(int argc, char **argv)<br>{<br>	gdp_gin_t *gin;<br>	EP_STAT estat;<br>	gdp_name_t gobiname;	// internal name of GOB<br>	gdp_datum_t *d;<br>	gdp_recno_t recno;<br><br>	// general startup and initialization<br>	if (argc &lt; 2)<br>		usage_error();<br>	estat = gdp_init();<br>	if (!EP_STAT_ISOK(estat))<br>		initialization_error(estat);<br>	d = gdp_datum_new();
+<br><br>	// parse command line name to internal format<br>	estat = gdp_parse_name(argv[1], gobiname);<br>	if (!EP_STAT_ISOK(estat))<br>		name_syntax_error();
+<br>	// attempt to open the GOB<br>	estat = gdp_gin_open(gobiname, GDP_MODE_RO, &amp;gin);<br>	if (!EP_STAT_ISOK(estat))<br>		open_error(estat, argv[1]);<br>
+&nbsp;	recno = 1;<br>	for (;;)<br>	{<br>		estat = gdp_gin_read_by_recno(gin, recno++, d);<br>		EP_STAT_CHECK(estat, break);<br>		gdp_datum_print(d, stdout);<br>	}<br>	exit(0);<br>}</pre>
     <br>
     <hr width="100%" size="2">
     <p>If you want to use subscriptions, the recno variable can be removed and
       the for loop replaced with: </p>
-    <pre>	// enable the subscription<br>	estat = gdp_gcl_subscribe_by_recno(gcl, 1, -1, NULL, NULL);<br>	if (!EP_STAT_ISOK(estat))<br>		subscribe_error(estat, argv[1]);<br><br>	for (;;)<br>	{<br>		gdp_event_t *gev = gdp_event_next(true);<br>		if (gdp_event_gettype(gev) != GDP_EVENT_DATA)<br>			continue;<br>		gdp_datum_print(gdp_event_getdatum(gev), stdout);<br>		gdp_event_free(gev);<br>	}</pre>
+    <pre>	// enable the subscription<br>	estat = gdp_gin_subscribe_by_recno(gin, 1, -1, NULL, NULL);<br>	if (!EP_STAT_ISOK(estat))<br>		subscribe_error(estat, argv[1]);<br><br>	for (;;)<br>	{<br>		gdp_event_t *gev = gdp_event_next(true);<br>		if (gdp_event_gettype(gev) != GDP_EVENT_DATA)<br>			continue;<br>		gdp_datum_print(gdp_event_getdatum(gev), stdout);<br>		gdp_event_free(gev);<br>	}</pre>
     <br>
     <hr width="100%" size="2">
     <h2>Appendix B:&nbsp; Compiling and Linking</h2>
@@ -1184,7 +1200,7 @@ typedef struct
       not be up to date. </p>
     <h3>C.1 Access Control</h3>
     <p> Do this using Access Control Lists (so each user/app has a keypair) or
-      by passing public/secret keys around (so each GCL has a secret keypair).
+      by passing public/secret keys around (so each GOB has a secret keypair).
       The latter makes revocation impossible (even for write access), so I
       prefer the ACL approach. Third way?</p>
     <p> Revocation? Deep vs. Shallow. Deep = take away permissions that have
@@ -1203,42 +1219,42 @@ typedef struct
       when a bad player creates a new identity/keypair they do not get access to
       any previous grants, so this may be sufficient.</p>
     <h3> C.2 Naming</h3>
-    <p> If each GCL has a secret keypair, then the public key is sufficient to
-      name the entity. If not, then assigning a GCL a GUID on creation seems
+    <p> If each GOB has a secret keypair, then the public key is sufficient to
+      name the entity. If not, then assigning a GOB a GUID on creation seems
       like the best approach. Having the user assign a name seems like a
       non-starter, if only because of the possibility of conflicts.</p>
     <p> There will probably be some need for external naming, e.g., some overlay
       directory structure. That might be a different gcl_type.</p>
     <p> This seems like an open research topic.</p>
     <h3> C.3 Orphans, Expiration, Charging, and Accounting</h3>
-    <p> If a GCL isn't linked into a directory structure and everyone forgets
+    <p> If a GOB isn't linked into a directory structure and everyone forgets
       its name then it will live forever (or until it expires). This could be
-      quite common if a GCL is temporary, that is, not a candidate for long-term
+      quite common if a GOB is temporary, that is, not a candidate for long-term
       archival.</p>
     <p> Expiration could be an issue without some sort of charging, which
       implies accounting.</p>
-    <p> Charging and accounting will affect the API. It seems like on GCL
+    <p> Charging and accounting will affect the API. It seems like on GOB
       creation the creator needs to offer payment for both carrying and storing
       the data. This payment would presumably accrue to the actors providing the
       actual service. Payment for storage might be limited time or indefinite
       time (i.e., it would be an endowment).</p>
     <p> The creator could also specify a cost for any potential consumer in
-      order to access the GCL. Such payments would accrue to the creator of the
-      GCL, and might be used to fund continued access, i.e. it could be rolled
+      order to access the GOB. Such payments would accrue to the creator of the
+      GOB, and might be used to fund continued access, i.e. it could be rolled
       back into the endowment. This would lean toward making less-used data
       disappear: appealing in some ways, but anathema to librarians and
       historians.</p>
-    <p> As for API effects, it seems that GCL creation needs to include a
+    <p> As for API effects, it seems that GOB creation needs to include a
       payment for initial service, a cost for access, and an account into which
-      to deposit any consumer payments. Accessing a GCL only requires an offered
+      to deposit any consumer payments. Accessing a GOB only requires an offered
       payment (which is probably best viewed as a bid rather than a payment,
       thus allowing multiple providers to compete for access).</p>
     <p> Note that none of this is dependent on the form of payment. It does
       however assume that there is a mutually agreed upon form of payment, i.e.,
       a universal currency.</p>
     <h3> C.4 Quality of Service</h3>
-    <p> Is Quality of Service specified on a particular GCL, a particular open
-      instance of a GCL, or between a pair of endpoints?</p>
+    <p> Is Quality of Service specified on a particular GOB, a particular open
+      instance of a GOB, or between a pair of endpoints?</p>
     <p> What does QoS actually mean? For example, in a live media stream it
       probably means the resolution of the data stream (which determines
       real-time bandwidth), latency, and possibly jitter, but after that stream
@@ -1250,7 +1266,7 @@ typedef struct
       real-time version of the stream &mdash; for example, over a slow network
       link.</p>
     <h2> Appendix D: References</h2>
-    <table width="100%" cellspacing="2" cellpadding="2" border="1">
+    <table cellspacing="2" cellpadding="2" border="1" width="100%">
       <tbody>
         <tr>
           <td valign="top">[Dab13a] </td>

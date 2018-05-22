@@ -209,11 +209,14 @@
 **		Use __attribute__((packed))
 **	EP_CCCF_USE_ATTR_UNUSED
 **		Use __attribute__((unused))
+**	EP_CCCF_USE_ATTR_DEPRECATED
+**		Use __attribute__((deprecated))
 */
 
 # define EP_CCCF_USE_ATTR_NORETURN	1	// use __attribute__((noreturn))
 # define EP_CCCF_USE_ATTR_PACKED	1	// use __attribute__((packed))
 # define EP_CCCF_USE_ATTR_UNUSED	1	// use __attribute__((unused))
+# define EP_CCCF_USE_ATTR_DEPRECATED	1	// use __attribute__((deprecated))
 
 // wrap GCC attributes in macros to make code easier to port to non-gcc
 #if EP_CCCF_USE_ATTR_NORETURN
@@ -230,6 +233,11 @@
 #  define EP_ATTR_UNUSED	__attribute__((unused))
 #else
 #  define EP_ATTR_UNUSED
+#endif
+#if EP_CCCF_USE_ATTR_DEPRECATED
+#  define EP_ATTR_DEPRECATED	__attribute__((deprecated))
+#else
+#  define EP_ATTR_DEPRECATED
 #endif
 
 #endif // _EP_CONF_H_

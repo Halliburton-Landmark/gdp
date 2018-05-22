@@ -27,10 +27,11 @@
 #
 
 BINALL_ZC=	gdp-zcbrowse
-#ALL=	gcl-create gdp-writer gdp-reader gdp-rest rw-bench log-view
-BINALL=		gcl-create \
+#ALL=	gdp-create gdp-writer gdp-reader gdp-rest rw-bench log-view
+BINALL=		\
 		log-exists \
 		log-mirror \
+		gdp-create \
 		gdp-reader \
 		gdp-writer \
 		$(BINALL_ZC) \
@@ -42,7 +43,6 @@ SBINALL=	\
 		gdp-delete \
 		$(SBINALL_ZC) \
 #		gdp-log-check \
-#		gdp-newsegment \
 #		gdp-rest \
 #		log-view \
 
@@ -57,9 +57,11 @@ MAN5ALL=
 
 MAN7ALL=
 
-MAN8ALL=	gcl-clone.8 \
-		gcl-create.8 \
+MAN8ALL=	\
+		gdp-create.8 \
+		gdp-delete.8 \
 		gdp-log-check.8 \
+#		gcl-clone.8 \
 #		log-view.8 \
 
 MANALL=		${MAN1ALL} ${MAN3ALL} ${MAN5ALL} ${MAN7ALL} ${MAN8ALL}

@@ -133,7 +133,7 @@ _gdp_acknak_from_estat(EP_STAT estat, gdp_cmd_t def)
 **		This usually only applies to gdplogd.
 */
 
-static EP_THR_MUTEX		GclCreateMutex			EP_THR_MUTEX_INITIALIZER;
+static EP_THR_MUTEX		GdpCreateMutex			EP_THR_MUTEX_INITIALIZER;
 
 static void
 process_cmd(void *cpdu_)
@@ -154,7 +154,7 @@ process_cmd(void *cpdu_)
 
 	// create has too many special cases, so we single thread it
 	if (cmd == GDP_CMD_CREATE)
-		ep_thr_mutex_lock(&GclCreateMutex);
+		ep_thr_mutex_lock(&GdpCreateMutex);
 
 	estat = _gdp_gob_cache_get(cpdu->dst, GGCF_NOCREATE, &gob);
 	if (gob != NULL)
@@ -263,7 +263,7 @@ fail0:
 	}
 
 	if (cmd == GDP_CMD_CREATE)
-		ep_thr_mutex_unlock(&GclCreateMutex);
+		ep_thr_mutex_unlock(&GdpCreateMutex);
 
 	ep_dbg_cprintf(Dbg, 40, "process_cmd <<< done\n");
 }
@@ -615,13 +615,13 @@ process_resp(void *rpdu_)
 	}
 
 	// free up resources
-	// use a shadow variable so req does not lose gob
-	gob = req->gob;
-	if (gob != NULL)
-	{
-		_gdp_gob_decref(&gob, false);
-		gob = req->gob;
-	}
+//	// use a shadow variable so req does not lose gob
+//	gob = req->gob;
+//	if (gob != NULL)
+//	{
+//		_gdp_gob_decref(&gob, false);
+//		gob = req->gob;
+//	}
 
 	if (EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
 		_gdp_req_unlock(req);

@@ -235,7 +235,7 @@ sorted_insert(size_t klen, const void *key, const void *gob_, va_list av)
 	gdp_gob_t *gob = (gdp_gob_t *) gob_;
 
 	// if this is being dropped, just skip this GOB
-	if (EP_UT_BITSET(GCLF_DROPPING, gob->flags))
+	if (EP_UT_BITSET(GOBF_DROPPING, gob->flags))
 		return;
 
 	gdp_gob_t *g2 = LIST_FIRST(&GobsByUse);
@@ -291,7 +291,7 @@ add_cache_unlocked(gdp_gob_t *gob)
 
 	check_cache_consistency("add_cache_unlocked");
 
-	if (EP_UT_BITSET(GCLF_INCACHE, gob->flags))
+	if (EP_UT_BITSET(GOBF_INCACHE, gob->flags))
 	{
 		ep_dbg_cprintf(Dbg, 9,
 				"_gdp_gob_cache_add(%p): already cached\n",
@@ -332,7 +332,7 @@ add_cache_unlocked(gdp_gob_t *gob)
 		}
 	}
 
-	gob->flags |= GCLF_INCACHE;
+	gob->flags |= GOBF_INCACHE;
 	ep_dbg_cprintf(Dbg, 40, "_gdp_gob_cache_add: %s => %p\n",
 			gob->pname, gob);
 }
@@ -373,7 +373,7 @@ _gdp_gob_cache_changename(gdp_gob_t *gob, gdp_name_t newname)
 	EP_ASSERT_ELSE(GDP_GOB_ISGOOD(gob), return);
 	EP_ASSERT_ELSE(gdp_name_is_valid(gob->name), return);
 	EP_ASSERT_ELSE(gdp_name_is_valid(newname), return);
-	EP_ASSERT_ELSE(EP_UT_BITSET(GCLF_INCACHE, gob->flags), return);
+	EP_ASSERT_ELSE(EP_UT_BITSET(GOBF_INCACHE, gob->flags), return);
 
 	ep_thr_mutex_lock(&GobCacheMutex);
 	check_cache_consistency("_gdp_gob_cache_changename");
@@ -394,7 +394,7 @@ _gdp_gob_cache_changename(gdp_gob_t *gob, gdp_name_t newname)
 **		it returns null unless the GGCF_CREATE flag is set, in which
 **		case it is created and returned.  This allows the Cache Mutex
 **		to be locked before the GOB is locked.  Newly created GOBs
-**		are marked GCLF_PENDING unless the open routine clears that bit.
+**		are marked GOBF_PENDING unless the open routine clears that bit.
 **		In particular, gdp_gob_open needs to do additional opening
 **		_after_ _gdp_gob_cache_get returns so that the cache is
 **		unlocked while sending protocol to the server.
@@ -426,10 +426,10 @@ _gdp_gob_cache_get(
 
 		// sanity checking:
 		// someone may have snuck in before we acquired the lock
-		if (!EP_UT_BITSET(GCLF_INUSE, gob->flags) ||
-				!EP_UT_BITSET(GCLF_INCACHE, gob->flags) ||
-				EP_UT_BITSET(GCLF_DROPPING, gob->flags) ||
-				(EP_UT_BITSET(GCLF_PENDING, gob->flags) &&
+		if (!EP_UT_BITSET(GOBF_INUSE, gob->flags) ||
+				!EP_UT_BITSET(GOBF_INCACHE, gob->flags) ||
+				EP_UT_BITSET(GOBF_DROPPING, gob->flags) ||
+				(EP_UT_BITSET(GOBF_PENDING, gob->flags) &&
 				 !EP_UT_BITSET(GGCF_GET_PENDING, flags)))
 		{
 			// someone deallocated this in the brief window above
@@ -492,7 +492,7 @@ _gdp_gob_cache_drop(gdp_gob_t *gob, bool cleanup)
 	}
 
 	GDP_GOB_ASSERT_ISLOCKED(gob);
-	if (!EP_ASSERT(EP_UT_BITSET(GCLF_INCACHE, gob->flags)))
+	if (!EP_ASSERT(EP_UT_BITSET(GOBF_INCACHE, gob->flags)))
 		return;
 	if (cleanup)
 	{
@@ -514,7 +514,7 @@ _gdp_gob_cache_drop(gdp_gob_t *gob, bool cleanup)
 	}
 
 	// mark it as being dropped to detect race condition
-	gob->flags |= GCLF_DROPPING;
+	gob->flags |= GOBF_DROPPING;
 
 	// if we're not cleanup up (GobCacheMutex unlocked) we have to
 	// get the lock ordering right
@@ -528,7 +528,7 @@ _gdp_gob_cache_drop(gdp_gob_t *gob, bool cleanup)
 
 		// sanity checks (XXX should these be assertions? XXX)
 		//XXX need to check that nothing bad happened while GOB was unlocked
-		EP_ASSERT(EP_UT_BITSET(GCLF_INCACHE, gob->flags));
+		EP_ASSERT(EP_UT_BITSET(GOBF_INCACHE, gob->flags));
 	}
 
 	// remove it from the associative cache
@@ -536,7 +536,7 @@ _gdp_gob_cache_drop(gdp_gob_t *gob, bool cleanup)
 
 	// ... and the LRU list
 	LIST_REMOVE(gob, ulist);
-	gob->flags &= ~GCLF_INCACHE;
+	gob->flags &= ~GOBF_INCACHE;
 
 	if (!cleanup)
 	{
@@ -571,7 +571,7 @@ _gdp_gob_touch(gdp_gob_t *gob)
 	{
 		// GOB isn't locked: do nothing
 	}
-	else if (!EP_UT_BITSET(GCLF_INCACHE, gob->flags))
+	else if (!EP_UT_BITSET(GOBF_INCACHE, gob->flags))
 	{
 		// GOB isn't in cache: do nothing
 	}
@@ -657,19 +657,19 @@ _gdp_gob_cache_reclaim(time_t maxage)
 				// couldn't get the lock: previous g2 setting may be wrong
 				continue;
 			}
-			g1->flags |= GCLF_ISLOCKED;
+			g1->flags |= GOBF_ISLOCKED;
 			g2 = LIST_NEXT(g1, ulist);		// get g2 again with the lock
 			if (g1->utime > mintime)
 			{
 				_gdp_gob_unlock(g1);
 				continue;
 			}
-			if (EP_UT_BITSET(GCLF_DROPPING, g1->flags) || g1->refcnt > 0)
+			if (EP_UT_BITSET(GOBF_DROPPING, g1->flags) || g1->refcnt > 0)
 			{
 				if (ep_dbg_test(Dbg, 19))
 				{
 					ep_dbg_printf("_gdp_gob_cache_reclaim: skipping %s:\n   ",
-							EP_UT_BITSET(GCLF_DROPPING, g1->flags) ?
+							EP_UT_BITSET(GOBF_DROPPING, g1->flags) ?
 								"dropping" : "referenced");
 					_gdp_gob_dump(g1, ep_dbg_getfile(), GDP_PR_DETAILED, 0);
 				}
@@ -731,7 +731,7 @@ _gdp_gob_cache_shutdown(void (*shutdownfunc)(gdp_req_t *))
 	for (g1 = LIST_FIRST(&GobsByUse); g1 != NULL; g1 = g2)
 	{
 		ep_thr_mutex_trylock(&g1->mutex);
-		g1->flags |= GCLF_ISLOCKED;
+		g1->flags |= GOBF_ISLOCKED;
 		g2 = LIST_NEXT(g1, ulist);
 		_gdp_req_freeall(g1, NULL, shutdownfunc);
 		_gdp_gob_free(&g1);	// also removes from cache and usage list

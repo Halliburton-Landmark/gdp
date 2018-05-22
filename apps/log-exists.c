@@ -58,9 +58,9 @@ main(int argc, char **argv)
 	int opt;
 	bool show_usage = false;
 	EP_STAT estat;
-	gdp_gcl_t *gcl;
+	gdp_gin_t *gin;
 	char *gdpd_addr = NULL;
-	gdp_name_t gcliname;
+	gdp_name_t gdpiname;
 
 	while ((opt = getopt(argc, argv, "D:G:")) > 0)
 	{
@@ -97,8 +97,8 @@ main(int argc, char **argv)
 	ep_time_nanosleep(INT64_C(100000000));
 
 	// open GCL to be tested
-	gdp_parse_name(argv[0], gcliname);
-	estat = gdp_gcl_open(gcliname, GDP_MODE_RO, NULL, &gcl);
+	gdp_parse_name(argv[0], gdpiname);
+	estat = gdp_gin_open(gdpiname, GDP_MODE_RO, NULL, &gin);
 	if (EP_STAT_ISOK(estat))
 		exit(EX_OK);
 	else

@@ -40,7 +40,7 @@
 #include "gdp.h"
 #include "gdp_chan.h"		// for PUT64
 #include "gdp_event.h"
-#include "gdp_gclmd.h"
+#include "gdp_md.h"
 #include "gdp_priv.h"
 
 #include <event2/event.h>
@@ -60,7 +60,7 @@ _gdp_gob_newname(gdp_gob_t *gob)
 {
 	if (!GDP_GOB_ISGOOD(gob))
 		return GDP_STAT_LOG_NOT_OPEN;
-	_gdp_newname(gob->name, gob->gclmd);
+	_gdp_newname(gob->name, gob->gob_md);
 	gdp_printable_name(gob->name, gob->pname);
 	return EP_STAT_OK;
 }
@@ -77,7 +77,7 @@ _gdp_gob_newname(gdp_gob_t *gob)
 EP_STAT
 _gdp_gob_create(gdp_name_t gobname,
 				gdp_name_t logdname,
-				gdp_gclmd_t *gmd,
+				gdp_md_t *gmd,
 				gdp_chan_t *chan,
 				uint32_t reqflags,
 				gdp_gob_t **pgob)
@@ -101,7 +101,7 @@ _gdp_gob_create(gdp_name_t gobname,
 	// add UUID to guarantee that the name will be unique
 	size_t mlen;
 	const void *mdata;
-	if (!EP_STAT_ISOK(gdp_gclmd_find(gmd, GDP_GCLMD_UUID, &mlen, &mdata)))
+	if (!EP_STAT_ISOK(gdp_md_find(gmd, GDP_MD_UUID, &mlen, &mdata)))
 	{
 		EP_UUID uuid;
 		EP_UUID_STR uustr;
@@ -125,11 +125,11 @@ _gdp_gob_create(gdp_name_t gobname,
 			return estat;
 		}
 		ep_dbg_cprintf(Dbg, 17, "_gdp_gob_create: added UUID %s\n", uustr);
-		estat = gdp_gclmd_add(gmd, GDP_GCLMD_UUID, strlen(uustr), uustr);
+		estat = gdp_md_add(gmd, GDP_MD_UUID, strlen(uustr), uustr);
 		if (!EP_STAT_ISOK(estat))
 		{
 			char ebuf[100];
-			ep_dbg_cprintf(Dbg, 1, "_gdp_gob_create: gdp_gclmd_add(UUID): %s\n",
+			ep_dbg_cprintf(Dbg, 1, "_gdp_gob_create: gdp_md_add(UUID): %s\n",
 						ep_stat_tostr(estat, ebuf, sizeof ebuf));
 			return estat;
 		}
@@ -161,7 +161,7 @@ _gdp_gob_create(gdp_name_t gobname,
 		{
 			uint8_t *mdbuf;
 			size_t mdlen;
-			mdlen = _gdp_gclmd_serialize(gmd, &mdbuf);
+			mdlen = _gdp_md_serialize(gmd, &mdbuf);
 			payload->metadata->data.len = mdlen;
 			payload->metadata->data.data = mdbuf;
 		}
@@ -210,7 +210,7 @@ fail0:
 
 static EP_STAT
 find_secret_key(gdp_gob_t *gob,
-			gdp_gcl_open_info_t *open_info)
+			gdp_open_info_t *open_info)
 {
 	// We will write the log, and it does have a public key.  We need
 	// to find the secret to match it.
@@ -222,7 +222,7 @@ find_secret_key(gdp_gob_t *gob,
 	EP_STAT estat;
 
 	// see if we have a public key; if not we're done
-	estat = gdp_gclmd_find(gob->gclmd, GDP_GCLMD_PUBKEY,
+	estat = gdp_md_find(gob->gob_md, GDP_MD_PUBKEY,
 				&pkbuflen, (const void **) &pkbuf);
 	if (!EP_STAT_ISOK(estat))
 	{
@@ -297,7 +297,7 @@ find_secret_key(gdp_gob_t *gob,
 	{
 		uint8_t *mdbuf;
 		size_t mdlen;
-		mdlen = _gdp_gclmd_serialize(gob->gclmd, &mdbuf);
+		mdlen = _gdp_md_serialize(gob->gob_md, &mdbuf);
 		ep_crypto_sign_update(gob->digest, mdbuf, mdlen);
 		ep_mem_free(mdbuf);
 	}
@@ -314,7 +314,7 @@ find_secret_key(gdp_gob_t *gob,
 EP_STAT
 _gdp_gob_open(gdp_gob_t *gob,
 			gdp_cmd_t cmd,
-			gdp_gcl_open_info_t *open_info,
+			gdp_open_info_t *open_info,
 			gdp_chan_t *chan,
 			uint32_t reqflags)
 {
@@ -360,7 +360,7 @@ _gdp_gob_open(gdp_gob_t *gob,
 		gob->nrecs = payload->recno;
 
 		// read in the metadata to internal format
-		gob->gclmd = _gdp_gclmd_deserialize(payload->metadata.data,
+		gob->gob_md = _gdp_md_deserialize(payload->metadata.data,
 										payload->metadata.len);
 	}
 
@@ -456,7 +456,7 @@ _gdp_gob_delete(gdp_gob_t *gob,
 	if (EP_STAT_ISOK(estat))
 	{
 		// invalidate gob regardless of reference count (but leave memory)
-		gob->flags |= GCLF_DROPPING;
+		gob->flags |= GOBF_DROPPING;
 	}
 
 	_gdp_req_free(&req);
@@ -720,10 +720,12 @@ fail0:
 /*
 **  _GDP_GOB_READ_BY_RECNO --- read a record from a GOB by record number
 **
+**  Only returns a single record; if multiple records match, the choice
+**  is random.  Use the async version to get all records that match.
+**
 **		Parameters:
 **			gob --- the gob from which to read
 **			recno --- the starting record number
-**			nrecs --- the number of records to read
 **			chan --- the data channel used to contact the remote
 **			reqflags --- flags for the request
 **			datum --- the data buffer (to avoid dynamic memory)
@@ -735,7 +737,6 @@ fail0:
 EP_STAT
 _gdp_gob_read_by_recno(gdp_gob_t *gob,
 			gdp_recno_t recno,
-			uint32_t nrecs,
 			gdp_chan_t *chan,
 			uint32_t reqflags,
 			gdp_datum_t *datum)
@@ -796,7 +797,7 @@ fail0:
 
 
 /*
-**  _GDP_GOB_READ_BY_RECNO_ASYNC --- asynchronously read a record from a GOB
+**  _GDP_GOB_READ_BY_RECNO_ASYNC --- asynchronously read records from a GOB
 **
 **		Parameters:
 **			gob --- the gob from which to read
@@ -839,7 +840,11 @@ _gdp_gob_read_by_recno_async(
 	GdpMessage__CmdReadByRecno *payload = msg->cmd_read_by_recno;
 	EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
 	payload->recno = recno;
-	payload->nrecs = nrecs;
+	if (nrecs > 0)
+	{
+		payload->nrecs = nrecs;
+		payload->has_nrecs = true;
+	}
 
 	// arrange for responses to appear as events or callbacks
 	_gdp_event_setcb(req, cbfunc, cbarg);
@@ -867,7 +872,7 @@ _gdp_gob_read_by_recno_async(
 
 EP_STAT
 _gdp_gob_getmetadata(gdp_gob_t *gob,
-		gdp_gclmd_t **gmdp,
+		gdp_md_t **gmdp,
 		gdp_chan_t *chan,
 		uint32_t reqflags)
 {
@@ -902,11 +907,11 @@ _gdp_gob_getmetadata(gdp_gob_t *gob,
 		GdpMessage__AckSuccess *payload = msg->ack_success;
 
 		// read in the metadata to internal format
-		gob->gclmd = _gdp_gclmd_deserialize(payload->metadata.data,
+		gob->gob_md = _gdp_md_deserialize(payload->metadata.data,
 										payload->metadata.len);
 	}
 
-	*gmdp = gob->gclmd;
+	*gmdp = gob->gob_md;
 
 fail1:
 	_gdp_req_free(&req);

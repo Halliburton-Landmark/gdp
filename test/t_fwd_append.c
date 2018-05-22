@@ -60,8 +60,8 @@ create_datum(gdp_recno_t recno)
 **		This does not wait for results: get those using the
 **		event interface.
 **
-**		Arguments to _gdp_gcl_fwd_append:
-**			gcl --- log being written.
+**		Arguments to _gdp_gin_fwd_append:
+**			gin --- log being written.
 **			datum --- source datum to be forwarded.
 **			srvname --- name of server to forward to.
 **			cbfunc --- callback function for collecting results;
@@ -72,7 +72,7 @@ create_datum(gdp_recno_t recno)
 */
 
 EP_STAT
-do_fwd_append(gdp_gcl_t *gcl,
+do_fwd_append(gdp_gin_t *gin,
 		gdp_datum_t *datum,
 		gdp_name_t svrname,
 		void *udata)
@@ -81,7 +81,7 @@ do_fwd_append(gdp_gcl_t *gcl,
 
 	// start up a fwd_append
 	//   ==> this is the API being tested
-	estat = _gdp_gcl_fwd_append(gcl, datum, svrname, NULL, udata, NULL, 0);
+	estat = _gdp_gin_fwd_append(gin, datum, svrname, NULL, udata, NULL, 0);
 
 	// check to make sure the fwd_append succeeded; if not, bail
 	if (!EP_STAT_ISOK(estat))
@@ -109,7 +109,7 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	gdp_gcl_t *gcl;
+	gdp_gin_t *gin;
 	EP_STAT estat;
 	char ebuf[60];
 	int opt;
@@ -153,8 +153,8 @@ main(int argc, char **argv)
 	ep_time_nanosleep(INT64_C(100000000));
 
 	// parse the name of the log to be appended to
-	gdp_name_t gclname;
-	estat = gdp_parse_name(log_xname, gclname);
+	gdp_name_t gdpname;
+	estat = gdp_parse_name(log_xname, gdpname);
 	if (EP_STAT_ISOK(estat))
 		ep_app_info("gdp_parse_name(%s): OK", log_xname);
 	else
@@ -171,20 +171,20 @@ main(int argc, char **argv)
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 
 	// open the log (note: doesn't use svrname)
-	estat = gdp_gcl_open(gclname, GDP_MODE_RA, NULL, &gcl);
+	estat = gdp_gin_open(gdpname, GDP_MODE_RA, NULL, &gin);
 	if (EP_STAT_ISOK(estat))
-		ep_app_info("gdp_gcl_open: OK");
+		ep_app_info("gdp_gin_open: OK");
 	else
-		ep_app_fatal("gdp_gcl_open: %s",
+		ep_app_fatal("gdp_gin_open: %s",
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 
 	// create datum(s) and send them to the explicit server
-	recno = gdp_gcl_getnrecs(gcl);
+	recno = gdp_gin_getnrecs(gin);
 	int nresults = 0;
 	while (nresults < nappends)
 	{
 		gdp_datum_t *datum = create_datum(++recno);
-		estat = do_fwd_append(gcl, datum, svrname, NULL);
+		estat = do_fwd_append(gin, datum, svrname, NULL);
 		nresults++;
 		if (EP_STAT_ISOK(estat))
 			ep_app_info("do_fwd_append (%d): OK", nresults);
@@ -200,7 +200,7 @@ main(int argc, char **argv)
 	// collect results
 	ep_app_info("waiting for status events, nresults = %d", nresults);
 	gdp_event_t *gev;
-	while ((gev = gdp_event_next(gcl, NULL)) != NULL)
+	while ((gev = gdp_event_next(gin, NULL)) != NULL)
 	{
 		gdp_event_print(gev, stdout, 3);
 		if (gdp_event_gettype(gev) == GDP_EVENT_EOS)

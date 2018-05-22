@@ -135,7 +135,7 @@ gdp_event_free(gdp_event_t *gev)
 */
 
 gdp_event_t *
-gdp_event_next(gdp_gcl_t *gin, EP_TIME_SPEC *timeout)
+gdp_event_next(gdp_gin_t *gin, EP_TIME_SPEC *timeout)
 {
 	gdp_event_t *gev;
 	EP_TIME_SPEC *abs_to = NULL;
@@ -552,8 +552,8 @@ gdp_event_gettype(gdp_event_t *gev)
 }
 
 
-gdp_gcl_t *
-gdp_event_getgcl(gdp_event_t *gev)
+gdp_gin_t *
+gdp_event_getgin(gdp_event_t *gev)
 {
 	EP_ASSERT_POINTER_VALID(gev);
 	return gev->gin;
