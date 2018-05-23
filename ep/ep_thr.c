@@ -210,7 +210,7 @@ _ep_thr_spawn(EP_THR *thidp,
 		const char *file,
 		int line)
 {
-	int r;
+int r;
 
 	// to make the TRACE call compile
 	const char *name = NULL;
@@ -272,7 +272,10 @@ _ep_thr_mutex_init(EP_THR_MUTEX *mtx, int type,
 		return 0;
 #if EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
 	mtx->magic = _EP_THR_MUTEX_MAGIC;
+	mtx->locker = 0;
 	mtx->order = 0;
+	mtx->l_file = NULL;
+	mtx->l_line = 0;
 	pthread_mutex_t *pmtx = &mtx->pthr_mtx;
 #else
 	pthread_mutex_t *pmtx = mtx;
@@ -399,6 +402,14 @@ _ep_thr_mutex_lock(EP_THR_MUTEX *mtx,
 			"_ep_thr_mutex_lock: mutex %p (%s) already self-locked",
 			mtx, name);
 	}
+#elif EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
+	if (mtx->locker == ep_thr_gettid())
+	{
+		ep_assert_print(file, line,
+			"_ep_thr_mutex_lock: mutex %p (%s) already self-locked"
+			" (%s:%d)",
+			mtx, name, mtx->l_file, mtx->l_line);
+	}
 #endif
 #if EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
 	struct lorder *lorder;
@@ -427,8 +438,14 @@ _ep_thr_mutex_lock(EP_THR_MUTEX *mtx,
 	if ((err = pthread_mutex_lock(pmtx)) != 0)
 		diagnose_thr_err(err, "mutex_lock", file, line, name, mtx);
 #if EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
-	if (err == 0 && mtxorder > 0 && lorder != NULL)
-		lorder->lorder_used |= 1 << (mtxorder - 1);
+	if (err == 0)
+	{
+		if (mtxorder > 0 && lorder != NULL)
+			lorder->lorder_used |= 1 << (mtxorder - 1);
+		mtx->locker = ep_thr_gettid();
+		mtx->l_file = file;
+		mtx->l_line = line;
+	}
 #endif
 	CHECKMTX(mtx, "lock <<<");
 	return err;
@@ -459,6 +476,15 @@ _ep_thr_mutex_trylock(EP_THR_MUTEX *mtx,
 			"already self-locked (%s:%d)\n",
 			mtx, name, file, line);
 	}
+#elif EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
+	if (mtx->locker == ep_thr_gettid())
+	{
+		// this is not necessarily an error
+		ep_dbg_cprintf(Dbg, 1,
+			"_ep_thr_mutex_lock: mutex %p (%s) already self-locked\n"
+			"    (error at %s:%d, previous lock %s:%d)\n",
+			mtx, name, file, line, mtx->l_file, mtx->l_line);
+	}
 #endif
 	// EBUSY => mutex was already locked
 	if ((err = pthread_mutex_trylock(pmtx)) != 0 && err != EBUSY)
@@ -467,8 +493,14 @@ _ep_thr_mutex_trylock(EP_THR_MUTEX *mtx,
 	struct lorder *lorder;
 	pthread_once(&lorder_once, lorder_init);
 	lorder = (struct lorder *) pthread_getspecific(lorder_key);
-	if (err == 0 && mtxorder > 0 && lorder != NULL)
-		lorder->lorder_used |= 1 << (mtxorder - 1);
+	if (err == 0)
+	{
+		if (mtxorder > 0 && lorder != NULL)
+			lorder->lorder_used |= 1 << (mtxorder - 1);
+		mtx->locker = ep_thr_gettid();
+		mtx->l_file = file;
+		mtx->l_line = line;
+	}
 #endif
 	CHECKMTX(mtx, "trylock <<<");
 	return err;
@@ -492,17 +524,28 @@ _ep_thr_mutex_unlock(EP_THR_MUTEX *mtx,
 				"_ep_thr_mutex_unlock: mtx owner = %d, "
 				"I am %" EP_THR_PRItid,
 				pmtx->__data.__owner, ep_thr_gettid());
+#elif EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
+	if (mtx->locker != ep_thr_gettid())
+		ep_assert_print(file, line,
+				"_ep_thr_mutex_unlock: mtx owner = %"
+				EP_THR_PRItid " (%s:%d), I am %" EP_THR_PRItid,
+				mtx->locker, mtx->l_file, mtx->l_line,
+				ep_thr_gettid());
 #endif
 	if ((err = pthread_mutex_unlock(pmtx)) != 0)
 		diagnose_thr_err(err, "mutex_unlock", file, line, name, mtx);
 #if EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
-	if (err == 0 && mtxorder > 0)
+	if (err == 0)
 	{
-		struct lorder *lorder;
-		pthread_once(&lorder_once, lorder_init);
-		lorder = (struct lorder *) pthread_getspecific(lorder_key);
-		if (lorder != NULL)
-			lorder->lorder_used &= ~(1 << (mtxorder - 1));
+		if (mtxorder > 0)
+		{
+			struct lorder *lorder;
+			pthread_once(&lorder_once, lorder_init);
+			lorder = (struct lorder *) pthread_getspecific(lorder_key);
+			if (lorder != NULL)
+				lorder->lorder_used &= ~(1 << (mtxorder - 1));
+		}
+		mtx->locker = 0;
 	}
 #endif // EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
 	CHECKMTX(pmtx, "unlock <<<");
@@ -527,12 +570,23 @@ _ep_thr_mutex_tryunlock(EP_THR_MUTEX *mtx,
 				"_ep_thr_mutex_unlock: mtx owner = %d, "
 				"I am %" EP_THR_PRItid,
 				pmtx->__data.__owner, ep_thr_gettid());
+#elif EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
+	if (mtx->locker != ep_thr_gettid())
+		ep_assert_print(file, line,
+				"_ep_thr_mutex_unlock: mtx owner = %"
+				EP_THR_PRItid " (%s:%d), I am %" EP_THR_PRItid,
+				mtx->locker, mtx->l_file, mtx->l_line,
+				ep_thr_gettid());
 #endif
 	// EAGAIN => mutex was not locked
 	// EPERM  => mutex held by a different thread
 	if ((err = pthread_mutex_unlock(pmtx)) != 0 &&
 			err != EAGAIN && err != EPERM)
 		diagnose_thr_err(err, "mutex_unlock", file, line, name, mtx);
+#if EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
+	if (err == 0)
+		mtx->locker = 0;
+#endif
 	CHECKMTX(pmtx, "tryunlock <<<");
 	return err;
 }
@@ -571,9 +625,24 @@ ep_thr_mutex_assert_islocked(
 				"(should be %" EP_THR_PRItid ")",
 				mstr, m, ep_thr_gettid());
 	else
-		ep_assert_print(file, line, "mutex %s (%p) locked by %d "
+		ep_assert_print(file, line,
+				"mutex %s (%p) locked by %d "
 				"(should be %" EP_THR_PRItid ")",
 				mstr, m, pmtx->__data.__owner, ep_thr_gettid());
+	return false;
+#elif EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
+	if (m->locker == 0)
+		ep_assert_print(file, line, "mutex %s (%p) is not locked "
+				"(should be %" EP_THR_PRItid ")",
+				mstr, m, ep_thr_gettid());
+	else if (m->locker != ep_thr_gettid())
+		ep_assert_print(file, line,
+				"mutex %s (%p) is locked by %" EP_THR_PRItid
+				" (%s:%d), should be %" EP_THR_PRItid,
+				mstr, m, m->locker, m->l_file, m->l_line,
+				ep_thr_gettid());
+	else
+		return true;
 	return false;
 #else
 	return true;
@@ -602,6 +671,15 @@ ep_thr_mutex_assert_isunlocked(
 			"(should be unlocked; I am %" EP_THR_PRItid ")",
 			mstr, m, pmtx->__data.__owner, ep_thr_gettid());
 	return false;
+#elif EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
+	if (m->locker == 0)
+		return true;
+	ep_assert_print(file, line,
+			"mutex %s (%p) is locked by %" EP_THR_PRItid
+			" (%s:%d), should be %" EP_THR_PRItid,
+			mstr, m, m->locker, m->l_file, m->l_line,
+			ep_thr_gettid());
+	return false;
 #else
 	return true;
 #endif
@@ -628,6 +706,15 @@ ep_thr_mutex_assert_i_own(
 			"mutex %s (%p) is locked by %d "
 			"(should be %" EP_THR_PRItid ")",
 			mstr, m, pmtx->__data.__owner, ep_thr_gettid());
+	return false;
+#elif EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
+	if (m->locker == ep_thr_gettid())
+		return true;
+	ep_assert_print(file, line,
+			"mutex %s (%p) is locked by %" EP_THR_PRItid
+			" (%s:%d), should be %" EP_THR_PRItid,
+			mstr, m, m->locker, m->l_file, m->l_line,
+			ep_thr_gettid());
 	return false;
 #else
 	return true;
@@ -698,6 +785,11 @@ _ep_thr_cond_wait(EP_THR_COND *cv, EP_THR_MUTEX *mtx, EP_TIME_SPEC *timeout,
 	GETMTX(mtx);
 	CHECKMTX(mtx, "wait >>>");
 	CHECKCOND(cv, "wait >>>");
+#if EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
+	EP_THR_ID save_locker = mtx->locker;
+	const char *save_l_file = mtx->l_file;
+	int save_l_line = mtx->l_line;
+#endif
 	if (timeout == NULL)
 	{
 		err = pthread_cond_wait(cv, pmtx);
@@ -711,6 +803,11 @@ _ep_thr_cond_wait(EP_THR_COND *cv, EP_THR_MUTEX *mtx, EP_TIME_SPEC *timeout,
 	}
 	if (err != 0)
 		diagnose_thr_err(err, "cond_wait", file, line, name, cv);
+#if EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
+	mtx->locker = save_locker;
+	mtx->l_file = save_l_file;
+	mtx->l_line = save_l_line;
+#endif
 	CHECKMTX(mtx, "wait <<<");
 	CHECKCOND(cv, "wait <<<");
 	return err;

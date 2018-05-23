@@ -149,6 +149,9 @@ struct ep_mutex
 {
 	uint32_t		magic;		// _EP_THR_MUTEX_MAGIC
 	pthread_mutex_t		pthr_mtx;	// the actual mutex
+	EP_THR_ID		locker;		// identity of locker
+	const char		*l_file;	// file of locker
+	int			l_line;		// line of locker
 	uint8_t			order;		// lock order indicator
 };
 typedef struct ep_mutex		EP_THR_MUTEX;
@@ -157,11 +160,15 @@ typedef struct ep_mutex		EP_THR_MUTEX;
 				_EP_THR_MUTEX_MAGIC,			\
 				PTHREAD_MUTEX_INITIALIZER,		\
 				0,					\
+				NULL, 0,				\
+				0,					\
 			}
 #  define	EP_THR_MUTEX_INITIALIZER2(o)	=			\
 			{						\
 				_EP_THR_MUTEX_MAGIC,			\
 				PTHREAD_MUTEX_INITIALIZER,		\
+				0,					\
+				NULL, 0,				\
 				o,					\
 			}
 
