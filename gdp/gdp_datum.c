@@ -112,8 +112,6 @@ gdp_datum_free(gdp_datum_t *datum)
 		gdp_sig_free(datum->sig);
 		datum->sig = NULL;
 	}
-	if (datum->gob != NULL)
-		_gdp_gob_decref(&datum->gob, true);
 
 	// make sure the datum is unlocked before putting on the free list
 	if (ep_thr_mutex_trylock(&datum->mutex) != 0)
@@ -294,10 +292,6 @@ gdp_datum_copy(gdp_datum_t *to, const gdp_datum_t *from)
 	to->ts = from->ts;
 	to->mdalg = from->mdalg;
 	to->inuse = from->inuse;
-	if (to->gob != NULL)
-		_gdp_gob_decref(&to->gob, true);
-	if (from->gob != NULL)
-		to->gob = _gdp_gob_incref(from->gob);
 	if (from->dbuf != NULL)
 	{
 		if (EP_ASSERT(to->dbuf != NULL))
@@ -321,8 +315,6 @@ gdp_datum_dup(const gdp_datum_t *datum)
 	gdp_datum_t *ndatum;
 
 	ndatum = gdp_datum_new();
-	if (datum->gob != NULL)
-		ndatum->gob = _gdp_gob_incref(datum->gob);
 	ndatum->recno = datum->recno;
 	ndatum->ts = datum->ts;
 	gdp_buf_copy(ndatum->dbuf, datum->dbuf);
@@ -423,11 +415,23 @@ _gdp_datum_digest(gdp_datum_t *datum, EP_CRYPTO_MD *md)
 }
 
 
+/*
+**  Compute hash of a datum.
+**
+**		Two versions, one using a GIN, other using a GOB.
+*/
+
 gdp_hash_t *
-gdp_datum_hash(gdp_datum_t *datum)
+gdp_datum_hash(gdp_datum_t *datum, gdp_gin_t *gin)
+{
+	return _gdp_datum_hash(datum, gin->gob);
+}
+
+
+gdp_hash_t *
+_gdp_datum_hash(gdp_datum_t *datum, const gdp_gob_t *gob)
 {
 	EP_CRYPTO_MD *md;
-	gdp_gob_t *gob = datum->gob;
 
 	md = ep_crypto_md_new(gob->mdalg);
 	ep_crypto_md_update(md, gob->name, sizeof gob->name);
@@ -447,11 +451,20 @@ gdp_datum_hash(gdp_datum_t *datum)
 */
 
 bool
+gdp_datum_hash_equal(gdp_datum_t *datum,
+					const gdp_gin_t *gin,
+					const gdp_hash_t *hash)
+{
+	return _gdp_datum_hash_equal(datum, gin->gob, hash);
+}
+
+bool
 _gdp_datum_hash_equal(gdp_datum_t *datum,
-					gdp_hash_t *hash)
+					const gdp_gob_t *gob,
+					const gdp_hash_t *hash)
 {
 	bool r = false;
-	gdp_hash_t *newhash = gdp_datum_hash(datum);
+	gdp_hash_t *newhash = _gdp_datum_hash(datum, gob);
 
 	if (gdp_hash_equal(hash, newhash))
 		r = true;

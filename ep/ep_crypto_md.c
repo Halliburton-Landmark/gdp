@@ -156,7 +156,7 @@ ep_crypto_md_clone(EP_CRYPTO_MD *oldmd)
 */
 
 EP_STAT
-ep_crypto_md_update(EP_CRYPTO_MD *md, void *data, size_t dsize)
+ep_crypto_md_update(EP_CRYPTO_MD *md, const void *data, size_t dsize)
 {
 	int istat;
 

@@ -150,7 +150,6 @@ struct gdp_datum
 {
 	EP_THR_MUTEX		mutex;			// locking mutex (mostly for dbuf)
 	struct gdp_datum	*next;			// next in free list
-	gdp_gob_t			*gob;			// associated GOB
 	bool				inuse:1;		// the datum is in use (for debugging)
 	gdp_recno_t			recno;			// the record number
 	EP_TIME_SPEC		ts;				// commit timestamp
@@ -176,9 +175,14 @@ void			_gdp_datum_dump(		// dump data record (for debugging)
 						const gdp_datum_t *datum,	// message to print
 						FILE *fp);					// file to print it to
 
-bool			gdp_datum_hash_equal(	// check that a hash matches the datum
-						const gdp_datum_t *datum,	// the datum to check
-						gdp_hash_t *hash);			// the hash to check against
+gdp_hash_t		*_gdp_datum_hash(		// compute hash of datum
+						gdp_datum_t *datum,
+						const gdp_gob_t *gob);		// enclosing GOB
+
+bool			_gdp_datum_hash_equal(	// check that a hash matches the datum
+						gdp_datum_t *datum,			// the datum to check
+						const gdp_gob_t *gob,		// enclosing GOB
+						const gdp_hash_t *hash);	// the hash to check against
 
 void			_gdp_datum_digest(		// add datum to existing digest
 						gdp_datum_t *datum,			// the datum to include

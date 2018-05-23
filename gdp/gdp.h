@@ -494,9 +494,16 @@ extern void		gdp_datum_copy(
 					gdp_datum_t *to,
 					const gdp_datum_t *from);
 
-// compute hash of a datum
+// compute hash of a datum for a given log
 gdp_hash_t		*gdp_datum_hash(
-						gdp_datum_t *datum);
+						gdp_datum_t *datum,
+						gdp_gin_t *gin);
+
+// check datum for equality to hash
+bool			gdp_datum_hash_equal(
+						gdp_datum_t *datum,
+						const gdp_gin_t *gin,
+						const gdp_hash_t *hash);
 
 // print out data record
 extern void		gdp_datum_print(
@@ -568,8 +575,8 @@ extern void			*gdp_hash_getptr(
 
 // compare two hash structures
 extern bool			gdp_hash_equal(
-						gdp_hash_t *a,
-						gdp_hash_t *b);
+						const gdp_hash_t *a,
+						const gdp_hash_t *b);
 
 
 /*

@@ -561,7 +561,6 @@ cmd_read_helper(gdp_req_t *req)
 	datum->recno = req->nextrec;
 	CMD_TRACE(req->cpdu->msg->cmd, "%s %" PRIgdp_recno,
 			req->gob->pname, datum->recno);
-	datum->gob = _gdp_gob_incref(req->gob);
 	estat = req->gob->x->physimpl->read_by_recno(req->gob, datum);
 
 	if (EP_STAT_ISOK(estat))
@@ -799,7 +798,6 @@ cmd_append(gdp_req_t *req)
 	// check the signature in the PDU
 	gdp_datum_t *datum = gdp_datum_new();
 	_gdp_datum_from_pb(datum, req->cpdu->msg, pbd);
-	datum->gob = _gdp_gob_incref(req->gob);
 
 	if (req->gob->digest == NULL)
 	{
@@ -954,7 +952,6 @@ post_subscribe(gdp_req_t *req)
 			req->numrecs, req->nextrec, req->gob->nrecs);
 
 	datum = gdp_datum_new();
-	datum->gob = _gdp_gob_incref(req->gob);
 	while (req->numrecs >= 0)
 	{
 		// see if data pre-exists in the GOB

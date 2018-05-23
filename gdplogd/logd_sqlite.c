@@ -1274,7 +1274,7 @@ sqlite_append(gdp_gob_t *gob,
 		CHECK_RC(rc, goto fail3);
 
 		phase = "append bind 1";
-		hash = gdp_datum_hash(datum);
+		hash = _gdp_datum_hash(datum, gob);
 		rc = sql_bind_hash(stmt, 1, hash);
 		CHECK_RC(rc, goto fail3);
 

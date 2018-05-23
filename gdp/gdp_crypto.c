@@ -97,7 +97,7 @@ _gdp_hash_getbuf(gdp_hash_t *hash)
 
 
 bool
-gdp_hash_equal(gdp_hash_t *a1, gdp_hash_t *b1)
+gdp_hash_equal(const gdp_hash_t *a1, const gdp_hash_t *b1)
 {
 	gdp_buf_t *a = (gdp_buf_t *) a1;
 	gdp_buf_t *b = (gdp_buf_t *) b1;

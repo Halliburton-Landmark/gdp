@@ -518,8 +518,6 @@ append_common(
 		}
 		// assumes records are written in order with no gaps
 		datum->recno = recno++;
-		if (datum->gob == NULL)
-			datum->gob = _gdp_gob_incref(gob);
 		if (!EP_TIME_IS_VALID(&datum->ts))
 			ep_time_now(&datum->ts);
 		if (datum->prevhash != NULL)
@@ -528,10 +526,10 @@ append_common(
 		{
 			if (datum->dhash != NULL)
 				gdp_hash_free(datum->dhash);
-			datum->dhash = gdp_datum_hash(datums[dno - 1]);
+			datum->dhash = _gdp_datum_hash(datums[dno - 1], gob);
 		}
 		datum->prevhash = prevhash;
-		prevhash = gdp_datum_hash(datum);
+		prevhash = _gdp_datum_hash(datum, gob);
 	}
 
 	// compute the signature on the final record in the chain
@@ -754,8 +752,6 @@ _gdp_gob_read_by_recno(gdp_gob_t *gob,
 	EP_ASSERT_ELSE(datum->inuse, return EP_STAT_ASSERT_ABORT);
 
 	// create and send a new request
-	if (datum->gob != NULL)
-		datum->gob = _gdp_gob_incref(gob);
 	estat = _gdp_req_new(GDP_CMD_READ_BY_RECNO, gob, chan, NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 

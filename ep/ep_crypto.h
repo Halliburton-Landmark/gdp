@@ -220,7 +220,7 @@ void			ep_crypto_md_free(
 
 EP_STAT			ep_crypto_md_update(
 				EP_CRYPTO_MD *md,
-				void *data,
+				const void *data,
 				size_t dsize);
 EP_STAT			ep_crypto_md_final(
 				EP_CRYPTO_MD *md,
