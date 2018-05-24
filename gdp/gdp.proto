@@ -75,7 +75,8 @@ message GdpMessage
 		optional bytes			logname = 2;		// name of new log
 	}
 
-	// Open a log.  Someday this may need to have access information.
+	// Open a log.  Someday this may need to have access information,
+	// QoS requirements, etc.
 	message CmdOpen
 	{
 	}
@@ -85,40 +86,86 @@ message GdpMessage
 	{
 	}
 
-	// Append a datum to a log.  Note that the signature inside the datum
-	// applies to the datum itself, not the PDU.  Presumably the PDU
-	// signature would not be required if the datum is already signed.
+	/*
+	**  Append data to a log.  This can include more than one datum,
+	**  where each datum contains the hash of the previous datum,
+	**  and the final datum is signed.  Note that the signature
+	**  inside the datum applies to the datum itself, not the PDU.
+	**  Presumably the PDU signature would not be required if the
+	**  datum is already signed.
+	**
+	**  This command only gets one acknowledgement, regardless of
+	**  the number of datums in the list.
+	*/
+
 	message CmdAppend
 	{
 		required GdpDatumList	dl = 1;				// data list to append
 	}
 
+	/*
+	**  Commands for reading the log.
+	**
+	**  In most cases these potentially produce a set of records in
+	**  one or more AckContent messages.  Each AckContent can contain
+	**  more than one datum.  See description of that message for
+	**  more detail.
+	**
+	**  The `nrecs` field specifies the maximum number of records
+	**  to return.  If 0, it indicates the "singleton" case, i.e.,
+	**  where a single datum is returned in one message, rather than
+	**  two or more messages.  Briefly, commands that may return a
+	**  set of records (`nrecs` > 0 and all subscriptions) return:
+	**    * An AckSuccess indicating that the command has been
+	**      received and processed, and more data will appear (or
+	**      a failure Nak).
+	**    * One or more AckContent messages containing the data that
+	**      is to be read.
+	**	If `nrecs` = 0 then only an AckContent (or a Nak) will be
+	**  returned.
+	**
+	**  If `nrecs` = -1 or is not specified it indicates infinity.
+	**
+	**  The exception is CmdReadByHash.  By definition it can never
+	**  return more than one datum.  However, it will be returned
+	**  using the existing, more general mechanism as for the others.
+	**  Essentially, it behaves as if `nrecs` is always = 0.
+	*/
+
 	// Read a record based on the record number.  Returns a set.
+	// If recno is negative, it is relative to the greatest recno
+	// in the log.
 	message CmdReadByRecno
 	{
-		required uint64			recno = 1;			// record number
-		optional int32			nrecs = 2;			// number of records
+		required sint64			recno = 1;			// record number
+		optional int32			nrecs = 2 [default = -1];	// number of records
 	}
 
-	// Read a record based on the timestamp.
+	// Read a record based on the timestamp.  Returns a set.
 	message CmdReadByTs
 	{
 		required GdpTimestamp	timestamp = 1;		// timestamp
-		optional int32			nrecs = 2;			// number of records
+		optional int32			nrecs = 2 [default = -1];	// number of records
 	}
 
 	// Read a record based on the hash of the data.  Should always be unique.
 	message CmdReadByHash
 	{
 		required bytes			hash = 1;			// hash value
-		optional int32			nrecs = 2;			// number of records
+		optional int32			nrecs = 2 [default = -1];	// number of records
 	}
+
+	/*
+	**  Subscriptions act very much like CmdReadBy*, except that when
+	**  the data is exhausted (i.e., no more data is available from the
+	**  log) they will wait until more data comes along for delivery.
+	*/
 
 	// Subscribe to a log starting from a given record number.
 	message CmdSubscribeByRecno
 	{
-		optional uint64			start = 1;			// starting record number
-		optional uint64			nrecs = 2;			// number of records
+		optional sint64			start = 1;			// starting record number
+		optional int32			nrecs = 2;			// number of records
 		optional GdpTimestamp	timeout = 3;		// timeout
 	}
 
@@ -155,6 +202,14 @@ message GdpMessage
 	{
 	}
 
+	/*
+	**  Positive acknowledgements.
+	**
+	**  Of particular interest is AckContent, which returns the results
+	**  from a read-type command or a subscription.
+	**  It can contain zero or more datums 
+	*/
+
 	// Generic success acknowledgement (shared).
 	message AckSuccess
 	{
@@ -174,7 +229,12 @@ message GdpMessage
 	message AckContent
 	{
 		required GdpDatumList	dl = 1;				// returned data list
+		optional bool			moredata = 2;		// set if more data possible
 	}
+
+	/*
+	**  Negative acknowledgements.
+	*/
 
 	// Generic failure (shared).
 	message NakGeneric

@@ -402,21 +402,12 @@ do_async_read(gdp_gin_t *gin,
 	}
 
 	// issue the multiread commands without reading results
-	gdp_recno_t recno = firstrec;
-	int n = 0;
-	while (EP_STAT_ISOK(estat) && n++ < numrecs)
+	estat = gdp_gin_read_by_recno_async(gin, firstrec, numrecs, cbfunc, NULL);
+	if (!EP_STAT_ISOK(estat))
 	{
-		estat = gdp_gin_read_by_recno_async(gin, recno, numrecs, cbfunc, NULL);
-		if (!EP_STAT_ISOK(estat))
-		{
-			char ebuf[100];
-			ep_app_error("async_read: gdp_gin_read_by_recno_async error:\n\t%s",
-					ep_stat_tostr(estat, ebuf, sizeof ebuf));
-		}
-		else
-		{
-			recno++;
-		}
+		char ebuf[100];
+		ep_app_error("async_read: gdp_gin_read_by_recno_async error:\n\t%s",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 
 	// this sleep will allow multiple results to appear before we start reading
@@ -426,7 +417,7 @@ do_async_read(gdp_gin_t *gin,
 	// now start reading the events that will be generated
 	if (!use_callbacks)
 	{
-		for (n = 0; n < numrecs; n++)
+		do
 		{
 			// get the next incoming event
 			gdp_event_t *gev = gdp_event_next(NULL, 0);
@@ -438,7 +429,7 @@ do_async_read(gdp_gin_t *gin,
 			gdp_event_free(gev);
 
 			//EP_STAT_CHECK(estat, break);
-		}
+		} while (EP_STAT_ISOK(estat));
 	}
 	else
 	{

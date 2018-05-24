@@ -330,7 +330,7 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 		fprintf(fp, "cmd_read_by_recno: recno=%" PRIgdp_recno,
 				msg->cmd_read_by_recno->recno);
 		if (msg->cmd_read_by_recno->has_nrecs)
-			fprintf(fp, ", nrecs=%d", msg->cmd_read_by_recno->nrecs);
+			fprintf(fp, ", nrecs=%"PRId32, msg->cmd_read_by_recno->nrecs);
 		fprintf(fp, "\n");
 		break;
 
@@ -338,7 +338,7 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 		fprintf(fp, "cmd_read_by_ts: ");
 		print_pb_ts(msg->cmd_read_by_ts->timestamp, fp);
 		if (msg->cmd_read_by_ts->has_nrecs)
-			fprintf(fp, ", nrecs=%d", msg->cmd_read_by_ts->nrecs);
+			fprintf(fp, ", nrecs=%"PRId32, msg->cmd_read_by_ts->nrecs);
 		fprintf(fp, "\n");
 		break;
 
@@ -348,7 +348,7 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 
 	case GDP_MESSAGE__BODY_CMD_SUBSCRIBE_BY_RECNO:
 		fprintf(fp, "cmd_subscribe_by_recno: start %"PRIgdp_recno
-					" nrecs %"PRIu64 "\n",
+					" nrecs %"PRId32 "\n",
 					msg->cmd_subscribe_by_recno->start,
 					msg->cmd_subscribe_by_recno->nrecs);
 		break;

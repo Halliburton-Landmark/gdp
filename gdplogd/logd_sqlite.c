@@ -1082,7 +1082,10 @@ sqlite_read_by_recno(gdp_gob_t *gob,
 	gob_physinfo_t *phys = GETPHYS(gob);
 	const char *phase = "init";
 
-	EP_ASSERT_POINTER_VALID(gob);
+	if (!EP_ASSERT_POINTER_VALID(gob) ||
+			!EP_ASSERT_POINTER_VALID(datum) ||
+			!EP_ASSERT_POINTER_VALID(datum->dbuf))
+		return EP_STAT_ASSERT_ABORT;
 	gdp_buf_reset(datum->dbuf);
 	if (datum->sig != NULL)
 		gdp_sig_reset(datum->sig);

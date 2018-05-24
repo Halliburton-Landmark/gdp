@@ -615,18 +615,16 @@ process_resp(void *rpdu_)
 	}
 
 	// free up resources
-//	// use a shadow variable so req does not lose gob
-//	gob = req->gob;
-//	if (gob != NULL)
-//	{
-//		_gdp_gob_decref(&gob, false);
-//		gob = req->gob;
-//	}
-
-	if (EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
-		_gdp_req_unlock(req);
-	else
+	if (!EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
 		_gdp_req_free(&req);
+	else
+	{
+		// use a shadow variable so req does not lose gob
+		gob = req->gob;
+		if (gob != NULL)
+			_gdp_gob_decref(&gob, false);
+		_gdp_req_unlock(req);
+	}
 
 	ep_dbg_cprintf(DbgProcResp, 40, "process_resp <<< done\n");
 }
