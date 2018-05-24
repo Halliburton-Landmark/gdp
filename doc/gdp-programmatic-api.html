@@ -89,23 +89,22 @@
       some of the interfaces and most of the documentation still refer to GCLs.</p>
     <p><i>A Note on Naming:</i> Function and type names are mostly intended to
       map cleanly to class and method names, which occasionally leads to
-      somewhat tortured names.&nbsp; For example, <code>gdp_gin_read_by_recno</code>
-      is intended to map to a method "<code>gdp_gin.read_by_recno</code>" (i.e,
-      the operation <code>read_by_recno</code> on a variable of class <code>gdp_gin</code>),
-      <code>gdp_buf_getlength</code> maps to <code>gdp_buf.getlength</code>,
+      somewhat tortured names.&nbsp; For example, <code>gdp_gin_read_by_recno(gin,
+        ...)</code> is intended to map to a method "<code>gin.read_by_recno(...)</code>"
+      (i.e, the operation <code>read_by_recno</code> on a variable of class <code>gdp_gin</code>),
+      <code>gdp_buf_getlength(buf, ...)</code> maps to <code><em>buf</em>.getlength(...)</code>,
       etc.&nbsp; In these cases the first argument of the function is what would
       be <code>self</code> in some languages.&nbsp; In some cases these also
-      apply to what would be class methods; for example <code>gdp_gin_create</code>
-      would map to a class method <code>gdp_gin.create</code>, even though it
-      doesn't take the named data type as the first argument.</p>
+      apply to what would be class methods; for example <code>gdp_gin_create(...)</code>
+      would map to a class method <code>gdp_gin.create(...)</code>.</p>
     <h2> 2&nbsp; Theory of Operation </h2>
     <p> GDP-based applications rely on three pieces: an in-process GDP library,
       a GDP Log Daemon, and the Routing Layer.&nbsp;&nbsp; This document
       describes the GDP library API. </p>
     <p> The primary point of the GDP library is to speak the network protocol
       between the application and the GDP Daemon. The library is threaded, with
-      (at the moment) two threads: one to process events (data arriving from the
-      daemon, although others can be added), and the other to run the
+      (at the moment) at least two threads: one to process events (data arriving
+      from the daemon, although others can be added), and the other to run the
       application itself. This allows the application to pretend it is a
       sequential program while still allowing asynchronous input from the GDP
       Daemon (e.g., processing results from subscription requests).&nbsp;
@@ -117,11 +116,12 @@
       tied to either a file or a network connection. On creation, a GOB is
       assigned a 256-bit opaque name. A GOB is append-only to writers.&nbsp; For
       the moment you can access the dataplane in one of two modes: synchronous
-      mode (using <code>gdp_gin_read_by_*</code> for reading) an asynchronous
-      mode (using <code>gdp_gin_read_by_*_async</code> or <code>gdp_gin_subscribe</code>
-      for reading). To use it in asynchronous mode you must subscribe to any
-      GOBs of interest and then call <code>gdp_event_next</code> repeatedly to
-      read the results.&nbsp; These are described in more detail below. </p>
+      mode (e.g., using <code>gdp_gin_read_by_*</code> for reading) or an
+      asynchronous mode (e.g., using <code>gdp_gin_read_by_*_async</code> or <code>gdp_gin_subscribe</code>
+      for reading). In asynchronous mode the original call return status applies
+      to the sending of the command, while final results (including any read
+      data) will be returned using callbacks or an event interface.&nbsp; These
+      are described in more detail below. </p>
     <p>All GOBs are named with an opaque, location independent, 256-bit number
       from a flat namespace.&nbsp; When printed it is shown as a base64-encoded
       value that is tweaked to be valid in a URI (that is, "+" and "/" are
@@ -363,17 +363,19 @@
 		gdp_datum_t *datum)<br>EP_STAT gdp_gin_read_by_hash(gdp_gin_t *gin,<br>                gdp_hash_t *hash,<br>                gdp_datum_t *datum)<br> </pre>
     <h4> Notes</h4>
     <ul>
-      <li> <code>gdp_gin_read_by_recno</code> reads the specified record number
-        and returns it in the user-supplied datum (see below).</li>
+      <li> These present a message-oriented interface.</li>
+      <li>The user provides the space in which to store the result (see section
+        4).</li>
+      <li> An OK stat includes the number of octets actually read. (This is
+        passed back in datum, so unneeded here.)</li>
+      <li><code>gdp_gin_read_by_recno</code> reads the specified record number
+        (sequential, starting from 1).&nbsp; Negative <code>recno</code>s are
+        interpreted relative to the end of the log (so the value &ndash;1
+        indicates the last message in the log).</li>
       <li><code>gdp_gin_read_by_ts</code> reads the record dated on or
         immediately after the indicated timestamp.</li>
       <li><code>gdp_gin_read_by_hash</code> returns the record with the
         indicated hash.</li>
-      <li>Presents a message-oriented interface.</li>
-      <li> An OK stat includes the number of octets actually read. (This is
-        passed back in datum, so unneeded here.)</li>
-      <li> The offset indicates a message number (sequential starting from one).
-        The value &ndash;1 indicates the last message in the log.</li>
     </ul>
     <ul>
     </ul>
@@ -873,7 +875,61 @@
       <li> <i>What status is included? Size (or number of records/messages),
           last access, &hellip;</i></li>
     </ul>
+    <p> </p>
     <br>
+    <hr>
+    <h4>Name</h4>
+    <p>gdp_gin_getnrecs &mdash; return the number of records in an existing GOB</p>
+    <h4>Synopsis</h4>
+    <p><code>gdp_recno_t gdp_gin_getnrecs(gdp_gin_t *gin)</code></p>
+    <h4>Notes</h4>
+    <ul>
+      <li>Returns the number of records in a GOB.</li>
+      <li>This does not check with the log server, i.e., the return value is
+        cached in the local process (and is updated each time the GOB is read or
+        written).&nbsp; This shouldn't be a problem for writers (since there
+        should only be one writer), but may be for readers.&nbsp; Readers
+        wanting to get the latest number of records can read the last record in
+        the GOB (using <code>gdp_gin_read_by_recno</code>) and check the record
+        number in the returned datum.</li>
+    </ul>
+    <hr>
+    <h4>Name</h4>
+    <p>gdp_gin_set_append_filter &mdash; filter appended data</p>
+    <h4>Synopsis</h4>
+    <code>void gdp_gin_set_append_filter(gdp_gin_t *gin,<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+      EP_STAT (*filter(gdp_datum_t *, void *),<br>
+      &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; void *filterdata)</code><br>
+    <h4>Notes</h4>
+    <ul>
+      <li>All data appended to the named <span class="variable">gin</span> are
+        first run through the <span class="variable">filter</span>.&nbsp; The
+        filter may modify the <span class="variable">datum</span> before it is
+        sent.</li>
+      <li>The <span class="variable">filterdata</span> parameter is passed as
+        the second argument to <span class="variable">filter</span>.</li>
+    </ul>
+    <hr><br>
+    <br>
+    <h4>Name</h4>
+    <p>gdp_gin_set_read_filter &mdash; filter read data</p>
+    <h4>Synopsis</h4>
+    <p><code>void gdp_gin_set_read_filter(gdp_gin_t *gin,<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        EP_STAT (*filter(gdp_datum_t *, void *),<br>
+        &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; void *filterdata)</code></p>
+    <h4>Notes</h4>
+    <ul>
+      <li>All data read from the named <span class="variable">gin</span> are
+        passed through this filter before being returned.&nbsp; The filter may
+        modify the <span class="variable">datum</span>.</li>
+      <li>The <span class="variable">filterdata</span> parameter is passed as
+        the second argument to <span class="variable">filter</span>.</li>
+    </ul>
+    <p></p>
+    <p><br>
+    </p>
     <hr width="100%" size="2">
     <h4> Name</h4>
     gdp_gin_print &mdash; print a GIN and associated GOB (for debugging)
@@ -964,7 +1020,7 @@ void gdp_datum_print(const gdp_datum_t *datum,
     <h4>Name</h4>
     gdp_datum_getsig &mdash; get the signature from a datum
     <h4>Synopsis</h4>
-    <pre>    gdp_buf_t *gdp_datum_getsig(const gdp_datum_t *datum)</pre>
+    <pre>    gdp_sig_t *gdp_datum_getsig(const gdp_datum_t *datum)</pre>
     <h4>Notes</h4>
     <ul>
       <li>Can return <span class="manifest">NULL</span> or an empty buffer if
@@ -1098,57 +1154,7 @@ typedef struct
       never see unencrypted data.&nbsp; However, read and write filters (see the
       next section) can be used to set encryption and decryption hooks for
       externally implemented encryption.</p>
-    <h2>6&nbsp; Miscellaneous and Utilities</h2>
-    <hr>
-    <h4>Name</h4>
-    <p>gdp_gin_getnrecs &mdash; return the number of records in an existing GOB</p>
-    <h4>Synopsis</h4>
-    <p><code>gdp_recno_t gdp_gin_getnrecs(gdp_gin_t *gin)</code></p>
-    <h4>Notes</h4>
-    <ul>
-      <li>Returns the number of records in a GOB.</li>
-      <li>This does not check with the log server, i.e., the return value is
-        cached in the local process (and is updated each time the GOB is read or
-        written).&nbsp; This shouldn't be a problem for writers (since there
-        should only be one writer), but may be for readers.&nbsp; Readers
-        wanting to get the latest number of records can read the last record in
-        the GOB (using <code>gdp_gin_read_by_recno</code>) and check the record
-        number in the returned datum.</li>
-    </ul>
-    <hr>
-    <h4>Name</h4>
-    <p>gdp_gin_set_append_filter &mdash; filter appended data</p>
-    <h4>Synopsis</h4>
-    <code>void gdp_gin_set_append_filter(gdp_gin_t *gin,<br>
-      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-      EP_STAT (*filter(gdp_datum_t *, void *),<br>
-      &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; void *filterdata)</code><br>
-    <h4>Notes</h4>
-    <ul>
-      <li>All data appended to the named <span class="variable">gin</span> are
-        first run through the <span class="variable">filter</span>.&nbsp; The
-        filter may modify the <span class="variable">datum</span> before it is
-        sent.</li>
-      <li>The <span class="variable">filterdata</span> parameter is passed as
-        the second argument to <span class="variable">filter</span>.</li>
-    </ul>
-    <hr><br>
     <br>
-    <h4>Name</h4>
-    <p>gdp_gin_set_read_filter &mdash; filter read data</p>
-    <h4>Synopsis</h4>
-    <p><code>void gdp_gin_set_read_filter(gdp_gin_t *gin,<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-        EP_STAT (*filter(gdp_datum_t *, void *),<br>
-        &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; void *filterdata)</code></p>
-    <h4>Notes</h4>
-    <ul>
-      <li>All data read from the named <span class="variable">gin</span> are
-        passed through this filter before being returned.&nbsp; The filter may
-        modify the <span class="variable">datum</span>.</li>
-      <li>The <span class="variable">filterdata</span> parameter is passed as
-        the second argument to <span class="variable">filter</span>.</li>
-    </ul>
     <hr>
     <h3>To be done</h3>
     <p>Header files<br>
