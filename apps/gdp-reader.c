@@ -700,6 +700,13 @@ fail0:
 	else
 		exitstat = EX_UNAVAILABLE;
 
+	if (ep_dbg_test(Dbg, 9))
+	{
+		char ebuf[100];
+		ep_dbg_printf("Cleaning up, exitstat %d, estat %s\n",
+				exitstat, ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
+
 	// might as well let the GDP know we're going away
 	if (gin != NULL)
 	{

@@ -979,6 +979,12 @@ send_helper(gdp_chan_t *chan,
 	}
 
 fail0:
+	if (!EP_STAT_ISOK(estat) && ep_dbg_test(Dbg, 4))
+	{
+		char ebuf[100];
+		ep_dbg_printf("send_helper failure: %s\n",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
 	bufferevent_unlock(chan->bev);
 	return estat;
 }
