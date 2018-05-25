@@ -399,15 +399,16 @@ _ep_thr_mutex_lock(EP_THR_MUTEX *mtx,
 	    pmtx->__data.__kind != PTHREAD_MUTEX_RECURSIVE_NP)
 	{
 		ep_assert_print(file, line,
-			"_ep_thr_mutex_lock: mutex %p (%s) already self-locked",
+			"ep_thr_mutex_lock: mutex %p (%s) already self-locked",
 			mtx, name);
 	}
 #elif EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
 	if (mtx->locker == ep_thr_gettid())
 	{
-		ep_assert_print(file, line,
-			"_ep_thr_mutex_lock: mutex %p (%s) already self-locked"
-			" (%s:%d)",
+		ep_dbg_cprintf(Dbg, 1,
+			"ep_thr_mutex_lock at %s:%d: mutex %p (%s) already self-locked"
+			" (%s:%d)\n",
+			file, line,
 			mtx, name, mtx->l_file, mtx->l_line);
 	}
 #endif
@@ -426,11 +427,11 @@ _ep_thr_mutex_lock(EP_THR_MUTEX *mtx,
 			if (llu > mtxorder)
 			{
 				ep_dbg_cprintf(Dbg, 1,
-					"_ep_thr_mutex_lock: mutex %p (%s) has"
-					" order %d,  but %d is already locked"
-					" (%s:%d)\n",
-					mtx, name, mtxorder, llu,
-					file, line);
+					"ep_thr_mutex_lock at %s:%d:"
+					" mutex %p (%s) has order %d,"
+					" but %d is already locked\n",
+					file, line,
+					mtx, name, mtxorder, llu);
 			}
 		}
 	}
@@ -481,7 +482,7 @@ _ep_thr_mutex_trylock(EP_THR_MUTEX *mtx,
 	{
 		// this is not necessarily an error
 		ep_dbg_cprintf(Dbg, 1,
-			"_ep_thr_mutex_lock: mutex %p (%s) already self-locked\n"
+			"ep_thr_mutex_lock: mutex %p (%s) already self-locked\n"
 			"    (error at %s:%d, previous lock %s:%d)\n",
 			mtx, name, file, line, mtx->l_file, mtx->l_line);
 	}
@@ -520,15 +521,18 @@ _ep_thr_mutex_unlock(EP_THR_MUTEX *mtx,
 #if EP_OPT_EXTENDED_MUTEX_CHECK & 0x01
 	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__owner, sizeof pmtx->__data.__owner);
 	if (pmtx->__data.__owner != ep_thr_gettid())
-		ep_assert_print(file, line,
-				"_ep_thr_mutex_unlock: mtx owner = %d, "
-				"I am %" EP_THR_PRItid,
+		ep_dbg_cprintf(Dbg, 1,
+				"ep_thr_mutex_unlock at %s:%d:"
+				" mtx owner = %d, I am %"EP_THR_PRItid "\n",
+				file, line,
 				pmtx->__data.__owner, ep_thr_gettid());
 #elif EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
 	if (mtx->locker != ep_thr_gettid())
-		ep_assert_print(file, line,
-				"_ep_thr_mutex_unlock: mtx owner = %"
-				EP_THR_PRItid " (%s:%d), I am %" EP_THR_PRItid,
+		ep_dbg_cprintf(Dbg, 1,
+				"ep_thr_mutex_unlock at %s:%d:"
+				" mtx owner = %"EP_THR_PRItid " at %s:%d;"
+				" I am %"EP_THR_PRItid "\n",
+				file, line,
 				mtx->locker, mtx->l_file, mtx->l_line,
 				ep_thr_gettid());
 #endif
@@ -566,15 +570,19 @@ _ep_thr_mutex_tryunlock(EP_THR_MUTEX *mtx,
 #if EP_OPT_EXTENDED_MUTEX_CHECK & 0x01
 	VALGRIND_HG_CLEAN_MEMORY(&pmtx->__data.__owner, sizeof pmtx->__data.__owner);
 	if (pmtx->__data.__owner != ep_thr_gettid())
-		ep_assert_print(file, line,
-				"_ep_thr_mutex_unlock: mtx owner = %d, "
-				"I am %" EP_THR_PRItid,
+		ep_dbg_cprintf(Dbg, 1,
+				"_ep_thr_mutex_unlock at %s:%d:"
+				" mtx owner = %"EP_THR_PRItid ","
+				" I am %" EP_THR_PRItid "\n",
+				file, line,
 				pmtx->__data.__owner, ep_thr_gettid());
 #elif EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
 	if (mtx->locker != ep_thr_gettid())
-		ep_assert_print(file, line,
-				"_ep_thr_mutex_unlock: mtx owner = %"
-				EP_THR_PRItid " (%s:%d), I am %" EP_THR_PRItid,
+		ep_dbg_cprintf(Dbg, 1,
+				"_ep_thr_mutex_unlock at %s:%d:"
+				" mtx owner = %"EP_THR_PRItid " at %s:%d,"
+				" I am %" EP_THR_PRItid "\n",
+				file, line,
 				mtx->locker, mtx->l_file, mtx->l_line,
 				ep_thr_gettid());
 #endif
@@ -621,7 +629,8 @@ ep_thr_mutex_assert_islocked(
 
 	// oops, not locked or not locked by me
 	if (pmtx->__data.__lock == 0)
-		ep_assert_print(file, line, "mutex %s (%p) is not locked "
+		ep_assert_print(file, line,
+				"mutex %s (%p) is not locked "
 				"(should be %" EP_THR_PRItid ")",
 				mstr, m, ep_thr_gettid());
 	else
@@ -712,7 +721,7 @@ ep_thr_mutex_assert_i_own(
 		return true;
 	ep_assert_print(file, line,
 			"mutex %s (%p) is locked by %" EP_THR_PRItid
-			" (%s:%d), should be %" EP_THR_PRItid,
+			" at %s:%d, should be %" EP_THR_PRItid,
 			mstr, m, m->locker, m->l_file, m->l_line,
 			ep_thr_gettid());
 	return false;
