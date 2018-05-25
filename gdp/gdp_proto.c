@@ -93,7 +93,7 @@ _gdp_invoke(gdp_req_t *req)
 		}
 	}
 	EP_ASSERT_ELSE(req->state == GDP_REQ_ACTIVE, return EP_STAT_ASSERT_ABORT);
-	//EP_ASSERT(ep_thr_mutex_islocked(&req->mutex));
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex);
 
 	// scale timeout to milliseconds
 	delta_to = ep_adm_getlongparam("swarm.gdp.invoke.timeout", 10000L);

@@ -230,7 +230,18 @@ sub_end_subscription(gdp_req_t *req)
 		_gdp_gob_decref(&gob, true);
 	}
 
+	// make sure we have a response message available
+	if (req->rpdu == NULL || req->rpdu->msg == NULL)
+	{
+		GdpMessage *msg = ep_mem_malloc(sizeof *msg);
+		gdp_message__init(msg);
+		if (req->rpdu == NULL)
+			req->rpdu = _gdp_pdu_new(msg, req->cpdu->dst, req->cpdu->src);
+		req->rpdu->msg = msg;
+	}
+
 	// send an "end of subscription" event
+	req->rpdu->msg->rid = req->cpdu->msg->rid;
 	req->rpdu->msg->cmd = GDP_ACK_DELETED;
 
 	if (ep_dbg_test(Dbg, 39))

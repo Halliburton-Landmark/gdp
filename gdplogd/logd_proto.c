@@ -969,7 +969,12 @@ post_subscribe(gdp_req_t *req)
 			// OK, the next record exists: send it
 			gdpd_ack_resp(req, GDP_ACK_CONTENT);
 			GdpMessage__AckContent *resp = req->rpdu->msg->ack_content;
-			GdpDatum *pbd = resp->dl->d[0];		//FIXME
+			resp->dl->n_d = 1;		//FIXME
+			EP_ASSERT(resp->dl->d == NULL);
+			GdpDatum *pbd;
+			resp->dl->d = ep_mem_malloc(resp->dl->n_d * sizeof pbd);
+			resp->dl->d[0] = pbd = ep_mem_malloc(sizeof *pbd);
+			gdp_datum__init(pbd);
 			_gdp_datum_to_pb(datum, req->rpdu->msg, pbd);
 		}
 		else if (EP_STAT_IS_SAME(estat, GDP_STAT_RECORD_MISSING))

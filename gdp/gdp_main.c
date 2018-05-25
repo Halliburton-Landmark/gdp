@@ -615,15 +615,16 @@ process_resp(void *rpdu_)
 	}
 
 	// free up resources
-	if (!EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
-		_gdp_req_free(&req);
-	else
-	{
-		// use a shadow variable so req does not lose gob
-		gob = req->gob;
-		if (gob != NULL)
-			_gdp_gob_decref(&gob, false);
+//	gob = req->gob;
+	if (EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
 		_gdp_req_unlock(req);
+	else
+		_gdp_req_free(&req);		// also decref's req->gob (leaves locked)
+	if (gob != NULL)
+	{
+		if (!GDP_GOB_ASSERT_ISLOCKED(gob) || !EP_ASSERT(gob->refcnt > 0))
+			_gdp_gob_dump(gob, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+		_gdp_gob_decref(&gob, false);	// ref from _gdp_gob_cache_get
 	}
 
 	ep_dbg_cprintf(DbgProcResp, 40, "process_resp <<< done\n");
