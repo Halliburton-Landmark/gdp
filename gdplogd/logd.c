@@ -131,7 +131,7 @@ shutdown_req(gdp_req_t *req)
 
 	if (EP_UT_BITSET(GDP_REQ_SRV_SUBSCR, req->flags))
 	{
-		gdp_msg_t *msg = _gdp_msg_new(GDP_NAK_S_LOSTSUB,
+		gdp_msg_t *msg = _gdp_msg_new(GDP_NAK_S_LOST_SUBSCR,
 									req->cpdu->msg->rid,
 									req->cpdu->msg->seqno);
 		gdp_pdu_t *pdu = _gdp_pdu_new(msg, req->gob->name, req->cpdu->src);
@@ -139,7 +139,7 @@ shutdown_req(gdp_req_t *req)
 		req->rpdu = pdu;
 
 //		EP_STAT estat = _gdp_req_new(
-//								GDP_NAK_S_LOSTSUB,
+//								GDP_NAK_S_LOST_SUBSCR,
 //								req->gob,
 //								_GdpChannel,
 //								pdu,

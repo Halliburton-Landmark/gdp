@@ -147,6 +147,7 @@ implement_me(const char *s)
 }
 
 
+#if 0	//TODO
 /*
 **  GET_STARTING_POINT_BY_xxx --- get the starting point for a read or subscribe
 */
@@ -175,6 +176,7 @@ get_starting_point_by_ts(gdp_req_t *req, GdpTimestamp *ts)
 {
 	return implement_me("get_starting_point_by_ts");
 }
+#endif	//TODO
 
 
 /***********************************************************************
@@ -241,7 +243,7 @@ cmd_ping(gdp_req_t *req)
 done:
 	if (EP_STAT_ISOK(estat))
 		return gdpd_ack_resp(req, GDP_ACK_SUCCESS);
-	return gdpd_nak_resp(req, GDP_NAK_S_LOSTSUB,
+	return gdpd_nak_resp(req, GDP_NAK_S_LOST_SUBSCR,
 					"cmd_ping: lost subscription",
 					estat);
 }
@@ -559,9 +561,8 @@ cmd_read_helper(gdp_req_t *req)
 	gdp_datum_t *datum = gdp_datum_new();
 
 	datum->recno = req->nextrec;
-	CMD_TRACE(req->cpdu->msg->cmd, "%s %" PRIgdp_recno,
-			req->gob->pname, datum->recno);
-	estat = req->gob->x->physimpl->read_by_recno(req->gob, datum);
+	CMD_TRACE(req->cpdu->msg->cmd, "%s %" PRIgdp_recno ", %d",
+			req->gob->pname, req->nextrec, req->numrecs);
 
 	if (EP_STAT_ISOK(estat))
 	{
@@ -593,6 +594,61 @@ cmd_read_helper(gdp_req_t *req)
 	return estat;
 }
 
+
+static void
+make_read_acknak_pdu(gdp_req_t *req, EP_STAT estat)
+{
+	if (EP_STAT_ISOK(estat))
+	{
+		// OK, the next record exists: send it
+		gdpd_ack_resp(req, GDP_ACK_CONTENT);
+		GdpMessage__AckContent *resp = req->rpdu->msg->ack_content;
+		resp->dl->n_d = 1;		//FIXME
+		EP_ASSERT(resp->dl->d == NULL);
+		GdpDatum *pbd;
+		resp->dl->d = ep_mem_malloc(resp->dl->n_d * sizeof pbd);
+		resp->dl->d[0] = pbd = ep_mem_malloc(sizeof *pbd);
+		gdp_datum__init(pbd);
+	}
+	else if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOTFOUND))
+	{
+		// no results found matching query
+		gdpd_ack_resp(req, GDP_NAK_C_NOTFOUND);
+		GdpMessage__NakGeneric *resp = req->rpdu->msg->nak;
+		resp->ep_stat = EP_STAT_TO_INT(estat);
+		resp->recno = req->nextrec;
+	}
+	else if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_LOST_SUBSCR))
+	{
+		// found some results, but no more to come
+		gdpd_ack_resp(req, GDP_ACK_END_OF_RESULTS);
+		GdpMessage__NakGeneric *resp = req->rpdu->msg->nak;
+		resp->ep_stat = EP_STAT_TO_INT(estat);
+		resp->recno = req->nextrec;
+	}
+	else
+	{
+		// some other failure
+		gdpd_ack_resp(req, GDP_NAK_S_INTERNAL);
+		GdpMessage__NakGeneric *resp = req->rpdu->msg->nak;
+		resp->ep_stat = EP_STAT_TO_INT(estat);
+		resp->recno = req->nextrec;
+	}
+}
+
+static EP_STAT
+send_read_result(EP_STAT estat, gdp_datum_t *datum, gdp_result_ctx_t *cb_ctx)
+{
+	gdp_req_t *req = (gdp_req_t *) cb_ctx;
+
+	make_read_acknak_pdu(req, estat);
+	if (EP_STAT_ISOK(estat))
+		_gdp_datum_to_pb(datum, req->rpdu->msg,
+					req->rpdu->msg->ack_content->dl->d[0]);
+	req->stat = _gdp_pdu_out(req->rpdu, req->chan, NULL);
+	return estat;
+}
+
 EP_STAT
 cmd_read_by_recno(gdp_req_t *req)
 {
@@ -607,10 +663,25 @@ cmd_read_by_recno(gdp_req_t *req)
 
 	GdpMessage__CmdReadByRecno *payload;
 	GET_PAYLOAD(req, cmd_read_by_recno, CMD_READ_BY_RECNO);
+	req->numrecs = payload->nrecs;
+	if (req->numrecs < 0)
+		req->numrecs = UINT32_MAX;
 
-	estat = get_starting_point_by_recno(req, payload->recno);
+	req->nextrec = payload->recno;
+	if (req->nextrec < 0)
+	{
+		req->nextrec += req->gob->nrecs + 1;
+		if (req->nextrec <= 0)
+			req->nextrec = 1;
+	}
+
+	estat = req->gob->x->physimpl->read_by_recno(req->gob,
+								req->nextrec, req->numrecs,
+								send_read_result, req);
+	// if successful, data will have already been returned
 	if (EP_STAT_ISOK(estat))
-		estat = cmd_read_helper(req);
+		return GDP_STAT_RESPONSE_SENT;
+	make_read_acknak_pdu(req, estat);
 	return estat;
 }
 
@@ -629,10 +700,18 @@ cmd_read_by_ts(gdp_req_t *req)
 
 	GdpMessage__CmdReadByTs *payload;
 	GET_PAYLOAD(req, cmd_read_by_ts, CMD_READ_BY_TS);
+	req->numrecs = payload->nrecs;
+	if (req->numrecs < 0)
+		req->numrecs = UINT32_MAX;
 
-	estat = get_starting_point_by_ts(req, payload->timestamp);
+	EP_TIME_SPEC ts;
+	_gdp_timestamp_from_pb(&ts, payload->timestamp);
+	estat = req->gob->x->physimpl->read_by_timestamp(req->gob,
+								&ts, req->numrecs,
+								send_read_result, req);
 	if (EP_STAT_ISOK(estat))
-		estat = cmd_read_helper(req);
+		return GDP_STAT_RESPONSE_SENT;
+	make_read_acknak_pdu(req, estat);
 	return estat;
 }
 
@@ -941,7 +1020,6 @@ void
 post_subscribe(gdp_req_t *req)
 {
 	EP_STAT estat;
-	gdp_datum_t *datum;
 
 	EP_ASSERT_ELSE(req != NULL, return);
 	EP_ASSERT_ELSE(req->state != GDP_REQ_FREE, return);
@@ -951,63 +1029,23 @@ post_subscribe(gdp_req_t *req)
 			" gob->nrecs %"PRIgdp_recno "\n",
 			req->numrecs, req->nextrec, req->gob->nrecs);
 
-	datum = gdp_datum_new();
-	while (req->numrecs >= 0)
-	{
-		// see if data pre-exists in the GOB
-		if (req->nextrec > req->gob->nrecs)
-		{
-			// no, it doesn't; convert to long-term subscription
-			break;
-		}
+	if (req->numrecs <= 0)
+		req->numrecs = INT32_MAX;
 
-		// get the next record and return it as an event
-		datum->recno = req->nextrec;
-		estat = req->gob->x->physimpl->read_by_recno(req->gob, datum);
+	// if data pre-exists in the GOB, return it now
+	if (req->nextrec <= req->gob->nrecs)
+	{
+		// get the existing records and return them via callback
+		estat = req->gob->x->physimpl->read_by_recno(
+									req->gob,
+									req->nextrec, req->numrecs,
+									send_read_result, req);
 		if (EP_STAT_ISOK(estat))
 		{
-			// OK, the next record exists: send it
-			gdpd_ack_resp(req, GDP_ACK_CONTENT);
-			GdpMessage__AckContent *resp = req->rpdu->msg->ack_content;
-			resp->dl->n_d = 1;		//FIXME
-			EP_ASSERT(resp->dl->d == NULL);
-			GdpDatum *pbd;
-			resp->dl->d = ep_mem_malloc(resp->dl->n_d * sizeof pbd);
-			resp->dl->d[0] = pbd = ep_mem_malloc(sizeof *pbd);
-			gdp_datum__init(pbd);
-			_gdp_datum_to_pb(datum, req->rpdu->msg, pbd);
+			gdp_recno_t nrecs = EP_STAT_TO_INT(estat);
+			req->nextrec += nrecs;
+			req->numrecs -= nrecs;
 		}
-		else if (EP_STAT_IS_SAME(estat, GDP_STAT_RECORD_MISSING))
-		{
-			gdpd_nak_resp(req, GDP_NAK_C_REC_MISSING,
-							"post_subscribe: missing record", estat);
-		}
-		else
-		{
-			// this is some error that should be logged
-			ep_log(estat, "post_subscribe: bad read");
-			req->numrecs = -1;		// terminate subscription
-			break;
-		}
-
-		// send the PDU out
-		req->stat = estat = _gdp_pdu_out(req->rpdu, req->chan, NULL);
-		_gdp_pdu_free(&req->rpdu);
-
-		// advance to the next record
-		if (req->numrecs > 0 && --req->numrecs == 0)
-		{
-			// numrecs was positive, now zero, but zero means infinity
-			req->numrecs--;
-		}
-		req->nextrec++;
-
-		// if we didn't successfully send a record, terminate
-		EP_STAT_CHECK(estat, break);
-
-		// DEBUG: force records to be interspersed
-		if (ep_dbg_test(Dbg, 101))
-			ep_time_nanosleep(1 MILLISECONDS);
 	}
 
 	// done with response PDU
@@ -1126,8 +1164,16 @@ cmd_subscribe_by_recno(gdp_req_t *req)
 	}
 
 	// get our starting point, which may be relative to the end
-	estat = get_starting_point_by_recno(req, payload->start);
-	EP_STAT_CHECK(estat, goto fail0);
+	req->nextrec = payload->start;
+	if (req->nextrec <= 0)
+	{
+		req->nextrec += req->gob->nrecs + 1;
+		if (req->nextrec <= 0)
+		{
+			// can't read before the beginning
+			req->nextrec = 1;
+		}
+	}
 
 	ep_dbg_cprintf(Dbg, 24,
 			"cmd_subscribe: starting from %" PRIgdp_recno ", %d records\n",
@@ -1452,7 +1498,7 @@ static struct cmdfuncs	CmdFuncs[] =
 	{ GDP_CMD_CLOSE,				cmd_close				},
 	{ GDP_CMD_APPEND,				cmd_append				},
 	{ GDP_CMD_READ_BY_RECNO,		cmd_read_by_recno		},
-//	{ GDP_CMD_READ_BY_TS,			cmd_read_by_ts			},
+	{ GDP_CMD_READ_BY_TS,			cmd_read_by_ts			},
 //	{ GDP_CMD_READ_BY_HASH	,		cmd_read_by_hash		},
 	{ GDP_CMD_SUBSCRIBE_BY_RECNO,	cmd_subscribe_by_recno	},
 //	{ GDP_CMD_SUBSCRIBE_BY_TS,		cmd_subscribe_by_ts		},

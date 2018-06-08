@@ -202,6 +202,10 @@ EP_STAT			_gdp_datum_sign(		// sign a datum
 						gdp_datum_t *datum,			// the datum to sign
 						gdp_gob_t *gob);			// the object storing it
 
+void			_gdp_timestamp_from_pb(	// convert protobuf form to EP_TIME_SPEC
+						EP_TIME_SPEC *ts,
+						const GdpTimestamp *pbd);
+
 
 
 /*

@@ -101,16 +101,16 @@ _gdp_acknak_from_estat(EP_STAT estat, gdp_cmd_t def)
 	{
 		int d = EP_STAT_DETAIL(estat);
 
-		if (EP_STAT_ISOK(estat))
+		if (!EP_STAT_ISFAIL(estat))
 		{
-			if (d >= 200 && d < (200 + GDP_ACK_MAX - GDP_ACK_MIN))
+			if (d >= 200 && d <= (200 + GDP_ACK_MAX - GDP_ACK_MIN))
 				resp = (gdp_cmd_t) (d - 200 + GDP_ACK_MIN);
 		}
-		else if (d >= 400 && d < (400 + GDP_NAK_C_MAX - GDP_NAK_C_MIN))
+		else if (d >= 400 && d <= (400 + GDP_NAK_C_MAX - GDP_NAK_C_MIN))
 			resp = (gdp_cmd_t) (d - 400 + GDP_NAK_C_MIN);
-		else if (d >= 500 && d < (500 + GDP_NAK_S_MAX - GDP_NAK_S_MIN))
+		else if (d >= 500 && d <= (500 + GDP_NAK_S_MAX - GDP_NAK_S_MIN))
 				resp = (gdp_cmd_t) (d - 500 + GDP_NAK_S_MIN);
-		else if (d >= 600 && d < (600 + GDP_NAK_R_MAX - GDP_NAK_R_MIN))
+		else if (d >= 600 && d <= (600 + GDP_NAK_R_MAX - GDP_NAK_R_MIN))
 			resp = (gdp_cmd_t) (d - 600 + GDP_NAK_R_MIN);
 	}
 
@@ -143,7 +143,6 @@ process_cmd(void *cpdu_)
 	EP_STAT estat;
 	gdp_gob_t *gob = NULL;
 	gdp_req_t *req = NULL;
-	int resp;
 
 	GDP_MSG_CHECK(cpdu, return);
 	cmd = cpdu->msg->cmd;
@@ -176,9 +175,12 @@ process_cmd(void *cpdu_)
 	estat = _gdp_req_dispatch(req, cmd);
 	if (ep_dbg_test(Dbg, 59))
 	{
-		ep_dbg_printf("process_cmd: after dispatch, ");
-		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+		char ebuf[100];
+		ep_dbg_printf("process_cmd: dispatch => %s\n    ",
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 1);
 	}
+	bool response_already_sent = EP_STAT_IS_SAME(estat, GDP_STAT_RESPONSE_SENT);
 
 	// make sure request or GOB haven't gotten fubared
 	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex);
@@ -208,20 +210,24 @@ process_cmd(void *cpdu_)
 	if (gob == NULL && req->gob != NULL)
 		gob = _gdp_gob_incref(req->gob);
 
-	// figure out potential response code
-	// we compute even if unused so we can log server errors
-	resp = _gdp_acknak_from_estat(estat, req->rpdu->msg->cmd);
-
-	if (resp >= GDP_NAK_S_MIN && resp <= GDP_NAK_S_MAX)
+	if (!response_already_sent)
 	{
-		ep_log(estat, "process_cmd(%s): server error",
-				_gdp_proto_cmd_name(cmd));
-	}
+		// figure out potential response code
+		// we compute even if unused so we can log server errors
+		int resp;
+		resp = _gdp_acknak_from_estat(estat, req->rpdu->msg->cmd);
 
-	// send response PDU if appropriate
-	req->rpdu->msg->cmd = (GdpMsgCode) resp;
-	req->stat = _gdp_pdu_out(req->rpdu, req->chan, NULL);
-	//XXX anything to do with estat here?
+		if (resp >= GDP_NAK_S_MIN && resp <= GDP_NAK_S_MAX)
+		{
+			ep_log(estat, "process_cmd(%s): server error",
+					_gdp_proto_cmd_name(cmd));
+		}
+
+		// send response PDU if appropriate
+		req->rpdu->msg->cmd = (GdpMsgCode) resp;
+		req->stat = _gdp_pdu_out(req->rpdu, req->chan, NULL);
+		//XXX anything to do with estat here?
+	}
 
 	EP_ASSERT(gob == req->gob);
 	if (gob != NULL)
@@ -615,7 +621,7 @@ process_resp(void *rpdu_)
 	}
 
 	// free up resources
-//	gob = req->gob;
+	gob = req->gob;
 	if (EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
 		_gdp_req_unlock(req);
 	else

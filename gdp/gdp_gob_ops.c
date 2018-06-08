@@ -762,6 +762,8 @@ _gdp_gob_read_by_recno(gdp_gob_t *gob,
 		GdpMessage__CmdReadByRecno *payload = msg->cmd_read_by_recno;
 		EP_ASSERT_ELSE(payload != NULL, return EP_STAT_ASSERT_ABORT);
 		payload->recno = recno;
+		payload->nrecs = 0;
+		payload->has_nrecs = true;
 	}
 
 	estat = _gdp_invoke(req);
@@ -819,6 +821,7 @@ _gdp_gob_read_by_recno_async(
 	EP_STAT estat;
 	gdp_req_t *req;
 	gdp_msg_t *msg;
+	uint32_t reqflags = GDP_REQ_ASYNCIO | GDP_REQ_PERSIST;
 
 	errno = 0;				// avoid spurious messages
 
@@ -828,7 +831,7 @@ _gdp_gob_read_by_recno_async(
 
 	// create a new READ request (don't need a special command)
 	estat = _gdp_req_new(GDP_CMD_READ_BY_RECNO, gob, chan,
-						NULL, GDP_REQ_ASYNCIO, &req);
+						NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, return estat);
 
 	msg = req->cpdu->msg;

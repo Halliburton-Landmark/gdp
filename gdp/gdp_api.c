@@ -689,7 +689,8 @@ gdp_gin_read_by_recno(gdp_gin_t *gin,
 {
 	EP_STAT estat;
 
-	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gin_read_by_recno\n");
+	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gin_read_by_recno (%"PRIgdp_recno ")\n",
+			recno);
 	EP_ASSERT_POINTER_VALID(datum);
 	gdp_datum_reset(datum);
 

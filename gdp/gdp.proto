@@ -138,27 +138,37 @@ message GdpMessage
 	message CmdReadByRecno
 	{
 		required sint64			recno = 1;			// record number
-		optional int32			nrecs = 2 [default = -1];	// number of records
+		optional int32			nrecs = 2			// number of records
+										[default = -1];
 	}
 
 	// Read a record based on the timestamp.  Returns a set.
 	message CmdReadByTs
 	{
 		required GdpTimestamp	timestamp = 1;		// timestamp
-		optional int32			nrecs = 2 [default = -1];	// number of records
+		optional int32			nrecs = 2			// number of records
+										[default = -1];
 	}
 
-	// Read a record based on the hash of the data.  Should always be unique.
+	// Read a record based on the hash of the data.  Should always be unique;
+	// hence, we do not need nrecs.
 	message CmdReadByHash
 	{
 		required bytes			hash = 1;			// hash value
-		optional int32			nrecs = 2 [default = -1];	// number of records
 	}
 
 	/*
 	**  Subscriptions act very much like CmdReadBy*, except that when
 	**  the data is exhausted (i.e., no more data is available from the
 	**  log) they will wait until more data comes along for delivery.
+	**
+	**	For ReadByRecno, if `start` is zero or not specified, it means
+	**  to start at the next record written to the log.
+	**  If negative, it is interpreted relative to the number of records
+	**  already in the log (so -1 means to deliver the last record in
+	**  the log and then subsequent records.
+	**
+	**  If `nrecs` is unspecified or zero, it means to read forever.
 	*/
 
 	// Subscribe to a log starting from a given record number.
@@ -172,7 +182,7 @@ message GdpMessage
 	// Subscribe to a log starting from a particular timestamp.
 	message CmdSubscribeByTs
 	{
-		required GdpTimestamp	timestamp = 1;		// timestamp
+		required GdpTimestamp	timestamp = 1;		// starting timestamp
 		optional int32			nrecs = 2;			// number of records
 		optional GdpTimestamp	timeout = 3;		// timeout
 	}
@@ -280,13 +290,14 @@ enum GdpMsgCode
 	CMD_DELETE =				81;
 //	CMD_FWD_APPEND =			127;		//XXX moved to L4
 
-	// 128-191	Positive Acks
+	// 128-191	Positive Acks (HTTP 200-263)
 	ACK_SUCCESS =				128;		// HTTP 200
 	ACK_CREATED =				129;		// HTTP 201
 	ACK_DELETED =				130;		// HTTP 202
 	ACK_VALID =					131;		// HTTP 203
 	ACK_CHANGED =				132;		// no direct HTTP equiv XXX used???
 	ACK_CONTENT =				133;		// no direct HTTP equivalent
+	ACK_END_OF_RESULTS =		191;		// no more results (no HTTP equiv)
 
 	// 192-233	Negative acks, client side (CoAP, HTTP 400-431)
 	NAK_C_BADREQ =				192;		// HTTP 400
@@ -300,8 +311,8 @@ enum GdpMsgCode
 	NAK_C_PRECONFAILED =		204;		// HTTP 412
 	NAK_C_TOOLARGE =			205;		// HTTP 413
 	NAK_C_UNSUPMEDIA =			207;		// HTTP 415
-	NAK_C_REC_MISSING =			222;		// no HTTP equiv
-	NAK_C_REC_DUP =				223;		// no HTTP equiv
+	NAK_C_REC_MISSING =			222;		// record missing (no HTTP equiv)
+	NAK_C_REC_DUP =				223;		// multiple records (no HTTP equiv)
 
 	// 224-239	Negative acks, server side (CoAP, HTTP 500-515)
 	NAK_S_INTERNAL =			224;		// HTTP 500
@@ -310,7 +321,7 @@ enum GdpMsgCode
 	NAK_S_SVCUNAVAIL =			227;		// HTTP 503
 	NAK_S_GWTIMEOUT =			228;		// HTTP 504
 	NAK_S_PROXYNOTSUP =			229;		// HTTP 505
-	NAK_S_LOSTSUB =				239;		// no HTTP equiv
+	NAK_S_LOST_SUBSCR =			239;		// lost subscription (no HTTP equiv)
 
 	// 240-254	Negative acks, routing layer
 	NAK_R_NOROUTE =				240;		// no HTTP equiv	XXX remove?

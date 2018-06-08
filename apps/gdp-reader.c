@@ -601,7 +601,7 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	if (firstrec > 0 && dtstr != NULL)
+	if (firstrec != 0 && dtstr != NULL)
 	{
 		ep_app_error("Cannot specify -f and -d");
 		exit(EX_USAGE);

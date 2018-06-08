@@ -87,6 +87,7 @@ extern void		_gdp_stat_init(void);
 #define GDP_STAT_PDU_TOO_LONG			GDP_STAT_NEW(SEVERE, 38)
 #define GDP_STAT_CHAN_NOT_CONNECTED		GDP_STAT_NEW(ABORT, 39)
 #define GDP_STAT_METADATA_REQUIRED		GDP_STAT_NEW(SEVERE, 40)
+#define GDP_STAT_RESPONSE_SENT			GDP_STAT_NEW(WARN, 41)
 
 
 /*
@@ -114,6 +115,7 @@ extern void		_gdp_stat_init(void);
 #define _GDP_CCODE_CONTENT			205		// Content (~200, GET only)
 											// (HTTP 205 Reset Content)
 											// (HTTP 206 Partial Content)
+#define _GDP_CCODE_END_OF_RESULTS	263		// end of results (subscr/mread)
 
 #define _GDP_CCODE_BADREQ			400		// HTTP/CoAP Bad Request
 #define _GDP_CCODE_UNAUTH			401		// HTTP/CoAP Unauthorized
@@ -158,6 +160,7 @@ extern void		_gdp_stat_init(void);
 #define GDP_STAT_ACK_VALID			GDP_STAT_NEW(OK, _GDP_CCODE_VALID)
 #define GDP_STAT_ACK_CHANGED		GDP_STAT_NEW(OK, _GDP_CCODE_CHANGED)
 #define GDP_STAT_ACK_CONTENT		GDP_STAT_NEW(OK, _GDP_CCODE_CONTENT)
+#define GDP_STAT_ACK_END_OF_RESULTS	GDP_STAT_NEW(WARN, _GDP_CCODE_END_OF_RESULTS)
 
 #define GDP_STAT_NAK_BADREQ			GDP_STAT_NEW(ERROR, _GDP_CCODE_BADREQ)
 #define GDP_STAT_NAK_UNAUTH			GDP_STAT_NEW(ERROR, _GDP_CCODE_UNAUTH)

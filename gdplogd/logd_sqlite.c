@@ -411,8 +411,10 @@ physinfo_free(gob_physinfo_t *phys)
 		ep_dbg_cprintf(Dbg, 41, "physinfo_free: closing db @ %p\n", phys->db);
 
 		// clean up previously prepared statements
-		if (phys->read_by_recno_stmt != NULL)
-			sqlite3_finalize(phys->read_by_recno_stmt);
+		if (phys->read_by_recno_stmt1 != NULL)
+			sqlite3_finalize(phys->read_by_recno_stmt1);
+		if (phys->read_by_recno_stmt2 != NULL)
+			sqlite3_finalize(phys->read_by_recno_stmt2);
 		if (phys->read_by_hash_stmt != NULL)
 			sqlite3_finalize(phys->read_by_hash_stmt);
 		if (phys->read_by_timestamp_stmt != NULL)
@@ -955,9 +957,14 @@ read_signature(sqlite3_stmt *stmt, int index, gdp_sig_t **sigp)
 	read_blob(stmt, index, &buf);
 }
 
-static void
-process_row(sqlite3_stmt *stmt, gdp_datum_t *datum)
+static EP_STAT
+process_row(sqlite3_stmt *stmt,
+					gdp_result_cb_t *cb,
+					gdp_result_ctx_t *cb_ctx)
 {
+	EP_STAT estat;
+	gdp_datum_t *datum = gdp_datum_new();
+
 	// hash value of this record
 	//XXX unneeded except to validate the data
 //	{
@@ -989,26 +996,59 @@ process_row(sqlite3_stmt *stmt, gdp_datum_t *datum)
 	{
 		read_signature(stmt, 5, &datum->sig);
 	}
+
+	estat = (*cb)(GDP_STAT_ACK_CONTENT, datum, cb_ctx);
+
+	gdp_datum_free(datum);
+	return estat;
 }
 
 static EP_STAT
-process_select_results(sqlite3_stmt *stmt, gdp_datum_t *datum)
+process_select_results(sqlite3_stmt *stmt,
+					gdp_result_cb_t *cb,
+					gdp_result_ctx_t *cb_ctx,
+					bool one_only)
 {
 	int rc;
 	EP_STAT estat = EP_STAT_OK;
+	int nresults = 0;
 
 	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW)
 	{
-		process_row(stmt, datum);
-		break;		//TODO: allow multiple rows in one query
+		process_row(stmt, cb, cb_ctx);
+		nresults++;
+		if (one_only)
+			break;
 	}
 	int reset_rc = sqlite3_reset(stmt);
 	if (reset_rc != SQLITE_OK)
+	{
 		estat = sqlite_error(reset_rc, "process_select_results", "reset");
+	}
+	else if (rc == SQLITE_ROW)
+	{
+		// "one_only" case
+		estat = GDP_STAT_RESPONSE_SENT;
+	}
 	else if (rc == SQLITE_DONE)
-		estat = GDP_STAT_NAK_NOTFOUND;
+	{
+		if (nresults <= 0)
+		{
+			// nothing matched
+//			estat = (*cb)(GDP_STAT_NAK_NOTFOUND, NULL, cb_ctx);
+			estat = GDP_STAT_NAK_NOTFOUND;
+		}
+		else
+		{
+			// we had some results, but now we're done
+//			estat = (*cb)(GDP_STAT_ACK_END_OF_RESULTS, NULL, cb_ctx);
+			estat = GDP_STAT_ACK_END_OF_RESULTS;
+		}
+	}
 	else if (!sqlite_rc_success(rc))
 		estat = sqlite_error(rc, "process_select_results", "step");
+	if (EP_STAT_ISOK(estat))
+		estat = EP_STAT_FROM_INT(nresults);
 	return estat;
 }
 
@@ -1019,20 +1059,25 @@ process_select_results(sqlite3_stmt *stmt, gdp_datum_t *datum)
 
 static EP_STAT
 sqlite_read_by_hash(gdp_gob_t *gob,
-		gdp_datum_t *datum)
+		gdp_hash_t *hash,
+		gdp_result_cb_t *cb,
+		void *cb_ctx)
 {
 	EP_STAT estat = EP_STAT_OK;
 	int rc = SQLITE_OK;
 	gob_physinfo_t *phys = GETPHYS(gob);
 	const char *phase = "init";
+	size_t hashlen;
+	const void *hashptr = gdp_hash_getptr(hash, &hashlen);
 
 	EP_ASSERT_POINTER_VALID(gob);
-	gdp_buf_reset(datum->dbuf);
-	if (datum->sig != NULL)
-		gdp_sig_reset(datum->sig);
 
-	ep_dbg_cprintf(Dbg, 44, "sqlite_read_by_hash(%s %" PRIgdp_recno ")\n",
-			gob->pname, datum->recno);
+	if (ep_dbg_test(Dbg, 44))
+	{
+		ep_dbg_printf("sqlite_read_by_hash(%s\n    ", gob->pname);
+		ep_hexdump(hashptr, hashlen, ep_dbg_getfile(), EP_HEXDUMP_TERSE, 0);
+		ep_dbg_printf("\n");
+	}
 
 	ep_thr_rwlock_rdlock(&phys->lock);
 
@@ -1048,11 +1093,11 @@ sqlite_read_by_hash(gdp_gob_t *gob,
 	}
 
 	phase = "bind";
-	rc = sqlite3_bind_int64(phys->read_by_hash_stmt, 1, datum->recno);
+	rc = sql_bind_hash(phys->read_by_hash_stmt, 1, hash);
 	CHECK_RC(rc, goto fail2);
 
 	phase = "process results";
-	estat = process_select_results(phys->read_by_hash_stmt, datum);
+	estat = process_select_results(phys->read_by_hash_stmt, cb, cb_ctx, true);
 
 	if (false)
 	{
@@ -1063,6 +1108,9 @@ fail2:
 		sqlite3_clear_bindings(phys->read_by_hash_stmt);
 	ep_thr_rwlock_unlock(&phys->lock);
 
+	char ebuf[100];
+	ep_dbg_cprintf(Dbg, 44, "sqlite_read_by_hash => %s\n",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	return estat;
 }
 
@@ -1075,54 +1123,80 @@ fail2:
 
 static EP_STAT
 sqlite_read_by_recno(gdp_gob_t *gob,
-		gdp_datum_t *datum)
+		gdp_recno_t startrec,
+		uint32_t maxrecs,
+		gdp_result_cb_t *cb,
+		void *cb_ctx)
 {
 	EP_STAT estat = EP_STAT_OK;
 	int rc = SQLITE_OK;
 	gob_physinfo_t *phys = GETPHYS(gob);
+	bool one_only = maxrecs == 0;
 	const char *phase = "init";
+	sqlite3_stmt *stmt = NULL;
 
-	if (!EP_ASSERT_POINTER_VALID(gob) ||
-			!EP_ASSERT_POINTER_VALID(datum) ||
-			!EP_ASSERT_POINTER_VALID(datum->dbuf))
+	if (!EP_ASSERT_POINTER_VALID(gob))
 		return EP_STAT_ASSERT_ABORT;
-	gdp_buf_reset(datum->dbuf);
-	if (datum->sig != NULL)
-		gdp_sig_reset(datum->sig);
 
-	ep_dbg_cprintf(Dbg, 44, "sqlite_read_by_recno(%s %" PRIgdp_recno ")\n",
-			gob->pname, datum->recno);
+	ep_dbg_cprintf(Dbg, 44, "sqlite_read_by_recno(%s) rec %" PRIgdp_recno ", n %d\n",
+			gob->pname, startrec, maxrecs);
+	if (one_only)
+		maxrecs = 1;
 
 	ep_thr_rwlock_rdlock(&phys->lock);
 
-	if (phys->read_by_recno_stmt == NULL)
+	if (phys->read_by_recno_stmt1 == NULL)
 	{
 		const char *sql = "SELECT hash, recno, timestamp, prevhash, value, sig\n"
 						"	FROM log_entry\n"
-						"	WHERE recno = ?;\n";
+						"	WHERE recno = ?"
+						"   LIMIT ?;\n";
 		phase = "prepare";
-		ep_dbg_cprintf(Dbg, 55, "preparing\n    %s", sql);
-		rc = sqlite3_prepare_v2(phys->db, sql,
-						-1, &phys->read_by_recno_stmt, NULL);
+		ep_dbg_cprintf(Dbg, 55, "preparing %s", sql);
+		rc = sqlite3_prepare_v2(phys->db, sql, -1, &stmt, NULL);
 		CHECK_RC(rc, goto fail2);
+		phys->read_by_recno_stmt1 = stmt;
+	}
+	if (phys->read_by_recno_stmt2 == NULL)
+	{
+		const char *sql = "SELECT hash, recno, timestamp, prevhash, value, sig\n"
+						"	FROM log_entry\n"
+						"	WHERE recno >= ?"
+						"   LIMIT ?;\n";
+		phase = "prepare";
+		ep_dbg_cprintf(Dbg, 55, "preparing %s", sql);
+		rc = sqlite3_prepare_v2(phys->db, sql, -1, &stmt, NULL);
+		CHECK_RC(rc, goto fail2);
+		phys->read_by_recno_stmt2 = stmt;
 	}
 
-	phase = "bind";
-	rc = sqlite3_bind_int64(phys->read_by_recno_stmt, 1, datum->recno);
+	if (one_only)
+		stmt = phys->read_by_recno_stmt1;
+	else
+		stmt = phys->read_by_recno_stmt2;
+
+	phase = "bind1";
+	rc = sqlite3_bind_int64(stmt, 1, startrec);
+	CHECK_RC(rc, goto fail2);
+	phase = "bind2";
+	rc = sqlite3_bind_int(stmt, 2, maxrecs);
 	CHECK_RC(rc, goto fail2);
 
 	phase = "process results";
-	estat = process_select_results(phys->read_by_recno_stmt, datum);
+	estat = process_select_results(stmt, cb, cb_ctx, one_only);
 
 	if (false)
 	{
 fail2:
 		estat = sqlite_error(rc, "sqlite_read_by_recno", phase);
 	}
-	if (phys->read_by_recno_stmt != NULL)
-		sqlite3_clear_bindings(phys->read_by_recno_stmt);
+	if (stmt != NULL)
+		sqlite3_clear_bindings(stmt);
 	ep_thr_rwlock_unlock(&phys->lock);
 
+	char ebuf[100];
+	ep_dbg_cprintf(Dbg, 44, "sqlite_read_by_recno => %s\n",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	return estat;
 }
 
@@ -1135,26 +1209,29 @@ fail2:
 
 static EP_STAT
 sqlite_read_by_timestamp(gdp_gob_t *gob,
-		gdp_datum_t *datum)
+		EP_TIME_SPEC *start_time,
+		uint32_t maxrecs,
+		gdp_result_cb_t *cb,
+		void *cb_ctx)
 {
 	EP_STAT estat = EP_STAT_OK;
 	int rc = SQLITE_OK;
 	gob_physinfo_t *phys = GETPHYS(gob);
+	bool one_only = maxrecs == 0;
 	const char *phase = "init";
 
 	EP_ASSERT_POINTER_VALID(gob);
-	gdp_buf_reset(datum->dbuf);
-	if (datum->sig != NULL)
-		gdp_sig_reset(datum->sig);
 
 	if (ep_dbg_test(Dbg, 44))
 	{
 		char time_buf[100];
-		ep_time_format(&datum->ts, time_buf, sizeof time_buf,
+		ep_time_format(start_time, time_buf, sizeof time_buf,
 					EP_TIME_FMT_HUMAN);
-		ep_dbg_cprintf(Dbg, 44, "sqlite_read_by_timestamp(%s, %s)\n",
-					gob->pname, time_buf);
+		ep_dbg_cprintf(Dbg, 44, "sqlite_read_by_timestamp(%s, %s, %d)\n",
+					gob->pname, time_buf, maxrecs);
 	}
+	if (one_only)
+		maxrecs = 1;
 
 	ep_thr_rwlock_rdlock(&phys->lock);
 
@@ -1166,17 +1243,21 @@ sqlite_read_by_timestamp(gdp_gob_t *gob,
 						"	FROM log_entry"
 						"	WHERE timestamp >= ?"
 						"	ORDER BY timestamp"
-						"	LIMIT 1;",
+						"	LIMIT ?;",
 						-1, &phys->read_by_timestamp_stmt, NULL);
 		CHECK_RC(rc, goto fail2);
 	}
 
-	phase = "bind";
-	rc = sqlite3_bind_int64(phys->read_by_timestamp_stmt, 1, datum->recno);
+	phase = "bind1";
+	rc = sql_bind_timestamp(phys->read_by_timestamp_stmt, 1, start_time);
+	CHECK_RC(rc, goto fail2);
+	phase = "bind2";
+	rc = sqlite3_bind_int(phys->read_by_timestamp_stmt, 2, maxrecs);
 	CHECK_RC(rc, goto fail2);
 
 	phase = "process results";
-	estat = process_select_results(phys->read_by_timestamp_stmt, datum);
+	estat = process_select_results(phys->read_by_timestamp_stmt, cb, cb_ctx,
+							one_only);
 
 	if (false)
 	{
@@ -1187,6 +1268,9 @@ fail2:
 		sqlite3_clear_bindings(phys->read_by_timestamp_stmt);
 	ep_thr_rwlock_unlock(&phys->lock);
 
+	char ebuf[100];
+	ep_dbg_cprintf(Dbg, 44, "sqlite_read_by_timestamp => %s\n",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	return estat;
 }
 
@@ -1444,17 +1528,17 @@ sqlite_getstats(
 __BEGIN_DECLS
 struct gob_phys_impl	GdpSqliteImpl =
 {
-	.init =				sqlite_init,
+	.init				= sqlite_init,
 	.read_by_hash		= sqlite_read_by_hash,
-	.read_by_recno =	sqlite_read_by_recno,
+	.read_by_recno		= sqlite_read_by_recno,
 	.read_by_timestamp	= sqlite_read_by_timestamp,
-	.create =			sqlite_create,
-	.open =				sqlite_open,
-	.close =			sqlite_close,
-	.append =			sqlite_append,
-	.getmetadata =		sqlite_getmetadata,
-	.remove =			sqlite_remove,
-	.foreach =			sqlite_foreach,
-	.getstats =			sqlite_getstats,
+	.create				= sqlite_create,
+	.open				= sqlite_open,
+	.close				= sqlite_close,
+	.append				= sqlite_append,
+	.getmetadata		= sqlite_getmetadata,
+	.remove				= sqlite_remove,
+	.foreach			= sqlite_foreach,
+	.getstats			= sqlite_getstats,
 };
 __END_DECLS

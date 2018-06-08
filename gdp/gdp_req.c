@@ -590,7 +590,7 @@ _gdp_req_find(gdp_gob_t *gob, gdp_rid_t rid)
 	}
 	if (req != NULL)
 	{
-		if (!EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
+		if (!EP_UT_BITSET(GDP_REQ_PERSIST|GDP_REQ_ASYNCIO, req->flags))
 		{
 			EP_ASSERT(EP_UT_BITSET(GDP_REQ_ON_GOB_LIST, req->flags));
 			LIST_REMOVE(req, goblist);

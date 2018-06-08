@@ -167,19 +167,35 @@ struct gob_phys_stats
 	int64_t			size;			// size in bytes
 };
 
+typedef struct gdp_result_ctx	gdp_result_ctx_t;
+
+// callback for dispatching results of reads
+typedef EP_STAT		gdp_result_cb_t(
+							EP_STAT estat,
+							gdp_datum_t *datum,
+							gdp_result_ctx_t *cb_ctx);
+
 // the service switch entry
 struct gob_phys_impl
 {
 	EP_STAT		(*init)(void);
 	EP_STAT		(*read_by_hash)(
 						gdp_gob_t *gob,
-						gdp_datum_t *datum);
+						gdp_hash_t *hash,
+						gdp_result_cb_t *cb,
+						void *cb_ctx);
 	EP_STAT		(*read_by_recno)(
 						gdp_gob_t *gob,
-						gdp_datum_t *datum);
+						gdp_recno_t startrec,
+						uint32_t maxrecs,
+						gdp_result_cb_t *cb,
+						void *cb_ctx);
 	EP_STAT		(*read_by_timestamp)(
 						gdp_gob_t *gob,
-						gdp_datum_t *datum);
+						EP_TIME_SPEC *start_time,
+						uint32_t maxrecs,
+						gdp_result_cb_t *cb,
+						void *cb_ctx);
 	EP_STAT		(*create)(
 						gdp_gob_t *pgob,
 						gdp_md_t *gmd);

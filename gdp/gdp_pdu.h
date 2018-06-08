@@ -191,6 +191,7 @@ typedef struct gdp_pdu
 #define GDP_ACK_VALID				GDP_MSG_CODE__ACK_VALID
 #define GDP_ACK_CHANGED				GDP_MSG_CODE__ACK_CHANGED
 #define GDP_ACK_CONTENT				GDP_MSG_CODE__ACK_CONTENT
+#define GDP_ACK_END_OF_RESULTS		GDP_MSG_CODE__ACK_END_OF_RESULTS
 #define GDP_ACK_MAX			191			// maximum ack code
 
 //		192-223			Negative acks, client side (CoAP, HTTP 400-431)
@@ -220,7 +221,7 @@ typedef struct gdp_pdu
 #define GDP_NAK_S_GWTIMEOUT			GDP_MSG_CODE__NAK_S_GWTIMEOUT
 #define GDP_NAK_S_PROXYNOTSUP		GDP_MSG_CODE__NAK_S_PROXYNOTSUP
 #define GDP_NAK_S_REPLICATE_FAIL	GDP_MSG_CODE__NAK_S_REPLICATE_FAIL
-#define GDP_NAK_S_LOSTSUB			GDP_MSG_CODE__NAK_S_LOSTSUB
+#define GDP_NAK_S_LOST_SUBSCR		GDP_MSG_CODE__NAK_S_LOST_SUBSCR
 #define GDP_NAK_S_MAX		239			// maximum server-side nak code
 
 //		240-254			Negative acks, routing layer

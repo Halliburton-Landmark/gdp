@@ -79,7 +79,6 @@ sub_send_message_notification(gdp_req_t *req)
 				"sub_send_message_notification: couldn't write PDU!\n");
 	}
 
-
 	return estat;
 }
 
@@ -242,7 +241,7 @@ sub_end_subscription(gdp_req_t *req)
 
 	// send an "end of subscription" event
 	req->rpdu->msg->rid = req->cpdu->msg->rid;
-	req->rpdu->msg->cmd = GDP_ACK_DELETED;
+	req->rpdu->msg->cmd = GDP_ACK_END_OF_RESULTS;
 
 	if (ep_dbg_test(Dbg, 39))
 	{

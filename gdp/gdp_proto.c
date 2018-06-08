@@ -122,7 +122,6 @@ _gdp_invoke(gdp_req_t *req)
 		*/
 
 		// wait until we receive a result
-		ep_dbg_cprintf(Dbg, 37, "_gdp_invoke: waiting on %p\n", req);
 		ep_time_deltanow(&delta_ts, &abs_to);
 		estat = EP_STAT_OK;
 		req->state = GDP_REQ_WAITING;
@@ -134,7 +133,9 @@ _gdp_invoke(gdp_req_t *req)
 				_gdp_gob_unlock(req->gob);
 
 			// cond_wait will unlock the mutex
+			ep_dbg_cprintf(Dbg, 37, "_gdp_invoke: waiting on %p\n", req);
 			int e = ep_thr_cond_wait(&req->cond, &req->mutex, &abs_to);
+			ep_dbg_cprintf(Dbg, 37, "_gdp_invoke: continuing %p\n", req);
 
 			// re-acquire GOB lock
 			if (req->gob != NULL)
@@ -680,7 +681,7 @@ static dispatch_ent_t	DispatchTable[256] =
 	NOENT,				// 188
 	NOENT,				// 189
 	NOENT,				// 190
-	NOENT,				// 191
+	{ ack_success,		"ACK_END_OF_RESULTS",	GDP_STAT_ACK_END_OF_RESULTS	},	// 191
 
 	{ nak_client,		"NAK_C_BADREQ",			GDP_STAT_NAK_BADREQ			},	// 192
 	{ nak_client,		"NAK_C_UNAUTH",			GDP_STAT_NAK_UNAUTH			},	// 193
@@ -842,8 +843,8 @@ _gdp_req_dispatch(gdp_req_t *req, int cmd)
 	if (ep_dbg_test(Dbg, 28) || ep_dbg_test(DbgCmdTrace, 28))
 	{
 		flockfile(ep_dbg_getfile());
-		ep_dbg_printf("_gdp_req_dispatch >>> %s",
-				_gdp_proto_cmd_name(cmd));
+		ep_dbg_printf("_gdp_req_dispatch(%p -> %p) >>> %s",
+				req, req->gob, _gdp_proto_cmd_name(cmd));
 		if (pname[0] != '\0')
 			ep_dbg_printf("(%s)", req->gob->pname);
 		if (req->gob != NULL && ep_dbg_test(Dbg, 70))

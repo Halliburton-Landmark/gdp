@@ -376,8 +376,9 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 	case GDP_MESSAGE__BODY_ACK_SUCCESS:
 		fprintf(fp, "ack_success, recno=");
 		if (msg->ack_success->has_recno)
-			fprintf(fp, "%" PRIgdp_recno,
-						msg->ack_success->recno);
+			fprintf(fp, "%" PRIgdp_recno, msg->ack_success->recno);
+		else
+			fprintf(fp, "(none)");
 		fprintf(fp, ", ts=");
 		print_pb_ts(msg->ack_success->ts, fp);
 		fprintf(fp, "\n");

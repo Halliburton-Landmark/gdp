@@ -562,6 +562,22 @@ _gdp_datum_to_pb(const gdp_datum_t *datum,
 */
 
 void
+_gdp_timestamp_from_pb(EP_TIME_SPEC *ts,
+				const GdpTimestamp *pbd)
+{
+	if (pbd != NULL)
+	{
+		ts->tv_sec = pbd->sec;
+		ts->tv_nsec = pbd->nsec;
+		ts->tv_accuracy = pbd->accuracy;
+	}
+	else
+	{
+		EP_TIME_INVALIDATE(ts);
+	}
+}
+
+void
 _gdp_datum_from_pb(gdp_datum_t *datum,
 				const GdpMessage *msg,
 				const GdpDatum *pbd)
@@ -570,16 +586,7 @@ _gdp_datum_from_pb(gdp_datum_t *datum,
 	datum->recno = pbd->recno;
 
 	// timestamp
-	if (pbd->ts != NULL)
-	{
-		datum->ts.tv_sec = pbd->ts->sec;
-		datum->ts.tv_nsec = pbd->ts->nsec;
-		datum->ts.tv_accuracy = pbd->ts->accuracy;
-	}
-	else
-	{
-		EP_TIME_INVALIDATE(&datum->ts);
-	}
+	_gdp_timestamp_from_pb(&datum->ts, pbd->ts);
 
 	// data
 	if (datum->dbuf == NULL)
