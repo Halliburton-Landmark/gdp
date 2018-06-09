@@ -1127,7 +1127,6 @@ cmd_subscribe_by_recno(gdp_req_t *req)
 	}
 
 	gob = req->gob;
-	ep_dbg_cprintf(Dbg, 99, "[1] %d\n", gob->refcnt);
 	if (!EP_ASSERT(GDP_GOB_ISGOOD(gob)))
 	{
 		ep_dbg_printf("cmd_subscribe: bad gob %p in req, flags = %x\n",
@@ -1178,7 +1177,6 @@ cmd_subscribe_by_recno(gdp_req_t *req)
 	ep_dbg_cprintf(Dbg, 24,
 			"cmd_subscribe: starting from %" PRIgdp_recno ", %d records\n",
 			req->nextrec, req->numrecs);
-	ep_dbg_cprintf(Dbg, 99, "[2] %d\n", gob->refcnt);
 
 	// see if this is refreshing an existing subscription
 	{
@@ -1208,10 +1206,6 @@ cmd_subscribe_by_recno(gdp_req_t *req)
 		}
 		if (r1 != NULL)
 		{
-			// make sure we don't send data already sent
-			req->nextrec = r1->nextrec;
-			ep_dbg_cprintf(Dbg, 99, "[3] %d\n", gob->refcnt);
-
 			// abandon old request, we'll overwrite it with new request
 			// (but keep the GOB around)
 			ep_dbg_cprintf(Dbg, 20, "cmd_subscribe: removing old request\n");
@@ -1223,7 +1217,6 @@ cmd_subscribe_by_recno(gdp_req_t *req)
 	}
 
 	// the _gdp_gob_decref better not have invalidated the GOB
-	ep_dbg_cprintf(Dbg, 99, "[4] %d\n", gob->refcnt);
 	EP_ASSERT(GDP_GOB_ISGOOD(gob));
 
 	// mark this as persistent and upgradable
