@@ -154,7 +154,7 @@ write_record(gdp_datum_t *datum, gdp_gin_t *gin)
 		{
 			// print the return value (shows the record number assigned)
 			if (!Quiet)
-				gdp_datum_print(datum, stdout, 0);
+				gdp_datum_print(datum, stdout, GDP_DATUM_PRMETAONLY);
 		}
 		else if (!Quiet)
 		{
@@ -380,6 +380,7 @@ main(int argc, char **argv)
 					*p++ = '\0';
 
 				// first copy the text buffer into the datum buffer
+				gdp_datum_reset(datum);
 				gdp_buf_write(gdp_datum_getbuf(datum), buf, strlen(buf));
 
 				// write the record to the log

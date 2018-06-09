@@ -258,10 +258,7 @@ gdp_datum_print(const gdp_datum_t *datum, FILE *fp, uint32_t flags)
 	}
 
 	if (EP_UT_BITSET(GDP_DATUM_PRMETAONLY, flags))
-	{
-		fprintf(fp, "\n");
 		goto done;
-	}
 
 	if (EP_UT_BITSET(GDP_DATUM_PRTEXT, flags))
 		fprintf(fp, "%.*s\n", l, d);

@@ -639,7 +639,6 @@ gdp_gin_append(gdp_gin_t *gin, gdp_datum_t *datum, gdp_hash_t *prevhash)
 	if (EP_STAT_ISOK(estat))
 		estat = _gdp_gob_append(gin->gob, 1, &datum, prevhash,
 								_GdpChannel, 0);
-	gdp_datum_reset(datum);
 	unlock_gin_and_gob(gin, "gdp_gin_append");
 	prstat(estat, gin, "gdp_gin_append");
 	return estat;

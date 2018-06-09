@@ -217,6 +217,7 @@ main(int argc, char *argv[])
 			size_t dlen = strlen(&data[(i * max_record_size)]);
 
 			datum->recno = i + 1;
+			gdp_buf_reset(datum);
 			gdp_buf_write(datum->dbuf, &data[(i * max_record_size)], dlen);
 
 			estat = gdp_gin_append(gin_write, datum);
