@@ -393,12 +393,14 @@ ack_data_content(gdp_req_t *req)
 	GdpMessage__AckContent *payload = req->rpdu->msg->ack_content;
 
 	// if we returned zero content, handle specially
+	//TODO: should put all datums into event queue here rather than
+	//TODO: up the call stack.
 	if (payload->dl->n_d != 1)
 	{
 		if (ep_dbg_test(Dbg, 1))
 		{
-			ep_dbg_printf("ack_data_content: %s datums in ",
-					payload->dl->n_d <= 0 ? "no" : "multiple");
+			ep_dbg_printf("ack_data_content: %zd datums in ",
+					payload->dl->n_d);
 			_gdp_req_dump(req, NULL, GDP_PR_BASIC, 0);
 		}
 		if (payload->dl->n_d < 1)
