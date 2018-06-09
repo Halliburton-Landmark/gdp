@@ -397,7 +397,7 @@ _gdp_event_add_from_req(gdp_req_t *req)
 
 	  case GDP_ACK_END_OF_RESULTS:
 		// end of subscription
-		evtype = GDP_EVENT_EOS;
+		evtype = GDP_EVENT_DONE;
 		req->flags &= ~GDP_REQ_PERSIST;
 		break;
 
@@ -501,7 +501,7 @@ gdp_event_print(const gdp_event_t *gev, FILE *fp, int detail, int indent)
 		fprintf(fp, "Data created\n");
 		break;
 
-	  case GDP_EVENT_EOS:
+	  case GDP_EVENT_DONE:
 		fprintf(fp, "End of data\n");
 		break;
 

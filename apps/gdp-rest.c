@@ -1165,7 +1165,7 @@ kv_initialize(void)
 	EP_STAT_CHECK(estat, goto fail1);
 	while ((gev = gdp_event_next(KeyValGcl, 0)) != NULL)
 	{
-		if (gdp_event_gettype(gev) == GDP_EVENT_EOS)
+		if (gdp_event_gettype(gev) == GDP_EVENT_DONE)
 		{
 			// end of multiread --- we have it all
 			gdp_event_free(gev);

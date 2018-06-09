@@ -22,7 +22,7 @@ print_event(gdp_event_t *gev)
 		gdp_datum_print(gdp_event_getdatum(gev), stdout, GDP_DATUM_PRTEXT);
 		break;
 
-	  case GDP_EVENT_EOS:
+	  case GDP_EVENT_DONE:
 		// "end of subscription": no more data will be returned
 		fprintf(stderr, "End of multiread/subscription\n");
 		break;

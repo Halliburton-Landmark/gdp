@@ -128,7 +128,7 @@ main(int argc, char **argv)
 			EP_STAT_CHECK(estat, goto fail3);
 			break;
 
-		 case GDP_EVENT_EOS:
+		 case GDP_EVENT_DONE:
 		 case GDP_EVENT_SHUTDOWN:
 			ep_app_error("unexpected end of subscription");
 			estat = EP_STAT_END_OF_FILE;

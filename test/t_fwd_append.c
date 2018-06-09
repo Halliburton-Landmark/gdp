@@ -203,7 +203,7 @@ main(int argc, char **argv)
 	while ((gev = gdp_event_next(gin, NULL)) != NULL)
 	{
 		gdp_event_print(gev, stdout, 3);
-		if (gdp_event_gettype(gev) == GDP_EVENT_EOS)
+		if (gdp_event_gettype(gev) == GDP_EVENT_DONE)
 			break;
 		if (gdp_event_gettype(gev) == GDP_EVENT_CREATED &&
 				--nresults <= 0)

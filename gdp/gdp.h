@@ -148,7 +148,7 @@ typedef struct gdp_event	gdp_event_t;
 // event types
 #define _GDP_EVENT_FREE		0	// internal use: event is free
 #define GDP_EVENT_DATA		1	// 205 returned data
-#define GDP_EVENT_EOS		2	// 205 normal end of subscription
+#define GDP_EVENT_DONE		2	// 205 normal end of async read
 #define GDP_EVENT_SHUTDOWN	3	// 515 subscription terminating because of shutdown
 #define GDP_EVENT_CREATED	4	// 201 successful append, create, or similar
 #define GDP_EVENT_SUCCESS	5	// 200 generic asynchronous success status

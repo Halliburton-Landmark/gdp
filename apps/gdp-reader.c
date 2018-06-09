@@ -220,7 +220,7 @@ print_event(gdp_event_t *gev, bool subscribe)
 		printdatum(gdp_event_getdatum(gev), stdout);
 		break;
 
-	  case GDP_EVENT_EOS:
+	  case GDP_EVENT_DONE:
 		// "end of subscription": no more data will be returned
 		if (!Quiet)
 		{

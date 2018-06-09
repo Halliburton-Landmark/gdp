@@ -36,7 +36,7 @@
   <body>
     <h1>Global Data Plane Programmatic API </h1>
     <h4>Editor: Eric Allman, U.C. Berkeley Swarm Lab, eric@cs.berkeley.edu<br>
-      Version 0.10.0, 2018-05-20</h4>
+      Version 0.10.1, 2018-06-09</h4>
     <p>This document describes the procedural programmatic interface to the
       Global Data Plane.&nbsp; The native code is written in C for maximum
       flexibility and performance, but it is expected that most applications
@@ -349,6 +349,10 @@
         previous record.&nbsp; It is required to provide GDP security
         guarantees.&nbsp; If <code>prevhash</code> is NULL, the GDP library
         will attempt to fill in the appropriate value.</li>
+      <li>Note that when this returns the datum will still be filled in
+        (including the signature).&nbsp; To re-use the same datum, the
+        application <strong>must</strong> use <code>gdp_datum_reset</code> to
+        clear the old information before adding new data.</li>
     </ul>
     <br>
     <hr width="100%" size="2">
@@ -744,10 +748,10 @@
             asynchronous read. </td>
         </tr>
         <tr>
-          <td style="text-align: left; vertical-align: top;" valign="top"><code>GDP_EVENT_EOS</code>
+          <td style="text-align: left; vertical-align: top;" valign="top"><code>GDP_EVENT_DONE</code>
           </td>
-          <td style="text-align: left; vertical-align: top;" valign="top">Subscription
-            is terminated. </td>
+          <td style="text-align: left; vertical-align: top;" valign="top">Indicates
+            the end of a subscription or asynchronous read. </td>
         </tr>
         <tr>
           <td style="text-align: left; vertical-align: top;" valign="top"><tt>GDP_EVENT_SHUTDOWN</tt>
@@ -955,17 +959,18 @@
     <h3>4.1&nbsp; Datum Headers</h3>
     <hr width="100%" size="2">
     <h4>Name</h4>
-    <p>gdp_datum_new, gdp_datum_free, gdp_datum_print &mdash;
+    <p>gdp_datum_new, gdp_datum_reset, gdp_datum_free, gdp_datum_print &mdash;
       allocate/free/print a datum structure </p>
     <h4>Synopsis</h4>
-    <pre>gdp_datum_t *gdp_datum_new(void)
-void gdp_datum_free(gdp_datum_t *datum)
+    <pre>gdp_datum_t *gdp_datum_new(void)<br>void gdp_datum_reset(gdp_datum_t *datum)<br>void gdp_datum_free(gdp_datum_t *datum)
 void gdp_datum_print(const gdp_datum_t *datum,
 		FILE *fp,
 		uint32_t flags)</pre>
     <h4>Notes</h4>
     <ul>
       <li><code>gdp_datum_new</code> allocates a new empty datum.</li>
+      <li><code>gdp_datum_reset</code> resets a datum to the same state as a
+        newly created datum.</li>
       <li><code>gdp_datum_free</code> frees a datum.</li>
       <li><code>gdp_datum_print</code> writes a description of the datum
         (including the data contents) to the given file.&nbsp; If flags includes
@@ -1077,7 +1082,7 @@ void gdp_datum_print(const gdp_datum_t *datum,
     <pre>int gdp_buf_write(gdp_buf_t *b, void *in, size_t sz)<br>int gdp_buf_printf(gdp_buf_t *b, const char *fmt, ...)</pre>
     <h4>Notes</h4>
     <ul>
-      <li>These routines insert bytes into the named buffer.</li>
+      <li>These routines append bytes into the named buffer.</li>
       <li><code>gdp_buf_write</code> copies <code>sz</code> bytes into the
         buffer from the memory area in and returns 0 on success or &ndash;1 on
         failure. </li>
