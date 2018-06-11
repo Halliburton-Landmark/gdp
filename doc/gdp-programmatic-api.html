@@ -10,6 +10,10 @@
   color: red;
   background-color: #ffff99;
 }
+.meta {
+  font-style:italic;
+  color: blue;
+}
 .command {
   font-family: monospace;
 }
@@ -36,7 +40,7 @@
   <body>
     <h1>Global Data Plane Programmatic API </h1>
     <h4>Editor: Eric Allman, U.C. Berkeley Swarm Lab, eric@cs.berkeley.edu<br>
-      Version 0.10.1, 2018-06-09</h4>
+      Version 2.0.0, 2018-06-10</h4>
     <p>This document describes the procedural programmatic interface to the
       Global Data Plane.&nbsp; The native code is written in C for maximum
       flexibility and performance, but it is expected that most applications
@@ -55,9 +59,10 @@
       GDP or the EP library itself), and detail information.&nbsp; An OK status
       can return a positive integer as extra information. </p>
     <p>The code distribution includes an "apps" directory with two example
-      programs: gdp-writer.c and gdp-reader.c, that show simple cases of how to
-      append to a GOB and read from a GOB (including subscriptions). </p>
-    <p>This document corresponds to version 0.10 of the GDP library and
+      programs: <code>gdp-writer.c</code> and <code>gdp-reader.c</code>, that
+      show simple cases of how to append to a GOB and read from a GOB (including
+      subscriptions). </p>
+    <p>This document corresponds to version 2.0 of the GDP library and
       associated applications.&nbsp; Note that this interface is massively
       incompatible with version 0.9.</p>
     <h2>1&nbsp; Terminology</h2>
@@ -68,12 +73,15 @@
         commit timestamp (the time the record was committed into the GDP, as
         distinct from the time that the data originated), an associated blob
         containing the data itself, which we expect to be encrypted, and in most
-        cases a signature. </dd>
-      <dt>GDP Object (GOB) (previously GDP Channel/Log)</dt>
+        cases a signature.&nbsp; Beware: because of our unique single-writer
+        commit protocol, record numbers are not guaranteed to be unique nor
+        continuous; for example, there can be no record 3 but two record 4s in
+        some circumstances.&nbsp; This should be rare.</dd>
+      <dt>GDP Object (GOB)</dt>
       <dd>This represents an addressable entity in the Global Data Plane, which
         may be a log or a service.&nbsp; It is always addressed with a
-        location-independent name.&nbsp; Applications interact with GOBs via GDP
-        Instances.</dd>
+        location-independent 256-bit name (a "GDPName").&nbsp; Applications
+        interact with GOBs via GDP Instances (GINs).</dd>
       <dt>GOB Instance (GIN)</dt>
       <dd>An instance of a Global Data Plane log.&nbsp; An application can have
         multiple instances of a given GDP Object.&nbsp; It is the equivalent of
@@ -82,25 +90,34 @@
       <dt>GDP Name</dt>
       <dd>The name of a Global Data Plane Object.&nbsp; This is a 256-bit,
         opaque, globally unique number created as the SHA-256 hash of the
-        metadata of the object.</dd>
+        metadata of the object.&nbsp; <span class="meta">Someday, but not until
+          we have a human &rarr; internal name service.</span></dd>
     </dl>
     <p> In earlier versions of the GDP, both GINs and GOBs were referred to as
-      GCLs. These names are now broken apart for clarity. For historic reasons,
-      some of the interfaces and most of the documentation still refer to GCLs.</p>
+      GCLs (GDP Channel-Logs). These names are now broken apart for clarity. For
+      historic reasons, some of the interfaces and much of the documentation
+      still refer to GCLs, but that name is officially deprecated.</p>
     <p><i>A Note on Naming:</i> Function and type names are mostly intended to
       map cleanly to class and method names, which occasionally leads to
-      somewhat tortured names.&nbsp; For example, <code>gdp_gin_read_by_recno(gin,
-        ...)</code> is intended to map to a method "<code>gin.read_by_recno(...)</code>"
-      (i.e, the operation <code>read_by_recno</code> on a variable of class <code>gdp_gin</code>),
+      somewhat tortured names.&nbsp; For example, function names beginning with
+      <code>gdp_gin_</code> operate on objects of type <code>gdp_gin_t</code>
+      (with a few exceptions such as <code>gdp_gin_new</code>) and will take a
+      pointer to a <code>gdp_gin_t</code> as the first ("self") argument.&nbsp;
+      In most cases, everything that has a type (identified by a name ending <code>_t</code>)
+      is probably a class.&nbsp; More concretely, <code>gdp_gin_read_by_recno(gin,
+        ...)</code> where <code>gin</code> is type <code>gdp_gin_t</code> is
+      intended to map to a method "<code>gin.read_by_recno(...)</code>" (i.e,
+      the operation <code>read_by_recno</code> on a variable of class <code>gdp_gin</code>),
       <code>gdp_buf_getlength(buf, ...)</code> maps to <code><em>buf</em>.getlength(...)</code>,
-      etc.&nbsp; In these cases the first argument of the function is what would
-      be <code>self</code> in some languages.&nbsp; In some cases these also
-      apply to what would be class methods; for example <code>gdp_gin_create(...)</code>
-      would map to a class method <code>gdp_gin.create(...)</code>.</p>
+      etc.&nbsp; In some cases these also apply to what would be class methods;
+      for example <code>gdp_gin_create(...)</code> would map to a class method
+      <code>gdp_gin.create(...)</code>.</p>
+    <br>
     <h2> 2&nbsp; Theory of Operation </h2>
-    <p> GDP-based applications rely on three pieces: an in-process GDP library,
-      a GDP Log Daemon, and the Routing Layer.&nbsp;&nbsp; This document
-      describes the GDP library API. </p>
+    <p> GDP-based applications rely on three major pieces: an in-process GDP
+      library, a GDP Log Daemon, and the Routing Layer.&nbsp; In the future
+      there will also be a service layer, but to date that is ad hoc at
+      best.&nbsp; This document describes the GDP library API. </p>
     <p> The primary point of the GDP library is to speak the network protocol
       between the application and the GDP Daemon. The library is threaded, with
       (at the moment) at least two threads: one to process events (data arriving
@@ -126,23 +143,24 @@
       from a flat namespace.&nbsp; When printed it is shown as a base64-encoded
       value that is tweaked to be valid in a URI (that is, "+" and "/" are
       replaced with "&ndash;" and "_").&nbsp; Applications may choose to overlay
-      these unsightly names with some sort of directory service. </p>
+      these unsightly names with some sort of directory service.&nbsp; <span class="meta">Such
+        a directory service is planned but not yet implemented.</span></p>
     <p>Applications using the GDP library should <code>#include
         &lt;gdp/gdp.h&gt;</code> for all the essential definitions.</p>
-    <hr>
-    <h4> </h4>
+    <br>
+    <br>
     <h2>3&nbsp; GDP Operations</h2>
     <h3>3.1 Data Types and Initialization</h3>
     <hr>
     <h4>Name</h4>
     <p>GDP data types and basic utilities</p>
     <h4>Synopsis</h4>
-    <pre>#include &lt;gdp/gdp.h&gt;<br><br>gdp_name_t	InternalGdpName;	// 256-bit number<br>gdp_pname_t	PrintableGdpName;	// base-64 encoded string<br>bool		GDP_NAME_SAME(gdp_name_t a, gdp_name_t b);<br>bool		gdp_name_is_valid(gdp_name_t gname);<br>char		*gdp_printable_name(const gdp_name_t Internal,<br>			gdp_pname_t Printable);<br>EP_STAT		gdp_internal_name(const gdp_pname_t Printable,<br>			gdp_name_t Internal);<br>EP_STAT		gdp_parse_name(const char *external,<br>			gdp_name_t Internal);<br><br>gdp_gin_t	*GdpInstance;<br><br>gdp_datum_t	*GdpDatum;<br>gdp_hash_t      *GdpHash;<br>gdp_recno_t	RecordNumber;<br>EP_TIME_SPEC	TimeStampSpec;</pre>
+    <pre>#include &lt;gdp/gdp.h&gt;<br><br>// names: internal and printable<br>gdp_name_t	InternalGdpName;	// 256-bit number<br>gdp_pname_t	PrintableGdpName;	// base-64 encoded string<br>bool		GDP_NAME_SAME(gdp_name_t a, gdp_name_t b);<br>bool		gdp_name_is_valid(gdp_name_t gdpname);<br><br>// convert between printable and internal names<br>char		*gdp_printable_name(const gdp_name_t InternalFormat,<br>			gdp_pname_t PrintableFormat);<br>EP_STAT		gdp_internal_name(const gdp_pname_t PrintableFormat,<br>			gdp_name_t Internal);<br><br>// this will do human-friendly name lookup (may be expensive)<br>EP_STAT		gdp_parse_name(const char *external,<br>			gdp_name_t Internal);<br><br>gdp_gin_t	*GdpLogInstance;<br><br>gdp_datum_t	*GdpDatum;		// data storage unit<br>gdp_hash_t      *GdpHash;		// hash function over a gdp_datum_t<br>gdp_sig_t	*GdpSignature;		// signature (multiple usage)<br>gdp_recno_t	RecordNumber;		// datum record number<br>EP_TIME_SPEC	TimeStampSpec;		// timestamp: see libep</pre>
     <h4>Notes</h4>
     <ul>
       <li>Most of these are described in more detail below.</li>
     </ul>
-    <h3> </h3>
+    <br>
     <hr width="100%" size="2">
     <h4> Name</h4>
     gdp_init &mdash; Initialize the GDP library
@@ -184,7 +202,6 @@
     <h4> Name</h4>
     gdp_gin_create &mdash; Create an append-only GOB on a specified log daemon
     node, returning a GIN &nbsp; <span class="warning">[TEMPORARY INTERFACE]</span>
-    <div> </div>
     <h4> Synopsis</h4>
     <pre>EP_STAT gdp_gin_create(gdp_name_t gob_name,
 		gdp_name_t logdname,<br>                gdp_md_t *gmd,<br>                gdp_gin_t **ginp)
@@ -192,7 +209,8 @@
     <h4> Notes</h4>
     <ul>
       <li> Creates a GOB with the given name on the indicated log server, both
-        of which must be 256-bit values.</li>
+        of which must be 256-bit values.&nbsp; Arguably should be called <code>gdp_gob_create</code>
+        since it creates a GOB, but it returns a GIN.</li>
       <li>Metadata can be passed in that will be stored with the GOB.</li>
       <li> Returns a GOB instance (indirectly through <code>*ginp</code>).</li>
       <li> The returned GIN handle is an append-only object.&nbsp; <i>(Actually,
@@ -348,7 +366,7 @@
       <li>The <code>prevhash</code> parameter should be the hash of the
         previous record.&nbsp; It is required to provide GDP security
         guarantees.&nbsp; If <code>prevhash</code> is NULL, the GDP library
-        will attempt to fill in the appropriate value.</li>
+        will attempt to fill in the appropriate value.&nbsp; <span class="meta">Someday.</span></li>
       <li>Note that when this returns the datum will still be filled in
         (including the signature).&nbsp; To re-use the same datum, the
         application <strong>must</strong> use <code>gdp_datum_reset</code> to
@@ -424,10 +442,7 @@
         information will be returned through the event interface.&nbsp; The two
         interfaces are related but mutually exclusive.</li>
     </ul>
-    <p><br>
-    </p>
-    <ul>
-    </ul>
+    <br>
     <hr>
     <h4>Name</h4>
     gdp_gin_read_by_recno_async, gdp_gin_read_by_ts_async,
@@ -544,14 +559,13 @@
     </table>
     <br>
     <br>
-    <ul>
-    </ul>
+    <br>
     <hr width="100%" size="2">
     <h4> Name</h4>
     <p>gdp_gin_append_async &mdash; Asynchronously append one or more records to
       a writable GOB</p>
     <h4>Synopsis</h4>
-    <pre>EP_STAT gdp_gin_append_async(<br>		gdp_gin_t *gin,<br>                int32_t n_datums<br>		gdp_datum_t **datums,<br>		gdp_event_cbfunc_t *cbfunc,<br>		void *udata)</pre>
+    <pre>EP_STAT gdp_gin_append_async(<br>		gdp_gin_t *gin,<br>                int32_t n_datums<br>		gdp_datum_t **datums,<br>		gdp_hash_t *prevhash,<br>		gdp_event_cbfunc_t *cbfunc,<br>		void *udata)</pre>
     <h4>Notes</h4>
     <ul>
       <li>Appends the indicated <code>datum</code> to the GOB.</li>
@@ -879,7 +893,6 @@
       <li> <i>What status is included? Size (or number of records/messages),
           last access, &hellip;</i></li>
     </ul>
-    <p> </p>
     <br>
     <hr>
     <h4>Name</h4>
@@ -931,9 +944,7 @@
       <li>The <span class="variable">filterdata</span> parameter is passed as
         the second argument to <span class="variable">filter</span>.</li>
     </ul>
-    <p></p>
-    <p><br>
-    </p>
+    <br>
     <hr width="100%" size="2">
     <h4> Name</h4>
     gdp_gin_print &mdash; print a GIN and associated GOB (for debugging)
@@ -945,9 +956,7 @@
       <li>The output will contain internal information; it is not intended to
         display information to end users.</li>
     </ul>
-    <hr>
-    <p><br>
-    </p>
+    <hr><br>
     <h2>4&nbsp; Datums (Records)</h2>
     <p>GOBs are represented as a series of records of type <code>gdp_datum_t</code>.&nbsp;
       Each record has a record number, a commit timestamp, associated data, and
@@ -1066,7 +1075,7 @@ void gdp_datum_print(const gdp_datum_t *datum,
     <h4>Notes</h4>
     <ul>
       <li>Data can be consumed from the buffer by calling <code>gdp_buf_read</code>;
-        data is copied from the buffer into a memory area.</li>
+        data is copied into a memory area and removed from the buffer.</li>
       <li>Applications can "peek" at the buffer using <code> gdp_buf_peek</code>.&nbsp;
         This is identical to <code>gdp_buf_read</code> except that the data
         remains in the buffer.</li>
@@ -1115,11 +1124,11 @@ void gdp_datum_print(const gdp_datum_t *datum,
     <p>The time abstraction is imported directly from the ep library.&nbsp;
       Times are represented as follows: </p>
     <blockquote>
-      <pre><code>#pragma pack(push, 1)
+      <pre>#pragma pack(push, 1)
 typedef struct
 {
      int64_t	tv_sec;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; // seconds since January 1, 1970
-    &nbsp;uint32_t&nbsp;&nbsp; tv_nsec;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; // nanoseconds<br>     float&nbsp;&nbsp;&nbsp;&nbsp;  tv_accuracy;&nbsp;&nbsp;&nbsp; // accuracy in seconds<br>} EP_TIME_SPEC;<br>#pragma pack(pop)</code></pre>
+    &nbsp;uint32_t&nbsp;&nbsp; tv_nsec;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; // nanoseconds<br>     float&nbsp;&nbsp;&nbsp;&nbsp;  tv_accuracy;&nbsp;&nbsp;&nbsp; // accuracy in seconds<br>} EP_TIME_SPEC;<br>#pragma pack(pop)</pre>
     </blockquote>
     Note that the host system <code>struct timespec</code> may not match this
     structure; some systems still represent the time with only four bytes for <code>tv_sec</code>,
@@ -1133,7 +1142,7 @@ typedef struct
     <p>Each log should have a public key in the metadata which is used to verify
       writes to the log.&nbsp; The library hides most of the details of this,
       but some still appear.</p>
-    <p> The <span class="command">gcl-create</span> command automatically
+    <p> The <span class="command">gdp-create</span> command automatically
       creates a public/secret keypair unless otherwise specified.&nbsp; See the
       man page for details.&nbsp; The public part of the key is inserted into
       the log metadata and stored with the log.&nbsp; The secret part is stored
@@ -1156,9 +1165,10 @@ typedef struct
       daemon against the public key in the log metadata.</p>
     <h3>5.2&nbsp; Encryption</h3>
     <p>Encryption is explicitly not part of the GDP.&nbsp; Ideally the GDP will
-      never see unencrypted data.&nbsp; However, read and write filters (see the
-      next section) can be used to set encryption and decryption hooks for
-      externally implemented encryption.</p>
+      never see unencrypted data.&nbsp; However, read and write filters (see <code>gdp_gin_set_append_filter</code>
+      and <code>gdp_gin_set_append_filter</code> for details) can be used to
+      set encryption and decryption hooks for externally implemented
+      encryption.&nbsp; <span class="meta">We need to make this easier.</span></p>
     <br>
     <hr>
     <h3>To be done</h3>
@@ -1167,6 +1177,8 @@ typedef struct
       PRIgdp_recno macro<br>
     </p>
     <h2>Appendix A:&nbsp; Examples</h2>
+    <p class="meta">The following examples have not been validated with the v2
+      API, so they may be inaccurate.</p>
     <p>The following pseudo-code example excerpts from <tt>apps/gdp-writer.c</tt>.
     </p>
     <pre>#include &lt;gdp/gdp.h&gt;<br>#include &lt;stdio.h&gt;<br>#include &lt;string.h&gt;<br><br>int main(int argc, char **argv)<br>{<br>	gdp_gin_t *gin;<br>	EP_STAT estat;<br>	gdp_name_t gobiname;	// internal name of GOB<br>	gdp_datum_t *d;<br><br>	// general startup and initialization<br>	if (argc &lt; 2)<br>		usage_error();<br>	estat = gdp_init();<br>	if (!EP_STAT_ISOK(estat))<br>		initialization_error(estat);<br>	d = gdp_datum_new();
@@ -1206,9 +1218,9 @@ typedef struct
     <p>For additional information, see the <tt>README</tt> file in the
       distribution directory. </p>
     <h2> Appendix C: Open Questions</h2>
-    <p>This section is really an addendum to the document &mdash; a "scratch
-      area" to keep track of issues that we still need to consider.&nbsp; It may
-      not be up to date. </p>
+    <p class="meta">This section is really an addendum to the document &mdash; a
+      "scratch area" to keep track of issues that we still need to
+      consider.&nbsp; It may not be up to date. </p>
     <h3>C.1 Access Control</h3>
     <p> Do this using Access Control Lists (so each user/app has a keypair) or
       by passing public/secret keys around (so each GOB has a secret keypair).
