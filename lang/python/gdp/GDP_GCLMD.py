@@ -38,7 +38,7 @@ class GDP_GCLMD:
 
     """
 
-    class gdp_gclmd_t(Structure):
+    class gdp_md_t(Structure):
         pass
 
 
@@ -48,16 +48,16 @@ class GDP_GCLMD:
         """
 
         if len(kwargs)==0:
-            __func = gdp.gdp_gclmd_new
+            __func = gdp.gdp_md_new
             __func.argtypes = [c_int]
-            __func.restype = POINTER(self.gdp_gclmd_t)
+            __func.restype = POINTER(self.gdp_md_t)
 
-            self.gdp_gclmd_ptr = __func(c_int(0))
+            self.gdp_md_ptr = __func(c_int(0))
             self.did_i_create_it = True
 
         else:
             if "ptr" in kwargs:
-                self.gdp_gclmd_ptr = kwargs["ptr"]
+                self.gdp_md_ptr = kwargs["ptr"]
                 self.did_i_create_it = False
             else:
                 raise Exception
@@ -69,17 +69,17 @@ class GDP_GCLMD:
         """
 
         if self.did_i_create_it:
-            __func = gdp.gdp_gclmd_free
-            __func.argtypes = [POINTER(self.gdp_gclmd_t)]
+            __func = gdp.gdp_md_free
+            __func.argtypes = [POINTER(self.gdp_md_t)]
 
-            __func(self.gdp_gclmd_ptr)
+            __func(self.gdp_md_ptr)
 
         return
 
 
     def print_to_file(self, fh, detail):
         """
-        Print the gdp_gclmd C memory location contents to a file handle fh.
+        Print the gdp_md C memory location contents to a file handle fh.
             fh could be sys.stdout, or any other open file handle.
         Note: This just calls the corresponding C library function which
               handles the printing
@@ -87,27 +87,27 @@ class GDP_GCLMD:
 
         # need to convert this file handle to a C FILE*
         __fh = PyFile_AsFile(fh)
-        __func = gdp.gdp_gclmd_print
-        __func.argtypes = [POINTER(self.gdp_gclmd_t), FILE_P, c_int]
+        __func = gdp.gdp_md_print
+        __func.argtypes = [POINTER(self.gdp_md_t), FILE_P, c_int]
         # ignore the return value
 
-        __func(self.gdp_gclmd_ptr, __fh, detail)
+        __func(self.gdp_md_ptr, __fh, detail)
 
 
-    def add(self, gclmd_id, data):
+    def add(self, md_id, data):
         """
         Add a new entry to the metadata set
         """
 
-        __func = gdp.gdp_gclmd_add
-        __func.argtypes = [POINTER(self.gdp_gclmd_t), c_uint32,
+        __func = gdp.gdp_md_add
+        __func.argtypes = [POINTER(self.gdp_md_t), c_uint32,
                                 c_size_t, c_void_p]
         __func.restype = EP_STAT
 
         size = c_size_t(len(data))
         tmp_buf = create_string_buffer(data, len(data))        
         
-        estat = __func(self.gdp_gclmd_ptr, c_uint32(gclmd_id),
+        estat = __func(self.gdp_md_ptr, c_uint32(md_id),
                                 size, byref(tmp_buf))
         check_EP_STAT(estat)
 
@@ -119,39 +119,39 @@ class GDP_GCLMD:
         Get a new entry from the metadata set by index
         """
 
-        __func = gdp.gdp_gclmd_get
-        __func.argtypes = [POINTER(self.gdp_gclmd_t), c_int, POINTER(c_uint32), 
+        __func = gdp.gdp_md_get
+        __func.argtypes = [POINTER(self.gdp_md_t), c_int, POINTER(c_uint32),
                                 POINTER(c_size_t), POINTER(c_void_p)]
         __func.restype = EP_STAT
 
-        gclmd_id = c_uint32()
+        md_id = c_uint32()
         dlen = c_size_t()
         data_ptr = c_void_p()
         _index = c_int(index)
 
-        estat = __func(self.gdp_gclmd_ptr, _index, byref(gclmd_id),
+        estat = __func(self.gdp_md_ptr, _index, byref(md_id),
                                 byref(dlen), byref(data_ptr))
         check_EP_STAT(estat)
 
         data = string_at(data_ptr, dlen.value)
 
-        return (gclmd_id.value, data)
+        return (md_id.value, data)
 
 
-    def find(self, gclmd_id):
+    def find(self, md_id):
         """
         Get a new entry from the metadata set by id
         """
 
-        __func = gdp.gdp_gclmd_find
-        __func.argtypes = [POINTER(self.gdp_gclmd_t), c_uint32, 
+        __func = gdp.gdp_md_find
+        __func.argtypes = [POINTER(self.gdp_md_t), c_uint32,
                                 POINTER(c_size_t), POINTER(c_void_p)]
         __func.restype = EP_STAT
 
         dlen = c_size_t()
         data_ptr = c_void_p()
 
-        estat = __func(self.gdp_gclmd_ptr, c_uint32(gclmd_id),
+        estat = __func(self.gdp_md_ptr, c_uint32(md_id),
                                 byref(dlen), byref(data_ptr))
         check_EP_STAT(estat)
 

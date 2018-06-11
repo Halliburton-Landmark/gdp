@@ -38,7 +38,7 @@ class GDP_GCL_OPEN_INFO:
 
     """
 
-    class gdp_gcl_open_info_t(Structure):
+    class gdp_open_info_t(Structure):
         pass
 
 
@@ -52,28 +52,28 @@ class GDP_GCL_OPEN_INFO:
             associated functions for the dictionary open_info is:
 
         * skey: an instance of the class EP_CRYPTO_KEY.
-                Calls C library's gdp_gcl_open_info_set_signing_key
+                Calls C library's gdp_open_info_set_signing_key
         """
 
         # allocate memory for the C structure
-        __func1 = gdp.gdp_gcl_open_info_new
+        __func1 = gdp.gdp_open_info_new
         __func1.argtypes = []
-        __func1.restype = POINTER(self.gdp_gcl_open_info_t)
+        __func1.restype = POINTER(self.gdp_open_info_t)
 
-        self.gdp_gcl_open_info_ptr = __func1()
+        self.gdp_open_info_ptr = __func1()
 
         # read the open_info dictionary and set appropriate fields
         #   based on the key name.
 
         if 'skey' in open_info.keys():
             skey = open_info['skey']
-            __func2 = gdp.gdp_gcl_open_info_set_signing_key
-            __func2.argtypes = [POINTER(self.gdp_gcl_open_info_t),
+            __func2 = gdp.gdp_open_info_set_signing_key
+            __func2.argtypes = [POINTER(self.gdp_open_info_t),
                                     POINTER(EP_CRYPTO_KEY.EP_CRYPTO_KEY)]
 
             __func2.restype = EP_STAT
 
-            estat = __func2(self.gdp_gcl_open_info_ptr, skey.key_ptr)
+            estat = __func2(self.gdp_open_info_ptr, skey.key_ptr)
             check_EP_STAT(estat)
 
 
@@ -82,10 +82,10 @@ class GDP_GCL_OPEN_INFO:
         Destructor: Frees the C structure
         """
 
-        __func = gdp.gdp_gcl_open_info_free
-        __func.argtypes = [POINTER(self.gdp_gcl_open_info_t)]
+        __func = gdp.gdp_open_info_free
+        __func.argtypes = [POINTER(self.gdp_open_info_t)]
 
-        __func(self.gdp_gcl_open_info_ptr)
+        __func(self.gdp_open_info_ptr)
 
 
 

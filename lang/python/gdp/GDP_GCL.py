@@ -73,7 +73,7 @@ class GDP_GCL(object):
     #   to how to differentiate between events associated for different
     #   GCLs. Also, we no longer can free the handles automatically.
     #   Why? How would python know that we are not planning to get an
-    #   event for a gcl handle?
+    #   event for a gin handle?
 
     # C pointer to python object mapping
     object_dir = {}
@@ -94,9 +94,9 @@ class GDP_GCL(object):
     __old_udata = []
 
 
-    class gdp_gcl_t(Structure):
+    class gdp_gin_t(Structure):
 
-        "Corresponds to gdp_gcl_t structure exported by C library"
+        "Corresponds to gdp_gin_t structure exported by C library"
         pass
 
     class gdp_event_t(Structure):
@@ -113,7 +113,7 @@ class GDP_GCL(object):
             a GCL. However, the C library can return an existing pointer
             when an already open GCL is opened again.
 
-        name=<name-of-gcl>, iomode=<mode>
+        name=<name-of-gin>, iomode=<mode>
         name is a GDP_NAME object
         mode is one of the following: GDP_MODE_ANY, GDP_MODE_RO, GDP_MODE_AO,
                                       GDP_MODE_RA
@@ -126,29 +126,29 @@ class GDP_GCL(object):
         """
 
         # __ptr is just a C style pointer, that we will assign to something
-        __ptr = POINTER(cls.gdp_gcl_t)()
+        __ptr = POINTER(cls.gdp_gin_t)()
 
         # we do need an internal represenation of the name.
-        gcl_name_python = name.internal_name()
+        gin_name_python = name.internal_name()
         # convert this to a string that ctypes understands. Some ctypes magic
         # ahead
-        buf = create_string_buffer(gcl_name_python, 32+1)
-        gcl_name_ctypes_ptr = cast(byref(buf), POINTER(GDP_NAME.name_t))
-        gcl_name_ctypes = gcl_name_ctypes_ptr.contents
+        buf = create_string_buffer(gin_name_python, 32+1)
+        gin_name_ctypes_ptr = cast(byref(buf), POINTER(GDP_NAME.name_t))
+        gin_name_ctypes = gin_name_ctypes_ptr.contents
 
         # (optional) Do a quick sanity checking on open_info
         #   use it to get a GDP_GCL_OPEN_INFO structure
-        __gdp_gcl_open_info = GDP_GCL_OPEN_INFO(open_info)
+        __gdp_open_info = GDP_GCL_OPEN_INFO(open_info)
 
-        # open an existing gcl
-        __func = gdp.gdp_gcl_open
+        # open an existing gin
+        __func = gdp.gdp_gin_open
         __func.argtypes = [GDP_NAME.name_t, c_int,
-                           POINTER(GDP_GCL_OPEN_INFO.gdp_gcl_open_info_t),
-                           POINTER(POINTER(cls.gdp_gcl_t))]
+                           POINTER(GDP_GCL_OPEN_INFO.gdp_open_info_t),
+                           POINTER(POINTER(cls.gdp_gin_t))]
         __func.restype = EP_STAT
 
-        estat = __func(gcl_name_ctypes, iomode,
-                            __gdp_gcl_open_info.gdp_gcl_open_info_ptr,
+        estat = __func(gin_name_ctypes, iomode,
+                            __gdp_open_info.gdp_open_info_ptr,
                             pointer(__ptr))
         check_EP_STAT(estat)
 
@@ -164,7 +164,7 @@ class GDP_GCL(object):
             # create a new instance
             newobj = super(GDP_GCL, cls).__new__(cls)
             newobj.ptr = __ptr
-            newobj.gdp_gcl_open_info = __gdp_gcl_open_info
+            newobj.gdp_open_info = __gdp_open_info
             cls.object_dir[addressof(__ptr.contents)] = weakref.ref(newobj)
             return newobj
 
@@ -189,8 +189,8 @@ class GDP_GCL(object):
         self.object_dir.pop(addressof(self.ptr.contents), None)
 
         # call the C function to free associated C memory block
-        __func = gdp.gdp_gcl_close
-        __func.argtypes = [POINTER(self.gdp_gcl_t)]
+        __func = gdp.gdp_gin_close
+        __func.argtypes = [POINTER(self.gdp_gin_t)]
         __func.restype = EP_STAT
 
         estat = __func(self.ptr)
@@ -205,33 +205,33 @@ class GDP_GCL(object):
         """
 
         # we do need an internal represenation of the names.
-        gcl_name_python = name.internal_name()
+        gin_name_python = name.internal_name()
         logd_name_python = logd_name.internal_name()
 
         # convert this to a string that ctypes understands. Some ctypes magic
         # ahead
-        buf1 = create_string_buffer(gcl_name_python, 32+1)
-        gcl_name_ctypes_ptr = cast(byref(buf1), POINTER(GDP_NAME.name_t))
-        gcl_name_ctypes = gcl_name_ctypes_ptr.contents
+        buf1 = create_string_buffer(gin_name_python, 32+1)
+        gin_name_ctypes_ptr = cast(byref(buf1), POINTER(GDP_NAME.name_t))
+        gin_name_ctypes = gin_name_ctypes_ptr.contents
 
         buf2 = create_string_buffer(logd_name_python, 32+1)
         logd_name_ctypes_ptr = cast(byref(buf2), POINTER(GDP_NAME.name_t))
         logd_name_ctypes = logd_name_ctypes_ptr.contents
 
-        throwaway_ptr = POINTER(cls.gdp_gcl_t)()
+        throwaway_ptr = POINTER(cls.gdp_gin_t)()
 
         md = GDP_GCLMD()
         for k in metadata:
             md.add(k, metadata[k])
 
-        __func = gdp.gdp_gcl_create
+        __func = gdp.gdp_gin_create
         __func.argtypes = [GDP_NAME.name_t, GDP_NAME.name_t,
-                                POINTER(GDP_GCLMD.gdp_gclmd_t), 
-                                POINTER(POINTER(cls.gdp_gcl_t))]
+                                POINTER(GDP_GCLMD.gdp_md_t),
+                                POINTER(POINTER(cls.gdp_gin_t))]
         __func.restype = EP_STAT
 
-        estat = __func(gcl_name_ctypes, logd_name_ctypes,
-                            md.gdp_gclmd_ptr, throwaway_ptr)
+        estat = __func(gin_name_ctypes, logd_name_ctypes,
+                            md.gdp_md_ptr, throwaway_ptr)
         check_EP_STAT(estat)
         return
 
@@ -241,12 +241,12 @@ class GDP_GCL(object):
             Represented as a python dict
         """
 
-        __func = gdp.gdp_gcl_getmetadata
-        __func.argtypes = [POINTER(self.gdp_gcl_t),
-                                POINTER(POINTER(GDP_GCLMD.gdp_gclmd_t))]
+        __func = gdp.gdp_gin_getmetadata
+        __func.argtypes = [POINTER(self.gdp_gin_t),
+                                POINTER(POINTER(GDP_GCLMD.gdp_md_t))]
         __func.restype = EP_STAT
 
-        gmd = POINTER(GDP_GCLMD.gdp_gclmd_t)()
+        gmd = POINTER(GDP_GCLMD.gdp_md_t)()
         estat = __func(self.ptr, byref(gmd)) 
         check_EP_STAT(estat)
 
@@ -278,8 +278,8 @@ class GDP_GCL(object):
         if isinstance(query_param, int):
             __query_param = gdp_recno_t(query_param)
 
-            __func = gdp.gdp_gcl_read
-            __func.argtypes = [POINTER(self.gdp_gcl_t), gdp_recno_t,
+            __func = gdp.gdp_gin_read
+            __func.argtypes = [POINTER(self.gdp_gin_t), gdp_recno_t,
                                     POINTER(GDP_DATUM.gdp_datum_t)]
             __func.restype = EP_STAT
 
@@ -290,8 +290,8 @@ class GDP_GCL(object):
             __query_param.tv_nsec = c_uint32(query_param['tv_nsec'])
             __query_param.tv_accuracy = c_float(query_param['tv_accuracy'])
 
-            __func = gdp.gdp_gcl_read_ts
-            __func.argtypes = [POINTER(self.gdp_gcl_t),
+            __func = gdp.gdp_gin_read_ts
+            __func.argtypes = [POINTER(self.gdp_gin_t),
                                     POINTER(GDP_DATUM.EP_TIME_SPEC),
                                     POINTER(GDP_DATUM.gdp_datum_t)]
             __func.restype = EP_STAT
@@ -348,8 +348,8 @@ class GDP_GCL(object):
         Same as 'read', but aysnchoronous version. Returns events
         """
 
-        __func = gdp.gdp_gcl_read_async
-        __func.argtypes = [POINTER(self.gdp_gcl_t), gdp_recno_t,
+        __func = gdp.gdp_gin_read_async
+        __func.argtypes = [POINTER(self.gdp_gin_t), gdp_recno_t,
                                 c_void_p, c_void_p]
         __func.restype = EP_STAT
 
@@ -369,9 +369,9 @@ class GDP_GCL(object):
         if "data" in datum_dict.keys():
             datum.setbuf(datum_dict["data"])
 
-        __func = gdp.gdp_gcl_append
+        __func = gdp.gdp_gin_append
         __func.argtypes = [
-            POINTER(self.gdp_gcl_t), POINTER(GDP_DATUM.gdp_datum_t)]
+            POINTER(self.gdp_gin_t), POINTER(GDP_DATUM.gdp_datum_t)]
         __func.restype = EP_STAT
 
         estat = __func(self.ptr, datum.gdp_datum)
@@ -388,8 +388,8 @@ class GDP_GCL(object):
         if "data" in datum_dict.keys():
             datum.setbuf(datum_dict["data"])
 
-        __func = gdp.gdp_gcl_append_async
-        __func.argtypes = [ POINTER(self.gdp_gcl_t), 
+        __func = gdp.gdp_gin_append_async
+        __func.argtypes = [ POINTER(self.gdp_gin_t),
                             POINTER(GDP_DATUM.gdp_datum_t),
                             c_void_p, c_void_p ]
         __func.restype = EP_STAT
@@ -402,7 +402,7 @@ class GDP_GCL(object):
     # XXX: Check if this works.
     # More details here: http://python.net/crew/theller/ctypes/tutorial.html#callback-functions
     # The first argument, I believe, is the return type, which I think is void*
-    gdp_gcl_sub_cbfunc_t = CFUNCTYPE(c_void_p, POINTER(gdp_gcl_t),
+    gdp_gin_sub_cbfunc_t = CFUNCTYPE(c_void_p, POINTER(gdp_gin_t),
                                      POINTER(GDP_DATUM.gdp_datum_t), c_void_p)
 
     def __subscribe(self, start, numrecs, timeout, cbfunc, cbarg):
@@ -419,7 +419,7 @@ class GDP_GCL(object):
             __start = gdp_recno_t(start)
 
             __start_type = gdp_recno_t
-            __func = gdp.gdp_gcl_subscribe
+            __func = gdp.gdp_gin_subscribe
 
         elif isinstance(start, dict):
             __start = GDP_DATUM.EP_TIME_SPEC()
@@ -428,7 +428,7 @@ class GDP_GCL(object):
             __start.tv_accuracy = c_float(start['tv_accuracy'])
 
             __start_type = POINTER(GDP_DATUM.EP_TIME_SPEC)
-            __func = gdp.gdp_gcl_subscribe_ts
+            __func = gdp.gdp_gin_subscribe_ts
 
         else:   # should never reach here
             assert False
@@ -449,16 +449,16 @@ class GDP_GCL(object):
         if cbfunc == None:
             __cbfunc = None
         else:
-            __cbfunc = self.gdp_gcl_sub_cbfunc_t(cbfunc)
+            __cbfunc = self.gdp_gin_sub_cbfunc_t(cbfunc)
 
         if cbfunc == None:
-            __func.argtypes = [POINTER(self.gdp_gcl_t), __start_type,
+            __func.argtypes = [POINTER(self.gdp_gin_t), __start_type,
                                 c_int32, POINTER(GDP_DATUM.EP_TIME_SPEC),
                                 c_void_p, c_void_p]
         else:
-            __func.argtypes = [POINTER(self.gdp_gcl_t), __start_type,
+            __func.argtypes = [POINTER(self.gdp_gin_t), __start_type,
                                 c_int32, POINTER(GDP_DATUM.EP_TIME_SPEC),
-                                self.gdp_gcl_sub_cbfunc_t, c_void_p]
+                                self.gdp_gin_sub_cbfunc_t, c_void_p]
 
         __func.restype = EP_STAT
 
@@ -513,14 +513,14 @@ class GDP_GCL(object):
         if cbfunc == None:
             __cbfunc = None
         else:
-            __cbfunc = self.gdp_gcl_sub_cbfunc_t(cbfunc)
+            __cbfunc = self.gdp_gin_sub_cbfunc_t(cbfunc)
 
-        __func = gdp.gdp_gcl_unsubscribe
+        __func = gdp.gdp_gin_unsubscribe
         if cbfunc is None:
-            __func.argtypes = [POINTER(self.gdp_gcl_t), c_void_p, c_void_p]
+            __func.argtypes = [POINTER(self.gdp_gin_t), c_void_p, c_void_p]
         else:
-            __func.argtypes = [POINTER(self.gdp_gcl_t),
-                                self.gdp_gcl_sub_cbfunc_t, c_void_p]
+            __func.argtypes = [POINTER(self.gdp_gin_t),
+                                self.gdp_gin_sub_cbfunc_t, c_void_p]
         __func.restype = EP_STAT
 
         estat = __func(self.ptr, __cbfunc, cbarg)
@@ -539,7 +539,7 @@ class GDP_GCL(object):
             __start = gdp_recno_t(start)
 
             __start_type = gdp_recno_t
-            __func = gdp.gdp_gcl_multiread
+            __func = gdp.gdp_gin_multiread
 
         elif isinstance(start, dict):
             __start = GDP_DATUM.EP_TIME_SPEC()
@@ -548,7 +548,7 @@ class GDP_GCL(object):
             __start.tv_accuracy = c_float(start['tv_accuracy'])
 
             __start_type = POINTER(GDP_DATUM.EP_TIME_SPEC)
-            __func = gdp.gdp_gcl_multiread_ts
+            __func = gdp.gdp_gin_multiread_ts
 
         else:
             assert False
@@ -560,14 +560,14 @@ class GDP_GCL(object):
         if cbfunc == None:
             __cbfunc = None
         else:
-            __cbfunc = self.gdp_gcl_sub_cbfunc_t(cbfunc)
+            __cbfunc = self.gdp_gin_sub_cbfunc_t(cbfunc)
 
         if cbfunc == None:
-            __func.argtypes = [POINTER(self.gdp_gcl_t), __start_type,
+            __func.argtypes = [POINTER(self.gdp_gin_t), __start_type,
                                 c_int32, c_void_p, c_void_p]
         else:
-            __func.argtypes = [POINTER(self.gdp_gcl_t), __start_type,
-                                c_int32, self.gdp_gcl_sub_cbfunc_t, c_void_p]
+            __func.argtypes = [POINTER(self.gdp_gin_t), __start_type,
+                                c_int32, self.gdp_gin_sub_cbfunc_t, c_void_p]
         __func.restype = EP_STAT
 
         estat = __func(self.ptr, __start, __numrecs, __cbfunc, cbarg)
@@ -604,8 +604,8 @@ class GDP_GCL(object):
 
         __fh = PyFile_AsFile(fh)
 
-        __func = gdp.gdp_gcl_print
-        __func.argtypes = [POINTER(self.gdp_gcl_t), FILE_P, c_int, c_int]
+        __func = gdp.gdp_gin_print
+        __func.argtypes = [POINTER(self.gdp_gin_t), FILE_P, c_int, c_int]
         # ignore the return type
 
         __func(self.ptr, __fh, c_int(detail), c_int(indent))
@@ -614,22 +614,22 @@ class GDP_GCL(object):
     def getname(self):
         "Get the name of this GCL, returns a GDP_NAME object"
 
-        __func = gdp.gdp_gcl_getname
-        __func.argtypes = [POINTER(self.gdp_gcl_t)]
+        __func = gdp.gdp_gin_getname
+        __func.argtypes = [POINTER(self.gdp_gin_t)]
         __func.restype = POINTER(GDP_NAME.name_t)
 
-        gcl_name_pointer = __func(self.ptr)
-        gcl_name = string_at(gcl_name_pointer, 32)
-        return GDP_NAME(gcl_name)
+        gin_name_pointer = __func(self.ptr)
+        gin_name = string_at(gin_name_pointer, 32)
+        return GDP_NAME(gin_name)
 
 
     @classmethod
-    def _helper_get_next_event(cls, __gcl_handle, timeout, strict_threading):
-        """ Get the events for GCL __gcl_handle.  """
+    def _helper_get_next_event(cls, __gin_handle, timeout, strict_threading):
+        """ Get the events for GCL __gin_handle.  """
 
         if not strict_threading:
             ## this is the old library behavior, no checks on thread
-            return cls._helper_get_next_event_call_clib(__gcl_handle, timeout)
+            return cls._helper_get_next_event_call_clib(__gin_handle, timeout)
 
         ## Otherwise, do the threading check on Python side.
         ## use a mix of looking in local queue and calling the
@@ -649,14 +649,14 @@ class GDP_GCL(object):
 
         while ev is None and (time.time()-start_time)<timeout_s:
             ## phase 1: look in local queue
-            ev = cls._helper_get_next_event_check_q(__gcl_handle)
+            ev = cls._helper_get_next_event_check_q(__gin_handle)
 
             if ev is not None:
                 # print "############## From the queue"
                 break
 
             ## phase 2: query from the C library (this blocks)
-            ev = cls._helper_get_next_event_call_clib(__gcl_handle, tiny_t)
+            ev = cls._helper_get_next_event_call_clib(__gin_handle, tiny_t)
             ## we insert it back to the library, and retrieve it again
             ## just to make sure nobody snuck something in the queue in the
             ## meantime
@@ -672,7 +672,7 @@ class GDP_GCL(object):
             ## phase 3: look in local queue once again. If we fetched
             ## something from the library, it will be in the local queue
             ## this time, for sure.
-            ev = cls._helper_get_next_event_check_q(__gcl_handle)
+            ev = cls._helper_get_next_event_check_q(__gin_handle)
 
         if ev is not None:
             assert ev["udata"] == cls.__get_udata()
@@ -692,7 +692,7 @@ class GDP_GCL(object):
 
 
     @classmethod
-    def _helper_get_next_event_check_q(cls, gclh):
+    def _helper_get_next_event_check_q(cls, ginh):
         """
         Either extracts one event from the local queue that matches
         the requirements and returns that event, Or returns None if
@@ -701,24 +701,24 @@ class GDP_GCL(object):
 
         # pprint.pprint(cls.ev_queues)
         udata = cls.__get_udata()
-        gcl_handle = cls.object_dir.get(addressof(gclh.contents), None)()
+        gin_handle = cls.object_dir.get(addressof(ginh.contents), None)()
 
         with cls.ev_queues_lock:
             evlist = cls.ev_queues.get(udata, [])
             if len(evlist)>0:
                 ## sort the list, if it isn't for some reason
                 evlist.sort(key=lambda ev:ev['datum']['recno'])
-                if gclh is None or gcl_handle == evlist[0]["gcl_handle"]:
+                if ginh is None or gin_handle == evlist[0]["gin_handle"]:
                     return evlist.pop(0)
 
         return None
 
 
     @classmethod
-    def _helper_get_next_event_call_clib(cls, __gcl_handle, timeout):
+    def _helper_get_next_event_call_clib(cls, __gin_handle, timeout):
         """
-        Get the events for GCL __gcl_handle by calling the C library.
-        If __gcl_handle is None, then get events for any open GCL
+        Get the events for GCL __gin_handle by calling the C library.
+        If __gin_handle is None, then get events for any open GCL
 
         Returns at most one event.
         """
@@ -726,10 +726,10 @@ class GDP_GCL(object):
         __func1 = gdp.gdp_event_next
 
         # Find the 'type' we need to pass to argtypes
-        if __gcl_handle == None:
+        if __gin_handle == None:
             __func1_arg1_type = c_void_p
         else:
-            __func1_arg1_type = POINTER(cls.gdp_gcl_t)
+            __func1_arg1_type = POINTER(cls.gdp_gin_t)
 
         # if timeout is None, then we just skip this
         if timeout == None:
@@ -747,20 +747,20 @@ class GDP_GCL(object):
         __func1.argtypes = [__func1_arg1_type, __func1_arg2_type]
         __func1.restype = POINTER(cls.gdp_event_t)
 
-        event_ptr = __func1(__gcl_handle, __timeout)
+        event_ptr = __func1(__gin_handle, __timeout)
         if bool(event_ptr) == False:  # Null pointers have false boolean value
             return None
 
         # now get the associated GCL handle
-        __func2 = gdp.gdp_event_getgcl
+        __func2 = gdp.gdp_event_getgin
         __func2.argtypes = [POINTER(cls.gdp_event_t)]
-        __func2.restype = POINTER(cls.gdp_gcl_t)
+        __func2.restype = POINTER(cls.gdp_gin_t)
 
-        gcl_ptr = __func2(event_ptr)
+        gin_ptr = __func2(event_ptr)
 
         # now find this in the dictionary
         ## => need the '()' because we store weakrefs in object_dir
-        gcl_handle = cls.object_dir.get(addressof(gcl_ptr.contents), None)()
+        gin_handle = cls.object_dir.get(addressof(gin_ptr.contents), None)()
 
         # also get the associated datum object
         __func3 = gdp.gdp_event_getdatum
@@ -808,7 +808,7 @@ class GDP_GCL(object):
         check_EP_STAT(estat)
 
         gdp_event = {}
-        gdp_event["gcl_handle"] = gcl_handle
+        gdp_event["gin_handle"] = gin_handle
         gdp_event["datum"] = datum_dict
         gdp_event["type"] = event_type
         gdp_event["stat"] = event_ep_stat
@@ -818,7 +818,7 @@ class GDP_GCL(object):
 
     @classmethod
     def get_next_event(cls, timeout, strict_threading=False):
-        """ Get events for ANY open gcl """
+        """ Get events for ANY open gin """
         return cls._helper_get_next_event(None, timeout, strict_threading)
 
     def __get_next_event(self, timeout, strict_threading=False):
@@ -827,7 +827,7 @@ class GDP_GCL(object):
         if event is not None:
             ## the crazy '__repr__.__self__' is needed, because there's no
             ## unproxy. See https://stackoverflow.com/questions/10246116
-            assert event["gcl_handle"] == self.__repr__.__self__
+            assert event["gin_handle"] == self.__repr__.__self__
         return event
 
     @classmethod
