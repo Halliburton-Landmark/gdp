@@ -65,11 +65,17 @@ provided.
 
 """
 
-from MISC import GDP_MODE_ANY, GDP_MODE_RO, GDP_MODE_AO, GDP_MODE_RA, \
-    GDP_EVENT_DATA, GDP_EVENT_EOS, GDP_EVENT_SHUTDOWN, \
-    GDP_EVENT_CREATED, GDP_EVENT_SUCCESS, GDP_EVENT_FAILURE, \
-    GDP_GCLMD_XID, GDP_GCLMD_PUBKEY, GDP_GCLMD_CTIME, GDP_GCLMD_CID, \
-    gdp_init, gdp_run_accept_event_loop, dbg_set, check_EP_STAT, ep_stat_tostr
+from MISC import \
+        GDP_MODE_ANY, GDP_MODE_RO, GDP_MODE_AO, GDP_MODE_RA, \
+        _GDP_EVENT_FREE, GDP_EVENT_DATA, \
+        GDP_EVENT_DONE, GDP_EVENT_SHUTDOWN, \
+        GDP_EVENT_CREATED, GDP_EVENT_SUCCESS, \
+        GDP_EVENT_FAILURE, GDP_EVENT_MISSING, \
+        GDP_MD_XID, GDP_MD_PUBKEY, GDP_MD_CTIME, \
+        GDP_MD_EXPIRE, GDP_MD_CID, GDP_MD_SYNTAX, \
+        GDP_MD_LOCATION, GDP_MD_UUID, \
+        gdp_init, gdp_run_accept_event_loop, \
+        dbg_set, check_EP_STAT, ep_stat_tostr
 from GDP_NAME import GDP_NAME
 from GDP_GCL import GDP_GCL
 from EP_CRYPTO import EP_CRYPTO_KEY, \
@@ -78,9 +84,11 @@ from EP_CRYPTO import EP_CRYPTO_KEY, \
 from GDPcache import GDPcache
 
 __all__ = [GDP_MODE_ANY, GDP_MODE_RO, GDP_MODE_AO, GDP_MODE_RA,
-           GDP_EVENT_DATA, GDP_EVENT_EOS, GDP_EVENT_SHUTDOWN,
-           GDP_EVENT_CREATED, GDP_EVENT_SUCCESS, GDP_EVENT_FAILURE,
-           GDP_GCLMD_XID, GDP_GCLMD_PUBKEY, GDP_GCLMD_CTIME, GDP_GCLMD_CID,
+           _GDP_EVENT_FREE, GDP_EVENT_DATA, GDP_EVENT_DONE,
+           GDP_EVENT_SHUTDOWN, GDP_EVENT_CREATED,
+           GDP_EVENT_SUCCESS, GDP_EVENT_FAILURE, GDP_EVENT_MISSING,
+           GDP_MD_XID, GDP_MD_PUBKEY, GDP_MD_CTIME, GDP_MD_EXPIRE,
+           GDP_MD_CID, GDP_MD_SYNTAX, GDP_MD_LOCATION, GDP_MD_UUID,
            gdp_init, gdp_run_accept_event_loop, dbg_set,
            check_EP_STAT, ep_stat_tostr,
            GDP_NAME, GDP_GCL,

@@ -42,10 +42,10 @@ try:
 except OSError:
     try:
         gdp = CDLL(os.path.join(package_directory,
-                                "..", "..", "..", "gdp",  "libgdp.so.0.8"))
+                                "..", "..", "..", "gdp",  "libgdp.so.0.9"))
     except OSError:
         gdp = CDLL(os.path.join(package_directory,
-                                "..", "..", "..", "gdp",  "libgdp.0.8.dylib"))
+                                "..", "..", "..", "gdp",  "libgdp.0.9.dylib"))
 
 #ep = CDLL(os.path.join(package_directory,
 #          "..", "..", "..", "libs", "libep.so"))
@@ -70,41 +70,46 @@ PyFile_AsFile.restype = FILE_P
 # fp = open(filename, "w")
 # corresponding FILE* is obtained by PyFile_AsFile(fp)
 
-
-# GDP request ID. Not being used at least as of now, but including it anyways.
-gdp_rid_t = c_uint32
-
 # GCL record number
 gdp_recno_t = c_int64
 
 
 # I/O modes:
-#   GDP_MODE_ANY: no mode specified
-#   GDP_MODE_RO: read only
-#   GDP_MODE_AO: append only
+#   GDP_MODE_ANY: no mode specified (=RA)
+#   GDP_MODE_RO: readable
+#   GDP_MODE_AO: appendable
 #   GDP_MODE_RA: read+append
 
-(GDP_MODE_ANY, GDP_MODE_RO, GDP_MODE_AO, GDP_MODE_RA) = (0, 1, 2, 3)
+(GDP_MODE_ANY, GDP_MODE_RO, GDP_MODE_AO, GDP_MODE_RA) = (3, 1, 2, 3)
 
 # Event types
+#   _GDP_EVENT_FREE     0   // internal use: event is free
 #   GDP_EVENT_DATA      1   // returned data
-#   GDP_EVENT_EOS       2   // normal end of subscription
+#   GDP_EVENT_DONE      2   // normal end of async read
 #   GDP_EVENT_SHUTDOWN  3   // subscription terminating because of shutdown
 #   GDP_EVENT_CREATED   4   // successful append, create, or other similar
 #   GDP_EVENT_SUCCESS   5   // generic asynchronous success status
 #   GDP_EVENT_FAILURE   6   // generic asynchronous failure status
+#   GDP_EVENT_MISSING   7   // record is missing
 
-(GDP_EVENT_DATA, GDP_EVENT_EOS, GDP_EVENT_SHUTDOWN,
-        GDP_EVENT_CREATED, GDP_EVENT_SUCCESS, GDP_EVENT_FAILURE)=(1,2,3,4,5,6)
+(_GDP_EVENT_FREE, GDP_EVENT_DATA, GDP_EVENT_DONE, GDP_EVENT_SHUTDOWN,
+        GDP_EVENT_CREATED, GDP_EVENT_SUCCESS, GDP_EVENT_FAILURE,
+        GDP_EVENT_MISSING) = (0, 1, 2, 3, 4, 5, 6, 7)
 
 # GCL Metadata keys
-# GDP_GCLMD_XID       0x00584944  // XID (external id)
-# GDP_GCLMD_PUBKEY    0x00505542  // PUB (public key)
-# GDP_GCLMD_CTIME     0x0043544D  // CTM (creation time)
-# GDP_GCLMD_CID       0x00434944  // CID (creator id)
+# GDP_MD_XID       0x00584944  // XID (external id)
+# GDP_MD_PUBKEY    0x00505542  // PUB (public key)
+# GDP_MD_CTIME     0x0043544D  // CTM (creation time)
+# GDP_MD_EXPIRE    0x0058544D  // XTM (expiration date/time)
+# GDP_MD_CID       0x00434944  // CID (creator id)
+# GDP_MD_SYNTAX    0x0053594E  // SYN (data syntax: json, xml, etc.)
+# GDP_MD_LOCATION  0x004C4F43  // LOC (location: lat/long)
+# GDP_MD_UUID      0x00554944  // UID (unique ID)
 
-(GDP_GCLMD_XID, GDP_GCLMD_PUBKEY, GDP_GCLMD_CTIME, GDP_GCLMD_CID) = \
-            (0x00584944, 0x00505542, 0x0043544D, 0x00434944)
+(GDP_MD_XID, GDP_MD_PUBKEY, GDP_MD_CTIME, GDP_MD_EXPIRE
+    GDP_MD_CID, GDP_MD_SYNTAX, GDP_MD_LOCATION, GDP_MD_UUID) = \
+            (0x00584944, 0x00505542, 0x0043544D, 0x0058544D,
+            0x00434944, 0x0053594E, 0x004C4F43, 0x00554944)
 
 
 class EP_STAT(Structure):
@@ -185,7 +190,7 @@ GdpIoEventBase = POINTER(event_base)
 
 def gdp_init(*args):
     """
-    initialize the library, takes an optional argument of the form "HOST:PORT"
+    initialize the library, takes optional argument of the form "HOST:PORT"
     """
 
     __func = gdp.gdp_init
