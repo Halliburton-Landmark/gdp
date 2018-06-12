@@ -33,19 +33,20 @@ from MISC import *
 class GDP_NAME:
 
     """
-    Represents name of a GCL. Each GCL has potentially up to three kind of 
-    names:
-        - a 256 bit binary name
-        - a Base-64(ish) representation
-        - (optional) a more memorable name, which potentially is hashed to 
-          get the binary name
+    Represents a GDP name. Each GDP name has potentially up to three
+    different representations:
+     - a 256 bit binary version
+     - a Base-64(ish) representation
+     - (optional) a more memorable version; for the moment, this is
+       hashed to get the binary version
     """
 
-    # name_t, pname_t are ctypes types corresponding to gdp_name_t, gdp_pname_t
+    # name_t, pname_t are ctypes types that correspond to
+    # gdp_name_t and gdp_pname_t, respectively.
 
     # Types that will be used for some type-checking #
     name_t = c_uint8 * 32     # internal name of a GCL
-    PNAME_LEN = 43          # this is following the convention in gdp.h
+    PNAME_LEN = 43            # this is following the convention in gdp.h
     pname_t = c_uint8 * (PNAME_LEN + 1)     # printable name of a GCL
 
     def __init__(self, name, force_internal=False):
