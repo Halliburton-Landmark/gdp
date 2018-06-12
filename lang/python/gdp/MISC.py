@@ -77,22 +77,22 @@ gdp_recno_t = c_int64
 
 
 # I/O modes:
-#   GDP_MODE_ANY: no mode specified (=RA)
-#   GDP_MODE_RO: readable
-#   GDP_MODE_AO: appendable
-#   GDP_MODE_RA: read+append
+# GDP_MODE_ANY: no mode specified (=RA)
+# GDP_MODE_RO: readable
+# GDP_MODE_AO: appendable
+# GDP_MODE_RA: read+append
 
 (GDP_MODE_ANY, GDP_MODE_RO, GDP_MODE_AO, GDP_MODE_RA) = (3, 1, 2, 3)
 
 # Event types
-#   _GDP_EVENT_FREE     0   // internal use: event is free
-#   GDP_EVENT_DATA      1   // returned data
-#   GDP_EVENT_DONE      2   // normal end of async read
-#   GDP_EVENT_SHUTDOWN  3   // subscription terminating because of shutdown
-#   GDP_EVENT_CREATED   4   // successful append, create, or other similar
-#   GDP_EVENT_SUCCESS   5   // generic asynchronous success status
-#   GDP_EVENT_FAILURE   6   // generic asynchronous failure status
-#   GDP_EVENT_MISSING   7   // record is missing
+# _GDP_EVENT_FREE     0   // internal use: event is free
+# GDP_EVENT_DATA      1   // returned data
+# GDP_EVENT_DONE      2   // normal end of async read
+# GDP_EVENT_SHUTDOWN  3   // subscription terminating because of shutdown
+# GDP_EVENT_CREATED   4   // successful append, create, or other similar
+# GDP_EVENT_SUCCESS   5   // generic asynchronous success status
+# GDP_EVENT_FAILURE   6   // generic asynchronous failure status
+# GDP_EVENT_MISSING   7   // record is missing
 
 (_GDP_EVENT_FREE, GDP_EVENT_DATA, GDP_EVENT_DONE, GDP_EVENT_SHUTDOWN,
         GDP_EVENT_CREATED, GDP_EVENT_SUCCESS, GDP_EVENT_FAILURE,
