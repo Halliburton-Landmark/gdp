@@ -42,10 +42,10 @@ try:
 except OSError:
     try:
         gdp = CDLL(os.path.join(package_directory,
-                                "..", "..", "..", "gdp",  "libgdp.so.0.9"))
+                            "..", "..", "..", "gdp",  "libgdp.so.0.9"))
     except OSError:
         gdp = CDLL(os.path.join(package_directory,
-                                "..", "..", "..", "gdp",  "libgdp.0.9.dylib"))
+                            "..", "..", "..", "gdp",  "libgdp.0.9.dylib"))
 
 #ep = CDLL(os.path.join(package_directory,
 #          "..", "..", "..", "libs", "libep.so"))
@@ -53,13 +53,15 @@ try:
     evb = CDLL("libevent.so")       # On linux
 except OSError:
     try:
-        evb = CDLL("libevent.dylib")    # On Mac
+        # On Mac
+        evb = CDLL("libevent.dylib")
     except OSError:
-        evb = CDLL("/opt/local/lib/libevent.dylib")    # On Mac, use absolute path as installed by Mac port
+        # On Mac, use absolute path as installed by Mac port
+        evb = CDLL("/opt/local/lib/libevent.dylib")
 
-# hack for file pointer. Apparently this works only on Python 2.x and not with 3
-# copied from
-# http://stackoverflow.com/questions/16130268/python-3-replacement-for-pyfile-asfile
+# hack for file pointer. Apparently this works only on Python 2.x and
+# not with 3. Copied from
+# http://stackoverflow.com/questions/16130268/
 class FILE(Structure):
     pass
 FILE_P = POINTER(FILE)
@@ -164,7 +166,7 @@ class EP_STAT_SEV_ABORT(EP_STAT_Exception):
 def check_EP_STAT(ep_stat):
     """
     Perform basic checks on the EP_STAT. In case of not-okay code, raises
-        exception, which might be caught and dealt with, if that's required
+    exception, which might be caught and dealt with, if that's required
     """
 
     # either long is 32 bits, or 64 bits.
@@ -209,7 +211,7 @@ def gdp_init(*args):
 def dbg_set(level):
     """
     Set debug level to a specified value. This is equivalent to the
-        -D option in C example programs
+    -D option in C example programs
     """
     dbg_string = create_string_buffer(level)
 
