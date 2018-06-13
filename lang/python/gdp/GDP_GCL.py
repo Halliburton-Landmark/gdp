@@ -276,10 +276,12 @@ class GDP_GIN(object):
 
     def __read(self, query_param):
         """
-        An internal helper function for read. Either read by record number
-        or read by timestamp. If query_param is 'int', we assume it is
-        query by record number. If query_param is 'dict', we assume it
-        is query by timestamp
+        An internal helper function for synchronous read. Either read
+        by record number, timestamp, or the hash.
+
+        If query_param is 'int', we assume it is query by record number.
+        If query_param is 'dict', we assume it is query by timestamp.
+        If query_param is 'str', we assume it is query by hash.
         """
 
         datum = GDP_DATUM()
@@ -293,6 +295,7 @@ class GDP_GIN(object):
             __func.restype = EP_STAT
 
         elif isinstance(query_param, str):
+
             # TODO This is read by hash. We will come back to it later
             raise NotImplementedError
 
@@ -332,9 +335,15 @@ class GDP_GIN(object):
         - ts   : the timestamp, which itself is a dictionary with the keys
                     being tv_sec, tv_nsec, tv_accuracy
         - data : the actual data associated with this datum.
+        ...
         """
 
         return self.__read(recno)
+
+
+    def read_by_hash(self, hashbytes):
+        """ Takes a hash instead of recno """
+        return self.__read(hashbytes)
 
 
     def read_by_ts(self, tsdict):
@@ -355,24 +364,74 @@ class GDP_GIN(object):
         #   timestamps.
         return self.__read(tsdict)
 
-    def read_by_hash(self, hashbytes):
-        """ Takes a hash instead of recno """
-        return self.__read(hashbytes)
+
+    def __read_async(self, start, numrecs, cbfunc, cbarg):
+        """
+        same as __read, except that this is the async version (and
+        enables querying multiple records at once)
+        """
+
+        if isinstance(start, int):
+            # casting start to ctypes
+            __start = gdp_recno_t(start)
+
+            __start_type = gdp_recno_t
+            __func = gdp.gdp_gin_read_by_recno_async
+
+        elif isinstance(start, str):
+            ## TODO: this is query by hash
+            raise NotImplementedError
+
+        elif isinstance(start, dict):
+            __start = GDP_DATUM.EP_TIME_SPEC()
+            __start.tv_sec = c_int64(start['tv_sec'])
+            __start.tv_nsec = c_uint32(start['tv_nsec'])
+            __start.tv_accuracy = c_float(start['tv_accuracy'])
+
+            __start_type = POINTER(GDP_DATUM.EP_TIME_SPEC)
+            __func = gdp.gdp_gin_read_by_ts_async
+
+        else:
+            assert False
+
+        # casting numrecs to ctypes
+        __numrecs = c_int32(numrecs)
+
+        # casting the python function to the callback function
+        if cbfunc == None:
+            __cbfunc = None
+        else:
+            __cbfunc = self.gdp_gin_sub_cbfunc_t(cbfunc)
+
+        if cbfunc == None:
+            __func.argtypes = [POINTER(self.gdp_gin_t), __start_type,
+                                c_int32, c_void_p, c_void_p]
+        else:
+            __func.argtypes = [POINTER(self.gdp_gin_t), __start_type,
+                                c_int32, self.gdp_gin_sub_cbfunc_t, c_void_p]
+        __func.restype = EP_STAT
+
+        estat = __func(self.ptr, __start, __numrecs, __cbfunc, cbarg)
+        check_EP_STAT(estat)
+        return estat
 
 
+    def read_by_recno_async(self, start, numrecs):
+        """ For now, callbacks are not exposed to end-user. Events are
+        generated instead.  """
+        return self.__read_async(start, numrecs, None, None)
 
-    # def read_recno_async(self, recno):
-    #     """
-    #     Same as 'read', but aysnchoronous version. Returns events
-    #     """
 
-    #     __func = gdp.gdp_gin_read_by_recno_async
-    #     __func.argtypes = [POINTER(self.gdp_gin_t), gdp_recno_t,
-    #                             c_void_p, c_void_p]
-    #     __func.restype = EP_STAT
+    def read_by_hash_async(self, starthash, numrecs):
+        """ Read a number of records by specifying the initial hash """
+        return self.__read_async(starthash, numrecs, None, None)
 
-    #     estat = __func(self.ptr, gdp_recno_t(recno), None, None)
-    #     check_EP_STAT(estat)
+
+    def read_by_ts_async(self, startdict, numrecs):
+        """ Same as read_async, except that the starting point of multiread
+        is a timestamp dictionary rather than a record number.  """
+        return self.__read_async(startdict, numrecs, None, None)
+
 
     ##################################################################
     ########### Various subscribe functions (ts/recno/hash) ##########
@@ -384,7 +443,7 @@ class GDP_GIN(object):
         callback functions is experimental. Events are better for now.
 
         'start' could either be an 'int' (to represent record number),
-            or a 'dict' (to represent a timestamp)
+        a 'str' (for a hash), or a 'dict' (to represent a timestamp)
         """
 
         if isinstance(start, int):
@@ -393,6 +452,10 @@ class GDP_GIN(object):
 
             __start_type = gdp_recno_t
             __func = gdp.gdp_gin_subscribe
+
+        elif isinstance(start, str):
+            # TODO implement hashes
+            raise NotImplementedError
 
         elif isinstance(start, dict):
             __start = GDP_DATUM.EP_TIME_SPEC()
@@ -441,28 +504,31 @@ class GDP_GIN(object):
         return estat
 
 
-    def subscribe(self, start, numrecs, timeout):
+    def subscribe_by_recno(self, start, numrecs, timeout):
         """
         Subscriptions. Refer to the C-API for more details
         For now, callbacks are not exposed to end-user. Events are
-            generated instead.
+        generated instead.
         """
         return self.__subscribe(start, numrecs, timeout, None, None)
 
 
-    def subscribe_ts(self, startdict, numrecs, timeout):
+    def subscribe_by_hash(self, starthash, numrecs, timeout):
+        """Subscriptions, but by a hash instead of a record number"""
+        return self.__subscribe(starthash, numrecs, timeout, None, None)
+
+
+    def subscribe_by_ts(self, startdict, numrecs, timeout):
         """
         Same as subscribe, except that the starting point of subscription
-            is a timestamp dictionary rather than a record number.
-            (See also: 'read_ts')
+        is a timestamp dictionary rather than a record number.
+        (See also: 'read_ts')
         """
         return self.__subscribe(startdict, numrecs, timeout, None, None)
 
 
     def unsubscribe(self, cbfunc=None, cbarg=None):
-        """
-        Terminate the subscription.
-        """
+        """ Terminate the subscription.  """
 
         # casting the python function to the callback function
         if cbfunc == None:
@@ -481,73 +547,6 @@ class GDP_GIN(object):
         estat = __func(self.ptr, __cbfunc, cbarg)
         check_EP_STAT(estat)
         return estat
-
-
-
-    def __multiread(self, start, numrecs, cbfunc, cbarg):
-        """
-        similar to multiread in the GDP C API
-        """
-
-        if isinstance(start, int):
-            # casting start to ctypes
-            __start = gdp_recno_t(start)
-
-            __start_type = gdp_recno_t
-            __func = gdp.gdp_gin_multiread
-
-        elif isinstance(start, dict):
-            __start = GDP_DATUM.EP_TIME_SPEC()
-            __start.tv_sec = c_int64(start['tv_sec'])
-            __start.tv_nsec = c_uint32(start['tv_nsec'])
-            __start.tv_accuracy = c_float(start['tv_accuracy'])
-
-            __start_type = POINTER(GDP_DATUM.EP_TIME_SPEC)
-            __func = gdp.gdp_gin_multiread_ts
-
-        else:
-            assert False
-
-        # casting numrecs to ctypes
-        __numrecs = c_int32(numrecs)
-
-        # casting the python function to the callback function
-        if cbfunc == None:
-            __cbfunc = None
-        else:
-            __cbfunc = self.gdp_gin_sub_cbfunc_t(cbfunc)
-
-        if cbfunc == None:
-            __func.argtypes = [POINTER(self.gdp_gin_t), __start_type,
-                                c_int32, c_void_p, c_void_p]
-        else:
-            __func.argtypes = [POINTER(self.gdp_gin_t), __start_type,
-                                c_int32, self.gdp_gin_sub_cbfunc_t, c_void_p]
-        __func.restype = EP_STAT
-
-        estat = __func(self.ptr, __start, __numrecs, __cbfunc, cbarg)
-        check_EP_STAT(estat)
-        return estat
-
-
-    def multiread(self, start, numrecs):
-        """
-        Multiread. Refer to the C-API for details.
-        For now, callbacks are not exposed to end-user. Events are
-            generated instead.
-        """
-
-        return self.__multiread(start, numrecs, None, None)
-
-
-    def multiread_ts(self, startdict, numrecs):
-        """
-        Same as multiread, except that the starting point of multiread
-            is a timestamp dictionary rather than a record number.
-            (See also: 'read_ts')
-        """
-
-        return self.__multiread(startdict, numrecs, None, None)
 
     ##################################################################
     ############### Various Append functions #########################
