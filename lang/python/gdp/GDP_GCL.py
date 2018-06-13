@@ -33,6 +33,8 @@ import time
 import random
 import pprint
 from MISC import *
+from GDP_HASH import *
+from GDP_SIG import *
 from GDP_NAME import *
 from GDP_DATUM import *
 from GDP_GCLMD import *
@@ -86,6 +88,13 @@ class GDP_GIN(object):
 
         "Corresponds to gdp_event_t structure exported by C library"
         pass
+
+    # XXX: Check if this works.
+    # More details here: http://python.net/crew/theller/ctypes/tutorial.html#callback-functions
+    # The first argument, I believe, is the return type, which I think is void*
+    gdp_gin_sub_cbfunc_t = CFUNCTYPE(c_void_p, POINTER(gdp_gin_t),
+                                     POINTER(GDP_DATUM.gdp_datum_t), c_void_p)
+
 
     def __init__(self, name, iomode, open_info={}):
         """
@@ -228,9 +237,9 @@ class GDP_GIN(object):
     def __read(self, query_param):
         """
         An internal helper function for read. Either read by record number
-            or read by timestamp. If query_param is 'int', we assume it is
-            query by record number. If query_param is 'dict', we assume it
-            is query by timestamp
+        or read by timestamp. If query_param is 'int', we assume it is
+        query by record number. If query_param is 'dict', we assume it
+        is query by timestamp
         """
 
         datum = GDP_DATUM()
@@ -238,10 +247,14 @@ class GDP_GIN(object):
         if isinstance(query_param, int):
             __query_param = gdp_recno_t(query_param)
 
-            __func = gdp.gdp_gin_read
+            __func = gdp.gdp_gin_read_by_recno
             __func.argtypes = [POINTER(self.gdp_gin_t), gdp_recno_t,
                                     POINTER(GDP_DATUM.gdp_datum_t)]
             __func.restype = EP_STAT
+
+        elif isinstance(query_param, str):
+            # TODO This is read by hash. We will come back to it later
+            raise NotImplementedError
 
         elif isinstance(query_param, dict):
 
@@ -267,18 +280,18 @@ class GDP_GIN(object):
         datum_dict["ts"] = datum.getts()
         datum_dict["data"] = datum.getbuf()
         datum_dict["sig"] = datum.getsig()
-        datum_dict["sigalg"] = datum.getsigmdalg()
+        datum_dict["sigalg"] = datum.getmdalg()
 
         return datum_dict
 
 
-    def read(self, recno):
+    def read_recno(self, recno):
         """
         Returns a datum dictionary. The dictionary has the following keys:
-            - recno: the record number for this GDP
-            - ts   : the timestamp, which itself is a dictionary with the keys
-                        being tv_sec, tv_nsec, tv_accuracy
-            - data : the actual data associated with this datum.
+        - recno: the record number for this GDP
+        - ts   : the timestamp, which itself is a dictionary with the keys
+                    being tv_sec, tv_nsec, tv_accuracy
+        - data : the actual data associated with this datum.
         """
 
         return self.__read(recno)
@@ -289,9 +302,9 @@ class GDP_GIN(object):
         Same as 'read', but takes a time-stamp dictionary instead of
         a record number. The time-stamp dictionary has the following
         fields:
-            - tv_sec: seconds since epoch (an integer)
-            - tv_nsec: nano seconds (an integer)
-            - tv_accuracy: accuracy (a float)
+        - tv_sec: seconds since epoch (an integer)
+        - tv_nsec: nano seconds (an integer)
+        - tv_accuracy: accuracy (a float)
         """
 
         # the internal implementation is the same, we don't really
@@ -303,25 +316,25 @@ class GDP_GIN(object):
         return self.__read(tsdict)
 
 
-    def read_async(self, recno):
-        """
-        Same as 'read', but aysnchoronous version. Returns events
-        """
+    # def read_recno_async(self, recno):
+    #     """
+    #     Same as 'read', but aysnchoronous version. Returns events
+    #     """
 
-        __func = gdp.gdp_gin_read_async
-        __func.argtypes = [POINTER(self.gdp_gin_t), gdp_recno_t,
-                                c_void_p, c_void_p]
-        __func.restype = EP_STAT
+    #     __func = gdp.gdp_gin_read_by_recno_async
+    #     __func.argtypes = [POINTER(self.gdp_gin_t), gdp_recno_t,
+    #                             c_void_p, c_void_p]
+    #     __func.restype = EP_STAT
 
-        estat = __func(self.ptr, gdp_recno_t(recno), None, None)
-        check_EP_STAT(estat)
+    #     estat = __func(self.ptr, gdp_recno_t(recno), None, None)
+    #     check_EP_STAT(estat)
 
 
-    def append(self, datum_dict):
+    def append(self, datum_dict, prevhash):
         """
         Write a datum to the GCL. The datum should be a dictionary, with
-            the only valid key being 'data'. The value is the actual
-            data that is to be written
+        the only valid key being 'data'. The value is the actual
+        data that is to be written.
         """
 
         datum = GDP_DATUM()
@@ -330,11 +343,12 @@ class GDP_GIN(object):
             datum.setbuf(datum_dict["data"])
 
         __func = gdp.gdp_gin_append
-        __func.argtypes = [
-            POINTER(self.gdp_gin_t), POINTER(GDP_DATUM.gdp_datum_t)]
+        __func.argtypes = [POINTER(self.gdp_gin_t),
+                                POINTER(GDP_DATUM.gdp_datum_t),
+                                POINTER(GDP_HASH.gdp_hash_t)]
         __func.restype = EP_STAT
 
-        estat = __func(self.ptr, datum.gdp_datum)
+        estat = __func(self.ptr, datum.gdp_datum, prevhash.hash_)
         check_EP_STAT(estat)
 
 
@@ -357,13 +371,6 @@ class GDP_GIN(object):
         estat = __func(self.ptr, datum.gdp_datum, None, None)
         check_EP_STAT(estat)
 
-
-
-    # XXX: Check if this works.
-    # More details here: http://python.net/crew/theller/ctypes/tutorial.html#callback-functions
-    # The first argument, I believe, is the return type, which I think is void*
-    gdp_gin_sub_cbfunc_t = CFUNCTYPE(c_void_p, POINTER(gdp_gin_t),
-                                     POINTER(GDP_DATUM.gdp_datum_t), c_void_p)
 
     def __subscribe(self, start, numrecs, timeout, cbfunc, cbarg):
         """
@@ -625,7 +632,7 @@ class GDP_GIN(object):
         datum_dict["ts"] = datum.getts()
         datum_dict["data"] = datum.getbuf()
         datum_dict["sig"] = datum.getsig()
-        datum_dict["sigalg"] = datum.getsigmdalg()
+        datum_dict["sigalg"] = datum.getmdalg()
 
         # find the type of the event
         __func4 = gdp.gdp_event_gettype
