@@ -234,6 +234,46 @@ class GDP_GIN(object):
         return metadata
 
 
+    def getname(self):
+        "Get the name of the corresponding GOB, returns a GDP_NAME object"
+
+        __func = gdp.gdp_gin_getname
+        __func.argtypes = [POINTER(self.gdp_gin_t)]
+        __func.restype = POINTER(GDP_NAME.name_t)
+
+        _name_pointer = __func(self.ptr)
+        _name = string_at(_name_pointer, 32)
+        return GDP_NAME(_name)
+
+
+    def getnrecs(self):
+        "Get number of records"
+
+        __func = gdp.gdp_gin_getnrecs
+        __func.argtypes = [POINTER(self.gdp_gin_t)]
+        __func.restype = gdp_recno_t
+
+        ret = __func(self.ptr)
+        return ret
+
+
+    def print_to_file(self, fh):
+        """
+        Print this GDP object to a file. Could be sys.stdout
+            The actual printing is done by the C library
+        """
+        __fh = PyFile_AsFile(fh)
+        __func = gdp.gdp_gin_print
+        __func.argtypes = [POINTER(self.gdp_gin_t), FILE_P]
+        # ignore the return type
+        __func(self.ptr, __fh)
+
+
+
+    ##################################################################
+    ######## Various read functions (sync/async|ts/recno/hash) #######
+    ##################################################################
+
     def __read(self, query_param):
         """
         An internal helper function for read. Either read by record number
@@ -285,7 +325,7 @@ class GDP_GIN(object):
         return datum_dict
 
 
-    def read_recno(self, recno):
+    def read_by_recno(self, recno):
         """
         Returns a datum dictionary. The dictionary has the following keys:
         - recno: the record number for this GDP
@@ -297,7 +337,7 @@ class GDP_GIN(object):
         return self.__read(recno)
 
 
-    def read_ts(self, tsdict):
+    def read_by_ts(self, tsdict):
         """
         Same as 'read', but takes a time-stamp dictionary instead of
         a record number. The time-stamp dictionary has the following
@@ -315,6 +355,11 @@ class GDP_GIN(object):
         #   timestamps.
         return self.__read(tsdict)
 
+    def read_by_hash(self, hashbytes):
+        """ Takes a hash instead of recno """
+        return self.__read(hashbytes)
+
+
 
     # def read_recno_async(self, recno):
     #     """
@@ -329,48 +374,9 @@ class GDP_GIN(object):
     #     estat = __func(self.ptr, gdp_recno_t(recno), None, None)
     #     check_EP_STAT(estat)
 
-
-    def append(self, datum_dict, prevhash):
-        """
-        Write a datum to the GCL. The datum should be a dictionary, with
-        the only valid key being 'data'. The value is the actual
-        data that is to be written.
-        """
-
-        datum = GDP_DATUM()
-
-        if "data" in datum_dict.keys():
-            datum.setbuf(datum_dict["data"])
-
-        __func = gdp.gdp_gin_append
-        __func.argtypes = [POINTER(self.gdp_gin_t),
-                                POINTER(GDP_DATUM.gdp_datum_t),
-                                POINTER(GDP_HASH.gdp_hash_t)]
-        __func.restype = EP_STAT
-
-        estat = __func(self.ptr, datum.gdp_datum, prevhash.hash_)
-        check_EP_STAT(estat)
-
-
-    def append_async(self, datum_dict):
-        """
-        Async version of append. A writer ought to check return status by
-            invoking get_next_event, potentially in a different thread
-        """
-        datum = GDP_DATUM()
-
-        if "data" in datum_dict.keys():
-            datum.setbuf(datum_dict["data"])
-
-        __func = gdp.gdp_gin_append_async
-        __func.argtypes = [ POINTER(self.gdp_gin_t),
-                            POINTER(GDP_DATUM.gdp_datum_t),
-                            c_void_p, c_void_p ]
-        __func.restype = EP_STAT
-
-        estat = __func(self.ptr, datum.gdp_datum, None, None)
-        check_EP_STAT(estat)
-
+    ##################################################################
+    ########### Various subscribe functions (ts/recno/hash) ##########
+    ##################################################################
 
     def __subscribe(self, start, numrecs, timeout, cbfunc, cbarg):
         """
@@ -543,34 +549,56 @@ class GDP_GIN(object):
 
         return self.__multiread(startdict, numrecs, None, None)
 
+    ##################################################################
+    ############### Various Append functions #########################
+    ##################################################################
 
-
-    def print_to_file(self, fh, detail, indent):
+    def append(self, datum_dict, prevhash):
         """
-        Print this GDP object to a file. Could be sys.stdout
-            The actual printing is done by the C library
+        Write a datum to the GCL. The datum should be a dictionary, with
+        the only valid key being 'data'. The value is the actual
+        data that is to be written.
         """
 
-        __fh = PyFile_AsFile(fh)
+        datum = GDP_DATUM()
 
-        __func = gdp.gdp_gin_print
-        __func.argtypes = [POINTER(self.gdp_gin_t), FILE_P, c_int, c_int]
-        # ignore the return type
+        if "data" in datum_dict.keys():
+            datum.setbuf(datum_dict["data"])
 
-        __func(self.ptr, __fh, c_int(detail), c_int(indent))
-        return
+        __func = gdp.gdp_gin_append
+        __func.argtypes = [POINTER(self.gdp_gin_t),
+                                POINTER(GDP_DATUM.gdp_datum_t),
+                                POINTER(GDP_HASH.gdp_hash_t)]
+        __func.restype = EP_STAT
 
-    def getname(self):
-        "Get the name of this GCL, returns a GDP_NAME object"
+        estat = __func(self.ptr, datum.gdp_datum, prevhash.hash_)
+        check_EP_STAT(estat)
 
-        __func = gdp.gdp_gin_getname
-        __func.argtypes = [POINTER(self.gdp_gin_t)]
-        __func.restype = POINTER(GDP_NAME.name_t)
 
-        _name_pointer = __func(self.ptr)
-        _name = string_at(_name_pointer, 32)
-        return GDP_NAME(_name)
+########    def append_async(self, datum_dict):
+########        """
+########        Async version of append. A writer ought to check return status by
+########            invoking get_next_event, potentially in a different thread
+########        """
+########        datum = GDP_DATUM()
+########
+########        if "data" in datum_dict.keys():
+########            datum.setbuf(datum_dict["data"])
+########
+########        __func = gdp.gdp_gin_append_async
+########        __func.argtypes = [ POINTER(self.gdp_gin_t),
+########                            POINTER(GDP_DATUM.gdp_datum_t),
+########                            c_void_p, c_void_p ]
+########        __func.restype = EP_STAT
+########
+########        estat = __func(self.ptr, datum.gdp_datum, None, None)
+########        check_EP_STAT(estat)
+########
 
+
+    ##################################################################
+    ############### Various Helper functions #########################
+    ##################################################################
 
     @classmethod
     def _helper_get_next_event(cls, __gin_handle, timeout):
