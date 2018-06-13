@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# ----- BEGIN LICENSE BLOCK -----                                               
+# ----- BEGIN LICENSE BLOCK -----
 #	GDP: Global Data Plane
 #	From the Ubiquitous Swarm Lab, 490 Cory Hall, U.C. Berkeley.
 #
@@ -24,7 +24,7 @@
 #	IF ANY, PROVIDED HEREUNDER IS PROVIDED "AS IS". REGENTS HAS NO
 #	OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS,
 #	OR MODIFICATIONS.
-# ----- END LICENSE BLOCK -----                                               
+# ----- END LICENSE BLOCK -----
 
 
 import weakref
@@ -68,15 +68,14 @@ class GDP_GIN(object):
     """
 
     # We need to keep a list of all the open GCL handles we have, and
-    #   their associated gdp handles. I don't see any cleaner solution
-    #   to how to differentiate between events associated for different
-    #   GCLs. Also, we no longer can free the handles automatically.
-    #   Why? How would python know that we are not planning to get an
-    #   event for a gin handle?
+    # their associated gdp handles. I don't see any cleaner solution
+    # to how to differentiate between events associated for different
+    # GCLs. Also, we no longer can free the handles automatically.
+    # Why? How would python know that we are not planning to get an
+    # event for a gin handle?
 
     # C pointer to python object mapping
     object_dir = {}
-
 
     class gdp_gin_t(Structure):
 
@@ -88,29 +87,25 @@ class GDP_GIN(object):
         "Corresponds to gdp_event_t structure exported by C library"
         pass
 
-    def __new__(cls, name, iomode, open_info={}):
+    def __init__(self, name, iomode, open_info={}):
         """
-        Open a GCL with given name and io-mode. The reason to do custom
-            initialization in __new__ (rather than __init__) is because
-            we'd like a one-to-one correspondence between the underlying
-            C pointer for an open GCL and Python objects representing
-            a GCL. However, the C library can return an existing pointer
-            when an already open GCL is opened again.
+        Open a GCL with given name and io-mode.
 
         name=<name-of-gin>, iomode=<mode>
         name is a GDP_NAME object
         mode is one of the following: GDP_MODE_ANY, GDP_MODE_RO, GDP_MODE_AO,
                                       GDP_MODE_RA
         open_info is a dictionary. It contains extra information, such as the
-            private signature key, etc. The key may be optional, depending on
-            how the log was created and if a log-server is set up to reject 
-            unsigned appends, for example.
-            Here is the (incomplete) list of keys and their description:
-            'skey': an instance of EP_CRYPTO_KEY containing the signature key
+        private signature key, etc. The key may be optional, depending on
+        how the log was created and if a log-server is set up to reject
+        unsigned appends, for example.
+
+        Here is the (incomplete) list of keys and their description:
+        'skey': an instance of EP_CRYPTO_KEY containing the signature key
         """
 
         # __ptr is just a C style pointer, that we will assign to something
-        __ptr = POINTER(cls.gdp_gin_t)()
+        __ptr = POINTER(self.gdp_gin_t)()
 
         # we do need an internal represenation of the name.
         gin_name_python = name.internal_name()
@@ -128,7 +123,7 @@ class GDP_GIN(object):
         __func = gdp.gdp_gin_open
         __func.argtypes = [GDP_NAME.name_t, c_int,
                            POINTER(GDP_OPEN_INFO.gdp_open_info_t),
-                           POINTER(POINTER(cls.gdp_gin_t))]
+                           POINTER(POINTER(self.gdp_gin_t))]
         __func.restype = EP_STAT
 
         estat = __func(gin_name_ctypes, iomode,
@@ -136,38 +131,18 @@ class GDP_GIN(object):
                             pointer(__ptr))
         check_EP_STAT(estat)
 
-        if addressof(__ptr.contents) in cls.object_dir.keys():
-            ## need the '()' because we store weakrefs in object_dir
-            newobj = cls.object_dir[addressof(__ptr.contents)]()
-            ## the following assertion should hold, because anytime a GDP_GIN
-            ## object is freed, object_dir is also cleaned up. IF object_dir
-            ## has a pointer, that means the object hasn't been claimed by GC.
-            assert newobj is not None
-            return newobj
-        else:
-            # create a new instance
-            newobj = super(GDP_GIN, cls).__new__(cls)
-            newobj.ptr = __ptr
-            newobj.gdp_open_info = __gdp_open_info
-            cls.object_dir[addressof(__ptr.contents)] = weakref.ref(newobj)
-            return newobj
-
-        assert False    # should never get here
-
-
-    def __init__(self, *args):
+        self.ptr = __ptr
+        self.gdp_open_info = __gdp_open_info
         ## Create the instance method 'get_next_event', in addition to
         ## already existing class method
         self.get_next_event = WeakMethod(self.__get_next_event)
+        cls.object_dir[addressof(__ptr.contents)] = weakref.ref(newobj)
 
 
     def __del__(self):
         "close this GCL handle, and free the allocated resources"
 
-        if bool(self.ptr) == False:   # null pointers have a false boolean value
-            # Null pointer => no memory allocated => nothing to clean up
-            #   this happens if __init__ did not finish
-            return
+        assert self.ptr is not False    # null pointers have false bool val
 
         # remove the entry from object directory
         self.object_dir.pop(addressof(self.ptr.contents), None)
@@ -179,7 +154,7 @@ class GDP_GIN(object):
 
         estat = __func(self.ptr)
         check_EP_STAT(estat)
-        return
+
 
     @classmethod
     def create(cls, name, logd_name, metadata):
@@ -219,6 +194,7 @@ class GDP_GIN(object):
         check_EP_STAT(estat)
         return
 
+
     def getmetadata(self):
         """
         return the metadata included at creation time.
@@ -231,7 +207,7 @@ class GDP_GIN(object):
         __func.restype = EP_STAT
 
         gmd = POINTER(GDP_MD.gdp_md_t)()
-        estat = __func(self.ptr, byref(gmd)) 
+        estat = __func(self.ptr, byref(gmd))
         check_EP_STAT(estat)
 
         md = GDP_MD(ptr=gmd)
@@ -239,7 +215,7 @@ class GDP_GIN(object):
         idx = 0
         metadata = {}
         while True:
-            try: 
+            try:
                 (i,v) = md.get(idx)
                 metadata[i] = v
                 idx += 1
@@ -247,7 +223,7 @@ class GDP_GIN(object):
                 break
 
         return metadata
-            
+
 
     def __read(self, query_param):
         """
@@ -344,7 +320,7 @@ class GDP_GIN(object):
     def append(self, datum_dict):
         """
         Write a datum to the GCL. The datum should be a dictionary, with
-            the only valid key being 'data'. The value is the actual 
+            the only valid key being 'data'. The value is the actual
             data that is to be written
         """
 
@@ -455,7 +431,7 @@ class GDP_GIN(object):
     def subscribe(self, start, numrecs, timeout):
         """
         Subscriptions. Refer to the C-API for more details
-        For now, callbacks are not exposed to end-user. Events are 
+        For now, callbacks are not exposed to end-user. Events are
             generated instead.
         """
         return self.__subscribe(start, numrecs, timeout, None, None)
