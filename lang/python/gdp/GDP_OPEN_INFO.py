@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# ----- BEGIN LICENSE BLOCK -----                                               
+# ----- BEGIN LICENSE BLOCK -----
 #	GDP: Global Data Plane
 #	From the Ubiquitous Swarm Lab, 490 Cory Hall, U.C. Berkeley.
 #
@@ -24,7 +24,7 @@
 #	IF ANY, PROVIDED HEREUNDER IS PROVIDED "AS IS". REGENTS HAS NO
 #	OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS,
 #	OR MODIFICATIONS.
-# ----- END LICENSE BLOCK -----                                               
+# ----- END LICENSE BLOCK -----
 
 
 from MISC import *
@@ -48,7 +48,7 @@ class GDP_OPEN_INFO:
             Also sets up various things (such as private signature key)
             into this structure
 
-        The (incomplete) list of the keys, their description, and the 
+        The (incomplete) list of the keys, their description, and the
             associated functions for the dictionary open_info is:
 
         * skey: an instance of the class EP_CRYPTO_KEY.
@@ -86,7 +86,3 @@ class GDP_OPEN_INFO:
         __func.argtypes = [POINTER(self.gdp_open_info_t)]
 
         __func(self.gdp_open_info_ptr)
-
-
-
-

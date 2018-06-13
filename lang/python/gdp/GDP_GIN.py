@@ -37,8 +37,8 @@ from GDP_HASH import *
 from GDP_SIG import *
 from GDP_NAME import *
 from GDP_DATUM import *
-from GDP_GCLMD import *
-from GDP_GCL_OPEN_INFO import *
+from GDP_MD import *
+from GDP_OPEN_INFO import *
 
 ### From https://stackoverflow.com/questions/19443440/
 class WeakMethod(object):
@@ -714,4 +714,3 @@ class GDP_GIN(object):
             ## unproxy. See https://stackoverflow.com/questions/10246116
             assert event["gin_handle"] == self.__repr__.__self__
         return event
-
