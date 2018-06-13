@@ -77,15 +77,6 @@ class GDP_GIN(object):
     # C pointer to python object mapping
     object_dir = {}
 
-    # Thread ID => userdata mapping. We need to keep this in someplace other
-    # than a local variable, so that it doesn't get cleaned up by
-    # Garbage collection. Otherwise, our references to the memory get
-    # cleaned up over time, resulting in undefined behaviour
-    tid_udata_map = {}
-
-    # Old udata, so that they don't get garbage collected either
-    __old_udata = []
-
 
     class gdp_gin_t(Structure):
 
@@ -346,7 +337,7 @@ class GDP_GIN(object):
                                 c_void_p, c_void_p]
         __func.restype = EP_STAT
 
-        estat = __func(self.ptr, gdp_recno_t(recno), None, self.__gen_udata())
+        estat = __func(self.ptr, gdp_recno_t(recno), None, None)
         check_EP_STAT(estat)
 
 
@@ -387,7 +378,7 @@ class GDP_GIN(object):
                             c_void_p, c_void_p ]
         __func.restype = EP_STAT
 
-        estat = __func(self.ptr, datum.gdp_datum, None, self.__gen_udata())
+        estat = __func(self.ptr, datum.gdp_datum, None, None)
         check_EP_STAT(estat)
 
 
@@ -467,8 +458,7 @@ class GDP_GIN(object):
         For now, callbacks are not exposed to end-user. Events are 
             generated instead.
         """
-        return self.__subscribe(start, numrecs, timeout,
-                                                    None, self.__gen_udata())
+        return self.__subscribe(start, numrecs, timeout, None, None)
 
 
     def subscribe_ts(self, startdict, numrecs, timeout):
@@ -477,27 +467,10 @@ class GDP_GIN(object):
             is a timestamp dictionary rather than a record number.
             (See also: 'read_ts')
         """
-        return self.__subscribe(startdict, numrecs, timeout,
-                                                    None, self.__gen_udata())
-
-    def unsubscribe(self):
-        """
-        Terminate subscriptions (created by this current thread).
-        """
-
-        # FIXME: the behavior is unexpected, because of a potential
-        # bug in the C implementation; it neither terminates the
-        # specified subscription with non-null udata, nor terminates
-        # 'all' subscriptions on null udata.
-        # Fortunately, it does terminate the subscriptions by the 
-        # current thread with null udata. It's a workaround that
-        # *will* break soon.
-
-        # return self.__unsubscribe(None, self.__get_udata())
-        return self.__unsubscribe(None, None)
+        return self.__subscribe(startdict, numrecs, timeout, None, None)
 
 
-    def __unsubscribe(self, cbfunc, cbarg):
+    def unsubscribe(self, cbfunc=None, cbarg=None):
         """
         Terminate the subscription.
         """
@@ -575,7 +548,7 @@ class GDP_GIN(object):
             generated instead.
         """
 
-        return self.__multiread(start, numrecs, None, self.__gen_udata())
+        return self.__multiread(start, numrecs, None, None)
 
 
     def multiread_ts(self, startdict, numrecs):
@@ -585,7 +558,7 @@ class GDP_GIN(object):
             (See also: 'read_ts')
         """
 
-        return self.__multiread(startdict, numrecs, None, self.__gen_udata())
+        return self.__multiread(startdict, numrecs, None, None)
 
 
 
@@ -733,32 +706,3 @@ class GDP_GIN(object):
             assert event["gin_handle"] == self.__repr__.__self__
         return event
 
-    @classmethod
-    def __gen_udata(cls):
-        """
-        returns the current thread id as a c_void_p, that can be passed
-        as user data to asynchronous calls.
-        """
-        tid = cls.__tid()
-        str_buf = create_string_buffer(str(random.randint(0, 2**32)))
-
-        ## Keep this, such that this does not garbage collected
-        old_udata = cls.tid_udata_map.get(tid, None)
-        if old_udata is not None:
-            cls.__old_udata.append(old_udata)
-
-        ## update new udata
-        cls.tid_udata_map[tid] = str_buf
-        udata = cast(str_buf, c_void_p).value
-        return udata
-
-    @classmethod
-    def __get_udata(cls):
-        """ returns the current thread id, just as an integer """
-        tid = cls.__tid()
-        assert tid in cls.tid_udata_map
-        return int(cls.tid_udata_map[tid].value)
-
-    @staticmethod
-    def __tid():
-        return threading.current_thread().ident
