@@ -89,10 +89,10 @@ class GDP_GIN(object):
 
     def __init__(self, name, iomode, open_info={}):
         """
-        Open a GCL with given name and io-mode.
+        Open a GDP instance for a GDP object with given name and io-mode.
 
         name=<name-of-gin>, iomode=<mode>
-        name is a GDP_NAME object
+        name is a GDP_NAME object for the GDP object
         mode is one of the following: GDP_MODE_ANY, GDP_MODE_RO, GDP_MODE_AO,
                                       GDP_MODE_RA
         open_info is a dictionary. It contains extra information, such as the
@@ -108,12 +108,12 @@ class GDP_GIN(object):
         __ptr = POINTER(self.gdp_gin_t)()
 
         # we do need an internal represenation of the name.
-        gin_name_python = name.internal_name()
+        _name_python = name.internal_name()
         # convert this to a string that ctypes understands. Some ctypes magic
         # ahead
-        buf = create_string_buffer(gin_name_python, 32+1)
-        gin_name_ctypes_ptr = cast(byref(buf), POINTER(GDP_NAME.name_t))
-        gin_name_ctypes = gin_name_ctypes_ptr.contents
+        buf = create_string_buffer(_name_python, 32+1)
+        _name_ctypes_ptr = cast(byref(buf), POINTER(GDP_NAME.name_t))
+        _name_ctypes = _name_ctypes_ptr.contents
 
         # (optional) Do a quick sanity checking on open_info
         #   use it to get a GDP_OPEN_INFO structure
@@ -126,7 +126,7 @@ class GDP_GIN(object):
                            POINTER(POINTER(self.gdp_gin_t))]
         __func.restype = EP_STAT
 
-        estat = __func(gin_name_ctypes, iomode,
+        estat = __func(_name_ctypes, iomode,
                             __gdp_open_info.gdp_open_info_ptr,
                             pointer(__ptr))
         check_EP_STAT(estat)
@@ -164,14 +164,14 @@ class GDP_GIN(object):
         """
 
         # we do need an internal represenation of the names.
-        gin_name_python = name.internal_name()
+        _name_python = name.internal_name()
         logd_name_python = logd_name.internal_name()
 
         # convert this to a string that ctypes understands. Some ctypes magic
         # ahead
-        buf1 = create_string_buffer(gin_name_python, 32+1)
-        gin_name_ctypes_ptr = cast(byref(buf1), POINTER(GDP_NAME.name_t))
-        gin_name_ctypes = gin_name_ctypes_ptr.contents
+        buf1 = create_string_buffer(_name_python, 32+1)
+        _name_ctypes_ptr = cast(byref(buf1), POINTER(GDP_NAME.name_t))
+        _name_ctypes = _name_ctypes_ptr.contents
 
         buf2 = create_string_buffer(logd_name_python, 32+1)
         logd_name_ctypes_ptr = cast(byref(buf2), POINTER(GDP_NAME.name_t))
@@ -189,7 +189,7 @@ class GDP_GIN(object):
                                 POINTER(POINTER(cls.gdp_gin_t))]
         __func.restype = EP_STAT
 
-        estat = __func(gin_name_ctypes, logd_name_ctypes,
+        estat = __func(_name_ctypes, logd_name_ctypes,
                             md.gdp_md_ptr, throwaway_ptr)
         check_EP_STAT(estat)
         return
@@ -560,10 +560,9 @@ class GDP_GIN(object):
         __func.argtypes = [POINTER(self.gdp_gin_t)]
         __func.restype = POINTER(GDP_NAME.name_t)
 
-        gin_name_pointer = __func(self.ptr)
-        gin_name = string_at(gin_name_pointer, 32)
-        return GDP_NAME(gin_name)
-
+        _name_pointer = __func(self.ptr)
+        _name = string_at(_name_pointer, 32)
+        return GDP_NAME(_name)
 
 
     @classmethod
