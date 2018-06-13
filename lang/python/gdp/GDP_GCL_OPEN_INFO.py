@@ -30,7 +30,7 @@
 from MISC import *
 from EP_CRYPTO import *
 
-class GDP_GCL_OPEN_INFO:
+class GDP_OPEN_INFO:
 
     """
     Information that is required to open a GCL -- for internal use only.
