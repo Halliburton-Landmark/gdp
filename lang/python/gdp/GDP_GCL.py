@@ -55,17 +55,16 @@ class WeakMethod(object):
         return self.method(self.target, *args, **kwargs)
 ### End
 
-class GDP_GCL(object):
+class GDP_GIN(object):
 
     """
-    A class that represents a GCL handle. A GCL handle resembles an open
-        file handle in various ways. However, it is still different in
-        certain ways
+    A class that represents a GDP Instance. A GIN resembles an open
+    file handle in various ways.
 
     Note that get_next_event is both a class method (for events on any of
-        the GCL's) as well as an instance method (for events on a particular
-        GCL). The auto-generated documentation might not show this, but
-        something to keep in mind.
+    the GCL's) as well as an instance method (for events on a particular
+    GCL). The auto-generated documentation might not show this, but
+    something to keep in mind.
     """
 
     # We need to keep a list of all the open GCL handles we have, and
@@ -77,12 +76,6 @@ class GDP_GCL(object):
 
     # C pointer to python object mapping
     object_dir = {}
-
-    # Event Queues (events that we have extracted out of the C event
-    # queue, but don't belong to us). Maps udata => list of events
-    ev_queues = {}
-    ev_queues_lock = threading.Lock()
-
 
     # Thread ID => userdata mapping. We need to keep this in someplace other
     # than a local variable, so that it doesn't get cleaned up by
@@ -137,13 +130,13 @@ class GDP_GCL(object):
         gin_name_ctypes = gin_name_ctypes_ptr.contents
 
         # (optional) Do a quick sanity checking on open_info
-        #   use it to get a GDP_GCL_OPEN_INFO structure
-        __gdp_open_info = GDP_GCL_OPEN_INFO(open_info)
+        #   use it to get a GDP_OPEN_INFO structure
+        __gdp_open_info = GDP_OPEN_INFO(open_info)
 
         # open an existing gin
         __func = gdp.gdp_gin_open
         __func.argtypes = [GDP_NAME.name_t, c_int,
-                           POINTER(GDP_GCL_OPEN_INFO.gdp_open_info_t),
+                           POINTER(GDP_OPEN_INFO.gdp_open_info_t),
                            POINTER(POINTER(cls.gdp_gin_t))]
         __func.restype = EP_STAT
 
@@ -155,14 +148,14 @@ class GDP_GCL(object):
         if addressof(__ptr.contents) in cls.object_dir.keys():
             ## need the '()' because we store weakrefs in object_dir
             newobj = cls.object_dir[addressof(__ptr.contents)]()
-            ## the following assertion should hold, because anytime a GDP_GCL
+            ## the following assertion should hold, because anytime a GDP_GIN
             ## object is freed, object_dir is also cleaned up. IF object_dir
             ## has a pointer, that means the object hasn't been claimed by GC.
             assert newobj is not None
             return newobj
         else:
             # create a new instance
-            newobj = super(GDP_GCL, cls).__new__(cls)
+            newobj = super(GDP_GIN, cls).__new__(cls)
             newobj.ptr = __ptr
             newobj.gdp_open_info = __gdp_open_info
             cls.object_dir[addressof(__ptr.contents)] = weakref.ref(newobj)
@@ -220,13 +213,13 @@ class GDP_GCL(object):
 
         throwaway_ptr = POINTER(cls.gdp_gin_t)()
 
-        md = GDP_GCLMD()
+        md = GDP_MD()
         for k in metadata:
             md.add(k, metadata[k])
 
         __func = gdp.gdp_gin_create
         __func.argtypes = [GDP_NAME.name_t, GDP_NAME.name_t,
-                                POINTER(GDP_GCLMD.gdp_md_t),
+                                POINTER(GDP_MD.gdp_md_t),
                                 POINTER(POINTER(cls.gdp_gin_t))]
         __func.restype = EP_STAT
 
@@ -243,14 +236,14 @@ class GDP_GCL(object):
 
         __func = gdp.gdp_gin_getmetadata
         __func.argtypes = [POINTER(self.gdp_gin_t),
-                                POINTER(POINTER(GDP_GCLMD.gdp_md_t))]
+                                POINTER(POINTER(GDP_MD.gdp_md_t))]
         __func.restype = EP_STAT
 
-        gmd = POINTER(GDP_GCLMD.gdp_md_t)()
+        gmd = POINTER(GDP_MD.gdp_md_t)()
         estat = __func(self.ptr, byref(gmd)) 
         check_EP_STAT(estat)
 
-        md = GDP_GCLMD(ptr=gmd)
+        md = GDP_MD(ptr=gmd)
 
         idx = 0
         metadata = {}
@@ -623,99 +616,9 @@ class GDP_GCL(object):
         return GDP_NAME(gin_name)
 
 
-    @classmethod
-    def _helper_get_next_event(cls, __gin_handle, timeout, strict_threading):
-        """ Get the events for GCL __gin_handle.  """
-
-        if not strict_threading:
-            ## this is the old library behavior, no checks on thread
-            return cls._helper_get_next_event_call_clib(__gin_handle, timeout)
-
-        ## Otherwise, do the threading check on Python side.
-        ## use a mix of looking in local queue and calling the
-        ## underlying C library.
-
-        if timeout is None:
-            # set an insanely high value for infinite timeout
-            timeout = {'tv_sec':10**10, 'tv_nsec':0, 'tv_accuracy':0.0}
-
-        timeout_s = timeout['tv_sec'] + (1.0*timeout['tv_nsec'])/(10**9)
-
-        # 20 ms. seems like a good value for the moment.
-        tiny_t = {'tv_sec':0, 'tv_nsec':20*(10**6), 'tv_accuracy':0.0}
-
-        ev = None
-        start_time = time.time()
-
-        while ev is None and (time.time()-start_time)<timeout_s:
-            ## phase 1: look in local queue
-            ev = cls._helper_get_next_event_check_q(__gin_handle)
-
-            if ev is not None:
-                # print "############## From the queue"
-                break
-
-            ## phase 2: query from the C library (this blocks)
-            ev = cls._helper_get_next_event_call_clib(__gin_handle, tiny_t)
-            ## we insert it back to the library, and retrieve it again
-            ## just to make sure nobody snuck something in the queue in the
-            ## meantime
-            if ev is not None:
-                if ev["udata"] == cls.__get_udata():
-                    # print ">>>>>>>>>>>>>> From the library"
-                    pass
-
-                with cls.ev_queues_lock:
-                    evlist = cls.ev_queues.setdefault(ev["udata"], [])
-                    evlist.append(ev)
-
-            ## phase 3: look in local queue once again. If we fetched
-            ## something from the library, it will be in the local queue
-            ## this time, for sure.
-            ev = cls._helper_get_next_event_check_q(__gin_handle)
-
-        if ev is not None:
-            assert ev["udata"] == cls.__get_udata()
-
-        cls._helper_cleanup_event_q()
-
-        return ev
-
 
     @classmethod
-    def _helper_cleanup_event_q(cls):
-
-        ## cleanup step (done separately):
-        with cls.ev_queues_lock:
-            for udata in cls.__old_udata:
-                cls.ev_queues.pop(int(udata.value), None)
-
-
-    @classmethod
-    def _helper_get_next_event_check_q(cls, ginh):
-        """
-        Either extracts one event from the local queue that matches
-        the requirements and returns that event, Or returns None if
-        no event matches.
-        """
-
-        # pprint.pprint(cls.ev_queues)
-        udata = cls.__get_udata()
-        gin_handle = cls.object_dir.get(addressof(ginh.contents), None)()
-
-        with cls.ev_queues_lock:
-            evlist = cls.ev_queues.get(udata, [])
-            if len(evlist)>0:
-                ## sort the list, if it isn't for some reason
-                evlist.sort(key=lambda ev:ev['datum']['recno'])
-                if ginh is None or gin_handle == evlist[0]["gin_handle"]:
-                    return evlist.pop(0)
-
-        return None
-
-
-    @classmethod
-    def _helper_get_next_event_call_clib(cls, __gin_handle, timeout):
+    def _helper_get_next_event(cls, __gin_handle, timeout):
         """
         Get the events for GCL __gin_handle by calling the C library.
         If __gin_handle is None, then get events for any open GCL
@@ -817,13 +720,13 @@ class GDP_GCL(object):
         return gdp_event
 
     @classmethod
-    def get_next_event(cls, timeout, strict_threading=False):
+    def get_next_event(cls, timeout):
         """ Get events for ANY open gin """
-        return cls._helper_get_next_event(None, timeout, strict_threading)
+        return cls._helper_get_next_event(None, timeout)
 
-    def __get_next_event(self, timeout, strict_threading=False):
+    def __get_next_event(self, timeout):
         """ Get events for this particular GCL """
-        event = self._helper_get_next_event(self.ptr, timeout, strict_threading)
+        event = self._helper_get_next_event(self.ptr, timeout)
         if event is not None:
             ## the crazy '__repr__.__self__' is needed, because there's no
             ## unproxy. See https://stackoverflow.com/questions/10246116
