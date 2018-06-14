@@ -42,7 +42,7 @@
 #include <mysql.h>
 #include <errno.h>
 #include <assert.h>
-#include <gdp/gdp.h>
+#include "gdp/gdp.h"
 #include "gdp-directoryd.h"
 
 #define GDP_NAME_HEX_FORMAT (2 * sizeof(gdp_name_t))

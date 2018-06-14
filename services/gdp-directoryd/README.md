@@ -3,6 +3,14 @@
 Setup requires installation of mariadb database and mariadb
 Connector/C client library on the same host as gdp-directoryd.
 
+For Ubuntu 16.04:
+
+$ apt install \
+  	  mariadb-server \
+  	  libmariadb2 \
+  	  libmariadb-client-lgpl-dev \
+	  libmariadb-client-lgpl-dev-compat
+
 After mariadb is installed on the desired "blackbox" host,
 configure the database:
 
@@ -15,7 +23,7 @@ Copyright (c) 2000, 2017, Oracle, MariaDB Corporation Ab and others.
 
 Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 
-MariaDB [(none)]> CREATE DATABASE blackbox;
+MariaDB [(none)]> create database blackbox;
 Query OK, 1 row affected (0.00 sec)
 
 MariaDB [(none)]> show databases;
@@ -32,10 +40,10 @@ MariaDB [(none)]> show databases;
 #
 # NOTE: database is not made internet accessible to minimize security risk
 #
-MariaDB [(none)]> CREATE USER 'gdpr'@'127.0.0.1';
+MariaDB [(none)]> create user 'gdpr'@'127.0.0.1';
 Query OK, 0 rows affected (0.00 sec)
 
-MariaDB [(none)]> SELECT User, Host FROM mysql.user;
+MariaDB [(none)]> select user, host from mysql.user;
 +------+-----------+
 | User | Host      |
 +------+-----------+
@@ -44,16 +52,34 @@ MariaDB [(none)]> SELECT User, Host FROM mysql.user;
 +------+-----------+
 2 rows in set (0.00 sec)
 
-MariaDB [(none)]> USE blackbox;
+MariaDB [(none)]> use blackbox;
 Reading table information for completion of table and column names
 You can turn off this feature to get a quicker startup with -A
 
 Database changed
-MariaDB [blackbox]> GRANT ALL PRIVILEGES ON blackbox.* TO 'gdpr'@'127.0.0.1' IDENTIFIED BY 'testblackbox' WITH GRANT OPTION;
+MariaDB [blackbox]> grant all privileges on blackbox.* TO 'gdpr'@'127.0.0.1' identified by 'testblackbox' with grant option;
 Query OK, 0 rows affected (0.00 sec)
 
-MariaDB [blackbox]> CREATE TABLE gdpd ( dguid BINARY(32) NOT NULL, eguid BINARY(32) NOT NULL, ts TIMESTAMP );
+MariaDB [blackbox]> create table gdpd ( dguid BINARY(32) NOT NULL, eguid BINARY(32) NOT NULL, ts TIMESTAMP );
 Query OK, 0 rows affected (0.20 sec)
+
+
+After configuring the database, pull a gdp workspace, build gdp, then
+build and install gdp-directoryd service:
+
+$ mkdir gdp-workspace
+$ cd gdp-workspace
+$ git clone \
+	repoman@repo.eecs.berkeley.edu:projects/swarmlab/gdp.git \
+	gdp
+$ cd gdp
+$ make
+$ cd services/gdp-directoryd
+
+If gdp-directoryd is already installed and in service on this host,
+use "make reinstall" instead of the following:
+
+$ make install
 
 #
 # Sample dump of blackbox.gdpd table after adding one entry

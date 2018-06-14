@@ -43,7 +43,7 @@
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <assert.h>
-#include <gdp/gdp.h>
+#include "gdp/gdp.h"
 #include "../gdp-directoryd.h"
 
 // gdp directory currently installed on gdp-04
