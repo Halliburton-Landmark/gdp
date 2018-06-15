@@ -343,8 +343,19 @@ message GdpDatum
 	required int64			recno = 1;			// record number
 	optional GdpTimestamp	ts = 2;				// timestamp
 	optional bytes			prevhash = 3;		// hash of previous record
-	required bytes			data = 4;			// actual content
-	optional GdpSignature	sig = 5;			// signature over rest of datum
+	repeated GdpProof		proof = 4;			// other hashes with offsets
+	required bytes			data = 5;			// actual content
+	optional GdpSignature	sig = 6;			// signature over rest of datum
+}
+
+/*
+**
+*/
+
+message GdpProof
+{
+	required uint64			offset = 1;			// record offset
+	required bytes			hash = 2;			// hash of that record
 }
 
 /*
