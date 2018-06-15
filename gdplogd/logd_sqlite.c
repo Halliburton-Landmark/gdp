@@ -1149,7 +1149,7 @@ sqlite_read_by_recno(gdp_gob_t *gob,
 	{
 		const char *sql = "SELECT hash, recno, timestamp, prevhash, value, sig\n"
 						"	FROM log_entry\n"
-						"	WHERE recno = ?"
+						"	WHERE recno = ?\n"
 						"   LIMIT ?;\n";
 		phase = "prepare";
 		ep_dbg_cprintf(Dbg, 55, "preparing %s", sql);
@@ -1161,7 +1161,8 @@ sqlite_read_by_recno(gdp_gob_t *gob,
 	{
 		const char *sql = "SELECT hash, recno, timestamp, prevhash, value, sig\n"
 						"	FROM log_entry\n"
-						"	WHERE recno >= ?"
+						"	WHERE recno >= ?\n"
+						"	ORDER BY recno\n"
 						"   LIMIT ?;\n";
 		phase = "prepare";
 		ep_dbg_cprintf(Dbg, 55, "preparing %s", sql);
@@ -1239,11 +1240,11 @@ sqlite_read_by_timestamp(gdp_gob_t *gob,
 	{
 		phase = "prepare";
 		rc = sqlite3_prepare_v2(phys->db,
-						"SELECT hash, recno, timestamp, prevhash, value, sig"
-						"	FROM log_entry"
-						"	WHERE timestamp >= ?"
-						"	ORDER BY timestamp"
-						"	LIMIT ?;",
+						"SELECT hash, recno, timestamp, prevhash, value, sig\n"
+						"	FROM log_entry\n"
+						"	WHERE timestamp >= ?\n"
+						"	ORDER BY timestamp\n"
+						"	LIMIT ?;\n",
 						-1, &phys->read_by_timestamp_stmt, NULL);
 		CHECK_RC(rc, goto fail2);
 	}
