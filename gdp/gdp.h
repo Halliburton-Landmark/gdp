@@ -275,7 +275,7 @@ extern EP_STAT gdp_gin_read_by_hash(
 					gdp_hash_t *hash,		// hash of desired record
 					gdp_datum_t *datum);	// pointer to result
 
-// async read based on timestamp
+// async read based on hash
 extern EP_STAT gdp_gin_read_by_hash_async(
 					gdp_gin_t *gin,			// readable GIN handle
 					gdp_hash_t *hash,		// starting record hash
@@ -422,7 +422,7 @@ EP_STAT				gdp_open_info_set_signing_key(
 						gdp_open_info_t *info,
 						EP_CRYPTO_KEY *skey);
 
-// set the signing callback function
+// set the callback function to read a signing key from a user
 EP_STAT				gdp_open_info_set_signkey_cb(
 						gdp_open_info_t *info,
 						EP_STAT (*signkey_cb)(
