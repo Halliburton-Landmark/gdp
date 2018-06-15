@@ -116,12 +116,12 @@ _gdp_gob_new(gdp_name_t gob_name, gdp_gob_t **pgob)
 
 	// determine the digest algorithm for hashes and signatures
 	{
-		const char *mdalg = ep_adm_getstrparam("swarm.gdp.gob.mdalg", "sha256");
-		gob->mdalg = ep_crypto_md_alg_byname(mdalg);
-		if (gob->mdalg < 0)
+		const char *hashalg = ep_adm_getstrparam("swarm.gdp.gob.hashalg", "sha256");
+		gob->hashalg = ep_crypto_md_alg_byname(hashalg);
+		if (gob->hashalg < 0)
 		{
-			ep_dbg_cprintf(Dbg, 1, "_gdp_gob_new: unknown mdalg %s\n", mdalg);
-			gob->mdalg = EP_CRYPTO_MD_SHA256;
+			ep_dbg_cprintf(Dbg, 1, "_gdp_gob_new: unknown hashalg %s\n", hashalg);
+			gob->hashalg = EP_CRYPTO_MD_SHA256;
 		}
 	}
 

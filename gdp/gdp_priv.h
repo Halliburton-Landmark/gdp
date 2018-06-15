@@ -157,7 +157,6 @@ struct gdp_datum
 	gdp_hash_t			*dhash;			// hash of dbuf
 	gdp_sig_t			*sig;			// signature (may be NULL)
 	gdp_hash_t			*prevhash;		// hash of previous datum
-	uint16_t			mdalg;			// message digest algorithm
 };
 
 #define GDP_DATUM_ISGOOD(datum)											\
@@ -195,8 +194,8 @@ void			_gdp_datum_to_pb(		// convert datum to protobuf form
 
 void			_gdp_datum_from_pb(		// convert protobuf form to datum
 						gdp_datum_t *datum,
-						const GdpMessage *msg,
-						const GdpDatum *pb);
+						const GdpDatum *pb,
+						const GdpSignature *sig);
 
 EP_STAT			_gdp_datum_sign(		// sign a datum
 						gdp_datum_t *datum,			// the datum to sign
@@ -262,7 +261,7 @@ struct gdp_gob
 	gdp_name_t			name;			// the internal name
 	gdp_pname_t			pname;			// printable name (for debugging)
 	uint16_t			flags;			// flag bits, see below
-	uint16_t			mdalg;			// message digest (hash) algorithm
+	uint16_t			hashalg;		// hash algorithm
 	int					refcnt;			// reference counter
 	void				(*freefunc)(gdp_gob_t *);
 										// called when this is freed

@@ -342,6 +342,14 @@ extern EP_STAT	gdp_gin_set_read_filter(
 extern const gdp_name_t *gdp_gin_getname(
 					const gdp_gin_t *gin);	// open GIN handle
 
+// return the hash algorithm
+extern int		gdp_gin_gethashalg(
+					const gdp_gin_t *gin);	// open GIN handle
+
+// return the signature algorithm
+extern int		gdp_gin_getsigalg(
+					const gdp_gin_t *gin);	// open GIN handle
+
 // check to see if a GDP object name is valid
 extern bool		gdp_name_is_valid(
 					const gdp_name_t);
@@ -536,10 +544,6 @@ extern gdp_buf_t *gdp_datum_getbuf(
 
 // get the signature from a datum
 extern gdp_sig_t *gdp_datum_getsig(
-					const gdp_datum_t *datum);
-
-// get the message digest algorithm from a datum
-extern short	gdp_datum_getmdalg(
 					const gdp_datum_t *datum);
 
 

@@ -457,9 +457,8 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 	if (msg->sig == NULL)
 		fprintf(fp, "(none)\n");
 	else
-		fprintf(fp, "\n%ssig_type=0x%x, sig.len=%zd, sig.data=%p\n",
+		fprintf(fp, "\n%ssig.len=%zd, sig.data=%p\n",
 					_gdp_pr_indent(indent + 1),
-					msg->sig->sig_type,
 					msg->sig->sig.len,
 					msg->sig->sig.data);
 done:

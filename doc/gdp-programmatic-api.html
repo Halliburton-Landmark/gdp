@@ -504,7 +504,7 @@
       <li>Example for <code>gdp_gin_read_by_recno_async</code>:&nbsp; suppose
         there are 20 records already in a GOB.&nbsp; Then:</li>
     </ul>
-    <table cellspacing="2" cellpadding="2" border="1" align="center" width="80%">
+    <table width="80%" cellspacing="2" cellpadding="2" border="1" align="center">
       <tbody>
         <tr>
           <td valign="top">start </td>
@@ -629,7 +629,7 @@
       <li>Example:&nbsp; suppose there are 20 records already in a GOB.&nbsp;
         Then:</li>
     </ul>
-    <table cellspacing="2" cellpadding="2" border="1" align="center" width="80%">
+    <table width="80%" cellspacing="2" cellpadding="2" border="1" align="center">
       <tbody>
         <tr>
           <td valign="top">start </td>
@@ -748,7 +748,7 @@
     <ul>
       <li>The event types are as follows:</li>
     </ul>
-    <table cellspacing="2" cellpadding="2" border="1" align="center" width="80%">
+    <table width="80%" cellspacing="2" cellpadding="2" border="1" align="center">
       <tbody>
         <tr>
           <td style="width: 162.2px;" valign="top">Event Name </td>
@@ -912,6 +912,28 @@
     </ul>
     <hr>
     <h4>Name</h4>
+    gdp_gin_gethashalg &mdash; get the hash algorithm used by a GOB
+    <h4>Synopsis</h4>
+    <pre>    int gdp_gin_gethashalg(const gdp_gin_t *gin)</pre>
+    <h4>Notes</h4>
+    <ul>
+      <li>Returns the type of the hash (a.k.a. message digest) algorithm.</li>
+      <li>The values are defined by the libep.&nbsp; They consist of the major
+        SHA algorithms in various sizes, e.g., <span class="manifest">EP_CRYPTO_MD_SHA1</span>,
+        <span class="manifest">EP_CRYPTO_MD_SHA224</span>, etc. through <span class="manifest">SHA512</span>.</li>
+    </ul>
+    <hr>
+    <h4>Name</h4>
+    gdp_gin_getsigalg &mdash; get the signature algorithm used by a GOB
+    <h4>Synopsis</h4>
+    <pre>    int gdp_gin_getsigalg(const gdp_gin_t *gin)</pre>
+    <h4>Notes</h4>
+    <ul>
+      <li>Returns the type of the signature algorithm.</li>
+      <li>The values are defined by the libep.</li>
+    </ul>
+    <hr>
+    <h4>Name</h4>
     <p>gdp_gin_set_append_filter &mdash; filter appended data</p>
     <h4>Synopsis</h4>
     <code>void gdp_gin_set_append_filter(gdp_gin_t *gin,<br>
@@ -1016,20 +1038,6 @@ void gdp_datum_print(const gdp_datum_t *datum,
     <h4>Synopsis</h4>
     <pre>    gdp_buf_t *gdp_datum_getdbuf(const gdp_datum_t *datum)</pre>
     <h4>Notes</h4>
-    <hr width="100%" size="2">
-    <h4>Name</h4>
-    gdp_datum_getsigmdalg &mdash; get the signature message digest algorithm
-    from a datum
-    <h4>Synopsis</h4>
-    <pre>    int gdp_datum_getmdalg(const gdp_datum_t *datum)</pre>
-    <h4>Notes</h4>
-    <ul>
-      <li>Returns the type of the signature digest algorithm (if a signature
-        exists).</li>
-      <li>The values are defined by the libep.&nbsp; They consist of the major
-        SHA algorithms in various sizes, e.g., <span class="manifest">EP_CRYPTO_MD_SHA1</span>,
-        <span class="manifest">EP_CRYPTO_MD_SHA224</span>, etc. through <span class="manifest">SHA512</span>.</li>
-    </ul>
     <hr width="100%" size="2">
     <h4>Name</h4>
     gdp_datum_getsig &mdash; get the signature from a datum
@@ -1289,7 +1297,7 @@ typedef struct
       real-time version of the stream &mdash; for example, over a slow network
       link.</p>
     <h2> Appendix D: References</h2>
-    <table cellspacing="2" cellpadding="2" border="1" width="100%">
+    <table width="100%" cellspacing="2" cellpadding="2" border="1">
       <tbody>
         <tr>
           <td valign="top">[Dab13a] </td>

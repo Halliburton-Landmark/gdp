@@ -784,7 +784,7 @@ _gdp_gob_read_by_recno(gdp_gob_t *gob,
 	else
 	{
 		// ok, done!  pass the datum contents to the caller and free the request
-		_gdp_datum_from_pb(datum, msg, payload->dl->d[0]);
+		_gdp_datum_from_pb(datum, payload->dl->d[0], msg->sig);
 	}
 
 fail1:

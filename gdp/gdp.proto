@@ -349,7 +349,10 @@ message GdpDatum
 }
 
 /*
-**
+**  Proofs are a hash of a previous record and the offset of that
+**  record relative to the current record.  Offsets are unsigned but
+**  always treated as if they were negative, i.e., they can only
+**  point back in time.
 */
 
 message GdpProof
@@ -385,15 +388,12 @@ message GdpMetadata
 }
 
 /*
-**  Signatures can include a type, e.g., RSA-1024.
-**  Used to sign both PDUs and datums.
-**  Could be used to transmit HMAC using other sig_types.
+**  Signatures are used to sign both PDUs and datums.
 */
 
 message GdpSignature
 {
-	required uint32			sig_type = 1;
-	required bytes			sig = 2;
+	required bytes			sig = 1;
 }
 
 /*

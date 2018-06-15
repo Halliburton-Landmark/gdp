@@ -935,9 +935,9 @@ read_blob(sqlite3_stmt *stmt, int index, gdp_buf_t **blobp)
 static void
 read_hash(sqlite3_stmt *stmt, int index, gdp_hash_t **hashp)
 {
-	int mdalg = EP_CRYPTO_MD_NULL;		//FIXME
+	int hashalg = EP_CRYPTO_MD_NULL;		//FIXME
 	if (*hashp == NULL)
-		*hashp = gdp_hash_new(mdalg);
+		*hashp = gdp_hash_new(hashalg);
 	else
 		gdp_hash_reset(*hashp);
 	gdp_buf_t *buf = _gdp_hash_getbuf(*hashp);
@@ -948,9 +948,9 @@ read_hash(sqlite3_stmt *stmt, int index, gdp_hash_t **hashp)
 static void
 read_signature(sqlite3_stmt *stmt, int index, gdp_sig_t **sigp)
 {
-	int mdalg = EP_CRYPTO_MD_NULL;		//FIXME
+	int hashalg = EP_CRYPTO_MD_NULL;		//FIXME
 	if (*sigp == NULL)
-		*sigp = gdp_sig_new(mdalg);
+		*sigp = gdp_sig_new(hashalg);
 	else
 		gdp_sig_reset(*sigp);
 	gdp_buf_t *buf = _gdp_sig_getbuf(*sigp);

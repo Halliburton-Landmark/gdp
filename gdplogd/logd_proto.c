@@ -876,7 +876,7 @@ cmd_append(gdp_req_t *req)
 
 	// check the signature in the PDU
 	gdp_datum_t *datum = gdp_datum_new();
-	_gdp_datum_from_pb(datum, req->cpdu->msg, pbd);
+	_gdp_datum_from_pb(datum, pbd, req->cpdu->msg->sig);
 
 	if (req->gob->digest == NULL)
 	{

@@ -149,7 +149,6 @@ gdp_datum_reset(gdp_datum_t *datum)
 		datum->dbuf = gdp_buf_new();
 	else
 		gdp_buf_reset(datum->dbuf);
-	datum->mdalg = 0;
 	if (datum->sig != NULL)
 		gdp_sig_reset(datum->sig);
 	datum->recno = GDP_PDU_NO_RECNO;
@@ -187,11 +186,6 @@ gdp_datum_getsig(const gdp_datum_t *datum)
 	return datum->sig;
 }
 
-short
-gdp_datum_getmdalg(const gdp_datum_t *datum)
-{
-	return datum->mdalg;
-}
 
 /*
 **	GDP_DATUM_PRINT --- print a datum (for debugging)
@@ -267,10 +261,10 @@ gdp_datum_print(const gdp_datum_t *datum, FILE *fp, uint32_t flags)
 
 	if (EP_UT_BITSET(GDP_DATUM_PRSIG, flags))
 	{
-		fprintf(fp, "  signature alg = %d\n", datum->mdalg);
 		if (datum->sig != NULL && EP_UT_BITSET(GDP_DATUM_PRDEBUG, flags))
 		{
 			size_t siglen;
+			fprintf(fp, "  sig\n");
 			d = gdp_sig_getptr(datum->sig, &siglen);
 			ep_hexdump(d, siglen, fp, EP_HEXDUMP_HEX, 0);
 		}
@@ -289,7 +283,6 @@ gdp_datum_copy(gdp_datum_t *to, const gdp_datum_t *from)
 {
 	to->recno = from->recno;
 	to->ts = from->ts;
-	to->mdalg = from->mdalg;
 	to->inuse = from->inuse;
 	if (from->dbuf != NULL)
 	{
@@ -317,7 +310,6 @@ gdp_datum_dup(const gdp_datum_t *datum)
 	ndatum->recno = datum->recno;
 	ndatum->ts = datum->ts;
 	gdp_buf_copy(ndatum->dbuf, datum->dbuf);
-	ndatum->mdalg = datum->mdalg;
 	if (datum->sig != NULL)
 		ndatum->sig = gdp_sig_dup(datum->sig);
 
@@ -366,8 +358,8 @@ _gdp_datum_digest(gdp_datum_t *datum, EP_CRYPTO_MD *md)
 	// if the hash of the data isn't computed, build it now
 	if (datum->dhash == NULL)
 	{
-		int mdalg = ep_crypto_md_type(md);
-		EP_CRYPTO_MD *dmd = ep_crypto_md_new(mdalg);
+		int hashalg = ep_crypto_md_type(md);
+		EP_CRYPTO_MD *dmd = ep_crypto_md_new(hashalg);
 		if (datum->dbuf != NULL)
 		{
 			size_t dlen = gdp_buf_getlength(datum->dbuf);
@@ -377,7 +369,7 @@ _gdp_datum_digest(gdp_datum_t *datum, EP_CRYPTO_MD *md)
 		size_t mdlen = sizeof mdbuf;
 		ep_crypto_md_final(dmd, &mdbuf, &mdlen);
 		ep_crypto_md_free(dmd);
-		datum->dhash = gdp_hash_new(mdalg);
+		datum->dhash = gdp_hash_new(hashalg);
 		gdp_hash_set(datum->dhash, mdbuf, mdlen);
 	}
 
@@ -432,14 +424,14 @@ _gdp_datum_hash(gdp_datum_t *datum, const gdp_gob_t *gob)
 {
 	EP_CRYPTO_MD *md;
 
-	md = ep_crypto_md_new(gob->mdalg);
+	md = ep_crypto_md_new(gob->hashalg);
 	ep_crypto_md_update(md, gob->name, sizeof gob->name);
 	_gdp_datum_digest(datum, md);
 	uint8_t mdbuf[EP_CRYPTO_MAX_DIGEST];
 	size_t mdlen = sizeof mdbuf;
 	ep_crypto_md_final(md, &mdbuf, &mdlen);
 	ep_crypto_md_free(md);
-	gdp_hash_t *hash = gdp_hash_new(gob->mdalg);
+	gdp_hash_t *hash = gdp_hash_new(gob->hashalg);
 	gdp_hash_set(hash, mdbuf, mdlen);
 	return hash;
 }
@@ -537,7 +529,6 @@ _gdp_datum_to_pb(const gdp_datum_t *datum,
 			pbd->sig = (GdpSignature *) ep_mem_malloc(sizeof *pbd->sig);
 			gdp_signature__init(pbd->sig);
 		}
-		pbd->sig->sig_type = datum->mdalg;
 		size_t l;
 		void *sigdata = gdp_sig_getptr(datum->sig, &l);
 		pbd->sig->sig.len = l;
@@ -576,8 +567,8 @@ _gdp_timestamp_from_pb(EP_TIME_SPEC *ts,
 
 void
 _gdp_datum_from_pb(gdp_datum_t *datum,
-				const GdpMessage *msg,
-				const GdpDatum *pbd)
+				const GdpDatum *pbd,
+				const GdpSignature *sig)
 {
 	// recno
 	datum->recno = pbd->recno;
@@ -591,12 +582,11 @@ _gdp_datum_from_pb(gdp_datum_t *datum,
 	gdp_buf_write(datum->dbuf, pbd->data.data, pbd->data.len);
 
 	// signature
-	if (msg->sig != NULL)
+	if (sig != NULL)
 	{
 		if (datum->sig == NULL)
-			datum->sig = gdp_sig_new(msg->sig->sig_type);
-		datum->mdalg = msg->sig->sig_type;
-		gdp_sig_set(datum->sig, msg->sig->sig.data, msg->sig->sig.len);
+			datum->sig = gdp_sig_new(0);
+		gdp_sig_set(datum->sig, sig->sig.data, sig->sig.len);
 	}
 }
 
@@ -652,7 +642,7 @@ _gdp_datum_sign(gdp_datum_t *datum, gdp_gob_t *gob)
 	if (EP_STAT_ISOK(estat))
 	{
 		if (datum->sig == NULL)
-			datum->sig = gdp_sig_new(gob->mdalg);
+			datum->sig = gdp_sig_new(gob->hashalg);
 		gdp_sig_set(datum->sig, sigbuf, siglen);
 	}
 
