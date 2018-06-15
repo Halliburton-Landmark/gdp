@@ -452,7 +452,7 @@
     <pre>typedef void (*gdp_event_cbfunc_t)(gdp_event_t *gev)
 <br>EP_STAT gdp_gin_read_by_recno_async(<br>		gdp_gin_t *gin,
 		gdp_recno_t start,<br>		int32_t numrecs,<br>		gdp_event_cbfunc_t cbfunc,<br>		void *udata)<br>EP_STAT gdp_gin_read_by_ts_async(<br>		gdp_gin_t *gin,
-		EP_TIME_SPEC *start,<br>		int32_t numrecs,<br>		gdp_event_cbfunc_t cbfunc,<br>		void *udata)<br>EP_STAT gdp_gin_read_by_hash_async(<br>                gdp_gin_t *gin,<br>                gdp_hash_t *hash,<br>		gdp_event_cbfunc_t cbfunc,<br>		void *udata)
+		EP_TIME_SPEC *start,<br>		int32_t numrecs,<br>		gdp_event_cbfunc_t cbfunc,<br>		void *udata)<br>EP_STAT gdp_gin_read_by_hash_async(<br>                gdp_gin_t *gin,<br>		int32_t n_hashes,<br>                gdp_hash_t **hashes,<br>		gdp_event_cbfunc_t cbfunc,<br>		void *udata)
 </pre>
     <h4> Notes</h4>
     <ul>

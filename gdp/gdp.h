@@ -278,8 +278,8 @@ extern EP_STAT gdp_gin_read_by_hash(
 // async read based on hash
 extern EP_STAT gdp_gin_read_by_hash_async(
 					gdp_gin_t *gin,			// readable GIN handle
-					gdp_hash_t *hash,		// starting record hash
-					int32_t nrecs,			// number of records to read
+					uint32_t n_hashes,		// number of records to fetch
+					gdp_hash_t **hashes,	// list of hashes to fetch
 					gdp_event_cbfunc_t cbfunc,	// callback function
 					void *cbarg);			// argument to cbfunc
 

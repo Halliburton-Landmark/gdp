@@ -827,8 +827,8 @@ gdp_gin_read_by_ts_async(
 EP_STAT
 gdp_gin_read_by_hash_async(
 			gdp_gin_t *gin,
-			gdp_hash_t *hash,
-			int32_t nrecs,
+			uint32_t n_hashes,
+			gdp_hash_t **hashes,
 			gdp_event_cbfunc_t cbfunc,
 			void *cbarg)
 {
