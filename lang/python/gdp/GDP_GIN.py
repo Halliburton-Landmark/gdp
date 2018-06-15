@@ -145,7 +145,7 @@ class GDP_GIN(object):
         ## Create the instance method 'get_next_event', in addition to
         ## already existing class method
         self.get_next_event = WeakMethod(self.__get_next_event)
-        cls.object_dir[addressof(__ptr.contents)] = weakref.ref(newobj)
+        self.object_dir[addressof(__ptr.contents)] = weakref.ref(self)
 
 
     def __del__(self):
@@ -564,13 +564,17 @@ class GDP_GIN(object):
         if "data" in datum_dict.keys():
             datum.setbuf(datum_dict["data"])
 
+        __prevhash_type = c_void_p if prevhash is None \
+                                else POINTER(GDP_HASH.gdp_hash_t)
+        __prevhash_val = None if prevhash is None else prevhash.hash_
+
         __func = gdp.gdp_gin_append
         __func.argtypes = [POINTER(self.gdp_gin_t),
                                 POINTER(GDP_DATUM.gdp_datum_t),
-                                POINTER(GDP_HASH.gdp_hash_t)]
+                                __prevhash_type]
         __func.restype = EP_STAT
 
-        estat = __func(self.ptr, datum.gdp_datum, prevhash.hash_)
+        estat = __func(self.ptr, datum.gdp_datum, __prevhash_val)
         check_EP_STAT(estat)
 
 
