@@ -89,7 +89,7 @@ _gdp_invoke(gdp_req_t *req)
 		if (ep_dbg_test(Dbg, 11))
 		{
 			ep_dbg_printf("%s", _gdp_pr_indent(1));
-			_gdp_pdu_dump(req->cpdu, ep_dbg_getfile(), 2);
+			_gdp_pdu_dump(req->cpdu, ep_dbg_getfile(), 1);
 		}
 	}
 	EP_ASSERT_ELSE(req->state == GDP_REQ_ACTIVE, return EP_STAT_ASSERT_ABORT);

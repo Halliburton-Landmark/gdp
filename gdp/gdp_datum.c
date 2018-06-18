@@ -346,6 +346,7 @@ _gdp_datum_dump(const gdp_datum_t *datum,
 **		* record number
 **		* timestamp
 **		* hash of previous datum
+**		* the "proof" (hash back pointers and offsets)
 **		* hash of data payload
 **
 **	If the datum does not yet include the hash of the data payload,
@@ -355,6 +356,12 @@ _gdp_datum_dump(const gdp_datum_t *datum,
 void
 _gdp_datum_digest(gdp_datum_t *datum, EP_CRYPTO_MD *md)
 {
+	if (ep_dbg_test(Dbg, 50))
+	{
+		ep_dbg_printf("_gdp_datum_digest: ");
+		_gdp_datum_dump(datum, NULL);
+	}
+
 	// if the hash of the data isn't computed, build it now
 	if (datum->dhash == NULL)
 	{
@@ -369,11 +376,10 @@ _gdp_datum_digest(gdp_datum_t *datum, EP_CRYPTO_MD *md)
 		size_t mdlen = sizeof mdbuf;
 		ep_crypto_md_final(dmd, &mdbuf, &mdlen);
 		ep_crypto_md_free(dmd);
-		datum->dhash = gdp_hash_new(hashalg);
-		gdp_hash_set(datum->dhash, mdbuf, mdlen);
+		datum->dhash = gdp_hash_new(hashalg, mdbuf, mdlen);
 	}
 
-	// now compute H(recno || timestamp || prevHash || H(data))
+	// now compute H(recno || timestamp || prevHash || proof || H(data))
 	// recno
 	{
 		uint8_t recnobuf[8];		// 64 bits
@@ -397,6 +403,8 @@ _gdp_datum_digest(gdp_datum_t *datum, EP_CRYPTO_MD *md)
 		void *hashbytes = gdp_hash_getptr(datum->prevhash, &prevhashlen);
 		ep_crypto_md_update(md, hashbytes, prevhashlen);
 	}
+	// proof
+	//TODO: include proof
 	// data hash
 	{
 		size_t dhashlen;
@@ -410,6 +418,7 @@ _gdp_datum_digest(gdp_datum_t *datum, EP_CRYPTO_MD *md)
 **  Compute hash of a datum.
 **
 **		Two versions, one using a GIN, other using a GOB.
+**		This is not usable for signing or verification.
 */
 
 gdp_hash_t *
@@ -424,15 +433,13 @@ _gdp_datum_hash(gdp_datum_t *datum, const gdp_gob_t *gob)
 {
 	EP_CRYPTO_MD *md;
 
-	md = ep_crypto_md_new(gob->hashalg);
-	ep_crypto_md_update(md, gob->name, sizeof gob->name);
+	md = ep_crypto_md_clone(gob->digest);
 	_gdp_datum_digest(datum, md);
 	uint8_t mdbuf[EP_CRYPTO_MAX_DIGEST];
 	size_t mdlen = sizeof mdbuf;
 	ep_crypto_md_final(md, &mdbuf, &mdlen);
 	ep_crypto_md_free(md);
-	gdp_hash_t *hash = gdp_hash_new(gob->hashalg);
-	gdp_hash_set(hash, mdbuf, mdlen);
+	gdp_hash_t *hash = gdp_hash_new(gob->hashalg, mdbuf, mdlen);
 	return hash;
 }
 
@@ -585,7 +592,7 @@ _gdp_datum_from_pb(gdp_datum_t *datum,
 	if (sig != NULL)
 	{
 		if (datum->sig == NULL)
-			datum->sig = gdp_sig_new(0);
+			datum->sig = gdp_sig_new(0, NULL, 0);
 		gdp_sig_set(datum->sig, sig->sig.data, sig->sig.len);
 	}
 }
@@ -610,31 +617,12 @@ _gdp_datum_sign(gdp_datum_t *datum, gdp_gob_t *gob)
 		ep_dbg_cprintf(Dbg, 1, "_gdp_datum_sign: null GOB digest\n");
 		return GDP_STAT_SKEY_REQUIRED;
 	}
+
 	EP_CRYPTO_MD *md = ep_crypto_md_clone(gob->digest);
-	uint8_t sigbuf[EP_CRYPTO_MD_MAXSIZE];
-	uint8_t *pbp = sigbuf;
-
-	// collect the non-fixed part of the signature (message digest)
-	PUT64(datum->recno);
-	PUT64(datum->ts.tv_sec);
-	PUT32(datum->ts.tv_nsec);
-	PUT32(*(uint32_t *) &datum->ts.tv_accuracy);
-	ep_crypto_sign_update(md, sigbuf, sizeof sigbuf);
-
-	if (datum->prevhash != NULL)
-	{
-		size_t hashlen = gdp_hash_getlength(datum->prevhash);
-		ep_crypto_sign_update(md, gdp_hash_getptr(datum->prevhash, NULL),
-				hashlen);
-	}
-	if (datum->dhash != NULL)
-	{
-		size_t hashlen = gdp_hash_getlength(datum->dhash);
-		ep_crypto_sign_update(md, gdp_hash_getptr(datum->dhash, NULL),
-				hashlen);
-	}
+	_gdp_datum_digest(datum, md);
 
 	// now get the final signature
+	uint8_t sigbuf[EP_CRYPTO_MAX_SIG];
 	size_t siglen = sizeof sigbuf;
 	estat = ep_crypto_sign_final(md, sigbuf, &siglen);
 
@@ -642,8 +630,14 @@ _gdp_datum_sign(gdp_datum_t *datum, gdp_gob_t *gob)
 	if (EP_STAT_ISOK(estat))
 	{
 		if (datum->sig == NULL)
-			datum->sig = gdp_sig_new(gob->hashalg);
+			datum->sig = gdp_sig_new(gob->hashalg, NULL, 0);
 		gdp_sig_set(datum->sig, sigbuf, siglen);
+	}
+	else if (ep_dbg_test(Dbg, 1))
+	{
+		char ebuf[100];
+		ep_dbg_printf("_gdp_datum_sign: ep_crypto_sign_final => %s\n",
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 
 	// zero out sigbuf (good hygiene)

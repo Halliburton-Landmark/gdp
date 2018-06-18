@@ -551,9 +551,11 @@ extern gdp_sig_t *gdp_datum_getsig(
 **  Hashes
 */
 
-// create a new empty hash structure
+// create a new hash structure
 extern gdp_hash_t	*gdp_hash_new(
-						int alg);
+						int alg,				// hash algorithm
+						void *hashbytes,		// if set, initial bytes
+						size_t hashlen);		// length of hashbytes
 
 // free a hash structure
 extern void			gdp_hash_free(
@@ -563,16 +565,17 @@ extern void			gdp_hash_free(
 extern void			gdp_hash_reset(
 						gdp_hash_t *hash);
 
+// set the hash value; implies gdp_hash_reset
 extern void			gdp_hash_set(
-						gdp_hash_t *hash,
-						void *hashbytes,
-						size_t hashlen);
+						gdp_hash_t *hash,		// existing hash
+						void *hashbytes,		// actual hash buffer
+						size_t hashlen);		// length of hashbytes
 
 // get the length of a hash
 extern size_t		gdp_hash_getlength(
 						gdp_hash_t *hash);
 
-// get the actual hash value (and length)
+// get the actual hash value (and optionally length)
 extern void			*gdp_hash_getptr(
 						gdp_hash_t *hash,
 						size_t *hashlen_ptr);
@@ -589,7 +592,9 @@ extern bool			gdp_hash_equal(
 
 // create a new empty signature structure
 extern gdp_sig_t	*gdp_sig_new(
-						int alg);
+						int alg,				// signature algorithm
+						void *sigbytes,			// if set, initial bytes
+						size_t siglen);			// length of sigbytes
 
 // free a signature structure
 extern void			gdp_sig_free(
@@ -599,11 +604,11 @@ extern void			gdp_sig_free(
 extern void			gdp_sig_reset(
 						gdp_sig_t *sig);
 
-// set a signature
+// set a signature; implies gdp_sig_reset
 extern void			gdp_sig_set(
-						gdp_sig_t *sig,
-						void *sigbuf,
-						size_t siglen);
+						gdp_sig_t *sig,			// existing signature
+						void *sigbytes,			// actual signature value
+						size_t siglen);			// length of sigbytes
 
 // copy on signature into another
 extern void			gdp_sig_copy(

@@ -48,9 +48,12 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.crypto", "cryptographic operations for GDP"
 */
 
 gdp_hash_t *
-gdp_hash_new(int alg)
+gdp_hash_new(int alg, void *hashbytes, size_t hashlen)
 {
-	return (gdp_hash_t *) gdp_buf_new();
+	gdp_buf_t *hashbuf = gdp_buf_new();
+	if (hashbytes != NULL)
+		gdp_buf_write(hashbuf, hashbytes, hashlen);
+	return (gdp_hash_t *) hashbuf;
 }
 
 void
@@ -115,9 +118,12 @@ gdp_hash_equal(const gdp_hash_t *a1, const gdp_hash_t *b1)
 */
 
 gdp_sig_t *
-gdp_sig_new(int alg)
+gdp_sig_new(int al, void *sigbytes, size_t siglen)
 {
-	return (gdp_sig_t *) gdp_buf_new();
+	gdp_buf_t *sigbuf = gdp_buf_new();
+	if (sigbytes != NULL)
+		gdp_buf_write(sigbuf, sigbytes, siglen);
+	return (gdp_sig_t *) sigbuf;
 }
 
 void
@@ -168,10 +174,10 @@ gdp_sig_copy(gdp_sig_t *from, gdp_sig_t *to)
 }
 
 void
-gdp_sig_set(gdp_sig_t *sig, void *sigbuf, size_t siglen)
+gdp_sig_set(gdp_sig_t *sig, void *sigbytes, size_t siglen)
 {
 	gdp_buf_reset((gdp_buf_t *) sig);
-	gdp_buf_write((gdp_buf_t *) sig, sigbuf, siglen);
+	gdp_buf_write((gdp_buf_t *) sig, sigbytes, siglen);
 }
 
 

@@ -807,6 +807,9 @@ cmd_append(gdp_req_t *req)
 
 	GdpMessage__CmdAppend *payload;
 	GET_PAYLOAD(req, cmd_append, CMD_APPEND);
+	//FIXME: should loop through datums verifying hash chain.
+	//FIXME: only last entry should have signature.
+	EP_ASSERT(payload->dl->n_d == 1);		//FIXME
 	GdpDatum *pbd = payload->dl->d[0];		//FIXME
 
 	CMD_TRACE(req->cpdu->msg->cmd, "%s %" PRIgdp_recno,
@@ -876,7 +879,7 @@ cmd_append(gdp_req_t *req)
 
 	// check the signature in the PDU
 	gdp_datum_t *datum = gdp_datum_new();
-	_gdp_datum_from_pb(datum, pbd, req->cpdu->msg->sig);
+	_gdp_datum_from_pb(datum, pbd, pbd->sig);
 
 	if (req->gob->digest == NULL)
 	{
@@ -888,7 +891,7 @@ cmd_append(gdp_req_t *req)
 		}
 		ep_dbg_cprintf(Dbg, 51, "cmd_append: no public key (warn)\n");
 	}
-	else if (req->cpdu->msg->sig == NULL)
+	else if (pbd->sig == NULL)
 	{
 		// error (maybe): signature required
 		if (EP_UT_BITSET(GDP_SIG_REQUIRED, GdpSignatureStrictness))
@@ -905,8 +908,8 @@ cmd_append(gdp_req_t *req)
 		EP_CRYPTO_MD *md = ep_crypto_md_clone(req->gob->digest);
 
 		_gdp_datum_digest(datum, md);	//FIXME
-		len = req->cpdu->msg->sig->sig.len;
-		estat = ep_crypto_vrfy_final(md, req->cpdu->msg->sig->sig.data, len);
+		len = pbd->sig->sig.len;
+		estat = ep_crypto_vrfy_final(md, pbd->sig->sig.data, len);
 		ep_crypto_md_free(md);
 		if (!EP_STAT_ISOK(estat))
 		{

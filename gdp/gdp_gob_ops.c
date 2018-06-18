@@ -280,7 +280,7 @@ find_secret_key(gdp_gob_t *gob,
 		}
 	}
 
-	// set up the message digest context
+	// set up the signing context (doubles as a message digest)
 	gob->digest = ep_crypto_sign_new(secretkey, md_alg_id);
 
 	// we can release the key now
@@ -504,7 +504,6 @@ append_common(
 	EP_ASSERT_POINTER_VALID(datums);
 
 	// set up datums with appropriate back links
-	datums[0]->prevhash = prevhash;
 	int dno;
 	gdp_recno_t recno = gob->nrecs + 1;
 	gdp_datum_t *datum;
@@ -516,18 +515,13 @@ append_common(
 			ep_dbg_cprintf(Dbg, 1, "append_common: datum %d invalid\n", dno);
 			return GDP_STAT_DATUM_REQUIRED;
 		}
-		// assumes records are written in order with no gaps
-		datum->recno = recno++;
+
+		// fill in datum information
+		datum->recno = recno++;		// assumes records written in order with no gaps
 		if (!EP_TIME_IS_VALID(&datum->ts))
 			ep_time_now(&datum->ts);
 		if (datum->prevhash != NULL)
 			gdp_hash_free(datum->prevhash);
-		if (dno > 1)
-		{
-			if (datum->dhash != NULL)
-				gdp_hash_free(datum->dhash);
-			datum->dhash = _gdp_datum_hash(datums[dno - 1], gob);
-		}
 		datum->prevhash = prevhash;
 		prevhash = _gdp_datum_hash(datum, gob);
 	}
@@ -537,7 +531,12 @@ append_common(
 	if (gob->digest != NULL)
 	{
 		estat = _gdp_datum_sign(datum, gob);
-		//FIXME: check estat
+		if (!EP_STAT_ISOK(estat) && ep_dbg_test(Dbg, 1))
+		{
+			char ebuf[100];
+			ep_dbg_printf("append_common: _gdp_datum_sign => %s\n",
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		}
 	}
 
 	// create a new request structure
@@ -554,38 +553,35 @@ append_common(
 
 		payload->dl->n_d = n_datums;
 		payload->dl->d = (GdpDatum **) ep_mem_zalloc(n_datums * sizeof *datums);
-		int dno;
 		for (dno = 0; dno < n_datums; dno++)
 		{
+			datum = datums[dno];
+			if (ep_dbg_test(Dbg, 44))
+			{
+				ep_dbg_printf("append_common: _gdp_datum_to_pb: ");
+				_gdp_datum_dump(datum, NULL);
+			}
 			payload->dl->d[dno] = (GdpDatum *) ep_mem_zalloc(sizeof (GdpDatum));
 			gdp_datum__init(payload->dl->d[dno]);
-			_gdp_datum_to_pb(datums[dno], msg, payload->dl->d[dno]);
+			_gdp_datum_to_pb(datum, msg, payload->dl->d[dno]);
 		}
 
+#if 0		//XXX Done above FIXME
 		// set up for signing (req->digest will be updated with data part)
 		req->digest = gob->digest;
 		if (req->digest != NULL)
 		{
-			uint8_t recnobuf[8];		// 64 bits
-			uint8_t *pbp = recnobuf;
-			size_t len;
-			EP_CRYPTO_MD *md = ep_crypto_md_clone(req->digest);
-
 			// only sign the last datum in the set
 			GdpDatum *pbdatum = payload->dl->d[dno - 1];
+			EP_CRYPTO_MD *md = ep_crypto_md_clone(req->digest);
 
-			recnobuf[0] = msg->cmd;
-			ep_crypto_sign_update(md, &recnobuf[0], 1);
-			PUT64(datum->recno);
-			ep_crypto_sign_update(md, recnobuf, sizeof recnobuf);
-			len = pbdatum->data.len;
-			ep_crypto_sign_update(md, pbdatum->data.data, len);
+			_gdp_datum_digest(datum, md);
 			if (msg->sig == NULL)
 			{
 				msg->sig = (GdpSignature *) ep_mem_zalloc(sizeof *msg->sig);
 				gdp_signature__init(msg->sig);
 			}
-			len = EP_CRYPTO_MAX_PUB_KEY;
+			size_t len = EP_CRYPTO_MAX_PUB_KEY;
 			msg->sig->sig.data = (uint8_t *) ep_mem_malloc(len);
 			estat = ep_crypto_sign_final(md, msg->sig->sig.data, &len);
 			if (!EP_STAT_ISOK(estat))
@@ -599,13 +595,14 @@ append_common(
 				msg->sig->sig.len = len;
 			}
 		}
+#endif //FIXME
 	}
 
 	// Note that this is just a guess: the append may still fail,
 	// but we need to do this if there are multiple threads appending
 	// at the same time.
 	// If the append fails, we'll be out of sync and all hell breaks loose.
-	gob->nrecs++;
+	gob->nrecs += n_datums;
 
 fail0:
 	return estat;
