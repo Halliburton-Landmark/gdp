@@ -247,8 +247,13 @@ print_pb_datum(const GdpDatum *d, FILE *fp, int indent)
 	}
 	else
 	{
-		fprintf(fp, "\n%sprevhash=(none)", _gdp_pr_indent(indent));
+		fprintf(fp, "\n%sprevhash=(none)\n", _gdp_pr_indent(indent));
 	}
+	if (d->sig == NULL)
+		fprintf(fp, "%ssig=(none)", _gdp_pr_indent(indent));
+	else
+		fprintf(fp, "%ssig=%p [%zd]", _gdp_pr_indent(indent),
+					d->sig, d->sig->sig.len);
 	fprintf(fp, ", data[%zd]=\n", d->data.len);
 	ep_hexdump(d->data.data, d->data.len, fp, EP_HEXDUMP_ASCII, 0);
 }
@@ -284,7 +289,15 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 	else
 		fprintf(fp, "%" PRIgdp_seqno, msg->seqno);
 
-	fprintf(fp, "\n%sbody=", _gdp_pr_indent(indent));
+	fprintf(fp, "\n%ssig@%p", _gdp_pr_indent(indent), msg->sig);
+	if (msg->sig == NULL)
+		fprintf(fp, " (none)");
+	else
+		fprintf(fp, " len=%zd,  data=%p",
+					msg->sig->sig.len,
+					msg->sig->sig.data);
+
+	fprintf(fp, ", body=");
 	switch (msg->body_case)
 	{
 		int dno;
@@ -327,8 +340,8 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 		break;
 
 	case GDP_MESSAGE__BODY_CMD_READ_BY_RECNO:
-		fprintf(fp, "cmd_read_by_recno: recno=%" PRIgdp_recno,
-				msg->cmd_read_by_recno->recno);
+		fprintf(fp, "cmd_read_by_recno:\n%srecno=%" PRIgdp_recno,
+				_gdp_pr_indent(indent), msg->cmd_read_by_recno->recno);
 		if (msg->cmd_read_by_recno->has_nrecs)
 			fprintf(fp, ", nrecs=%"PRId32, msg->cmd_read_by_recno->nrecs);
 		fprintf(fp, "\n");
@@ -347,8 +360,9 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 		break;
 
 	case GDP_MESSAGE__BODY_CMD_SUBSCRIBE_BY_RECNO:
-		fprintf(fp, "cmd_subscribe_by_recno: start %"PRIgdp_recno
-					" nrecs %"PRId32 "\n",
+		fprintf(fp, "cmd_subscribe_by_recno:\n"
+					"%sstart %"PRIgdp_recno " nrecs %"PRId32 "\n",
+					_gdp_pr_indent(indent),
 					msg->cmd_subscribe_by_recno->start,
 					msg->cmd_subscribe_by_recno->nrecs);
 		break;
@@ -374,7 +388,7 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 		break;
 
 	case GDP_MESSAGE__BODY_ACK_SUCCESS:
-		fprintf(fp, "ack_success, recno=");
+		fprintf(fp, "ack_success:\n%srecno=", _gdp_pr_indent(indent));
 		if (msg->ack_success->has_recno)
 			fprintf(fp, "%" PRIgdp_recno, msg->ack_success->recno);
 		else
@@ -453,14 +467,6 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 		break;
 	}
 
-	fprintf(fp, "%ssig=%p", _gdp_pr_indent(indent), msg->sig);
-	if (msg->sig == NULL)
-		fprintf(fp, "(none)\n");
-	else
-		fprintf(fp, "\n%ssig.len=%zd, sig.data=%p\n",
-					_gdp_pr_indent(indent + 1),
-					msg->sig->sig.len,
-					msg->sig->sig.data);
 done:
 	funlockfile(fp);
 }
