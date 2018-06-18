@@ -35,8 +35,10 @@
 */
 
 #include <ep/ep.h>
-#include <ep_crypto.h>
+#include <ep/ep_crypto.h>
+#include <ep/ep_dbg.h>
 
+static EP_DBG	Dbg = EP_DBG_INIT("libep.crypto.vrfy", "cryptographic signature verification");
 
 /*
 **  Create a new cryptographic verification context.
@@ -72,6 +74,8 @@ ep_crypto_vrfy_new(EP_CRYPTO_KEY *pkey, int md_alg_id)
 				"cannot initialize digest for verification");
 		return NULL;
 	}
+	ep_dbg_cprintf(Dbg, 64, "ep_crypto_vrfy_new(%d) => %p\n",	//DEBUG
+			md_alg_id, md);					//DEBUG
 	return md;
 }
 
@@ -85,6 +89,8 @@ ep_crypto_vrfy_update(EP_CRYPTO_MD *md, void *dbuf, size_t dbufsize)
 {
 	int istat;
 
+	ep_dbg_cprintf(Dbg, 64, "ep_crypto_vrfy_update(%p, %zd)\n",	//DEBUG
+			md, dbufsize);					//DEBUG
 	istat = EVP_DigestVerifyUpdate(md, dbuf, dbufsize);
 	if (istat != 1)
 	{
@@ -109,6 +115,8 @@ ep_crypto_vrfy_final(EP_CRYPTO_MD *md, void *_obuf, size_t obufsize)
 	uint8_t *obuf = (uint8_t *) _obuf;
 	int istat;
 
+	ep_dbg_cprintf(Dbg, 64, "ep_crypto_vrfy_final(%p, %zd)\n",	//DEBUG
+			md, obufsize);					//DEBUG
 	istat = EVP_DigestVerifyFinal(md, obuf, obufsize);
 	if (istat == 1)
 	{

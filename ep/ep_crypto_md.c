@@ -28,9 +28,9 @@
 **  ----- END LICENSE BLOCK -----
 ***********************************************************************/
 
-#include <ep.h>
-#include <ep_crypto.h>
-#include <ep_dbg.h>
+#include <ep/ep.h>
+#include <ep/ep_crypto.h>
+#include <ep/ep_dbg.h>
 
 #include <strings.h>
 
@@ -120,6 +120,8 @@ ep_crypto_md_new(int md_alg_id)
 				"cannot initialize message digest");
 		return NULL;
 	}
+	ep_dbg_cprintf(Dbg, 64, "ep_crypto_md_new(%d) => %p\n",		//DEBUG
+			md_alg_id, md);					//DEBUG
 	return md;
 }
 
@@ -147,6 +149,8 @@ ep_crypto_md_clone(EP_CRYPTO_MD *oldmd)
 		return NULL;
 	}
 
+	ep_dbg_cprintf(Dbg, 64, "ep_crypto_md_clone(%p) => %p\n",	//DEBUG
+			oldmd, md);					//DEBUG
 	return md;
 }
 
@@ -160,6 +164,8 @@ ep_crypto_md_update(EP_CRYPTO_MD *md, const void *data, size_t dsize)
 {
 	int istat;
 
+	ep_dbg_cprintf(Dbg, 64, "ep_crypto_md_update(%p, %zd)\n",	//DEBUG
+			md, dsize);					//DEBUG
 	istat = EVP_DigestUpdate(md, data, dsize);
 	if (istat != 1)
 	{
@@ -185,6 +191,8 @@ ep_crypto_md_final(EP_CRYPTO_MD *md, void *_dbuf, size_t *dbufsize)
 	int istat;
 	unsigned int dbsize = *dbufsize;
 
+	ep_dbg_cprintf(Dbg, 64, "ep_crypto_md_final(%p, %zd)\n",	//DEBUG
+			md, *dbufsize);					//DEBUG
 	istat = EVP_DigestFinal_ex(md, dbuf, &dbsize);
 	if (istat != 1)
 	{
