@@ -61,14 +61,14 @@ Names marked with \* also have parameter changes.
 | `gdp_gcl_read`		| `gdp_gin_read_by_recno`		|
 | `gdp_gcl_read_async`		| `gdp_gin_read_by_recno_async`\*	|
 | `gdp_gcl_read_ts`		| `gdp_gin_read_by_ts`			|
-| `gdp_gcl_read_ts`		| `gdp_gin_read_by_ts_async`\*		|
+| _new_				| `gdp_gin_read_by_ts_async`\*		|
 | _new_				| `gdp_gin_read_by_hash`		|
 | _new_				| `gdp_gin_read_by_hash_async`\*	|
 | `gdp_gcl_subscribe`		| `gdp_gin_subscribe_by_recno`\*	|
 | `gdp_gcl_subscribe_ts`	| `gdp_gin_subscribe_by_ts`\*		|
 | `gdp_gcl_unsubscribe`		| `gdp_gin_unsubscribe`\*		|
-| `gdp_gcl_multiread`		| `gdp_gin_read_by_recno_async`\*	|
-| `gdp_gcl_multiread_ts`	| `gdp_gin_read_by_ts_async`\*		|
+| `gdp_gcl_multiread`		| `gdp_gin_read_by_recno_async`		|
+| `gdp_gcl_multiread_ts`	| `gdp_gin_read_by_ts_async`		|
 | `gdp_gcl_getmetadata`		| `gdp_gin_getmetadata`			|
 | `gdp_gcl_newsegment`		| _deleted_				|
 | `gdp_gcl_set_append_filter`	| `gdp_gin_set_append_filter`		|
