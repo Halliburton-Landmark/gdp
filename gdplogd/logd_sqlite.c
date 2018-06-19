@@ -77,9 +77,13 @@ static uint32_t		DefaultLogFlags;	// as indicated
 /*
 **  The database schema for logs.
 **
-**		FIXME: This discards the "accuracy" field of the timestamp.
-**		FIXME: Changing this would require breaking this into two
-**				columns: ts_nsec INTEGER12 and ts_accuracy FLOAT4.
+**		Timestamp usage note: using a 64-bit signed integer nanoseconds
+**			centered on 1970/01/01 means that only dates from about 1680
+**			through 2360 can be represented; the EP_TIME_SPEC range is
+**			much higher.  For this purpose, this is probably OK.  An
+**			alternative would be to store dates in microseconds, which
+**			is the limit of what most Linux clocks will give you as of
+**			this date.
 */
 
 static const char *LogSchema =
@@ -87,6 +91,7 @@ static const char *LogSchema =
 				"	hash BLOB(32) PRIMARY KEY ON CONFLICT IGNORE,\n"
 				"	recno INTEGER,\n"
 				"	timestamp INTEGER,\n"	// 64 bit, nanoseconds since 1/1/70
+				"	accuracy FLOAT,\n"		// in seconds (single precision)
 				"	prevhash BLOB(32),\n"
 				"	value BLOB,\n"
 				"	sig BLOB);\n"
@@ -257,6 +262,10 @@ sqlite_init(void)
 
 /*
 **  SQL_BIND_* --- GDP-specific type bindings
+**
+**		Note: sql_bind_timestamp always binds two fields (the time
+**			itself and the accuracy), which means the SQL must always
+**			list these two fields adjacently.
 */
 
 static int
@@ -278,18 +287,17 @@ sql_bind_recno(sqlite3_stmt *stmt, int index, gdp_recno_t recno)
 static int
 sql_bind_timestamp(sqlite3_stmt *stmt, int index, EP_TIME_SPEC *ts)
 {
-	//FIXME: expand range on times, either by storing in microseconds
-	//		or including two fields in database
-	//FIXME: include accuracy in database
-	int64_t int_time = ts->tv_sec SECONDS + ts->tv_nsec;
-	int rc = sqlite3_bind_int64(stmt, index, int_time);
+	int rc = sqlite3_bind_int64(stmt, index, ep_time_to_nsec(ts));
+	if (rc != 0)
+		return rc;
+	// Note the use of adjacent fields
+	rc = sqlite3_bind_double(stmt, index + 1, ts->tv_accuracy);
 	return rc;
 }
 
 static int
 sql_bind_signature(sqlite3_stmt *stmt, int index, gdp_datum_t *datum)
 {
-	//FIXME: need sigmdalg and siglen fields
 	size_t siglen;
 	void *sigptr = gdp_sig_getptr(datum->sig, &siglen);
 
@@ -558,8 +566,8 @@ sqlite_create(gdp_gob_t *gob, gdp_md_t *gmd)
 	sqlite3_stmt *stmt;
 	rc = sqlite3_prepare_v2(phys->db,
 				"INSERT INTO log_entry"
-				"	(hash, recno, timestamp, value)"
-				"	VALUES (?, 0, ?, ?);",
+				"	(hash, recno, timestamp, accuracy, value)"
+				"	VALUES (?, 0, ?, ?, ?);",
 				-1, &stmt, NULL);
 	CHECK_RC(rc, goto fail3);
 
@@ -580,7 +588,7 @@ sqlite_create(gdp_gob_t *gob, gdp_md_t *gmd)
 	}
 
 	// bind metadata content
-	phase = "metadata bind 3";
+	phase = "metadata bind 4";
 	{
 		uint8_t *obuf;
 		size_t mdsize = _gdp_md_serialize(gmd, &obuf);
@@ -598,7 +606,7 @@ sqlite_create(gdp_gob_t *gob, gdp_md_t *gmd)
 			estat = GDP_STAT_METADATA_REQUIRED;
 			goto fail0;
 		}
-		rc = sqlite3_bind_blob(stmt, 3, obuf, mdsize, SQLITE_TRANSIENT);
+		rc = sqlite3_bind_blob(stmt, 4, obuf, mdsize, SQLITE_TRANSIENT);
 		CHECK_RC(rc, goto fail3);
 	}
 
@@ -931,11 +939,10 @@ read_blob(sqlite3_stmt *stmt, int index, gdp_buf_t **blobp)
 		gdp_buf_write(*blobp, blob, bloblen);
 }
 
-//FIXME: this should deal with hash length and type
 static void
 read_hash(sqlite3_stmt *stmt, int index, gdp_hash_t **hashp)
 {
-	int hashalg = EP_CRYPTO_MD_NULL;		//FIXME
+	int hashalg = EP_CRYPTO_MD_NULL;		//FIXME: should come from GOB
 	if (*hashp == NULL)
 		*hashp = gdp_hash_new(hashalg, NULL, 0);
 	else
@@ -944,11 +951,10 @@ read_hash(sqlite3_stmt *stmt, int index, gdp_hash_t **hashp)
 	read_blob(stmt, index, &buf);
 }
 
-//FIXME: this should deal with signature length and type
 static void
 read_signature(sqlite3_stmt *stmt, int index, gdp_sig_t **sigp)
 {
-	int hashalg = EP_CRYPTO_MD_NULL;		//FIXME
+	int hashalg = EP_CRYPTO_MD_NULL;		//FIXME: should come from GOB
 	if (*sigp == NULL)
 		*sigp = gdp_sig_new(hashalg, NULL, 0);
 	else
@@ -980,21 +986,22 @@ process_row(sqlite3_stmt *stmt,
 	{
 		int64_t int_ts = sqlite3_column_int64(stmt, 2);
 		ep_time_from_nsec(int_ts, &datum->ts);
+		datum->ts.tv_accuracy = sqlite3_column_double(stmt, 3);
 	}
 
 	// hash of previous record
 	{
-		read_hash(stmt, 3, &datum->prevhash);
+		read_hash(stmt, 4, &datum->prevhash);
 	}
 
 	// the actual value
 	{
-		read_blob(stmt, 4, &datum->dbuf);
+		read_blob(stmt, 5, &datum->dbuf);
 	}
 
 	// signature (if it exists)
 	{
-		read_signature(stmt, 5, &datum->sig);
+		read_signature(stmt, 6, &datum->sig);
 	}
 
 	estat = (*cb)(GDP_STAT_ACK_CONTENT, datum, cb_ctx);
@@ -1085,7 +1092,7 @@ sqlite_read_by_hash(gdp_gob_t *gob,
 	{
 		phase = "prepare";
 		rc = sqlite3_prepare_v2(phys->db,
-						"SELECT hash, recno, timestamp, prevhash, value, sig"
+						"SELECT hash, recno, timestamp, accuracy, prevhash, value, sig"
 						"	FROM log_entry"
 						"	WHERE hash = ?;",
 						-1, &phys->read_by_hash_stmt, NULL);
@@ -1147,7 +1154,7 @@ sqlite_read_by_recno(gdp_gob_t *gob,
 
 	if (phys->read_by_recno_stmt1 == NULL)
 	{
-		const char *sql = "SELECT hash, recno, timestamp, prevhash, value, sig\n"
+		const char *sql = "SELECT hash, recno, timestamp, accuracy, prevhash, value, sig\n"
 						"	FROM log_entry\n"
 						"	WHERE recno = ?\n"
 						"   LIMIT ?;\n";
@@ -1159,7 +1166,7 @@ sqlite_read_by_recno(gdp_gob_t *gob,
 	}
 	if (phys->read_by_recno_stmt2 == NULL)
 	{
-		const char *sql = "SELECT hash, recno, timestamp, prevhash, value, sig\n"
+		const char *sql = "SELECT hash, recno, timestamp, accuracy, prevhash, value, sig\n"
 						"	FROM log_entry\n"
 						"	WHERE recno >= ?\n"
 						"	ORDER BY recno\n"
@@ -1240,7 +1247,7 @@ sqlite_read_by_timestamp(gdp_gob_t *gob,
 	{
 		phase = "prepare";
 		rc = sqlite3_prepare_v2(phys->db,
-						"SELECT hash, recno, timestamp, prevhash, value, sig\n"
+						"SELECT hash, recno, timestamp, accuracy, prevhash, value, sig\n"
 						"	FROM log_entry\n"
 						"	WHERE timestamp >= ?\n"
 						"	ORDER BY timestamp\n"
@@ -1253,7 +1260,7 @@ sqlite_read_by_timestamp(gdp_gob_t *gob,
 	rc = sql_bind_timestamp(phys->read_by_timestamp_stmt, 1, start_time);
 	CHECK_RC(rc, goto fail2);
 	phase = "bind2";
-	rc = sqlite3_bind_int(phys->read_by_timestamp_stmt, 2, maxrecs);
+	rc = sqlite3_bind_int(phys->read_by_timestamp_stmt, 3, maxrecs);
 	CHECK_RC(rc, goto fail2);
 
 	phase = "process results";
@@ -1356,8 +1363,8 @@ sqlite_append(gdp_gob_t *gob,
 		phase = "append prepare";
 		rc = sqlite3_prepare_v2(phys->db,
 					"INSERT INTO log_entry"
-					"	(hash, recno, timestamp, prevhash, value, sig)"
-					"	VALUES(?, ?, ?, ?, ?, ?);",
+					"	(hash, recno, timestamp, accuracy, prevhash, value, sig)"
+					"	VALUES(?, ?, ?, ?, ?, ?, ?);",
 					-1, &stmt, NULL);
 		CHECK_RC(rc, goto fail3);
 
@@ -1371,24 +1378,25 @@ sqlite_append(gdp_gob_t *gob,
 		CHECK_RC(rc, goto fail3);
 
 		phase = "append bind 3";
+		// actually binds fields 3 and 4
 		rc = sql_bind_timestamp(stmt, 3, &datum->ts);
 		CHECK_RC(rc, goto fail3);
 
 		if (datum->prevhash != NULL)
 		{
-			phase = "append bind 4";
-			rc = sql_bind_hash(stmt, 4, datum->prevhash);
+			phase = "append bind 5";
+			rc = sql_bind_hash(stmt, 5, datum->prevhash);
 			CHECK_RC(rc, goto fail3);
 		}
 
-		phase = "append bind 5";
-		rc = sql_bind_buf(stmt, 5, datum->dbuf);
+		phase = "append bind 6";
+		rc = sql_bind_buf(stmt, 6, datum->dbuf);
 		CHECK_RC(rc, goto fail3);
 
 		if (datum->sig != NULL)
 		{
-			phase = "append bind 6";
-			rc = sql_bind_signature(stmt, 6, datum);
+			phase = "append bind 7";
+			rc = sql_bind_signature(stmt, 7, datum);
 			CHECK_RC(rc, goto fail3);
 		}
 
