@@ -384,37 +384,6 @@ extern gdp_recno_t	gdp_gin_getnrecs(
 					const gdp_gin_t *gin);	// open GIN handle
 
 /*
-**  Following are for back compatibility
-*/
-
-// read from a readable GIN based on record number
-#define gdp_gcl_read		gdp_gin_read_by_recno
-
-// read from a readable GIN based on timestamp
-#define gdp_gcl_read_ts		gdp_gin_read_by_ts
-
-// read asynchronously from a GIN based on record number
-extern EP_STAT gdp_gin_read_async(
-					gdp_gin_t *gin,			// readable GIN handle
-					gdp_recno_t recno,		// starting record number
-					int32_t nrecs,			// number of records
-					gdp_event_cbfunc_t cbfunc,	// callback function
-					void *cbarg);			// argument to cbfunc
-
-// subscribe to a readable GIN
-#define gdp_gcl_subscribe		gdp_gin_subscribe_by_recno
-
-// subscribe by timestamp
-#define gdp_gcl_subscribe_ts	gdp_gin_subscribe_by_ts
-
-#define gdp_gcl_multiread		gdp_gin_read_by_recno_async
-
-// read multiple records starting from timestamp (no subscriptions)
-#define gdp_gcl_multiread_ts	gdp_gin_read_by_ts_async
-
-
-
-/*
 **  GOB Open Information
 */
 
