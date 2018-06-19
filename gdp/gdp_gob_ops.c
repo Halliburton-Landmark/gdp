@@ -501,6 +501,7 @@ append_common(
 		ep_dbg_cprintf(Dbg, 1, "append_common: need at least one datum\n");
 		return GDP_STAT_DATUM_REQUIRED;
 	}
+	EP_ASSERT(n_datums == 1);	//FIXME: server doesn't handle n_datums > 1 yet
 	EP_ASSERT_POINTER_VALID(datums);
 
 	// set up datums with appropriate back links
@@ -565,37 +566,6 @@ append_common(
 			gdp_datum__init(payload->dl->d[dno]);
 			_gdp_datum_to_pb(datum, msg, payload->dl->d[dno]);
 		}
-
-#if 0		//XXX Done above FIXME
-		// set up for signing (req->digest will be updated with data part)
-		req->digest = gob->digest;
-		if (req->digest != NULL)
-		{
-			// only sign the last datum in the set
-			GdpDatum *pbdatum = payload->dl->d[dno - 1];
-			EP_CRYPTO_MD *md = ep_crypto_md_clone(req->digest);
-
-			_gdp_datum_digest(datum, md);
-			if (msg->sig == NULL)
-			{
-				msg->sig = (GdpSignature *) ep_mem_zalloc(sizeof *msg->sig);
-				gdp_signature__init(msg->sig);
-			}
-			size_t len = EP_CRYPTO_MAX_PUB_KEY;
-			msg->sig->sig.data = (uint8_t *) ep_mem_malloc(len);
-			estat = ep_crypto_sign_final(md, msg->sig->sig.data, &len);
-			if (!EP_STAT_ISOK(estat))
-			{
-				ep_mem_free(msg->sig->sig.data);
-				ep_mem_free(msg->sig);
-				msg->sig = NULL;
-			}
-			else
-			{
-				msg->sig->sig.len = len;
-			}
-		}
-#endif //FIXME
 	}
 
 	// Note that this is just a guess: the append may still fail,

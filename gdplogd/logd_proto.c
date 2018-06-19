@@ -603,7 +603,7 @@ make_read_acknak_pdu(gdp_req_t *req, EP_STAT estat)
 		// OK, the next record exists: send it
 		gdpd_ack_resp(req, GDP_ACK_CONTENT);
 		GdpMessage__AckContent *resp = req->rpdu->msg->ack_content;
-		resp->dl->n_d = 1;		//FIXME
+		resp->dl->n_d = 1;		//FIXME: should handle multiples
 		EP_ASSERT(resp->dl->d == NULL);
 		GdpDatum *pbd;
 		resp->dl->d = ep_mem_malloc(resp->dl->n_d * sizeof pbd);

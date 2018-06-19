@@ -881,7 +881,7 @@ send_helper(gdp_chan_t *chan,
 	EP_STAT estat = EP_STAT_OK;
 	int i;
 	size_t payload_len = 0;
-	uint16_t seqno = 0;			//FIXME
+	uint16_t seqno = 0;			//FIXME: should be useful
 
 	if (payload != NULL)
 		payload_len = gdp_buf_getlength(payload);
