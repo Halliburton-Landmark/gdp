@@ -108,13 +108,13 @@ class logCreationService(GDPService):
 
         # early exit if a router told us something (usually not a good
         # sign)
-        if payload.cmd >= gdp_pb2.NAK_R_MIN and \
-                        payload.cmd <= gdp_pb2.NAK_R_MAX:
+        if payload.cmd >= GDP_NAK_R_MIN and \
+                        payload.cmd <= GDP_NAK_R_MAX:
             logger.warning("Routing error, src: %r", req['src'])
             return
 
         # check if it's a request from a client or a response from a logd.
-        if payload.cmd < 128:      ## it's a command
+        if payload.cmd < GDP_ACK_MIN:      ## it's a command
 
             ## First check for any error conditions. If any of the
             ## following occur, we ought to send back a NAK
