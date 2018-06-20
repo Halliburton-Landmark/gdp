@@ -231,9 +231,9 @@ class GDPProtocol(Protocol):
         msg_dict['ver'] = message[0]
         msg_dict['hdr_len'] = hdr_len       # byte index 1
 
-        msg_dict['addr_format'] = ord(message[2] & 0x07)
-        msg_dict['flags'] = ord((message[2] & 0x18)>>3)
-        msg_dict['type'] = ord((message[2] & 0xe0)>>5)
+        msg_dict['addr_format'] = ord(message[2]) & 0x07
+        msg_dict['flags'] = (ord(message[2]) & 0x18)>>3
+        msg_dict['type'] = (ord(message[2]) & 0xe0)>>5
         if msg_dict['addr_format'] != 0:
             logging.warning("addr formats not implemented yet")
             return
@@ -241,7 +241,7 @@ class GDPProtocol(Protocol):
             logging.warning('only regular traffic supported for now')
             return
 
-        msg_dict['ttl'] = ord(message[3] & 0x3f)
+        msg_dict['ttl'] = ord(message[3]) & 0x3f
 
         for i in xrange(4,10):
             if message[i] != '\x00':
