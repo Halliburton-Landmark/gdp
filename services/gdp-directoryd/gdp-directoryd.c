@@ -308,20 +308,18 @@ int main(int argc, char **argv)
 				{
 					memcpy(&otw_dir.eguid[0], (uint8_t *) mysql_row[0],
 						   sizeof(gdp_name_t));
-					if (otw_dir.cmd == GDP_CMD_DIR_FOUND)
-					{
-						debug(INFO, "<- eguid[%s]\n",
-							  gdp_printable_name(otw_dir.eguid, _tmp_pname_1));
-						printf("<- eguid [");
-						for (int i = 0; i < sizeof(gdp_name_t); i++)
-						{
-							printf("%.2x", (uint8_t) otw_dir.eguid[i]);
-						}
-						printf("]\n");
-					}
-					
-					// tell submitter to add eguid (response to find)
+
 					otw_dir.cmd = GDP_CMD_DIR_FOUND;
+					
+					debug(INFO, "\teguid[%s]\n",
+						  gdp_printable_name(otw_dir.eguid, _tmp_pname_1));
+
+					printf("<- eguid[");
+					for (int i = 0; i < sizeof(gdp_name_t); i++)
+					{
+						printf("%.2x", (uint8_t) otw_dir.eguid[i]);
+					}
+					printf("]\n");
 				}
 			}
 
