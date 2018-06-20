@@ -547,54 +547,6 @@ cmd_delete(gdp_req_t *req)
 }
 
 
-/*
-**  CMD_READ_BY_xxx --- read from a GOB by { record number, timestamp, hash }
-**
-**		This returns the data as part of the response.  To get multiple
-**		values in one call, see cmd_subscribe.
-*/
-
-static EP_STAT
-cmd_read_helper(gdp_req_t *req)
-{
-	EP_STAT estat;
-	gdp_datum_t *datum = gdp_datum_new();
-
-	datum->recno = req->nextrec;
-	CMD_TRACE(req->cpdu->msg->cmd, "%s %" PRIgdp_recno ", %d",
-			req->gob->pname, req->nextrec, req->numrecs);
-
-	if (EP_STAT_ISOK(estat))
-	{
-		gdpd_ack_resp(req, GDP_ACK_CONTENT);
-		GdpMessage__AckContent *resp = req->rpdu->msg->ack_content;
-		GdpDatum *pbd = ep_mem_zalloc(sizeof *pbd);
-		gdp_datum__init(pbd);
-		_gdp_datum_to_pb(datum, req->cpdu->msg, pbd);
-		resp->dl->d = ep_mem_malloc(sizeof pbd);
-		resp->dl->d[0] = pbd;
-		resp->dl->n_d = 1;
-	}
-	else
-	{
-		if (EP_STAT_IS_SAME(estat, GDP_STAT_RECORD_EXPIRED))
-			gdpd_nak_resp(req, GDP_NAK_C_GONE,
-						"requested record has expired", estat);
-		else if (EP_STAT_IS_SAME(estat, GDP_STAT_RECORD_MISSING))
-			gdpd_nak_resp(req, GDP_NAK_C_REC_MISSING,
-						"requested record is not available", estat);
-		else if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOTFOUND))
-			gdpd_nak_resp(req, GDP_NAK_C_NOTFOUND,
-						"record not found", estat);
-		else
-			gdpd_nak_resp(req, GDP_NAK_S_INTERNAL,
-						"unknown read failure", estat);
-	}
-	gdp_datum_free(datum);
-	return estat;
-}
-
-
 static void
 make_read_acknak_pdu(gdp_req_t *req, EP_STAT estat)
 {
@@ -1237,7 +1189,6 @@ cmd_subscribe_by_recno(gdp_req_t *req)
 
 	// we don't drop the GOB reference until the subscription is satisified
 
-fail0:
 	if (EP_STAT_ISOK(estat) && req->rpdu == NULL)
 	{
 		gdpd_ack_resp(req, GDP_ACK_SUCCESS);
