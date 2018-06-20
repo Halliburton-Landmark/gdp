@@ -197,19 +197,25 @@ int main(int argc, char **argv)
 			strcpy(query, call_find_nhop_pre);
 			q = query + sizeof(call_find_nhop_pre) - 1;
 
+			debug(INFO, "-> oguid[");
 			for (int i = 0; i < sizeof(gdp_name_t); i++)
 			{
+				debug(INFO, "%.2x", otw_dir.oguid[i]);
 				sprintf(q + (i * 2), "%.2x", otw_dir.oguid[i]);
 			}
+			debug(INFO, "]\n");
 			q += (2 * sizeof(gdp_name_t));
 			
 			strcat(q, call_find_nhop_mid);
 			q += sizeof(call_find_nhop_mid) - 1;
 
+			debug(INFO, "-> dguid[");
 			for (int i = 0; i < sizeof(gdp_name_t); i++)
 			{
+				debug(INFO, "%.2x", otw_dir.dguid[i]);
 				sprintf(q + (i * 2), "%.2x", otw_dir.dguid[i]);
 			}
+			debug(INFO, "]\n");
 			q += (2 * sizeof(gdp_name_t));
 			
 			strcat(q, call_find_nhop_end);
@@ -233,19 +239,25 @@ int main(int argc, char **argv)
 			strcpy(query, call_add_nhop_pre);
 			q = query + sizeof(call_add_nhop_pre) - 1;
 
+			debug(INFO, "-> dguid[");
 			for (int i = 0; i < sizeof(gdp_name_t); i++)
 			{
+				debug(INFO, "%.2x", otw_dir.dguid[i]);
 				sprintf(q + (i * 2), "%.2x", otw_dir.dguid[i]);
 			}
+			debug(INFO, "]\n");
 			q += (2 * sizeof(gdp_name_t));
 			
 			strcat(q, call_add_nhop_mid);
 			q += sizeof(call_add_nhop_mid) - 1;
 
+			debug(INFO, "-> eguid[");
 			for (int i = 0; i < sizeof(gdp_name_t); i++)
 			{
+				debug(INFO, "%.2x", otw_dir.eguid[i]);
 				sprintf(q + (i * 2), "%.2x", otw_dir.eguid[i]);
 			}
+			debug(INFO, "]\n");
 			q += (2 * sizeof(gdp_name_t));
 			
 			strcat(q, call_add_nhop_end);
@@ -296,8 +308,18 @@ int main(int argc, char **argv)
 				{
 					memcpy(&otw_dir.eguid[0], (uint8_t *) mysql_row[0],
 						   sizeof(gdp_name_t));
-					debug(INFO, "\teguid[%s]\n",
-						  gdp_printable_name(otw_dir.eguid, _tmp_pname_1));
+					if (otw_dir.cmd == GDP_CMD_DIR_FOUND)
+					{
+						debug(INFO, "<- eguid[%s]\n",
+							  gdp_printable_name(otw_dir.eguid, _tmp_pname_1));
+						printf("<- eguid [");
+						for (int i = 0; i < sizeof(gdp_name_t); i++)
+						{
+							printf("%.2x", (uint8_t) otw_dir.eguid[i]);
+						}
+						printf("]\n");
+					}
+					
 					// tell submitter to add eguid (response to find)
 					otw_dir.cmd = GDP_CMD_DIR_FOUND;
 				}
