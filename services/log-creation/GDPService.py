@@ -2,20 +2,22 @@
 
 """
 
-A library to perform network related operations (setting up TCP connections,
-parsing incoming PDUs, sending out replies, etc) for a GDP service.
+A library to perform network related operations (setting up TCP
+connections, parsing incoming PDUs, sending out replies, etc) for
+a GDP service.
 
-To use GDPService for your own service, at the very minimum, you need to
-subclass GDPService and override the method 'request_handler'. Then, you need
-to create an instance of this service with the 256-bit GDP address that this
-service should listen on and the address of a GDP router (as a
-"IP-address:port" string).
+To use GDPService for your own service, at the very minimum, you
+need to subclass GDPService and override the method 'request_handler'.
+Then, you need to create an instance of this service with the 256-bit
+GDP address that this service should listen on and the address of
+a GDP router (as a "IP-address:port" string).
 
-Any GDP PDU destined to the GDP address specified for at the instantiation time
-is parsed and passed as a dictionary to the 'request_handler'. This request
-handler should act on the received data and return a python dictionary
-containing field=>value pairs for a PDU to be sent as a reply. GDPService adds
-some defaults (such as source address, destination address, etc) unless these
+Any GDP PDU destined to the GDP address specified for at the
+instantiation time is parsed and passed as a dictionary to the
+'request_handler'. This request handler should act on the received
+data and return a python dictionary containing field=>value pairs
+for a PDU to be sent as a reply. GDPService adds some defaults
+(such as source address, destination address, etc) unless these
 are overridden in the response dictionary.
 
 """
@@ -131,12 +133,12 @@ class GDPProtocol(Protocol):
             if version == '\x02':
                 logging.warning("Someone is using old version number")
                 logging.info("buflen: %d, datalen: %d, seekptr: %d, "
-                            "version: %d", l1, l2, l, ord(__get_byte_num(0)))
+                        "version: %d", l1, l2, l, ord(__get_byte_num(0)))
 
-            if version != '\x02' and version != '\x03':   # bogus version number
+            if version != '\x02' and version != '\x03':   # bogus ver number
                 self.terminateConnection("bogus version number")
                 logging.info("buflen: %d, datalen: %d, seekptr: %d, "
-                            "version: %d", l1, l2, l, ord(__get_byte_num(0)))
+                        "version: %d", l1, l2, l, ord(__get_byte_num(0)))
                 break
 
             if (l + 80) > (l1 + l2):
@@ -197,7 +199,7 @@ class GDPProtocol(Protocol):
                     data, l - l1, (l1 + l2) - l)    # just a buffer
             else:       # case 2
                 self.buffer = (buffer(self.buffer, l, l1 - l) +
-                               buffer(data, 0, len(data)))  # Expensive string
+                           buffer(data, 0, len(data)))  # Expensive string
             # if len(self.buffer)>0: assert ord(self.buffer[0])==2
 
 
@@ -252,8 +254,8 @@ class GDPProtocol(Protocol):
         msg_dict['sig'] = message[ctr:]
 
         # get the response dictionary
-        # msg_dictuest_handler is to be supplied by GDPProtocolFactory, which
-        #   in turn gets it from GDPService
+        # msg_dictuest_handler is to be supplied by GDPProtocolFactory,
+        # which in turn gets it from GDPService
         # XXX: What all information should be made available here?
         keys = set(msg_dict.keys()) & set(['cmd', 'dst', 'src', 'flags',
                                                 'rid', 'data', 'options'])
@@ -274,8 +276,8 @@ class GDPProtocol(Protocol):
         destination is a 256 bit address. This should *not* be called
         from the reactor thread.
 
-        Qpen question: what all fields should be accepted from the caller?
-        So far: cmd, dst, src, flags, rid, data, options
+        Qpen question: what all fields should be accepted from the
+        caller? So far: cmd, dst, src, flags, rid, data, options
         """
 
         assert threading.currentThread().getName() != "ReactorThr"
@@ -345,24 +347,26 @@ class GDPProtocolFactory(ReconnectingClientFactory):
     def clientConnectionLost(self, connector, reason):
         logging.error("Conenction lost: %r", reason)
         self.protocol.advertising_call.stop()
-        ReconnectingClientFactory.clientConnectionLost(self, connector, reason)
+        ReconnectingClientFactory.clientConnectionLost(
+                                                self, connector, reason)
 
     def clientConnectionFailed(self, connector, reason):
         logging.error("Connection failed: %r", reason)
-        ReconnectingClientFactory.clientConnectionFailed(self,
-                                                            connector, reason)
+        ReconnectingClientFactory.clientConnectionFailed(
+                                                self, connector, reason)
 
 class GDPService(object):
     """
-    A generic GDP Service. In a perfect world, all GDP services should
-    be subclasses of this class.
+    A generic GDP Service. In a perfect world, all GDP services
+    should be subclasses of this class.
 
-    To implement your own GDP service, override the 'request_handler' method
-    and put your service's request processing logic.
+    To implement your own GDP service, override the
+    'request_handler' method and put your service's request
+    processing logic.
 
-    One can also override 'setup' to do service specific startup functions.
-    These functions are called *before* establishing connection to the
-    GDP router.
+    One can also override 'setup' to do service specific startup
+    functions. These functions are called *before* establishing
+    connection to the GDP router.
     """
 
 
@@ -381,16 +385,19 @@ class GDPService(object):
         self.router_port = int(t[1])
         self.GDPaddrs = GDPaddrs
 
-        ProtocolFactory = GDPProtocolFactory(self.request_handler, GDPaddrs)
+        ProtocolFactory = GDPProtocolFactory(self.request_handler,
+                                                GDPaddrs)
 
         ## Call service specific setup code
         self.setup()
 
-        ## Establish connection to the router (the reactor isn't running
-        ## yet, so this will only get established when 'start()' is called.
+        ## Establish connection to the router (the reactor isn't
+        ## running yet, so this will only get established when
+        ## 'start()' is called.
         logging.debug("Connecting to host:%s, port:%d",
-                            self.router_host, self.router_port)
-        reactor.connectTCP(self.router_host, self.router_port, ProtocolFactory)
+                        self.router_host, self.router_port)
+        reactor.connectTCP(self.router_host,
+                        self.router_port, ProtocolFactory)
 
 
     def setup(self):
