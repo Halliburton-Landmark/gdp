@@ -59,9 +59,6 @@ class GDPProtocol(Protocol):
     then, we only have one connection to maintain.
     """
 
-    # this is the conventional GDP address of a router
-    GDPROUTER_ADDRESS = (chr(255) + chr(0)) * 16
-
     def __init__(self, req_handler, GDPaddrs):
         """ The GDP address for the service end point """
 
@@ -82,8 +79,8 @@ class GDPProtocol(Protocol):
         # address to the routing layer [the PDU is 76 octet long].
         # TODO change the hard-coded values to something more general.
         ad = ('\x04' + '\x13' + '\x40' + '\x0f' +
-                '\x00'*4 + '\x00'*2 + '\x00'*2 + '\x00'*2 +
-                 self.GDPROUTER_ADDRESS + addr)
+                '\x00'*4 + '\x00'*2 + '\x00'*2 +
+                 addr + addr)
         return ad
 
 
