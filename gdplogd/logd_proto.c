@@ -730,15 +730,14 @@ init_sig_digest(gdp_gob_t *gob)
 	size_t pklen;
 	uint8_t *pkbuf;
 	int pktype;
-	int mdtype;
+	int mdtype = gob->hashalg;
 	EP_CRYPTO_KEY *key;
 
 	if (gob->digest != NULL)
 		return EP_STAT_OK;
 
 	// assuming we have a public key, set up the message digest context
-	if (gob->gob_md == NULL)
-		goto nopubkey;
+	EP_ASSERT_ELSE(gob->gob_md != NULL, return GDP_STAT_NO_METADATA);
 	estat = gdp_md_find(gob->gob_md, GDP_MD_PUBKEY, &pklen,
 					(const void **) &pkbuf);
 	if (!EP_STAT_ISOK(estat) || pklen < 5)
@@ -750,23 +749,12 @@ init_sig_digest(gdp_gob_t *gob)
 			mdtype, pktype, pklen);
 	key = ep_crypto_key_read_mem(pkbuf + 4, pklen - 4,
 			EP_CRYPTO_KEYFORM_DER, EP_CRYPTO_F_PUBLIC);
-	if (key == NULL)
-		goto nopubkey;
-
-	gob->digest = ep_crypto_vrfy_new(key, mdtype);
-
-	// include the GOB name
-	ep_crypto_vrfy_update(gob->digest, gob->name, sizeof gob->name);
-
-	// and the metadata (re-serialized)
+	if (key != NULL)
 	{
-		uint8_t *mdbuf;
-		size_t mdlen = _gdp_md_serialize(gob->gob_md, &mdbuf);
-		ep_crypto_vrfy_update(gob->digest, mdbuf, mdlen);
-		ep_mem_free(mdbuf);
+		gob->digest = ep_crypto_vrfy_new(key, mdtype);
+		gob->flags |= GOBF_SIGNING;
 	}
-
-	if (false)
+	else
 	{
 nopubkey:
 		if (EP_UT_BITSET(GDP_SIG_PUBKEYREQ, GdpSignatureStrictness))
@@ -781,6 +769,18 @@ nopubkey:
 						gob->pname);
 			estat = EP_STAT_OK;
 		}
+		gob->digest = ep_crypto_md_new(mdtype);
+	}
+
+	// include the GOB name
+	ep_crypto_md_update(gob->digest, gob->name, sizeof gob->name);
+
+	// and the metadata (re-serialized)
+	{
+		uint8_t *mdbuf;
+		size_t mdlen = _gdp_md_serialize(gob->gob_md, &mdbuf);
+		ep_crypto_md_update(gob->digest, mdbuf, mdlen);
+		ep_mem_free(mdbuf);
 	}
 
 	return estat;
@@ -901,7 +901,7 @@ cmd_append(gdp_req_t *req)
 		}
 		ep_dbg_cprintf(Dbg, 1, "cmd_append: missing signature (warn)\n");
 	}
-	else
+	else if (EP_UT_BITSET(GOBF_SIGNING, req->gob->flags))
 	{
 		// check the signature
 		size_t len;
@@ -919,34 +919,13 @@ cmd_append(gdp_req_t *req)
 				ep_dbg_cprintf(Dbg, 1, "cmd_append: signature failure (fail)\n");
 				goto fail1;
 			}
-			ep_dbg_cprintf(Dbg, 51, "cmd_append: signature failure (warn)\n");
+			ep_dbg_cprintf(Dbg, 31, "cmd_append: signature failure (warn)\n");
 		}
 		else
 		{
 			ep_dbg_cprintf(Dbg, 51, "cmd_append: good signature\n");
 		}
 	}
-
-#if 0	//XXX breaks signatures
-	// make sure timestamp in payload is up to date
-	{
-		EP_TIME_SPEC now;
-		estat = ep_time_now(&now);
-
-		if (pbd->ts == NULL)
-		{
-			pbd->ts = (GdpTimestamp *) ep_mem_zalloc(sizeof *pbd->ts);
-			gdp_timestamp__init(pbd->ts);
-		}
-
-		pbd->ts->sec = now.tv_sec;
-		pbd->ts->has_nsec = true;
-		pbd->ts->nsec = now.tv_nsec;
-		if (now.tv_accuracy != 0.0)
-			pbd->ts->has_accuracy = true;
-		pbd->ts->accuracy = now.tv_accuracy;
-	}
-#endif //XXX
 
 	// append to disk file and send to subscribers
 	{

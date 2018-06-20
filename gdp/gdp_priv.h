@@ -279,6 +279,7 @@ struct gdp_gob
 #define GOBF_DEFER_FREE		0x0010		// defer actual free until reclaim
 #define GOBF_KEEPLOCKED		0x0020		// don't unlock in _gdp_gob_decref
 #define GOBF_PENDING		0x0040		// not yet fully open
+#define GOBF_SIGNING		0x0080		// we are signing records
 
 
 /*

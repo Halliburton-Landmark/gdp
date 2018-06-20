@@ -303,6 +303,7 @@ find_secret_key(gdp_gob_t *gob,
 	}
 
 	// the GOB hash structure now has the fixed part of the hash
+	gob->flags |= GOBF_SIGNING;
 	return estat;
 }
 
@@ -366,7 +367,30 @@ _gdp_gob_open(gdp_gob_t *gob,
 
 	// if we're not going to write, we don't need a secret key
 	if (cmd == GDP_CMD_OPEN_AO || cmd == GDP_CMD_OPEN_RA)
-			estat = find_secret_key(gob, open_info);
+		estat = find_secret_key(gob, open_info);
+
+	if (gob->digest == NULL)
+	{
+		// not signing, but we still need to set up the message digest
+		gob->digest = ep_crypto_md_new(gob->hashalg);
+		if (gob->digest == NULL)
+		{
+			estat = EP_STAT_CRYPTO_DIGEST;
+			goto fail0;
+		}
+
+		// add the GOB name to the hashed message digest
+		ep_crypto_md_update(gob->digest, gob->name, sizeof gob->name);
+
+		// re-serialize the metadata and include it
+		{
+			uint8_t *mdbuf;
+			size_t mdlen;
+			mdlen = _gdp_md_serialize(gob->gob_md, &mdbuf);
+			ep_crypto_md_update(gob->digest, mdbuf, mdlen);
+			ep_mem_free(mdbuf);
+		}
+	}
 
 fail0:
 	if (req != NULL)
@@ -529,7 +553,7 @@ append_common(
 
 	// compute the signature on the final record in the chain
 	// (secret key and initial digest is already in the gob)
-	if (gob->digest != NULL)
+	if (EP_UT_BITSET(GOBF_SIGNING, gob->flags))
 	{
 		estat = _gdp_datum_sign(datum, gob);
 		if (!EP_STAT_ISOK(estat) && ep_dbg_test(Dbg, 1))
