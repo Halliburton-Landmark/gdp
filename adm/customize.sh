@@ -22,8 +22,14 @@ source_root=`basename $source_file .template`
 source_file="$source_dir/$source_root.template"
 #echo source_file=$source_file, source_dir=$source_dir, source_root=$source_root, target_dir=$target_dir
 
-{ test -r /usr/local/etc/gdp.conf.sh && . /usr/local/etc/gdp.conf.sh; } ||
-	{ test -r /etc/gdp.conf.sh && . /etc/gdp.conf.sh; }
+# allow environment to give us a different configuration; local overrides
+: ${GDP_VER=}
+{ test -r /etc/gdp.conf.sh && . /etc/gdp.conf.sh; }
+{ test -r /usr/local/etc/gdp.conf.sh && . /usr/local/etc/gdp.conf.sh; }
+{ test -r /etc/gdp${GDP_VER}.conf.sh && . /etc/gdp${GDP_VER}.conf.sh; }
+{ test -r /usr/local/etc/gdp${GDP_VER}.conf.sh && . /usr/local/etc/gdp${GDP_VER}.conf.sh; }
+
+# default configuration
 : ${GDP_ROOT:=/usr}
 if [ "$GDP_ROOT" = "/usr" ]
 then
@@ -38,6 +44,7 @@ fi
 : ${GDP_VAR:=/var/swarm/gdp}
 : ${GDP_VAR_RUN:=/var/run}
 : ${GDP_KEYS_DIR:=$GDP_ETC/keys}
+: ${GDPLOGD_BIN:=$GDP_ROOT/sbin/gdplogd$GDP_VER}
 : ${GDPLOGD_ARGS:=}
 : ${GDPLOGD_DATADIR:=}
 : ${GDPLOGD_PIDFILE:=$GDP_VAR_RUN/gdplogd.pid}
@@ -48,15 +55,17 @@ fi
 (
 	echo "# Generated" `date +"%F %T %z"` from $source_file
 	sed \
+		-e "s;@GDP_VER@;$GDP_VER;g" \
 		-e "s;@GDP_ROOT@;$GDP_ROOT;g" \
 		-e "s;@GDP_ETC@;$GDP_ETC;g" \
-		-e "s;@GDP_KEYS_DIR@;$GDP_KEYS_DIR;g" \
 		-e "s;@GDP_LOG_DIR@;$GDP_LOG_DIR;g" \
 		-e "s;@GDP_SYSLOG_FACILITY@;$GDP_SYSLOG_FACILITY;g" \
 		-e "s;@GDP_SYSLOG_LEVEL@;$GDP_SYSLOG_LEVEL;g" \
 		-e "s;@GDP_USER@;$GDP_USER;g" \
 		-e "s;@GDP_VAR@;$GDP_VAR;g" \
 		-e "s;@GDP_VAR_RUN@;$GDP_VAR_RUN;g" \
+		-e "s;@GDP_KEYS_DIR@;$GDP_KEYS_DIR;g" \
+		-e "s;@GDPLOGD_BIN@;$GDPLOGD_BIN;g" \
 		-e "s;@GDPLOGD_ARGS@;$GDPLOGD_ARGS;g" \
 		-e "s;@GDPLOGD_DATADIR@;$GDPLOGD_DATADIR;g" \
 		-e "s;@GDPLOGD_PIDFILE@;$GDPLOGD_PIDFILE;g" \
