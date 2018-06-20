@@ -1,10 +1,10 @@
-gdc-test:
-	gcc -Wall -o gdc-test gdp-directory-client.c \
+gdp-nhop:  gdp-directory-client.c ../gdp-directoryd.h
+	gcc -Wall -o gdp-nhop gdp-directory-client.c \
 		-I../../../../gdp ../../../../gdp/libs/libgdp.a \
 		-I../../../../ep ../../../../gdp/libs/libep.a \
 		-lpthread -lcrypto
 
-all: gdc-test
+all: gdp-nhop
 
 clean:
-	rm gdc-test
+	rm gdp-nhop

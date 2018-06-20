@@ -8,7 +8,7 @@
 **	Applications for the Global Data Plane
 **	From the Ubiquitous Swarm Lab, 490 Cory Hall, U.C. Berkeley.
 **
-**	Copyright (c) 2017, Regents of the University of California.
+**	Copyright (c) 2017-2018, Regents of the University of California.
 **	All rights reserved.
 **
 **	Permission is hereby granted, without written agreement and without
@@ -45,31 +45,29 @@
 #include "gdp/gdp.h"
 #include "gdp-directoryd.h"
 
+// must match database configuration (see setup.mysql)
+#define IDENTIFIED_BY "testblackbox"
+
 #define GDP_NAME_HEX_FORMAT (2 * sizeof(gdp_name_t))
 #define GDP_NAME_HEX_STRING (GDP_NAME_HEX_FORMAT + 1)
 char dguid_s[GDP_NAME_HEX_STRING];
 char eguid_s[GDP_NAME_HEX_STRING];
 
-char query_replace_prefix[] = "replace into blackbox.gdpd values (x'";
-char query_replace_mid[] = "', x'";
-char query_replace_sep[] = "', NULL), (x'";
-char query_replace_end[] = "', CURRENT_TIMESTAMP);";
+// TODO mysql_real_query (binary safe) may be faster than submitting hex?
+char call_add_nhop_pre[] = "call blackbox.add_nhop (x'";
+char call_add_nhop_mid[] = "', x'";
+char call_add_nhop_end[] = "');";
 
-char query_delete_prefix[] =
-	"delete from blackbox.gdpd where (dguid,eguid,ts) in ((x'";
-char query_delete_mid[] = "', x'";
-char query_delete_sep[] = "'), (x'";
-char query_delete_end[] = "'), (NULL));";
+char call_find_nhop_pre[] = "call blackbox.find_nhop (x'";
+char call_find_nhop_mid[] = "', x'";
+char call_find_nhop_end[] = "');";
 
-char query_expire[] = "delete from blackbox.gdpd "
+#define EXPIRE_TIMEOUT_SEC 60
+char query_expire[] = "delete from blackbox.nhops "
 	"where (ts) < DATE_SUB(NOW(), INTERVAL 5 MINUTE);";
 
-char query_find_prefix[] =
-	"select eguid from blackbox.gdpd where dguid = x'";
-char query_find_end[] = "' ;";
-
-// FIXME rough num
-#define GDP_QUERY_STRING ((2 + DIR_OGUID_MAX) * 2 * sizeof(gdp_name_t) + 2048)
+// FIXME approximate size plus margin of error
+#define GDP_QUERY_STRING (3 * (2 * sizeof(gdp_name_t)) + 256)
 char query[GDP_QUERY_STRING];
 
 otw_dir_t otw_dir;
@@ -84,7 +82,7 @@ void fail(MYSQL *con, char *s)
 
 int main(int argc, char **argv)
 {
-	struct timeval tv = { .tv_sec = 60, .tv_usec = 0 };
+	struct timeval tv = { .tv_sec = EXPIRE_TIMEOUT_SEC, .tv_usec = 0 };
 	struct sockaddr_in si_loc;
 	struct sockaddr_in si_rem;
 	socklen_t si_rem_len = sizeof(si_rem);
@@ -95,11 +93,9 @@ int main(int argc, char **argv)
 	MYSQL_RES *mysql_result;
 	unsigned int mysql_fields;
 	MYSQL_ROW mysql_row;
-	int oguid_len;
-	
-	// sanity check compiler directive is operational
-	assert(sizeof(otw_dir_t) == OTW_DIR_SIZE_ASSERT);
-	
+	gdp_pname_t _tmp_pname_1;
+	gdp_pname_t _tmp_pname_2;					
+
 	if ((fd_listen = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
 		fail(NULL, "socket");
 
@@ -122,7 +118,7 @@ int main(int argc, char **argv)
 	if ((mysql_con = mysql_init(NULL)) == NULL)
 		fail(NULL, mysql_error(mysql_con));
   
-	if (mysql_real_connect(mysql_con, "127.0.0.1", "gdpr", "testblackbox",
+	if (mysql_real_connect(mysql_con, "127.0.0.1", "gdpr", IDENTIFIED_BY,
 						   NULL, 0, NULL, 0) == NULL)
 		fail(mysql_con, mysql_error(mysql_con));
 
@@ -132,19 +128,38 @@ int main(int argc, char **argv)
 		otw_dir_len = recvfrom(fd_listen, (uint8_t *) &otw_dir.ver,
 							   sizeof(otw_dir), 0,
 							   (struct sockaddr *)&si_rem, &si_rem_len);
+
+		// timeout used to expire rows
 		if (otw_dir_len < 0 && errno == EAGAIN)
 		{
-			debug(INFO, "\nprocess expired rows");
+			debug(INFO, "\nprocess expired rows ");
 			if (mysql_query(mysql_con, query_expire))
 			{
 				fprintf(stderr, "Error: query %s\n", mysql_error(mysql_con));
 				fail(mysql_con, query_expire);
 			}
-			debug(INFO, " = %llu", mysql_affected_rows(mysql_con));
+			debug(INFO, "= %llu\n", mysql_affected_rows(mysql_con));
+
+			// ensure "commands out of sync" error does not occur on next query
+			mysql_result = mysql_store_result(mysql_con);
+			if (mysql_result != NULL)
+			{
+				debug(INFO, "expired rows results found and freed\n");
+				mysql_free_result(mysql_result);
+				while (mysql_more_results(mysql_con))
+				{
+					debug(INFO, "expired rows more results found and freed\n");
+					if (mysql_next_result(mysql_con) == 0)
+					{
+						mysql_result = mysql_store_result(mysql_con);
+						mysql_free_result(mysql_result);
+					}
+				}
+			}
 			continue;
 		}
 
-		// handle timeouts along with obviously short packets
+		// continue if timeout or obviously short packets
 		if (otw_dir_len < offsetof(otw_dir_t, oguid))
 		{
 			continue;
@@ -170,173 +185,75 @@ int main(int argc, char **argv)
 		{
 			char *q;
 			
-			// one entry per key, so no multiple replies for now
-			debug(INFO, "id(0x%x) cmd -> find\n", ntohs(otw_dir.id));
+			debug(INFO, "id(0x%x) cmd -> find nhop\n"
+				  "\toguid[%s]\n"
+				  "\tdguid[%s]\n",
+				  ntohs(otw_dir.id),
+				  gdp_printable_name(otw_dir.oguid, _tmp_pname_1),
+				  gdp_printable_name(otw_dir.dguid, _tmp_pname_2));
 
 			// build the query
 
-			strcpy(query, query_find_prefix);
-			q = query + sizeof(query_find_prefix) - 1;
+			strcpy(query, call_find_nhop_pre);
+			q = query + sizeof(call_find_nhop_pre) - 1;
 
-			debug(VERB, "-> dguid [");
 			for (int i = 0; i < sizeof(gdp_name_t); i++)
 			{
-				debug(VERB, "%.2x", otw_dir.dguid[i]);
-				sprintf(q + (i * 2), "%.2x", otw_dir.dguid[i]);
+				sprintf(q + (i * 2), "%.2x", otw_dir.oguid[i]);
 			}
-			debug(VERB, "]\n");
 			q += (2 * sizeof(gdp_name_t));
 			
-			strcat(q, query_find_end);
+			strcat(q, call_find_nhop_mid);
+			q += sizeof(call_find_nhop_mid) - 1;
+
+			for (int i = 0; i < sizeof(gdp_name_t); i++)
+			{
+				sprintf(q + (i * 2), "%.2x", otw_dir.dguid[i]);
+			}
+			q += (2 * sizeof(gdp_name_t));
+			
+			strcat(q, call_find_nhop_end);
+			q += sizeof(call_find_nhop_end) - 1;
 		}
 		break;
 
 		case GDP_CMD_DIR_ADD:
 		{
 			char *q;
-			
-			debug(INFO, "id(0x%x) cmd -> add\n", ntohs(otw_dir.id));
 
-			oguid_len = otw_dir_len - offsetof(otw_dir_t, oguid);
-			if (oguid_len % sizeof(gdp_name_t) != 0)
-			{
-				debug(WARN, "Warn: invalid oguid len %d", oguid_len);
-				continue;
-			}
+			debug(INFO, "id(0x%x) cmd -> add nhop\n"
+				  "\tdguid[%s]\n"
+				  "\teguid[%s]\n",
+				  ntohs(otw_dir.id),
+				  gdp_printable_name(otw_dir.dguid, _tmp_pname_1),
+				  gdp_printable_name(otw_dir.eguid, _tmp_pname_2));
 
 			// build the query
 
-			strcpy(query, query_replace_prefix);
-			q = query + sizeof(query_replace_prefix) - 1;
+			strcpy(query, call_add_nhop_pre);
+			q = query + sizeof(call_add_nhop_pre) - 1;
 
-			debug(VERB, "-> dguid [");
 			for (int i = 0; i < sizeof(gdp_name_t); i++)
 			{
-				debug(VERB, "%.2x", otw_dir.dguid[i]);
 				sprintf(q + (i * 2), "%.2x", otw_dir.dguid[i]);
 			}
-			debug(VERB, "]\n");
 			q += (2 * sizeof(gdp_name_t));
 			
-			strcat(q, query_replace_mid);
-			q += sizeof(query_replace_mid) - 1;
+			strcat(q, call_add_nhop_mid);
+			q += sizeof(call_add_nhop_mid) - 1;
 
-			debug(VERB, "-> eguid [");
 			for (int i = 0; i < sizeof(gdp_name_t); i++)
 			{
-				debug(VERB, "%.2x", otw_dir.eguid[i]);
 				sprintf(q + (i * 2), "%.2x", otw_dir.eguid[i]);
 			}
-			debug(VERB, "]\n");
 			q += (2 * sizeof(gdp_name_t));
-
-			debug(VERB, "oguid len %d\n", oguid_len);
-
-			for (int d = 0; d < oguid_len; d += sizeof(gdp_name_t))
-			{
-				strcat(q, query_replace_sep);
-				q += sizeof(query_replace_sep) - 1;
-				
-				debug(VERB, "-> dguid [");
-				for (int i = 0; i < sizeof(gdp_name_t); i++)
-				{
-					debug(VERB, "%.2x", otw_dir.oguid[d + i]);
-					sprintf(q + (i * 2), "%.2x", otw_dir.oguid[d + i]);
-				}
-				debug(VERB, "]\n");
-				q += (2 * sizeof(gdp_name_t));
-
-				strcat(q, query_replace_mid);
-				q += sizeof(query_replace_mid) - 1;
-
-				debug(VERB, "-> eguid [");
-				for (int i = 0; i < sizeof(gdp_name_t); i++)
-				{
-					debug(VERB, "%.2x", otw_dir.eguid[i]);
-					sprintf(q + (i * 2), "%.2x", otw_dir.eguid[i]);
-				}
-				debug(VERB, "]\n");
-				q += (2 * sizeof(gdp_name_t));
-			}
 			
-			strcat(q, query_replace_end);
-			q += sizeof(query_replace_end) - 1;
+			strcat(q, call_add_nhop_end);
+			q += sizeof(call_add_nhop_end) - 1;
+			
 		}
 		break;
 
-		case GDP_CMD_DIR_REMOVE:
-		{
-			char *q;
-			
-			debug(INFO, "id(0x%x) cmd -> remove\n", ntohs(otw_dir.id));
-
-			oguid_len = otw_dir_len - offsetof(otw_dir_t, oguid);
-			if (oguid_len % sizeof(gdp_name_t) != 0)
-			{
-				debug(WARN, "Warn: invalid oguid len %d", oguid_len);
-				continue;
-			}
-
-			// build the query
-
-			strcpy(query, query_delete_prefix);
-			q = query + sizeof(query_delete_prefix) - 1;
-
-			debug(VERB, "-> dguid [");
-			for (int i = 0; i < sizeof(gdp_name_t); i++)
-			{
-				debug(VERB, "%.2x", otw_dir.dguid[i]);
-				sprintf(q + (i * 2), "%.2x", otw_dir.dguid[i]);
-			}
-			debug(VERB, "]\n");
-			q += (2 * sizeof(gdp_name_t));
-			
-			strcat(q, query_delete_mid);
-			q += sizeof(query_delete_mid) - 1;
-
-			debug(VERB, "-> eguid [");
-			for (int i = 0; i < sizeof(gdp_name_t); i++)
-			{
-				debug(VERB, "%.2x", otw_dir.eguid[i]);
-				sprintf(q + (i * 2), "%.2x", otw_dir.eguid[i]);
-			}
-			debug(VERB, "]\n");
-			q += (2 * sizeof(gdp_name_t));
-
-			debug(VERB, "oguid len %d\n", oguid_len);
-
-			for (int d = 0; d < oguid_len; d += sizeof(gdp_name_t))
-			{
-				strcat(q, query_delete_sep);
-				q += sizeof(query_delete_sep) - 1;
-				
-				debug(VERB, "-> dguid [");
-				for (int i = 0; i < sizeof(gdp_name_t); i++)
-				{
-					debug(VERB, "%.2x", otw_dir.oguid[d + i]);
-					sprintf(q + (i * 2), "%.2x", otw_dir.oguid[d + i]);
-				}
-				debug(VERB, "]\n");
-				q += (2 * sizeof(gdp_name_t));
-
-				strcat(q, query_delete_mid);
-				q += sizeof(query_delete_mid) - 1;
-
-				debug(VERB, "-> eguid [");
-				for (int i = 0; i < sizeof(gdp_name_t); i++)
-				{
-					debug(VERB, "%.2x", otw_dir.eguid[i]);
-					sprintf(q + (i * 2), "%.2x", otw_dir.eguid[i]);
-				}
-				debug(VERB, "]\n");
-				q += (2 * sizeof(gdp_name_t));
-			}
-			
-			strcat(q, query_delete_end);
-			q += sizeof(query_delete_end) - 1;
-		}
-		break;
-		
 		default:
 		{
 			fprintf(stderr, "Error: packet with unknown cmd\n");
@@ -351,7 +268,6 @@ int main(int argc, char **argv)
 			fail(mysql_con, query);
 		}
 			
-		// handle result
 		mysql_result = mysql_store_result(mysql_con);
 
 		if (otw_dir.cmd != GDP_CMD_DIR_FIND)
@@ -373,29 +289,38 @@ int main(int argc, char **argv)
 				mysql_row = mysql_fetch_row(mysql_result);
 				if (!mysql_row || mysql_fields != 1 || mysql_row[0] == NULL)
 				{
-					debug(INFO, "dguid not found\n");
-					// should already be zero from sender...
-					// memset(&otw_dir.eguid[0], 0, sizeof(gdp_name_t));
+					debug(INFO, "not found\n");
+					memset(&otw_dir.eguid[0], 0, sizeof(gdp_name_t));
 				}
 				else
 				{
-					debug(INFO, "<- eguid [");
-					for (int c = 0; c < sizeof(gdp_name_t); c++)
-					{
-						debug(INFO, "%.2x", (uint8_t) mysql_row[0][c]);
-						otw_dir.eguid[c] = (uint8_t) mysql_row[0][c];
-					}
-					debug(INFO, "]\n");
+					memcpy(&otw_dir.eguid[0], (uint8_t *) mysql_row[0],
+						   sizeof(gdp_name_t));
+					debug(INFO, "\teguid[%s]\n",
+						  gdp_printable_name(otw_dir.eguid, _tmp_pname_1));
 					// tell submitter to add eguid (response to find)
 					otw_dir.cmd = GDP_CMD_DIR_FOUND;
 				}
-				// good or bad, free result now
-				mysql_free_result(mysql_result);
 			}
 
 			otw_dir_len = sendto(fd_listen, (uint8_t *) &otw_dir.ver,
 								 otw_dir_len, 0,
 								 (struct sockaddr *)&si_rem, sizeof(si_rem));
+		}
+
+		// ensure "commands out of sync" error does not occur on next query
+		if (mysql_result != NULL)
+		{
+			mysql_free_result(mysql_result);
+			while (mysql_more_results(mysql_con))
+			{
+				debug(INFO, "more results found and freed\n");
+				if (mysql_next_result(mysql_con) == 0)
+				{
+					mysql_result = mysql_store_result(mysql_con);
+					mysql_free_result(mysql_result);
+				}
+			}
 		}
 
 		if (otw_dir_len < 0)

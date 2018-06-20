@@ -1,9 +1,10 @@
 .PHONY: install-service install-binary install start stop reinstall deinstall
 
-gdp-directoryd:
+gdp-directoryd: gdp-directoryd.c gdp-directoryd.h
 	gcc -Wall -o gdp-directoryd gdp-directoryd.c \
 		-I/usr/include/mariadb -lmariadb \
-		-I../../../gdp
+		-I../../../gdp ../../../gdp/libs/libgdp.a ../../../gdp/libs/libep.a \
+		-lpthread -lcrypto
 
 install-service:
 	sudo cp gdp-directoryd.service /etc/systemd/system/
