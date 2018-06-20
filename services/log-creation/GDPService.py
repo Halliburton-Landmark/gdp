@@ -281,7 +281,8 @@ class GDPProtocol(Protocol):
         from the reactor thread.
 
         Qpen question: what all fields should be accepted from the
-        caller? So far: dst, src, data
+        caller? So far: dst, src, data.
+        Note that 'data' is a serialized protobuf message.
         """
 
         assert threading.currentThread().getName() != "ReactorThr"

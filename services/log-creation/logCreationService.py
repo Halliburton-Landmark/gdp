@@ -12,6 +12,7 @@ is handled cleanly, before we can come up with a better solution).
 
 from GDPService import GDPService
 import gdp
+import gdp_pb2
 import random
 import argparse
 import time
@@ -101,33 +102,38 @@ class logCreationService(GDPService):
         a log-server.
         """
 
+        # first, deserialize the payload from req pdu.
+        payload = gdp_pb2.GdpMessage()
+        payload.ParseFromString(req['data'])
+
         # early exit if a router told us something (usually not a good
         # sign)
-        if req['cmd'] >= GDP_NAK_R_MIN and req['cmd'] <= GDP_NAK_R_MAX:
+        if payload.cmd >= gdp_pb2.NAK_R_MIN and \
+                        payload.cmd <= gdp_pb2.NAK_R_MAX:
             logger.warning("Routing error, src: %r", req['src'])
             return
 
         # check if it's a request from a client or a response from a logd.
-        if req['cmd'] < 128:      ## it's a command
+        if payload.cmd < 128:      ## it's a command
 
             ## First check for any error conditions. If any of the
             ## following occur, we ought to send back a NAK
             if req['src'] in self.logservers:
-                logging.info("error: received cmd %d from server", req['cmd'])
-                return self.gen_nak(req, GDP_NAK_C_BADREQ)
+                logging.info("error: received cmd %d from server", payload.cmd)
+                return self.gen_nak(req, gdp_pb2.NAK_C_BADREQ)
 
-            if req['cmd'] != GDP_CMD_CREATE:
+            if payload.cmd != gdp_pb2.CMD_CREATE:
                 logging.info("error: recieved unknown request")
-                return self.gen_nak(req, GDP_NAK_S_NOTIMPL)
+                return self.gen_nak(req, gdp_pb2.NAK_S_NOTIMPL)
 
             ## By now, we know the request is a CREATE request from a client
 
             ## figure out the data we need to insert in the database
-            logname = req['data'][:32]
+            logname = payload.cmd_create.logname
             srvname = random.choice(self.logservers)
             ## private information that we will need later
             creator = req['src']
-            rid = req['rid']
+            rid = payload.rid
 
             ## log this to our backend database. Generate printable
             ## names (except the null character, which causes problems)
@@ -155,17 +161,21 @@ class logCreationService(GDPService):
                     spoofed_req = req.copy()
                     spoofed_req['src'] = req['dst']
                     spoofed_req['dst'] = srvname
-                    spoofed_req['rid'] = self.cur.lastrowid
-        
+                    ## make a copy of payload so that we can change rid
+                    __spoofed_payload = gdp_pb2.GdpMessage()
+                    __spoofed_payload.ParseFromString(req['data'])
+                    __spoofed_payload.rid = self.cur.lastrowid
+                    spoofed_req['data'] = __spoofed_payload.SerializeToString()
+
                     # now return this spoofed request back to transport layer
                     # Since we have overridden the destination, it will go
                     # to a log server instead of the actual client
                     return spoofed_req
-        
+
             except sqlite3.IntegrityError:
 
                 logging.info("Log already exists")
-                return self.gen_nak(req, GDP_NAK_C_CONFLICT)
+                return self.gen_nak(req, gdp_pb2.NAK_C_CONFLICT)
 
             ## Send a spoofed request to the logserver
 
@@ -174,15 +184,15 @@ class logCreationService(GDPService):
             ## Sanity checking
             if req['src'] not in self.logservers:
                 logging.info("error: received a response from non-logserver")
-                return self.gen_nak(req, GDP_NAK_C_BADREQ)
+                return self.gen_nak(req, gdp_pb2.NAK_C_BADREQ)
 
-            logging.info("Response from log-server, row %d", req['rid'])
+            logging.info("Response from log-server, row %d", payload.rid)
 
             with self.lock:
 
                 ## Fetch the original creator and rid from our database
                 self.cur.execute("""SELECT creator, rid, ack_seen FROM logs
-                                            WHERE rowid=?""", (req['rid'],))
+                                            WHERE rowid=?""", (payload.rid,))
                 dbrows = self.cur.fetchall()
 
             good_resp = len(dbrows) == 1
@@ -195,32 +205,44 @@ class logCreationService(GDPService):
             if not good_resp:
 
                 logging.info("error: bogus response")
-                return self.gen_nak(req, GDP_NAK_C_BADREQ)
+                return self.gen_nak(req, gdp_pb2.NAK_C_BADREQ)
 
             else:
 
                 with self.lock:
-                    logging.debug("Setting ack_seen to 1 for row %d", req['rid'])
+                    logging.debug("Setting ack_seen to 1 for row %d",
+                                                              payload.rid)
                     self.cur.execute("""UPDATE logs SET ack_seen=1
-                                            WHERE rowid=?""", (req['rid'],))
+                                        WHERE rowid=?""", (payload.rid,))
                     self.conn.commit()
 
             # create a spoofed reply and send it to the client
             spoofed_reply = req.copy()
             spoofed_reply['src'] = req['dst']
             spoofed_reply['dst'] = creator
-            spoofed_reply['rid'] = orig_rid
+
+            spoofed_payload = gdp_pb2.GdpMessage()
+            spoofed_payload.ParseFromString(req['data'])
+            spoofed_payload.rid = orig_rid
+
+            spoofed_reply['data'] = spoofed_payload.SerializeToString()
 
             # return this back to the transport layer
             return spoofed_reply
 
 
-    def gen_nak(self, req, nak=GDP_NAK_C_BADREQ):
+    def gen_nak(self, req, nak=gdp_pb2.NAK_C_BADREQ):
         resp = dict()
-        resp['cmd'] = nak
         resp['src'] = req['dst']
         resp['dst'] = req['src']
-        resp['rid'] = req['rid']
+
+        resp_payload = gdp_pb2.GdpMessage()
+        resp_payload.ParseFromString(req['data'])
+        resp_payload.cmd = nak
+        resp_payload.nak.ep_stat = 0
+
+        resp['data'] = resp_payload.SerializeToString()
+
         return resp
 
 
