@@ -38,6 +38,8 @@
 #include <ep/ep_dbg.h>
 #include <ep/ep_hexdump.h>
 #include <ep/ep_prflags.h>
+#include <ep/ep_string.h>
+#include <ep/ep_xlate.h>
 
 #include <string.h>
 
@@ -381,7 +383,7 @@ _gdp_md_deserialize(const uint8_t *smd, size_t smd_len)
 	if (ep_dbg_test(Dbg, 24))
 	{
 		ep_dbg_printf("_gdp_md_deserialize:\n  ");
-		gdp_md_print(gmd, ep_dbg_getfile(), 4, 0);
+		gdp_md_dump(gmd, ep_dbg_getfile(), 4, 0);
 	}
 
 	return gmd;
@@ -401,49 +403,112 @@ static EP_PRFLAGS_DESC	MdatumFlags[] =
 };
 
 void
-gdp_md_print(const gdp_md_t *gmd, FILE *fp, int detail, int indent)
+gdp_md_dump(const gdp_md_t *gmd, FILE *fp, int detail, int indent)
 {
-	indent++;
-	if (detail > 1)
-		fprintf(fp, "MD@%p: ", gmd);
-	if (gmd == NULL)
+	if (fp == NULL)
+		fp = ep_dbg_getfile();
+
+	if (detail < GDP_PR_BASIC)
 	{
-		fprintf(fp, "NULL\n");
-		return;
+		fprintf(fp, "    --------------- Metadata ---------------\n");
+	}
+	else
+	{
+		fprintf(fp, "MD@%p: ", gmd);
+		if (gmd == NULL)
+		{
+			fprintf(fp, "NULL\n");
+			return;
+		}
 	}
 
-	if (detail > 1)
+	if (detail >= GDP_PR_BASIC)
 	{
 		fprintf(fp, "nalloc = %d, nused = %d, databuf = %p\n%sflags = ",
 				gmd->nalloc, gmd->nused, gmd->databuf,
 				_gdp_pr_indent(indent));
 		ep_prflags(gmd->flags, GdpMdFlags, fp);
-		fprintf(fp, "\n%smds = %p\n", _gdp_pr_indent(indent), gmd->mds);
-		if (detail > 2)
+		fprintf(fp, "\n%smds = %p\n", _gdp_pr_indent(indent + 1), gmd->mds);
+	}
+
+	int i;
+	for (i = 0; i < gmd->nused; i++)
+	{
+		struct metadatum *md = &gmd->mds[i];
+		uint8_t *mdd = md->md_data;
+		if (detail >= GDP_PR_BASIC)
 		{
-			int i;
+			fprintf(fp, "%sid = %08x, len = %" PRIu32 ", flags = ",
+					_gdp_pr_indent(indent),
+					md->md_id, md->md_len);
+			ep_prflags(md->md_flags, MdatumFlags, fp);
+			fprintf(fp, "\n");
 
-			for (i = 0; i < gmd->nused; i++)
+			if (detail >= GDP_PR_BASIC + 1)
+				ep_hexdump(mdd, md->md_len, fp,
+						EP_HEXDUMP_ASCII, 0);
+			continue;
+		}
+
+		// this is the more "user friendly" style output
+		fprintf(fp, "%sMetadata %2d, id 0x%08x, length %" PRIu32,
+				_gdp_pr_indent(indent), i,
+				md->md_id, md->md_len);
+		if (detail > 1)
+		{
+			switch (md->md_id)
 			{
-				fprintf(fp, "%sid = %08x, len = %" PRIu32 ", flags = ",
-						_gdp_pr_indent(indent + 1),
-						gmd->mds[i].md_id, gmd->mds[i].md_len);
-				ep_prflags(gmd->mds[i].md_flags, MdatumFlags, fp);
-				fprintf(fp, "\n");
+				case GDP_MD_XID:
+					fprintf(fp, " (external id)\n%s%.*s\n",
+								_gdp_pr_indent(indent + 1), md->md_len, mdd);
+					break;
 
-				if (detail > 3)
-					ep_hexdump(gmd->mds[i].md_data, gmd->mds[i].md_len, fp,
-							EP_HEXDUMP_ASCII, 0);
+				case GDP_MD_UUID:
+					fprintf(fp, " (uuid)\n%s%.*s\n",
+								_gdp_pr_indent(indent + 1), md->md_len, mdd);
+					break;
+
+				case GDP_MD_CTIME:
+					fprintf(fp, " (creation time)\n%s%.*s\n",
+								_gdp_pr_indent(indent + 1), md->md_len, mdd);
+					break;
+
+				case GDP_MD_CID:
+					fprintf(fp, " (creator)\n%s%.*s\n",
+								_gdp_pr_indent(indent + 1), md->md_len, mdd);
+					break;
+
+				case GDP_MD_PUBKEY:
+					fprintf(fp, " (public key)\n");
+					{
+						int keylen = mdd[2] << 8 | mdd[3];
+						fprintf(fp, "%smd_alg %s (%d), keytype %s (%d), keylen %d\n",
+								_gdp_pr_indent(indent + 1),
+								ep_crypto_md_alg_name(mdd[0]), mdd[0],
+								ep_crypto_keytype_name(mdd[1]), mdd[1],
+								keylen);
+					}
+					if (detail > 1)
+					{
+						EP_CRYPTO_KEY *key;
+
+						key = ep_crypto_key_read_mem(mdd + 4,
+								md->md_len - 4,
+								EP_CRYPTO_KEYFORM_DER,
+								EP_CRYPTO_F_PUBLIC);
+						ep_crypto_key_print(key, stdout, EP_CRYPTO_F_PUBLIC);
+						ep_crypto_key_free(key);
+					}
+					if (detail >= 4)
+						ep_hexdump(mdd + 4, md->md_len - 4,
+								stdout, EP_HEXDUMP_HEX, 0);
+				default:
+					fprintf(fp, "\n%s%s",
+							_gdp_pr_indent(indent + 1), EpChar->lquote);
+					ep_xlate_out(mdd, md->md_len,
+							fp, "", EP_XLATE_PLUS | EP_XLATE_NPRINT);
+					fprintf(fp, "%s\n", EpChar->rquote);
 			}
 		}
-	}
-	else if (detail == 1)
-	{
-		int i;
-
-		for (i = 0; i < gmd->nused; i++)
-			fprintf(fp, "%sMetadata %2d, id %8x, length %" PRIu32 "\n",
-					_gdp_pr_indent(indent),
-					i, gmd->mds[i].md_id, gmd->mds[i].md_len);
 	}
 }

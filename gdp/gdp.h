@@ -162,7 +162,11 @@ extern gdp_event_t		*gdp_event_next(		// get event (caller must free!)
 extern EP_STAT			gdp_event_free(			// free event from gdp_event_next
 							gdp_event_t *gev);		// event to free
 
-extern void				gdp_event_print(		// print event (for debugging)
+extern void				gdp_event_print(		// print event (user access)
+							const gdp_event_t *gev,	// event in question
+							FILE *fp);				// output file
+
+extern void				gdp_event_debug(		// print event (for debugging)
 							const gdp_event_t *gev,	// event in question
 							FILE *fp,				// output file
 							int detail,				// how detailed?
@@ -447,7 +451,7 @@ EP_STAT			gdp_md_find(
 					const void **data);
 
 // print metadata set (for debugging)
-void			gdp_md_print(
+void			gdp_md_dump(
 					const gdp_md_t *gmd,
 					FILE *fp,
 					int detail,

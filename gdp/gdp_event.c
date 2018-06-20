@@ -476,12 +476,21 @@ _gdp_event_add_from_req(gdp_req_t *req)
 */
 
 void
-gdp_event_print(const gdp_event_t *gev, FILE *fp, int detail, int indent)
+gdp_event_print(const gdp_event_t *gev, FILE *fp)
+{
+	_gdp_event_dump(gev, fp, GDP_PR_PRETTY, 0);
+}
+
+void
+_gdp_event_dump(const gdp_event_t *gev, FILE *fp, int detail, int indent)
 {
 	gdp_recno_t recno = -1;
 	char ebuf[100];
 
-	if (detail > GDP_PR_BASIC + 1)
+	if (fp == NULL)
+		fp = ep_dbg_getfile();
+
+	if (detail >= GDP_PR_BASIC + 1)
 		fprintf(fp, "Event type %d, cbarg %p, stat %s\n",
 				gev->type, gev->udata,
 				ep_stat_tostr(gev->stat, ebuf, sizeof ebuf));
@@ -510,29 +519,21 @@ gdp_event_print(const gdp_event_t *gev, FILE *fp, int detail, int indent)
 		break;
 
 	  case GDP_EVENT_SUCCESS:
-		if (detail > GDP_PR_BASIC + 1)
-			fprintf(fp, "Generic success\n");
-		else
-			fprintf(fp, "Success: %s\n",
+		fprintf(fp, "Success: %s\n",
 					ep_stat_tostr(gev->stat, ebuf, sizeof ebuf));
 		break;
 
 	  case GDP_EVENT_FAILURE:
-		if (detail > GDP_PR_BASIC + 1)
-			fprintf(fp, "Generic failure\n");
-		else
-			fprintf(fp, "Failure: %s\n",
+		fprintf(fp, "Failure: %s\n",
 					ep_stat_tostr(gev->stat, ebuf, sizeof ebuf));
 		break;
 
 	  case GDP_EVENT_MISSING:
-		fprintf(fp, "Record %" PRIgdp_recno " missing\n",
-				recno);
+		fprintf(fp, "Record %" PRIgdp_recno " missing\n", recno);
 		break;
 
 	  default:
-		if (detail > 0)
-			fprintf(fp, "Unknown event type %d: %s\n",
+		fprintf(fp, "Unknown event type %d: %s\n",
 					gev->type, ep_stat_tostr(gev->stat, ebuf, sizeof ebuf));
 		break;
 	}

@@ -85,7 +85,7 @@
 #define gdp_gcl_read_async(gcl, recno, cbfunc, cbarg)						\
 				gdp_gin_read_by_recno_async(gcl, recno, 1, cbfunc, cbarg)
 #define gdp_gclmd_print(gmd, fp, detail)									\
-				gdp_md_print(gmd, fp, detail, 0)
+				gdp_md_dump(gmd, fp, detail, 0)
 
 /*
 **  Functions that can't be made 100% compatible

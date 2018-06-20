@@ -107,7 +107,7 @@ LIST_HEAD(req_head, gdp_req);
 
 // "dump" routine detail parameters (XXX should these be public?)
 #define GDP_PR_PRETTY		0		// suitable for end users
-#define GDP_PR_BASIC		1		// basic debug information
+#define GDP_PR_BASIC		8		// basic debug information
 #define GDP_PR_DETAILED		16		// detailed information
 #define GDP_PR_RECURSE		32		// recurse into substructures
 									// add N to recurse N+1 levels deep
