@@ -106,6 +106,7 @@ begin
 	insert ignore into blackbox.guids (guid) values (eguid);
 	select id into @eid from blackbox.guids where guid = eguid;
 	replace into blackbox.nhops (origid, destid, ts) values (@did, @eid, CURRENT_TIMESTAMP);
+	replace into blackbox.nhops (origid, destid, ts) values (@eid, @did, CURRENT_TIMESTAMP);
 	end //
 delimiter ;
 
@@ -153,6 +154,9 @@ call find_nhop(x'A1', x'A6');  # answer is HEX(guid) x'A2'
 select HEX(@nguid);
 
 call find_nhop(x'A2', x'A6');  # answer is HEX(GUID) x'A5'
+select HEX(@nguid);
+
+call find_nhop(x'A6', x'A2');  # answer is HEX(GUID) x'A5'
 select HEX(@nguid);
 
 call find_nhop(x'A1', x'A8');  # answer is the Empty set
