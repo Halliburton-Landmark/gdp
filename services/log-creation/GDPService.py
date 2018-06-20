@@ -288,11 +288,13 @@ class GDPProtocol(Protocol):
         msg['ver'] = '\x04'
         msg['hdr_len'] = '\x13'     # enough to hold two full addrs
 
-        msg['addr_format'] = '\x00'
-        msg['flags'] = '\x00'
-        msg['type'] = '\x00'
+        msg['addr_format'] = 0 & 0x07
+        msg['flags'] = 0 & 0x03
+        msg['type'] = 0 & 0x07
 
-        msg['ttl'] = chr(0x0f)                  # FIXME
+        _byte_2 = chr(msg['type']<<5 & msg['flags']<<3 & msg['addr_format'])
+
+        msg['ttl'] = '\x0f'                  # FIXME
 
         msg['seq_frag'] = '\x00'*6
 
@@ -311,8 +313,7 @@ class GDPProtocol(Protocol):
         for k in valid_size.keys():
             assert len(msg[k]) == valid_size[k]
 
-        message = ( msg['ver'] + msg['hdr_len'] +
-                    (msg['addr_format'] & msg['flags'] & msg['type']) +
+        message = ( msg['ver'] + msg['hdr_len'] + _byte_2 +
                     msg['ttl'] + msg['seq_frag'] + msg['data_len'] +
                     msg['dst'] + msg['src'] +
                     msg['data'])
