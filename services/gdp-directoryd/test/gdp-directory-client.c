@@ -81,6 +81,8 @@ int main(int argc, char *argv[])
 	int fd_dr;
 	uint16_t dr;
 
+	if (argc < 2)
+		help("missing parameter(s)");
 	if (strcmp(argv[1], "find") == 0)
 	{
 		if (argc > 4)
