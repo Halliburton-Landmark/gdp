@@ -8,7 +8,7 @@
 **	Applications for the Global Data Plane
 **	From the Ubiquitous Swarm Lab, 490 Cory Hall, U.C. Berkeley.
 **
-**	Copyright (c) 2017, Regents of the University of California.
+**	Copyright (c) 2017-2018, Regents of the University of California.
 **	All rights reserved.
 **
 **	Permission is hereby granted, without written agreement and without
@@ -68,9 +68,6 @@ int debug_knob = VERB;
 #define GDP_CMD_DIR_FIND	9
 #define GDP_CMD_DIR_FOUND  10
 
-// 516 bytes max for IPv4 UDP
-#define DIR_OGUID_MAX 14
-
 // FIXME eventually maintain this in gdp_chan.h or other appropriate shared .h
 typedef struct __attribute__((packed)) otw_dir_s
 {
@@ -79,8 +76,6 @@ typedef struct __attribute__((packed)) otw_dir_s
 	uint16_t id;
 	uint8_t eguid[sizeof(gdp_name_t)];
 	uint8_t dguid[sizeof(gdp_name_t)];
-	uint8_t oguid[sizeof(gdp_name_t) * DIR_OGUID_MAX];	
+	uint8_t oguid[sizeof(gdp_name_t)];
 } otw_dir_t;
 
-// on the wire pdu - sanity check compiler directive is operational
-#define OTW_DIR_SIZE_ASSERT 516

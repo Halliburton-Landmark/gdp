@@ -8,7 +8,7 @@
 **	Applications for the Global Data Plane
 **	From the Ubiquitous Swarm Lab, 490 Cory Hall, U.C. Berkeley.
 **
-**	Copyright (c) 2017, Regents of the University of California.
+**	Copyright (c) 2017-2018, Regents of the University of California.
 **	All rights reserved.
 **
 **	Permission is hereby granted, without written agreement and without
@@ -43,11 +43,13 @@
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <assert.h>
-#include <gdp/gdp.h>
+#include "gdp/gdp.h"
 #include "../gdp-directoryd.h"
 
-// gdp directory currently installed on gdp-04
-#define DIRECTORY_IP "128.32.62.174"
+// gdp-04
+// #define DIRECTORY_IP "128.32.62.174"
+// gdp-03
+#define DIRECTORY_IP "128.32.33.232"
 
 gdp_name_t gdp_eguid;
 gdp_name_t gdp_dguid;
@@ -59,7 +61,7 @@ void help(char *s)
 {
 	printf("Error: %s\n", s);
 	printf("Usage: gdc-test "
-		   "{ { add | remove } <eguid> <dguid>+ | find <dguid> }\n");
+		   "{ { add <eguid> <dguid> | find <oguid> <dguid> }\n");
 	exit(1);
 }
 
@@ -76,36 +78,26 @@ int main(int argc, char *argv[])
 	int fd_connect;
 	int arg_index;
 	int otw_dir_len;
-	int oguid_len;
 	int fd_dr;
 	uint16_t dr;
 
-	// sanity check compiler directive is operational
-	assert(sizeof(otw_dir_t) == OTW_DIR_SIZE_ASSERT);
-
+	if (argc < 2)
+		help("missing parameter(s)");
 	if (strcmp(argv[1], "find") == 0)
 	{
-		if (argc > 3)
+		if (argc > 4)
 			help("extraneous parameter(s)");
-		if (argc < 3)
-			help("software bug");
+		if (argc < 4)
+			help("missing parameter(s)");
 		otw_dir.cmd = GDP_CMD_DIR_FIND;
 	}
 	else if (strcmp(argv[1], "add") == 0)
 	{
-		if (argc > 4 + DIR_OGUID_MAX)
+		if (argc > 4)
 			help("extraneous parameter(s)");			
 		if (argc < 4)
 			help("missing parameter(s)");
 		otw_dir.cmd = GDP_CMD_DIR_ADD;
-	}
-	else if (strcmp(argv[1], "remove") == 0)
-	{
-		if (argc > 4 + DIR_OGUID_MAX)
-			help("extraneous parameter(s)");			
-		if (argc < 4)
-			help("missing parameter(s)");
-		otw_dir.cmd = GDP_CMD_DIR_REMOVE;
 	}
 	else
 		help("invalid action");
@@ -131,21 +123,20 @@ int main(int argc, char *argv[])
 	//
 	// build request
 	//
-	// { { add | remove } eguid dguid dguid* | find dguid cguid }
+	// { add eguid dguid } | find { oguid dguid }
 	//
-	// dguid* and cguid are stored in oguid[]
-
+	
 	otw_dir.ver = GDP_CHAN_PROTO_VERSION_4;
 
-	fd_dr = open("/dev/random", O_RDONLY);
+	fd_dr = open("/dev/urandom", O_RDONLY);
 	if (read(fd_dr, &dr, sizeof(dr)) != 2)
-		fail("read /dev/random error");
+		fail("read /dev/urandom error");
 	else
 		close(fd_dr);
 	
 	otw_dir.id = htons(dr); // htons comments on expected endianess of id field
 	
-	if (otw_dir.cmd != GDP_CMD_DIR_FIND)
+	if (otw_dir.cmd == GDP_CMD_DIR_ADD)
 	{
 		// set eguid
 		gdp_parse_name(argv[arg_index], gdp_eguid);
@@ -172,44 +163,30 @@ int main(int argc, char *argv[])
 	printf("]\n");
 	arg_index++;
 
-	// set optional dguid(s)
-	if (otw_dir.cmd != GDP_CMD_DIR_FIND)
+	if (otw_dir.cmd == GDP_CMD_DIR_FIND)
 	{
-		oguid_len = (argc - arg_index) * sizeof(gdp_name_t);
-		printf("oguid len %d\n", oguid_len);
-		for (int d = 0; d < oguid_len; d += sizeof(gdp_name_t))
+		// set required oguid
+		gdp_parse_name(argv[arg_index], gdp_oguid);
+		memcpy(&otw_dir.oguid[0], gdp_oguid, sizeof(gdp_name_t));
+		printf("-> oguid [");
+		for (int i = 0; i < sizeof(gdp_name_t); i++)
 		{
-			gdp_parse_name(argv[arg_index], gdp_oguid);
-			// opt dguids are in opaque space, so accessed through dguid offsets
-			memcpy(&otw_dir.oguid[d], gdp_oguid, sizeof(gdp_name_t));
-			printf("-> oguid [");
-			for (int i = 0; i < sizeof(gdp_name_t); i++)
-			{
-				printf("%.2x", otw_dir.oguid[d + i]);
-			}
-			printf("]\n");
-			arg_index++;
+			printf("%.2x", otw_dir.oguid[i]);
 		}
+		printf("]\n");
+		arg_index++;
 		
 		// connection-oriented udp - hardwired destination, simply send
 		otw_dir_len = send(fd_connect, (uint8_t *) &otw_dir.ver,
-						   offsetof(otw_dir_t, oguid) + oguid_len, 0);
+						   sizeof(otw_dir_t), 0);
 		printf("id(0x%x) send len %d\n", ntohs(otw_dir.id), otw_dir_len);
 	}
 	else
 	{
-		// set (fake) cguid to verify (0xc1c1c1... is) returned by server
-		memset(&otw_dir.oguid[0], 0xC1, sizeof(gdp_name_t));
-		printf("-> cguid [");
-		for (int i = 0; i < sizeof(gdp_name_t); i++)
-		{
-			printf("%.2x", (uint8_t) otw_dir.oguid[i]);
-		}
-		printf("]\n");
-
 		// connection-oriented udp - hardwired destination, simply send
-		send(fd_connect, (uint8_t *) &otw_dir.ver, offsetof(otw_dir_t, oguid) +
-			 sizeof(gdp_name_t), 0);
+		otw_dir_len = send(fd_connect, (uint8_t *) &otw_dir.ver,
+						   offsetof(otw_dir_t, oguid), 0);
+		printf("id(0x%x) send len %d\n", ntohs(otw_dir.id), otw_dir_len);
 	}
 
 	printf("...awaiting reply...\n");
@@ -225,11 +202,18 @@ int main(int argc, char *argv[])
 
 	printf("id(0x%x) recv len %d\n", ntohs(otw_dir.id), otw_dir_len);
 		
-	oguid_len = otw_dir_len - offsetof(otw_dir_t, oguid);
-	if (oguid_len % sizeof(gdp_name_t) != 0)
+	if (otw_dir.cmd == GDP_CMD_DIR_FIND)
 	{
-		printf("Error: invalid oguid len %d", oguid_len);
-		exit(1);
+		printf("<- eguid nak\n");
+	}
+	else // FOUND or ADD
+	{
+		printf("<- eguid [");
+		for (int i = 0; i < sizeof(gdp_name_t); i++)
+		{
+			printf("%.2x", (uint8_t) otw_dir.eguid[i]);
+		}
+		printf("]\n");
 	}
 
 	printf("<- dguid [");
@@ -239,40 +223,14 @@ int main(int argc, char *argv[])
 	}
 	printf("]\n");
 
-	if (otw_dir.cmd == GDP_CMD_DIR_FOUND)
+	if (otw_dir.cmd == GDP_CMD_DIR_FOUND || otw_dir.cmd == GDP_CMD_DIR_FIND)
 	{
-		printf("<- eguid [");
+		printf("<- oguid [");
 		for (int i = 0; i < sizeof(gdp_name_t); i++)
 		{
-			printf("%.2x", (uint8_t) otw_dir.eguid[i]);
+			printf("%.2x", otw_dir.oguid[i]);
 		}
 		printf("]\n");
-
-		printf("<- cguid [");
-		for (int i = 0; i < sizeof(gdp_name_t); i++)
-		{
-			printf("%.2x", (uint8_t) otw_dir.oguid[i]);
-		}
-		printf("]\n");
-	}
-	else if (otw_dir.cmd == GDP_CMD_DIR_FIND)
-	{
-		printf("<- eguid nak\n");
-	}
-	else
-	{
-		printf("oguid len %d\n", oguid_len);
-		
-		for (int d = 0; d < oguid_len; d += sizeof(gdp_name_t))
-		{
-			printf("<- oguid [");
-			for (int i = 0; i < sizeof(gdp_name_t); i++)
-			{
-				printf("%.2x", otw_dir.oguid[d + i]);
-			}
-			printf("]\n");
-			arg_index++;
-		}
 	}
 	
 	close(fd_connect);

@@ -1,77 +1,75 @@
-# GDP-DIRECTORYD
+# GDP Directory Daemon (Interim Version 2)
 
-Setup requires installation of mariadb database and mariadb
-Connector/C client library on the same host as gdp-directoryd.
+The gdp-directoryd interim version 2 binary depends upon the
+co-located installation and configuration of a MariaDB Server and
+several supporting packages including the OCGraph plugin.
 
-After mariadb is installed on the desired "blackbox" host,
-configure the database:
+## MariaDB Installation
 
-$ mysql
-Welcome to the MariaDB monitor.  Commands end with ; or \g.
-Your MariaDB connection id is 56
-Server version: 10.0.31-MariaDB-0ubuntu0.16.04.2 Ubuntu 16.04
+For Ubuntu 16.04, install the following packages:
 
-Copyright (c) 2000, 2017, Oracle, MariaDB Corporation Ab and others.
+    $ apt install \
+  	  	  MariaDB-server \
+  	  	  libMariaDB2 \
+  	  	  libMariaDB-client-lgpl-dev \
+	  	  libMariaDB-client-lgpl-dev-compat \
+	  	  MariaDB-plugin-oqgraph
 
-Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+## MariaDB Configuration
 
-MariaDB [(none)]> CREATE DATABASE blackbox;
-Query OK, 1 row affected (0.00 sec)
+The database will be configured for localhost access ONLY, but a
+production installation should also replace the default "testblackbox"
+password (both within setup.sql and the directory daemon source code
+later in these instructions so they match!), before proceeding to the
+following two commands:
 
-MariaDB [(none)]> show databases;
-+--------------------+
-| Database           |
-+--------------------+
-| blackbox           |
-| information_schema |
-| mysql              |
-| performance_schema |
-+--------------------+
-4 rows in set (0.00 sec)
+    $ sudo mysql -v --show-warnings < setup.sql
+    $ sudo mysql -v --show-warnings < blackbox.sql
 
-#
-# NOTE: database is not made internet accessible to minimize security risk
-#
-MariaDB [(none)]> CREATE USER 'gdpr'@'127.0.0.1';
-Query OK, 0 rows affected (0.00 sec)
+## MariaDB Service Controls
 
-MariaDB [(none)]> SELECT User, Host FROM mysql.user;
-+------+-----------+
-| User | Host      |
-+------+-----------+
-| gdpr | 127.0.0.1 |
-| root | localhost |
-+------+-----------+
-2 rows in set (0.00 sec)
+The database underlying the directory service is now available for use
+by the directory daemon. The MariaDB database service (named "mysql")
+can be controlled as follows:
 
-MariaDB [(none)]> USE blackbox;
-Reading table information for completion of table and column names
-You can turn off this feature to get a quicker startup with -A
+    $ sudo service mysql { stop | start | restart }
 
-Database changed
-MariaDB [blackbox]> GRANT ALL PRIVILEGES ON blackbox.* TO 'gdpr'@'127.0.0.1' IDENTIFIED BY 'testblackbox' WITH GRANT OPTION;
-Query OK, 0 rows affected (0.00 sec)
+## Directory Daemon Installation
 
-MariaDB [blackbox]> CREATE TABLE gdpd ( dguid BINARY(32) NOT NULL, eguid BINARY(32) NOT NULL, ts TIMESTAMP );
-Query OK, 0 rows affected (0.20 sec)
+### Git and Build the GDP Source Tree
 
-#
-# Sample dump of blackbox.gdpd table after adding one entry
-#
+    $ mkdir <workspace-name>
+    $ cd <workspace-name>
+    $ git clone repoman@repo.eecs.berkeley.edu:projects/swarmlab/gdp.git gdp
+    $ cd gdp
+    $ make
 
-MariaDB [blackbox]> select hex(dguid), hex(eguid), ts from blackbox.gdpd;
-Empty set (0.00 sec)
+### Directory Daemon Build and Install
 
-MariaDB [blackbox]> select hex(dguid), hex(eguid), ts from blackbox.gdpd;
-+------------------------------------------------------------------+------------------------------------------------------------------+---------------------+
-| hex(dguid)                                                       | hex(eguid)                                                       | ts                  |
-+------------------------------------------------------------------+------------------------------------------------------------------+---------------------+
-| D65A93F45F8C7FA3AD37E88D565DAD3214151CA8F8491734ECA0662CA44A6C74 | DDC128C2064AC6335EF450C31E7B9A1794329CA53007469A67C1B801EBC96C2E | 2018-05-09 13:40:51 |
-+------------------------------------------------------------------+------------------------------------------------------------------+---------------------+
-1 row in set (0.00 sec)
+Continuing from the prior section:
+	
+    $ cd services/gdp-directoryd
 
-#
-# delete rows after test runs
-#
-MariaDB [blackbox]> delete from blackbox.gdpd;
-Query OK, 1 row affected (0.09 sec)
+Replace the password -- specifically, edit the #define IDENTIFIED_BY
+"<password>" line within gdp-directoryd.c -- to match the password
+change, if any, made to the setup.sql file when following the MariaDB
+Configuration instructions above.
+
+If gdp-directoryd is already installed and in service on this host,
+then use "make reinstall" to replace the binary and restart the
+service.
+
+Otherwise, for new installations, run the following to build, install,
+and start the GDP Directory Daemon as a service:
+
+    $ make install
+
+The GDP Directory Daemon should now be ready to service requests
+on port 9001 of the installation host.
+
+## Directory Daemon Debugging
+
+To debug this daemon, uncomment "#define TESTING" (which will change
+the listen port to 9002 and raise the default debug level), rebuild,
+then run the program interactively from a suitable command shell.
+
