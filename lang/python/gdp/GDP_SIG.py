@@ -39,40 +39,46 @@ class GDP_SIG(object):
     class gdp_sig_t(Structure):
         pass
 
-    def __init__(self, alg):
+    def __init__(self, alg, sigbytes, **kwargs):
         """ Creates a new sig structure by calling C functions """
-        __func = gdp.gdp_sig_new
-        __func.argtypes = [c_int]
-        __func.restype = POINTER(self.gdp_sig_t)
-        self.sig_ = __func(c_int(alg))
+
+        if len(kwargs) == 0:
+            __func = gdp.gdp_sig_new
+            __func.argtypes = [c_int, c_void_p, c_size_t]
+            __func.restype = POINTER(self.gdp_sig_t)
+
+            assert alg is not None
+            alg = c_int(alg)
+            if sigbytes is not None:
+                size = c_size_t(len(sigbytes))
+                buf = create_string_buffer(sigbytes, len(sigbytes))
+            else:
+                size = c_size_t(0)
+                buf = None
+            self.sig_ = __func(alg, buf, size)
+            self.did_i_create_it = True
+
+        else:
+            if "ptr" in kwargs:
+                self.sig_ = kwargs["ptr"]
+                self.did_i_create_it = False
+            else:
+                raise Exception
 
 
     def __del__(self):
         """Free the memory"""
-        __func = gdp.gdp_sig_free
-        __func.argtypes = [POINTER(self.gdp_sig_t)]
-        __func(self.sig_)
+        if self.did_i_create_it:
+            __func = gdp.gdp_sig_free
+            __func.argtypes = [POINTER(self.gdp_sig_t)]
+            __func(self.sig_)
 
 
     def reset(self):
         """Reset the sig structure"""
         __func = gdp.gdp_sig_reset
         __func.argtypes = [POINTER(self.gdp_sig_t)]
-        __func.restype = c_int
-
-        ret = __func(self.sig_)
-        return int(ret)
-
-
-    def getlength(self):
-        "Returns the length of the data associated with this sig structure"
-
-        __func = gdp.gdp_sig_getlength
-        __func.argtypes = [POINTER(self.gdp_sig_t)]
-        __func.restype = c_size_t
-
-        ret = __func(self.sig_)
-        return ret
+        __func(self.sig_)
 
 
     def set(self, sigbytes):
@@ -84,6 +90,17 @@ class GDP_SIG(object):
         size = c_size_t(len(sigbytes))
         tmp_buf = create_string_buffer(sigbytes, len(sigbytes))
         written_bytes = __func(self.sig_, byref(tmp_buf), size)
+
+
+    def getlength(self):
+        "Returns the length of the data associated with this sig structure"
+
+        __func = gdp.gdp_sig_getlength
+        __func.argtypes = [POINTER(self.gdp_sig_t)]
+        __func.restype = c_size_t
+
+        ret = __func(self.sig_)
+        return ret
 
 
     def get(self):
