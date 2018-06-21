@@ -48,59 +48,58 @@ def generate_random_data(N, count):
     "returns an count-sized array of N-sized alphanumeric strings"
 
     ret = []
+    charset = string.ascii_letters + string.digits
     for idx in xrange(count):
-        ret.append(''.join(random.choice(string.ascii_letters + string.digits)
-                   for _ in range(N)))
+        ret.append(''.join(random.choice(charset) for _ in range(N)))
 
     return ret
 
 
 def main(name_str, keyfile=None):
 
+    # the data that will be written
+    data = generate_random_data(100, 10)
+
+    # XXX handling secret key at Python level doesn't work at the moment
+    open_info = {}
     if keyfile is not None:
         skey = gdp.EP_CRYPTO_KEY(filename=keyfile,
                                 keyform=gdp.EP_CRYPTO_KEYFORM_PEM,
                                 flags=gdp.EP_CRYPTO_F_SECRET)
         open_info = {'skey': skey}
 
-    else:
-        open_info = {}
+    gin_name = gdp.GDP_NAME(name_str)
+    _name = "".join(["%0.2x" % ord(x) for x in gin_name.internal_name()])
+    print "opening", _name
+    gin_handle = gdp.GDP_GIN(gin_name, gdp.GDP_MODE_RA, open_info)
 
-    gcl_name = gdp.GDP_NAME(name_str)
-
-    print "opening gcl", "".join(
-                        ["%0.2x" % ord(x) for x in gcl_name.internal_name()])
-    gcl_handle = gdp.GDP_GCL(gcl_name, gdp.GDP_MODE_RA, open_info)
-
-    # the data that will be written
-    data = generate_random_data(100, 10)
-
-    # writing the data
+    # writing the actual data
+    datum = gdp.GDP_DATUM()         # reusable datum
     for (idx, s) in enumerate(data):
-
         print "writing message", idx
-        datum = {"data": s}         # Create a minimalist datum object
-        gcl_handle.append(datum)   # write this to the GCL
+        datum["buf"].reset()
+        datum["buf"].write(s)
+        gin_handle.append(datum)
 
-    # reading the data back
+    ################################
+    ####  reading the data back ####
+    ################################
 
-    # to store the data read back from the GCL
-    read_data = [] 
+    # read by recno (synchronous)
+    read_by_recno = []
     for idx in xrange(-1*len(data),0):
-
         print "reading message", -1*idx, "from the end"
-        datum = gcl_handle.read(idx)            # -n => n-th record from end
-        read_data.append(datum["data"])         # append the data to read_data
+        datum = gin_handle.read_by_recno(idx)   # -n => n-th record from end
+        read_by_recno.append(datum["buf"].peek())
 
-    # verifying the correctness
-    for idx in xrange(len(data)):
-        if data[idx] == read_data[idx]:
+    for idx in xrange(len(data)):               # verify correctness
+        if data[idx] == read_by_recno[idx]:
             print "message %d matches" % idx
 
 if __name__ == "__main__":
 
     if len(sys.argv) < 2:
-        print "Usage: %s <gcl_name> [<signing-key-file>]" % sys.argv[0]
+        print "Usage: %s <name> [<signing-key-file>]" % sys.argv[0]
         sys.exit(1)
 
     name_str = sys.argv[1]
