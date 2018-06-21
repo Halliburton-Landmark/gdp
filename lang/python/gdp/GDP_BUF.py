@@ -39,19 +39,31 @@ class GDP_BUF(object):
     class gdp_buf_t(Structure):
         pass
 
-    def __init__(self):
-        """ Creates a new buffer structure by calling C functions """
-        __func = gdp.gdp_buf_new
-        __func.argtypes = []
-        __func.restype = POINTER(self.gdp_buf_t)
-        self.buf = __func()
-
+    def __init__(self, **kwargs):
+        """
+        Creates a new buffer structure by calling C functions, unless
+        an existing pointer to a C-structure is provided to us
+        externally (by using a 'ptr=x' argument).
+        """
+        if len(kwargs) == 0:
+            __func = gdp.gdp_buf_new
+            __func.argtypes = []
+            __func.restype = POINTER(self.gdp_buf_t)
+            self.buf = __func()
+            self.did_i_create_it = True
+        else:
+            if "ptr" in kwargs:
+                self.buf = kwargs["ptr"]
+                self.did_i_create_it = False
+            else:
+                raise Exception
 
     def __del__(self):
-        """Free the memory"""
-        __func = gdp.gdp_buf_free
-        __func.argtypes = [POINTER(self.gdp_buf_t)]
-        __func(self.buf)
+        """Free the memory, but only if we allocated it."""
+        if self.did_i_create_it:
+            __func = gdp.gdp_buf_free
+            __func.argtypes = [POINTER(self.gdp_buf_t)]
+            __func(self.buf)
 
 
     def reset(self):
