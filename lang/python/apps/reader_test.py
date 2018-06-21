@@ -38,24 +38,22 @@ import gdp
 def main(name_str, start, stop):
 
     # create a python object
-    gcl_name = gdp.GDP_NAME(name_str)
-    print gcl_name.printable_name()
+    _name = gdp.GDP_NAME(name_str)
+    print _name.printable_name()
 
     # Assume that the GCL already exists
-    gcl_handle = gdp.GDP_GCL(gcl_name, gdp.GDP_MODE_RO)
+    gin_handle = gdp.GDP_GIN(_name, gdp.GDP_MODE_RO)
 
     # initialize this to the first record number
     recno = start
     while recno<=stop:
         try:
-            datum = gcl_handle.read(recno)
-            print datum
+            datum = gin_handle.read_by_recno(recno)
+            print datum["buf"].peek()
             recno += 1
-        except:
-            # End of log.
-            # this can happen for reasons other than end of the log, but 
-            #   I don't see there to be any other easy way to find that out
-            break
+        except Exception as e:
+            # Typically, end of log.
+            raise e
 
 if __name__ == "__main__":
 
