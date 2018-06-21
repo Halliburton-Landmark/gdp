@@ -39,40 +39,46 @@ class GDP_HASH(object):
     class gdp_hash_t(Structure):
         pass
 
-    def __init__(self, alg):
+    def __init__(self, alg, hashbytes, **kwargs):
         """ Creates a new hash structure by calling C functions """
-        __func = gdp.gdp_hash_new
-        __func.argtypes = [c_int]
-        __func.restype = POINTER(self.gdp_hash_t)
-        self.hash_ = __func(c_int(alg))
 
+        if len(kwargs) == 0:
+            __func = gdp.gdp_hash_new
+            __func.argtypes = [c_int, c_void_p, c_size_t]
+            __func.restype = POINTER(self.gdp_hash_t)
+
+            assert alg is not None
+            alg = c_int(alg)
+            if hashbytes is not None:
+                size = c_size_t(len(hashbytes))
+                buf = create_string_buffer(hashbytes, len(hashbytes))
+            else:
+                size = c_size_t(0)
+                buf = None
+
+            self.hash_ = __func(alg, bug, size)
+            self.did_i_create_it = True
+
+        else:
+            if "ptr" in kwargs:
+                self.hash_ = kwargs["ptr"]
+                self.did_i_create_it = False
+            else:
+                raise Exception
 
     def __del__(self):
         """Free the memory"""
-        __func = gdp.gdp_hash_free
-        __func.argtypes = [POINTER(self.gdp_hash_t)]
-        __func(self.hash_)
+        if self.did_i_create_it:
+            __func = gdp.gdp_hash_free
+            __func.argtypes = [POINTER(self.gdp_hash_t)]
+            __func(self.hash_)
 
 
     def reset(self):
         """Reset the hash structure"""
         __func = gdp.gdp_hash_reset
         __func.argtypes = [POINTER(self.gdp_hash_t)]
-        __func.restype = c_int
-
-        ret = __func(self.hash_)
-        return int(ret)
-
-
-    def getlength(self):
-        "Returns the length of the data associated with this hash structure"
-
-        __func = gdp.gdp_hash_getlength
-        __func.argtypes = [POINTER(self.gdp_hash_t)]
-        __func.restype = c_size_t
-
-        ret = __func(self.hash_)
-        return ret
+        __func(self.hash_)
 
 
     def set(self, hashbytes):
@@ -84,6 +90,17 @@ class GDP_HASH(object):
         size = c_size_t(len(hashbytes))
         tmp_buf = create_string_buffer(hashbytes, len(hashbytes))
         written_bytes = __func(self.hash_, byref(tmp_buf), size)
+
+
+    def getlength(self):
+        "Returns the length of the data associated with this hash structure"
+
+        __func = gdp.gdp_hash_getlength
+        __func.argtypes = [POINTER(self.gdp_hash_t)]
+        __func.restype = c_size_t
+
+        ret = __func(self.hash_)
+        return ret
 
 
     def get(self):
