@@ -354,7 +354,6 @@ class GDP_GIN(object):
         if isinstance(start, int):
             # casting start to ctypes
             __start = gdp_recno_t(start)
-
             __start_type = gdp_recno_t
             __func = gdp.gdp_gin_read_by_recno_async
 
@@ -367,7 +366,6 @@ class GDP_GIN(object):
             __start.tv_sec = c_int64(start['tv_sec'])
             __start.tv_nsec = c_uint32(start['tv_nsec'])
             __start.tv_accuracy = c_float(start['tv_accuracy'])
-
             __start_type = POINTER(GDP_DATUM.EP_TIME_SPEC)
             __func = gdp.gdp_gin_read_by_ts_async
 
@@ -532,7 +530,7 @@ class GDP_GIN(object):
     ############### Various Append functions #########################
     ##################################################################
 
-    def append(self, datum, prevhash):
+    def append(self, datum, prevhash=None):
         """ Write a datum to the GCL.  """
 
         assert isinstance(datum, GDP_DATUM)
