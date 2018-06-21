@@ -52,9 +52,6 @@ class GDP_DATUM:
     class gdp_datum_t(Structure):
         pass
 
-    class gdp_buf_t(Structure):
-        pass
-
     # Python representation of this is a dictionary, with the exact same fields
     class EP_TIME_SPEC(Structure):
         pass
@@ -81,13 +78,13 @@ class GDP_DATUM:
             __func.argtypes = []
             __func.restype = POINTER(self.gdp_datum_t)
 
-            self.gdp_datum = __func()
+            self.ptr = __func()
             self.did_i_create_it = True
 
         else:
             # we probably got passed a C pointer to an existing datum.
             if "ptr" in kwargs:
-                self.gdp_datum = kwargs["ptr"]
+                self.ptr = kwargs["ptr"]
                 self.did_i_create_it = False
             else:
                 raise Exception     # FIXME
@@ -101,11 +98,10 @@ class GDP_DATUM:
         if self.did_i_create_it:
             __func = gdp.gdp_datum_free
             __func.argtypes = [POINTER(self.gdp_datum_t)]
+            __func(self.ptr)
 
-            __func(self.gdp_datum)
 
-
-    def print_to_file(self, fh, flags):
+    def print_(self, fh, flags):
         """
         Print the GDP datum C memory location contents to a file handle fh.
         fh could be sys.stdout, or any other open file handle. Flags are
@@ -120,7 +116,42 @@ class GDP_DATUM:
         __func = gdp.gdp_datum_print
         __func.argtypes = [POINTER(self.gdp_datum_t), FILE_P, c_uint32]
         # ignore the return value
-        __func(self.gdp_datum, __fh, c_uint32(flags))
+        __func(self.ptr, __fh, c_uint32(flags))
+
+    def __getitem__(self, key):
+
+        if key == "recno":
+            return self.getrecno()
+        if key == "ts":
+            return self.getts()
+        if key == "dlen":
+            return self.getdlen()
+        if key == "buf":
+            return self.getbuf()
+        if key == "sig":
+            return self.getsig()
+        raise NotImplementedError
+
+    def reset(self):
+        """ Reset the datum """
+        __func = gdp.gdp_datum_reset
+        __func.argtypes = [POINTER(self.gdp_datum_t)]
+        __func(self.ptr)
+
+
+    def gethash(self, gin):
+        """
+        Compute the hash of the datum for a given log?
+        """
+        assert isinstance(gin, GDP_GIN)
+        __func = gdp.gdp_datum_hash
+        __func.argtypes = [POINTER(self.gdp_datum_t),
+                                    POINTER(GDP_GIN.gdp_gin_t)]
+        __func.restype = POINTER(gdp_hash_t)
+
+        gdp_hash_ptr = __func(self.ptr, gin.ptr)
+        return GDP_HASH(ptr=gdp_hash_ptr)
+
 
     def getrecno(self):
         """
@@ -131,7 +162,7 @@ class GDP_DATUM:
         __func.argtypes = [POINTER(self.gdp_datum_t)]
         __func.restype = gdp_recno_t
 
-        ret = __func(self.gdp_datum)
+        ret = __func(self.ptr)
         return int(ret)
 
     def getts(self):
@@ -146,7 +177,7 @@ class GDP_DATUM:
             POINTER(self.gdp_datum_t), POINTER(self.EP_TIME_SPEC)]
         # ignore the return value
 
-        __func(self.gdp_datum, byref(ts))
+        __func(self.ptr, byref(ts))
         # represent the time spec as a dictionary
 
         ret = {}
@@ -163,7 +194,7 @@ class GDP_DATUM:
         __func.argtypes = [POINTER(self.gdp_datum_t)]
         __func.restype = c_size_t
 
-        ret = __func(self.gdp_datum)
+        ret = __func(self.ptr)
         return ret
 
     def getbuf(self):
@@ -177,36 +208,29 @@ class GDP_DATUM:
 
         __func = gdp.gdp_datum_getbuf
         __func.argtypes = [POINTER(self.gdp_datum_t)]
-        __func.restype = POINTER(self.gdp_buf_t)
+        __func.restype = POINTER(GDP_BUF.gdp_buf_t)
 
-        gdp_buf_ptr = __func(self.gdp_datum)
-        __func_read = gdp.gdp_buf_read
-        __func_read.argtypes = [POINTER(self.gdp_buf_t), c_void_p, c_size_t]
-        __func_read.restype = c_size_t
+        gdp_buf_ptr = __func(self.ptr)
+        return GDP_BUF(ptr=gdp_buf_ptr)
 
-        dlen = self.getdlen()
-        tmp_buf = create_string_buffer(dlen)
-        readbytes = __func_read(gdp_buf_ptr, byref(tmp_buf), dlen)
 
-        return string_at(tmp_buf, readbytes)
+    # def setbuf(self, data):
+    #     "Set the buffer to the given data. data is a python string"
 
-    def setbuf(self, data):
-        "Set the buffer to the given data. data is a python string"
+    #     __func = gdp.gdp_datum_getbuf
+    #     __func.argtypes = [POINTER(self.gdp_datum_t)]
+    #     __func.restype = POINTER(GDP_BUF.gdp_buf_t)
 
-        __func = gdp.gdp_datum_getbuf
-        __func.argtypes = [POINTER(self.gdp_datum_t)]
-        __func.restype = POINTER(self.gdp_buf_t)
+    #     gdp_buf_ptr = __func(self.ptr)
 
-        gdp_buf_ptr = __func(self.gdp_datum)
+    #     __func_write = gdp.gdp_buf_write
+    #     __func_write.argtypes = [POINTER(GDP_BUF.gdp_buf_t), c_void_p, c_size_t]
+    #     __func_write.restype = c_int
 
-        __func_write = gdp.gdp_buf_write
-        __func_write.argtypes = [POINTER(self.gdp_buf_t), c_void_p, c_size_t]
-        __func_write.restype = c_int
-
-        size = c_size_t(len(data))
-        tmp_buf = create_string_buffer(data, len(data))
-        written_bytes = __func_write(gdp_buf_ptr, byref(tmp_buf), size)
-        return
+    #     size = c_size_t(len(data))
+    #     tmp_buf = create_string_buffer(data, len(data))
+    #     written_bytes = __func_write(gdp_buf_ptr, byref(tmp_buf), size)
+    #     return
 
 
     def getsig(self):
@@ -216,30 +240,8 @@ class GDP_DATUM:
         # get a pointer to signature buffer
         __func = gdp.gdp_datum_getsig
         __func.argtypes = [POINTER(self.gdp_datum_t)]
-        __func.restype = POINTER(self.gdp_buf_t)
+        __func.restype = POINTER(GDP_BUF.gdp_buf_t)
 
-        sig_buf_ptr = __func(self.gdp_datum)
+        sig_buf_ptr = __func(self.ptr)
 
-        if bool(sig_buf_ptr)==False:  # Null pointers have false boolean value
-            return ""
-
-        # Get the length of this buffer
-        __func_len = gdp.gdp_buf_getlength
-        __func_len.argtypes = [POINTER(self.gdp_buf_t)]
-        __func_len.restype = c_size_t
-
-        sig_buf_len = __func_len(sig_buf_ptr)
-
-        # Okay, let's just copy the data without draining. But, we first
-        #   need a place to store that data
-        sig_string = create_string_buffer(int(sig_buf_len))
-
-        __func_peek = gdp.gdp_buf_peek
-        __func_peek.argtypes = [POINTER(self.gdp_buf_t), c_void_p, c_size_t]
-        __func_peek.restype = c_size_t
-
-        t = __func_peek(sig_buf_ptr, sig_string, sig_buf_len)
-        assert t == sig_buf_len
-
-        return string_at(sig_string)
-
+        return GDP_SIG(ptr=sig_buf_ptr)

@@ -90,7 +90,8 @@ class GDP_GIN(object):
         pass
 
     # XXX: Check if this works.
-    # More details here: http://python.net/crew/theller/ctypes/tutorial.html#callback-functions
+    # More details here:
+    # http://python.net/crew/theller/ctypes/tutorial.html#callback-functions
     # The first argument, I believe, is the return type, which I think is void*
     gdp_gin_sub_cbfunc_t = CFUNCTYPE(c_void_p, POINTER(gdp_gin_t),
                                      POINTER(GDP_DATUM.gdp_datum_t), c_void_p)
@@ -220,18 +221,7 @@ class GDP_GIN(object):
         check_EP_STAT(estat)
 
         md = GDP_MD(ptr=gmd)
-
-        idx = 0
-        metadata = {}
-        while True:
-            try:
-                (i,v) = md.get(idx)
-                metadata[i] = v
-                idx += 1
-            except EP_STAT_SEV_ERROR:
-                break
-
-        return metadata
+        return md
 
 
     def getname(self):
@@ -284,7 +274,6 @@ class GDP_GIN(object):
         If query_param is 'str', we assume it is query by hash.
         """
 
-        datum = GDP_DATUM()
 
         if isinstance(query_param, int):
             __query_param = gdp_recno_t(query_param)
@@ -315,16 +304,12 @@ class GDP_GIN(object):
         else:   # should never reach here
             assert False
 
-        estat = __func(self.ptr, __query_param, datum.gdp_datum)
+        datum_ptr = GDP_DATUM.gdp_datum_t()
+
+        estat = __func(self.ptr, __query_param, datum_ptr)
         check_EP_STAT(estat)
 
-        datum_dict = {}
-        datum_dict["recno"] = datum.getrecno()
-        datum_dict["ts"] = datum.getts()
-        datum_dict["data"] = datum.getbuf()
-        datum_dict["sig"] = datum.getsig()
-
-        return datum_dict
+        return GDP_DATUM(ptr=datum_ptr)
 
 
     def read_by_recno(self, recno):
@@ -593,7 +578,7 @@ class GDP_GIN(object):
 ########                            c_void_p, c_void_p ]
 ########        __func.restype = EP_STAT
 ########
-########        estat = __func(self.ptr, datum.gdp_datum, None, None)
+########        estat = __func(self.ptr, datum.ptr, None, None)
 ########        check_EP_STAT(estat)
 ########
 
@@ -611,102 +596,42 @@ class GDP_GIN(object):
         Returns at most one event.
         """
 
-        __func1 = gdp.gdp_event_next
+        __func = gdp.gdp_event_next
 
         # Find the 'type' we need to pass to argtypes
         if __gin_handle == None:
-            __func1_arg1_type = c_void_p
+            __func_arg1_type = c_void_p
         else:
-            __func1_arg1_type = POINTER(cls.gdp_gin_t)
+            __func_arg1_type = POINTER(cls.gdp_gin_t)
 
         # if timeout is None, then we just skip this
         if timeout == None:
             __timeout = None
-            __func1_arg2_type = c_void_p
+            __func_arg2_type = c_void_p
         else:
             __timeout = GDP_DATUM.EP_TIME_SPEC()
             __timeout.tv_sec = c_int64(timeout['tv_sec'])
             __timeout.tv_nsec = c_uint32(timeout['tv_nsec'])
             __timeout.tv_accuracy = c_float(timeout['tv_accuracy'])
-            __func1_arg2_type = POINTER(GDP_DATUM.EP_TIME_SPEC)
+            __func_arg2_type = POINTER(GDP_DATUM.EP_TIME_SPEC)
 
         # Enable some type checking
 
-        __func1.argtypes = [__func1_arg1_type, __func1_arg2_type]
-        __func1.restype = POINTER(cls.gdp_event_t)
+        __func.argtypes = [__func_arg1_type, __func_arg2_type]
+        __func.restype = POINTER(cls.gdp_event_t)
 
-        event_ptr = __func1(__gin_handle, __timeout)
+        event_ptr = __func(__gin_handle, __timeout)
         if bool(event_ptr) == False:  # Null pointers have false boolean value
             return None
 
-        # now get the associated GCL handle
-        __func2 = gdp.gdp_event_getgin
-        __func2.argtypes = [POINTER(cls.gdp_event_t)]
-        __func2.restype = POINTER(cls.gdp_gin_t)
+        return GDP_EVENT(ptr=event_ptr)
 
-        gin_ptr = __func2(event_ptr)
-
-        # now find this in the dictionary
-        ## => need the '()' because we store weakrefs in object_dir
-        gin_handle = cls.object_dir.get(addressof(gin_ptr.contents), None)()
-
-        # also get the associated datum object
-        __func3 = gdp.gdp_event_getdatum
-        __func3.argtypes = [POINTER(cls.gdp_event_t)]
-        __func3.restype = POINTER(GDP_DATUM.gdp_datum_t)
-
-        datum_ptr = __func3(event_ptr)
-        datum = GDP_DATUM(ptr=datum_ptr)
-        datum_dict = {}
-        datum_dict["recno"] = datum.getrecno()
-        datum_dict["ts"] = datum.getts()
-        datum_dict["data"] = datum.getbuf()
-        datum_dict["sig"] = datum.getsig()
-
-        # find the type of the event
-        __func4 = gdp.gdp_event_gettype
-        __func4.argtypes = [POINTER(cls.gdp_event_t)]
-        __func4.restype = c_int
-
-        event_type = __func4(event_ptr)
-
-        # get the status code
-        __func5 = gdp.gdp_event_getstat
-        __func5.argtypes = [POINTER(cls.gdp_event_t)]
-        __func5.restype = EP_STAT
-
-        event_ep_stat = __func5(event_ptr)
-        check_EP_STAT(event_ep_stat)
-
-        # get user data
-        __func6 = gdp.gdp_event_getudata
-        __func6.argtypes = [POINTER(cls.gdp_event_t)]
-        __func6.restype = c_void_p
-
-        _udata = __func6(event_ptr)
-        udata = int(cast(_udata, c_char_p).value)
-
-        # also free the event
-        __func7 = gdp.gdp_event_free
-        __func7.argtypes = [POINTER(cls.gdp_event_t)]
-        __func7.restype = EP_STAT
-
-        estat = __func7(event_ptr)
-        check_EP_STAT(estat)
-
-        gdp_event = {}
-        gdp_event["gin_handle"] = gin_handle
-        gdp_event["datum"] = datum_dict
-        gdp_event["type"] = event_type
-        gdp_event["stat"] = event_ep_stat
-        gdp_event["udata"] = udata
-
-        return gdp_event
 
     @classmethod
     def get_next_event(cls, timeout):
         """ Get events for ANY open gin """
         return cls._helper_get_next_event(None, timeout)
+
 
     def __get_next_event(self, timeout):
         """ Get events for this particular GCL """
