@@ -56,7 +56,7 @@ class GDP_HASH(object):
                 size = c_size_t(0)
                 buf = None
 
-            self.hash_ = __func(alg, bug, size)
+            self.hash_ = __func(alg, buf, size)
             self.did_i_create_it = True
 
         else:
