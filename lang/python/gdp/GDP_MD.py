@@ -88,7 +88,7 @@ class GDP_MD:
             __func(self.gdp_md_ptr)
 
 
-    def print_to_file(self, fh, detail, indent):
+    def dump(self, fh, detail, indent):
         """
         Print the gdp_md C memory location contents to a file handle fh.
         fh could be sys.stdout, or any other open file handle.
@@ -98,7 +98,7 @@ class GDP_MD:
 
         # need to convert this file handle to a C FILE*
         __fh = PyFile_AsFile(fh)
-        __func = gdp.gdp_md_print
+        __func = gdp.gdp_md_dump
         __func.argtypes = [POINTER(self.gdp_md_t), FILE_P, c_int, c_int]
         # ignore the return value
 
