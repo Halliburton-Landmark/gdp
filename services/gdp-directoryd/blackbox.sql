@@ -105,7 +105,7 @@ begin
 	# guid id assignment (hence insert ignore rather than replace)
 	insert ignore into blackbox.guids (guid) values (eguid);
 	select id into @eid from blackbox.guids where guid = eguid;
-	replace into blackbox.nhops (origid, destid, ts) values (@did, @eid, CURRENT_TIMESTAMP);
+	# (re)add @eid -> @did path to graph with latest timestamp
 	replace into blackbox.nhops (origid, destid, ts) values (@eid, @did, CURRENT_TIMESTAMP);
 	end //
 delimiter ;
