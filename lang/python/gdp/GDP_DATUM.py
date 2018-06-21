@@ -243,13 +243,3 @@ class GDP_DATUM:
 
         return string_at(sig_string)
 
-    def getmdalg(self):
-        """ Return the signature algorithm as read from the GCL metadata"""
-
-        __func = gdp.gdp_datum_getmdalg
-        __func.argtypes = [POINTER(self.gdp_datum_t)]
-        __func.restype = c_short
-
-        ret = __func(self.gdp_datum)
-
-        return int(ret)

@@ -323,7 +323,6 @@ class GDP_GIN(object):
         datum_dict["ts"] = datum.getts()
         datum_dict["data"] = datum.getbuf()
         datum_dict["sig"] = datum.getsig()
-        datum_dict["sigalg"] = datum.getmdalg()
 
         return datum_dict
 
@@ -663,7 +662,6 @@ class GDP_GIN(object):
         datum_dict["ts"] = datum.getts()
         datum_dict["data"] = datum.getbuf()
         datum_dict["sig"] = datum.getsig()
-        datum_dict["sigalg"] = datum.getmdalg()
 
         # find the type of the event
         __func4 = gdp.gdp_event_gettype
