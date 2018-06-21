@@ -26,8 +26,8 @@
 #  ----- END LICENSE BLOCK -----
 #
 
-BINALL_ZC=	gdp-zcbrowse
 #ALL=	gdp-create gdp-writer gdp-reader gdp-rest rw-bench log-view
+BINALL_ZC=	gdp-zcbrowse
 BINALL=		\
 		log-exists \
 		log-mirror \
@@ -111,7 +111,6 @@ LIBJANSSON=	-ljansson
 LIBEVENT2=	-levent -levent_pthreads -pthread
 LIBCRYPTO=	-lcrypto
 LIBPROTO_C=	-lprotobuf-c
-LIBAVAHI=	-lavahi-client -lavahi-common
 LIBADD=		`sh ../adm/add-libs.sh`
 INCS=		${INCSEARCH} ${INCGDP} ${INCEP}
 LDFLAGS+=	${LIBSEARCH}
@@ -120,7 +119,6 @@ LDLIBS=		${LIBGDP} \
 		${LIBEVENT2} \
 		${LIBCRYPTO} \
 		${LIBPROTO_C} \
-		${LIBAVAHI} \
 		${LIBJANSSON} \
 		${LIBADD}
 PG=
