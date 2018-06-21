@@ -28,6 +28,7 @@
 
 
 from MISC import *
+from GDP_BUF import GDP_BUF
 
 # Formatting options
 # GDP_DATUM_PRTEXT        0x00000001      // print data as text

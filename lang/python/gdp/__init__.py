@@ -77,9 +77,15 @@ from MISC import \
         gdp_init, gdp_run_accept_event_loop, \
         dbg_set, check_EP_STAT, ep_stat_tostr
 from GDP_DATUM import GDP_DATUM_PRTEXT, GDP_DATUM_PRDEBUG, \
-        GDP_DATUM_PRSIG, GDP_DATUM_PRQUIET, GDP_DATUM_PRMETAONLY
+        GDP_DATUM_PRSIG, GDP_DATUM_PRQUIET, GDP_DATUM_PRMETAONLY, \
+        GDP_DATUM
 from GDP_NAME import GDP_NAME
 from GDP_GIN import GDP_GIN
+from GDP_EVENT import GDP_EVENT
+from GDP_BUF import GDP_BUF
+from GDP_HASH import GDP_HASH
+from GDP_SIG import GDP_SIG
+from GDP_MD import GDP_MD
 from EP_CRYPTO import EP_CRYPTO_KEY, \
     EP_CRYPTO_KEYFORM_UNKNOWN, EP_CRYPTO_KEYFORM_PEM, EP_CRYPTO_KEYFORM_DER, \
     EP_CRYPTO_F_PUBLIC, EP_CRYPTO_F_SECRET
@@ -95,7 +101,9 @@ __all__ = [GDP_MODE_ANY, GDP_MODE_RO, GDP_MODE_AO, GDP_MODE_RA,
            check_EP_STAT, ep_stat_tostr,
            GDP_DATUM_PRTEXT, GDP_DATUM_PRDEBUG,
            GDP_DATUM_PRSIG, GDP_DATUM_PRQUIET, GDP_DATUM_PRMETAONLY,
+           GDP_DATUM,
            GDP_NAME, GDP_GIN,
+           GDP_EVENT, GDP_BUF, GDP_HASH, GDP_SIG, GDP_MD,
            EP_CRYPTO_KEY,
            EP_CRYPTO_KEYFORM_UNKNOWN, EP_CRYPTO_KEYFORM_PEM,
            EP_CRYPTO_KEYFORM_DER,

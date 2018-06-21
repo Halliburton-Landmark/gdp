@@ -35,6 +35,7 @@ import pprint
 from MISC import *
 from GDP_HASH import *
 from GDP_SIG import *
+from GDP_EVENT import *
 from GDP_NAME import *
 from GDP_DATUM import *
 from GDP_MD import *
@@ -84,10 +85,6 @@ class GDP_GIN(object):
         "Corresponds to gdp_gin_t structure exported by C library"
         pass
 
-    class gdp_event_t(Structure):
-
-        "Corresponds to gdp_event_t structure exported by C library"
-        pass
 
     # XXX: Check if this works.
     # More details here:
@@ -304,12 +301,11 @@ class GDP_GIN(object):
         else:   # should never reach here
             assert False
 
-        datum_ptr = GDP_DATUM.gdp_datum_t()
-
-        estat = __func(self.ptr, __query_param, datum_ptr)
+        datum = GDP_DATUM()
+        estat = __func(self.ptr, __query_param, datum.ptr)
         check_EP_STAT(estat)
 
-        return GDP_DATUM(ptr=datum_ptr)
+        return datum
 
 
     def read_by_recno(self, recno):
@@ -435,7 +431,7 @@ class GDP_GIN(object):
             __start = gdp_recno_t(start)
 
             __start_type = gdp_recno_t
-            __func = gdp.gdp_gin_subscribe
+            __func = gdp.gdp_gin_subscribe_by_recno
 
         elif isinstance(start, str):
             # TODO implement hashes
@@ -536,17 +532,11 @@ class GDP_GIN(object):
     ############### Various Append functions #########################
     ##################################################################
 
-    def append(self, datum_dict, prevhash):
-        """
-        Write a datum to the GCL. The datum should be a dictionary, with
-        the only valid key being 'data'. The value is the actual
-        data that is to be written.
-        """
+    def append(self, datum, prevhash):
+        """ Write a datum to the GCL.  """
 
-        datum = GDP_DATUM()
-
-        if "data" in datum_dict.keys():
-            datum.setbuf(datum_dict["data"])
+        assert isinstance(datum, GDP_DATUM)
+        assert isinstance(prevhash, GDP_HASH) or prevhash is None
 
         __prevhash_type = c_void_p if prevhash is None \
                                 else POINTER(GDP_HASH.gdp_hash_t)
@@ -558,7 +548,7 @@ class GDP_GIN(object):
                                 __prevhash_type]
         __func.restype = EP_STAT
 
-        estat = __func(self.ptr, datum.gdp_datum, __prevhash_val)
+        estat = __func(self.ptr, datum.ptr, __prevhash_val)
         check_EP_STAT(estat)
 
 
@@ -618,7 +608,7 @@ class GDP_GIN(object):
         # Enable some type checking
 
         __func.argtypes = [__func_arg1_type, __func_arg2_type]
-        __func.restype = POINTER(cls.gdp_event_t)
+        __func.restype = POINTER(GDP_EVENT.gdp_event_t)
 
         event_ptr = __func(__gin_handle, __timeout)
         if bool(event_ptr) == False:  # Null pointers have false boolean value
