@@ -629,5 +629,5 @@ class GDP_GIN(object):
         if event is not None:
             ## the crazy '__repr__.__self__' is needed, because there's no
             ## unproxy. See https://stackoverflow.com/questions/10246116
-            assert event["gin_handle"] == self.__repr__.__self__
+            assert event["gin"] == self.__repr__.__self__
         return event

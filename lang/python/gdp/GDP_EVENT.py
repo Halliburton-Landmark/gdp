@@ -26,7 +26,7 @@
 #	OR MODIFICATIONS.
 # ----- END LICENSE BLOCK -----
 
-
+import gdp as _gdp
 from MISC import *
 
 class GDP_EVENT:
@@ -129,13 +129,13 @@ class GDP_EVENT:
 
         __func = gdp.gdp_event_getgin
         __func.argtypes = [POINTER(self.gdp_event_t)]
-        __func.restype = POINTER(GDP_GIN.gdp_gin_t)
+        __func.restype = POINTER(_gdp.GDP_GIN.gdp_gin_t)
 
         gin_ptr = __func(self.ptr)
 
         # now find this in the dictionary
         ## => need the '()' because we store weakrefs in object_dir
-        gin = GDP_GIN.object_dir.get(addressof(gin_ptr.contents), None)()
+        gin = _gdp.GDP_GIN.object_dir.get(addressof(gin_ptr.contents), None)()
         return gin
 
 
@@ -143,9 +143,9 @@ class GDP_EVENT:
 
         __func = gdp.gdp_event_getdatum
         __func.argtypes = [POINTER(self.gdp_event_t)]
-        __func.restype = POINTER(GDP_DATUM.gdp_datum_t)
+        __func.restype = POINTER(_gdp.GDP_DATUM.gdp_datum_t)
         datum_ptr = __func(self.ptr)
-        datum = GDP_DATUM(ptr=datum_ptr)
+        datum = _gdp.GDP_DATUM(ptr=datum_ptr)
         return datum
 
     def getudata(self):
