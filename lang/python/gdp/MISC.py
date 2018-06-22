@@ -29,6 +29,7 @@
 
 from ctypes import *
 import os
+import time
 
 # Make sure that we can actually find the .so files, irrespective of
 #   where the actual python script is it.
@@ -231,6 +232,15 @@ def gdp_run_accept_event_loop(arg):
     ret = __func(arg)
     return ret
 
+
+def get_current_ts():
+    """returns the current timestamp, formatted as an
+    EP_TIME_SPEC compatible dictionary"""
+
+    t = time.time()
+    return {"tv_sec": int(t),
+            "tv_nsec": int((t-int(t))*(10**9)),
+            "tv_accuracy": 0.5}
 
 # RECIPE FOR CASTING POINTERS
 # buf = create_string_buffer(32)

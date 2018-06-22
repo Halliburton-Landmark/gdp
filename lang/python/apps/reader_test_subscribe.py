@@ -38,28 +38,22 @@ import gdp
 def main(name_str):
 
     # create a python object
-    gcl_name = gdp.GDP_NAME(name_str)
-
-    # Assume that the GCL already exists
-    gcl_handle = gdp.GDP_GCL(gcl_name, gdp.GDP_MODE_RO)
-
+    _name = gdp.GDP_NAME(name_str)
+    gin_handle = gdp.GDP_GIN(_name, gdp.GDP_MODE_RO)
     # this is the actual subscribe call
-    gcl_handle.subscribe(0, 0, None)
+    gin_handle.subscribe_by_recno(0, 0, None)
 
     while True:
-
         # This blocks, until there is a new event
-        event = gdp.GDP_GCL.get_next_event(None)
+        event = gin_handle.get_next_event(None)
         datum = event["datum"]
-        handle = event["gcl_handle"]
-        print datum
+        print datum["buf"].peek()
 
 if __name__ == "__main__":
 
     if len(sys.argv) < 2:
-        print "Usage: %s <gcl-name>" % sys.argv[0]
+        print "Usage: %s <name>" % sys.argv[0]
         sys.exit(1)
 
-    # Change this to point to a gdp_router
     gdp.gdp_init()
     main(sys.argv[1])

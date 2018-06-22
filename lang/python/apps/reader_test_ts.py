@@ -38,18 +38,18 @@ import gdp
 def main(name_str, tv_sec, tv_nsec, tv_accuracy=0.5):
 
     # create a python object
-    gcl_name = gdp.GDP_NAME(name_str)
-    print gcl_name.printable_name()
+    _name = gdp.GDP_NAME(name_str)
+    print _name.printable_name()
 
     # Assume that the GCL already exists
-    gcl_handle = gdp.GDP_GCL(gcl_name, gdp.GDP_MODE_RO)
+    gin_handle = gdp.GDP_GIN(_name, gdp.GDP_MODE_RO)
 
     # Create a dictionary for the timestamp. This is the preferred format
     #   for timstamps in gdp.
     ts = {'tv_sec': tv_sec, 'tv_nsec': tv_nsec, 'tv_accuracy': tv_accuracy}
 
     # query by time stamp
-    datum = gcl_handle.read_ts(ts)
+    datum = gin_handle.read_by_ts(ts)
     print datum
 
 if __name__ == "__main__":

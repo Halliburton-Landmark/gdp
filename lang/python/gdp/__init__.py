@@ -75,7 +75,7 @@ from MISC import \
         GDP_MD_EXPIRE, GDP_MD_CID, GDP_MD_SYNTAX, \
         GDP_MD_LOCATION, GDP_MD_UUID, \
         gdp_init, gdp_run_accept_event_loop, \
-        dbg_set, check_EP_STAT, ep_stat_tostr
+        dbg_set, check_EP_STAT, ep_stat_tostr, get_current_ts
 from GDP_DATUM import GDP_DATUM_PRTEXT, GDP_DATUM_PRDEBUG, \
         GDP_DATUM_PRSIG, GDP_DATUM_PRQUIET, GDP_DATUM_PRMETAONLY, \
         GDP_DATUM
@@ -98,7 +98,7 @@ __all__ = [GDP_MODE_ANY, GDP_MODE_RO, GDP_MODE_AO, GDP_MODE_RA,
            GDP_MD_XID, GDP_MD_PUBKEY, GDP_MD_CTIME, GDP_MD_EXPIRE,
            GDP_MD_CID, GDP_MD_SYNTAX, GDP_MD_LOCATION, GDP_MD_UUID,
            gdp_init, gdp_run_accept_event_loop, dbg_set,
-           check_EP_STAT, ep_stat_tostr,
+           check_EP_STAT, ep_stat_tostr, get_current_ts,
            GDP_DATUM_PRTEXT, GDP_DATUM_PRDEBUG,
            GDP_DATUM_PRSIG, GDP_DATUM_PRQUIET, GDP_DATUM_PRMETAONLY,
            GDP_DATUM,
