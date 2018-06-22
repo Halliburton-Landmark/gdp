@@ -53,14 +53,11 @@ def main(name_str, start, stop):
     while True:
 
         # This could return a None, after the specified timeout
-        event = gdp.GDP_GIN.get_next_event(t)
+        event = gin_handle.get_next_event(t)
         if event is None or event["type"] == gdp.GDP_EVENT_DONE:
             break
         datum = event["datum"]
-        ## FIXME the following doesn't work yet because of a bug
-        ## in the C library.
-        # handle = event["gin"]
-        # assert handle == gin_handle
+        assert event["gin"] == gin_handle       ## sanity check
         print datum["buf"].peek()
 
 if __name__ == "__main__":
