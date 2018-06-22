@@ -142,7 +142,6 @@ class GDP_GIN(object):
 
             if "ptr" in kwargs:
                 self.ptr = kwargs["ptr"]
-                print self.ptr.contents
                 self.get_next_event = WeakMethod(self.__get_next_event)
                 self.did_i_create_it = False
             else:
@@ -164,7 +163,8 @@ class GDP_GIN(object):
             check_EP_STAT(estat)
 
     def __eq__(self, other):
-        return self.ptr == other.ptr
+        ## XXX is this correct?
+        return addressof(self.ptr.contents) == addressof(other.ptr.contents)
 
     @classmethod
     def create(cls, name, logd_name, metadata):
@@ -651,7 +651,5 @@ class GDP_GIN(object):
         """ Get events for this particular GCL """
         event = self._helper_get_next_event(self.ptr, timeout)
         if event is not None:
-            ## the crazy '__repr__.__self__' is needed, because there's no
-            ## unproxy. See https://stackoverflow.com/questions/10246116
-            assert event["gin"] == self.__repr__.__self__
+            assert event["gin"] == self
         return event
