@@ -142,6 +142,7 @@ class GDP_GIN(object):
 
             if "ptr" in kwargs:
                 self.ptr = kwargs["ptr"]
+                print self.ptr.contents
                 self.get_next_event = WeakMethod(self.__get_next_event)
                 self.did_i_create_it = False
             else:
@@ -161,6 +162,9 @@ class GDP_GIN(object):
 
             estat = __func(self.ptr)
             check_EP_STAT(estat)
+
+    def __eq__(self, other):
+        return self.ptr == other.ptr
 
     @classmethod
     def create(cls, name, logd_name, metadata):
