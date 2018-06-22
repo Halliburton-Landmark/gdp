@@ -528,6 +528,7 @@ _ep_thr_mutex_unlock(EP_THR_MUTEX *mtx,
 				pmtx->__data.__owner, ep_thr_gettid());
 #elif EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
 	if (mtx->locker != ep_thr_gettid())
+	{
 		ep_dbg_cprintf(Dbg, 1,
 				"ep_thr_mutex_unlock at %s:%d:"
 				" mtx owner = %"EP_THR_PRItid " at %s:%d;"
@@ -535,21 +536,22 @@ _ep_thr_mutex_unlock(EP_THR_MUTEX *mtx,
 				file, line,
 				mtx->locker, mtx->l_file, mtx->l_line,
 				ep_thr_gettid());
+	}
+	else
+	{
+		mtx->locker = 0;	// presumptuous
+	}
 #endif
 	if ((err = pthread_mutex_unlock(pmtx)) != 0)
 		diagnose_thr_err(err, "mutex_unlock", file, line, name, mtx);
 #if EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
-	if (err == 0)
+	if (err == 0 && mtxorder > 0)
 	{
-		if (mtxorder > 0)
-		{
-			struct lorder *lorder;
-			pthread_once(&lorder_once, lorder_init);
-			lorder = (struct lorder *) pthread_getspecific(lorder_key);
-			if (lorder != NULL)
-				lorder->lorder_used &= ~(1 << (mtxorder - 1));
-		}
-		mtx->locker = 0;
+		struct lorder *lorder;
+		pthread_once(&lorder_once, lorder_init);
+		lorder = (struct lorder *) pthread_getspecific(lorder_key);
+		if (lorder != NULL)
+			lorder->lorder_used &= ~(1 << (mtxorder - 1));
 	}
 #endif // EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
 	CHECKMTX(pmtx, "unlock <<<");
@@ -578,6 +580,7 @@ _ep_thr_mutex_tryunlock(EP_THR_MUTEX *mtx,
 				pmtx->__data.__owner, ep_thr_gettid());
 #elif EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
 	if (mtx->locker != ep_thr_gettid())
+	{
 		ep_dbg_cprintf(Dbg, 1,
 				"_ep_thr_mutex_unlock at %s:%d:"
 				" mtx owner = %"EP_THR_PRItid " at %s:%d,"
@@ -585,16 +588,17 @@ _ep_thr_mutex_tryunlock(EP_THR_MUTEX *mtx,
 				file, line,
 				mtx->locker, mtx->l_file, mtx->l_line,
 				ep_thr_gettid());
+	}
+	else
+	{
+		mtx->locker = 0;	// presumptuous
+	}
 #endif
 	// EAGAIN => mutex was not locked
 	// EPERM  => mutex held by a different thread
 	if ((err = pthread_mutex_unlock(pmtx)) != 0 &&
 			err != EAGAIN && err != EPERM)
 		diagnose_thr_err(err, "mutex_unlock", file, line, name, mtx);
-#if EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
-	if (err == 0)
-		mtx->locker = 0;
-#endif
 	CHECKMTX(pmtx, "tryunlock <<<");
 	return err;
 }
