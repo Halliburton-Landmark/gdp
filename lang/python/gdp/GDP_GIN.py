@@ -70,16 +70,6 @@ class GDP_GIN(object):
     something to keep in mind.
     """
 
-    # We need to keep a list of all the open GCL handles we have, and
-    # their associated gdp handles. I don't see any cleaner solution
-    # to how to differentiate between events associated for different
-    # GCLs. Also, we no longer can free the handles automatically.
-    # Why? How would python know that we are not planning to get an
-    # event for a gin handle?
-
-    # C pointer to python object mapping
-    object_dir = {}
-
     class gdp_gin_t(Structure):
 
         "Corresponds to gdp_gin_t structure exported by C library"
@@ -94,7 +84,7 @@ class GDP_GIN(object):
                                      POINTER(GDP_DATUM.gdp_datum_t), c_void_p)
 
 
-    def __init__(self, name, iomode, open_info={}):
+    def __init__(self, name, iomode, open_info={}, **kwargs):
         """
         Open a GDP instance for a GDP object with given name and io-mode.
 
@@ -111,39 +101,51 @@ class GDP_GIN(object):
         'skey': an instance of EP_CRYPTO_KEY containing the signature key
         """
 
-        # __ptr is just a C style pointer, that we will assign to something
-        __ptr = POINTER(self.gdp_gin_t)()
+        if len(kwargs)==0:
 
-        # we do need an internal represenation of the name.
-        _name_python = name.internal_name()
-        # convert this to a string that ctypes understands. Some ctypes magic
-        # ahead
-        buf = create_string_buffer(_name_python, 32+1)
-        _name_ctypes_ptr = cast(byref(buf), POINTER(GDP_NAME.name_t))
-        _name_ctypes = _name_ctypes_ptr.contents
+            # __ptr is just a C style pointer, that we will assign to
+            # something
+            __ptr = POINTER(self.gdp_gin_t)()
 
-        # (optional) Do a quick sanity checking on open_info
-        #   use it to get a GDP_OPEN_INFO structure
-        __gdp_open_info = GDP_OPEN_INFO(open_info)
+            # we do need an internal represenation of the name.
+            _name_python = name.internal_name()
+            # convert this to a string that ctypes understands.
+            # Some ctypes magic ahead
+            buf = create_string_buffer(_name_python, 32+1)
+            _name_ctypes_ptr = cast(byref(buf), POINTER(GDP_NAME.name_t))
+            _name_ctypes = _name_ctypes_ptr.contents
 
-        # open an existing gin
-        __func = gdp.gdp_gin_open
-        __func.argtypes = [GDP_NAME.name_t, c_int,
-                           POINTER(GDP_OPEN_INFO.gdp_open_info_t),
-                           POINTER(POINTER(self.gdp_gin_t))]
-        __func.restype = EP_STAT
+            # (optional) Do a quick sanity checking on open_info
+            #   use it to get a GDP_OPEN_INFO structure
+            __gdp_open_info = GDP_OPEN_INFO(open_info)
 
-        estat = __func(_name_ctypes, iomode,
-                            __gdp_open_info.gdp_open_info_ptr,
-                            pointer(__ptr))
-        check_EP_STAT(estat)
+            # open an existing gin
+            __func = gdp.gdp_gin_open
+            __func.argtypes = [GDP_NAME.name_t, c_int,
+                               POINTER(GDP_OPEN_INFO.gdp_open_info_t),
+                               POINTER(POINTER(self.gdp_gin_t))]
+            __func.restype = EP_STAT
 
-        self.ptr = __ptr
-        self.gdp_open_info = __gdp_open_info
-        ## Create the instance method 'get_next_event', in addition to
-        ## already existing class method
-        self.get_next_event = WeakMethod(self.__get_next_event)
-        self.object_dir[addressof(__ptr.contents)] = weakref.ref(self)
+            estat = __func(_name_ctypes, iomode,
+                                __gdp_open_info.gdp_open_info_ptr,
+                                pointer(__ptr))
+            check_EP_STAT(estat)
+
+            self.ptr = __ptr
+            ## Create the instance method 'get_next_event', in addition to
+            ## already existing class method
+            # self.get_next_event = WeakMethod(self.__get_next_event)
+            self.get_next_event = self.__get_next_event
+            self.did_i_create_it = True
+
+        else:
+
+            if "ptr" in kwargs:
+                self.ptr = kwargs["ptr"]
+                self.get_next_event = WeakMethod(self.__get_next_event)
+                self.did_i_create_it = False
+            else:
+                raise Exception
 
 
     def __del__(self):
@@ -151,17 +153,14 @@ class GDP_GIN(object):
 
         assert self.ptr is not False    # null pointers have false bool val
 
-        # remove the entry from object directory
-        self.object_dir.pop(addressof(self.ptr.contents), None)
+        if self.did_i_create_it:
+            # call the C function to free associated C memory block
+            __func = gdp.gdp_gin_close
+            __func.argtypes = [POINTER(self.gdp_gin_t)]
+            __func.restype = EP_STAT
 
-        # call the C function to free associated C memory block
-        __func = gdp.gdp_gin_close
-        __func.argtypes = [POINTER(self.gdp_gin_t)]
-        __func.restype = EP_STAT
-
-        estat = __func(self.ptr)
-        check_EP_STAT(estat)
-
+            estat = __func(self.ptr)
+            check_EP_STAT(estat)
 
     @classmethod
     def create(cls, name, logd_name, metadata):

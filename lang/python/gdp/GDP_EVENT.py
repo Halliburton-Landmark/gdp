@@ -132,10 +132,7 @@ class GDP_EVENT:
         __func.restype = POINTER(_gdp.GDP_GIN.gdp_gin_t)
 
         gin_ptr = __func(self.ptr)
-
-        # now find this in the dictionary
-        ## => need the '()' because we store weakrefs in object_dir
-        gin = _gdp.GDP_GIN.object_dir.get(addressof(gin_ptr.contents), None)()
+        gin = _gdp.GDP_GIN(None, None, ptr=gin_ptr)
         return gin
 
 
