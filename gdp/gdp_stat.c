@@ -82,7 +82,7 @@ static struct ep_stat_to_string Stats[] =
 	{ GDP_STAT_RECORD_MISSING,			"record missing (look elsewhere)",	},
 	{ GDP_STAT_RECORD_DUPLICATED,		"record duplicated",				},
 	{ GDP_STAT_DATUM_REQUIRED,			"missing required datum",			},
-	{ GDP_STAT_CORRUPT_TIDX,			"corrupt timestamp index",			},
+	{ GDP_STAT_SQLITE_ERROR,			"other sqlite3 error",				},
 	{ GDP_STAT_INVOKE_TIMEOUT,			"GDP command timeout",				},
 	{ GDP_STAT_PDU_TOO_LONG,			"PDU too long",						},
 	{ GDP_STAT_CHAN_NOT_CONNECTED,		"cannot connect to router",			},

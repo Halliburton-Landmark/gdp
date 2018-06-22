@@ -401,6 +401,8 @@ physinfo_alloc(gdp_gob_t *gob)
 	return phys;
 
 fail1:
+	ep_dbg_cprintf(Dbg, 1, "physinfo_alloc: cannot create rwlock: %s\n",
+			strerror(errno));
 	ep_mem_free(phys);
 	return NULL;
 }
@@ -664,6 +666,58 @@ fail0:
 
 
 /*
+**  Check SQLite PRAGMAs for correctness.
+*/
+
+static EP_STAT
+check_pragma(struct sqlite3 *db,
+			const char *name,
+			int expected,
+			EP_STAT errstat)
+{
+	EP_STAT estat;
+	sqlite3_stmt *stmt;
+	int rc;
+	char qbuf[50];
+
+	snprintf(qbuf, sizeof qbuf, "PRAGMA %s;", name);
+	rc = sqlite3_prepare_v2(db, qbuf, -1, &stmt, NULL);
+	if (rc != SQLITE_OK)
+	{
+		estat = sqlite_error(rc, "sqlite_open pragma prepare", name);
+		if (EP_STAT_ISOK(estat))
+			estat = GDP_STAT_SQLITE_ERROR;
+		return estat;
+	}
+
+	rc = sqlite3_step(stmt);
+	if (rc != SQLITE_ROW)
+	{
+		estat = sqlite_error(rc, "sqlite_open pragma check", name);
+		if (EP_STAT_ISOK(estat))
+			estat = GDP_STAT_SQLITE_ERROR;
+		sqlite3_finalize(stmt);
+		return estat;
+	}
+
+	// check to make sure this is really a database we understand
+	int actual = sqlite3_column_int(stmt, 0);
+	if (actual == expected)
+	{
+		estat = EP_STAT_OK;
+	}
+	else
+	{
+		estat = errstat;
+		ep_log(estat, "database corruption error: unknown %s %d expected %d",
+				name, actual, expected);
+	}
+	sqlite3_finalize(stmt);
+	return estat;
+}
+
+
+/*
 **	SQLITE_OPEN --- do physical open of a GOB
 */
 
@@ -709,47 +763,13 @@ sqlite_open(gdp_gob_t *gob)
 	// and it's the correct version (user_version)
 	phase = "database verification";
 	{
-		sqlite3_stmt *stmt;
-		rc = sqlite3_prepare_v2(phys->db,
-					"SELECT * FROM pragma_application_id, pragma_user_version;",
-					-1, &stmt, NULL);
-		CHECK_RC(rc, goto fail1);
-		rc = sqlite3_step(stmt);
-		if (rc != SQLITE_ROW)
-		{
-			sqlite3_finalize(stmt);
+		estat = check_pragma(phys->db, "application_id", GLOG_MAGIC,
+							GDP_STAT_CORRUPT_LOG);
+		if (EP_STAT_ISOK(estat))
+			estat = check_pragma(phys->db, "user_version", GLOG_VERSION,
+							GDP_STAT_LOG_VERSION_MISMATCH);
+		if (!EP_STAT_ISOK(estat))
 			goto fail1;
-		}
-
-		// check to make sure this is really a database we understand
-		{
-			int32_t magic = sqlite3_column_int(stmt, 0);
-			if (magic != GLOG_MAGIC)
-			{
-				estat = GDP_STAT_CORRUPT_LOG;
-				ep_log(estat, "database corruption error: unknown application_id %d expected %d",
-						magic, GLOG_MAGIC);
-				sqlite3_finalize(stmt);
-				goto fail2;
-			}
-		}
-
-		// check that we can understand this version of the dataase
-		// (this may become more complex with time when we understand
-		//		more version numbers)
-		{
-			int32_t vers = sqlite3_column_int(stmt, 1);
-			if (vers != GLOG_VERSION)
-			{
-				estat = GDP_STAT_LOG_VERSION_MISMATCH;
-				ep_log(estat, "unknown database version %d expected %d",
-						vers, GLOG_VERSION);
-				sqlite3_finalize(stmt);
-				goto fail2;
-			}
-			phys->ver = vers;
-		}
-		sqlite3_finalize(stmt);
 	}
 
 	// read metadata
