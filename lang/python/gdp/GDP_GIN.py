@@ -285,23 +285,30 @@ class GDP_GIN(object):
 
         elif isinstance(query_param, str):
 
-            # TODO This is read by hash. We will come back to it later
+            # TODO This is read by hash. We will come back to it
+            # later when the C-library implements this functionality.
             raise NotImplementedError
 
         elif isinstance(query_param, dict):
 
-            __query_param = GDP_DATUM.EP_TIME_SPEC()
-            __query_param.tv_sec = c_int64(query_param['tv_sec'])
-            __query_param.tv_nsec = c_uint32(query_param['tv_nsec'])
-            __query_param.tv_accuracy = c_float(query_param['tv_accuracy'])
+            raise NotImplementedError
 
-            __func = gdp.gdp_gin_read_ts
-            __func.argtypes = [POINTER(self.gdp_gin_t),
-                                    POINTER(GDP_DATUM.EP_TIME_SPEC),
-                                    POINTER(GDP_DATUM.gdp_datum_t)]
-            __func.restype = EP_STAT
+            # TODO check whether the following commented out version
+            # works when the C-library implements this functionality.
 
-        else:   # should never reach here
+            # __query_param = GDP_DATUM.EP_TIME_SPEC()
+            # __query_param.tv_sec = c_int64(query_param['tv_sec'])
+            # __query_param.tv_nsec = c_uint32(query_param['tv_nsec'])
+            # __query_param.tv_accuracy = c_float(query_param['tv_accuracy'])
+
+            # __func = gdp.gdp_gin_read_by_ts
+            # __func.argtypes = [POINTER(self.gdp_gin_t),
+            #                         POINTER(GDP_DATUM.EP_TIME_SPEC),
+            #                         POINTER(GDP_DATUM.gdp_datum_t)]
+            # __func.restype = EP_STAT
+
+        else:
+            # should never reach here
             assert False
 
         datum = GDP_DATUM()
@@ -320,7 +327,6 @@ class GDP_GIN(object):
         - data : the actual data associated with this datum.
         ...
         """
-
         return self.__read(recno)
 
 
@@ -338,13 +344,12 @@ class GDP_GIN(object):
         - tv_nsec: nano seconds (an integer)
         - tv_accuracy: accuracy (a float)
         """
-
         # the internal implementation is the same, we don't really
-        #   need two different functions. The only reason is to make
-        #   it clear to the user that reading by record number has
-        #   a different meaning than reading by timestamp (especially
-        #   when we don't trust the log-server to provide correct
-        #   timestamps.
+        # need two different functions. The only reason is to make
+        # it clear to the user that reading by record number has
+        # a different meaning than reading by timestamp (especially
+        # when we don't trust the log-server to provide correct
+        # timestamps.
         return self.__read(tsdict)
 
 
@@ -361,18 +366,27 @@ class GDP_GIN(object):
             __func = gdp.gdp_gin_read_by_recno_async
 
         elif isinstance(start, str):
-            ## TODO: this is query by hash
+            ## TODO: this is query by hash. The underlying
+            ## C-library does not implement this as of now.
             raise NotImplementedError
 
         elif isinstance(start, dict):
-            __start = GDP_DATUM.EP_TIME_SPEC()
-            __start.tv_sec = c_int64(start['tv_sec'])
-            __start.tv_nsec = c_uint32(start['tv_nsec'])
-            __start.tv_accuracy = c_float(start['tv_accuracy'])
-            __start_type = POINTER(GDP_DATUM.EP_TIME_SPEC)
-            __func = gdp.gdp_gin_read_by_ts_async
+
+            raise NotImplementedError
+
+            ## TODO: read by timestamp. Verify that the following
+            ## commented out version works when the underlying
+            ## C-library implements this functionality.
+
+            # __start = GDP_DATUM.EP_TIME_SPEC()
+            # __start.tv_sec = c_int64(start['tv_sec'])
+            # __start.tv_nsec = c_uint32(start['tv_nsec'])
+            # __start.tv_accuracy = c_float(start['tv_accuracy'])
+            # __start_type = POINTER(GDP_DATUM.EP_TIME_SPEC)
+            # __func = gdp.gdp_gin_read_by_ts_async
 
         else:
+            # should never reach here.
             assert False
 
         # casting numrecs to ctypes
@@ -435,19 +449,21 @@ class GDP_GIN(object):
             __func = gdp.gdp_gin_subscribe_by_recno
 
         elif isinstance(start, str):
-            # TODO implement hashes
             raise NotImplementedError
 
         elif isinstance(start, dict):
-            __start = GDP_DATUM.EP_TIME_SPEC()
-            __start.tv_sec = c_int64(start['tv_sec'])
-            __start.tv_nsec = c_uint32(start['tv_nsec'])
-            __start.tv_accuracy = c_float(start['tv_accuracy'])
+            raise NotImplementedError
 
-            __start_type = POINTER(GDP_DATUM.EP_TIME_SPEC)
-            __func = gdp.gdp_gin_subscribe_ts
+            # __start = GDP_DATUM.EP_TIME_SPEC()
+            # __start.tv_sec = c_int64(start['tv_sec'])
+            # __start.tv_nsec = c_uint32(start['tv_nsec'])
+            # __start.tv_accuracy = c_float(start['tv_accuracy'])
 
-        else:   # should never reach here
+            # __start_type = POINTER(GDP_DATUM.EP_TIME_SPEC)
+            # __func = gdp.gdp_gin_subscribe_ts
+
+        else:
+            # should never reach here
             assert False
 
         # casting numrecs to ctypes
