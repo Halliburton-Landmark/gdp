@@ -133,9 +133,7 @@ class GDP_BUF(object):
 
         __func = gdp.gdp_buf_write
         __func.argtypes = [POINTER(self.gdp_buf_t), c_void_p, c_size_t]
-        __func.restype = c_int
 
         size = c_size_t(len(data))
         tmp_buf = create_string_buffer(data, len(data))
-        written_bytes = __func(self.buf, byref(tmp_buf), size)
-        return written_bytes
+        __func(self.buf, byref(tmp_buf), size)
