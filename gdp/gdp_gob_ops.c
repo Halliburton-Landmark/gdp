@@ -505,6 +505,7 @@ _gdp_gob_delete(gdp_gob_t *gob,
 static EP_STAT
 append_common(
 		gdp_gob_t *gob,				// the receiving GOB
+		gdp_gin_t *gin,				// associated GIN, may be NULL
 		int n_datums,				// number of datums in this chain
 		gdp_datum_t **datums,		// the actual datums
 		gdp_hash_t *prevhash,		// hash of record -1
@@ -568,6 +569,7 @@ append_common(
 	estat = _gdp_req_new(GDP_CMD_APPEND, gob, chan, NULL, reqflags, reqp);
 	EP_STAT_CHECK(estat, goto fail0);
 	req = *reqp;
+	req->gin = gin;
 
 	// set up the message content
 	msg = req->cpdu->msg;
@@ -604,13 +606,13 @@ fail0:
 
 
 /*
-**  _GDP_GOB_APPEND --- shared operation for appending to a GOB
+**  _GDP_GOB_APPEND_SYNC --- shared operation for synchronous append to a GOB
 **
 **		Used both in GDP client library and gdpd.
 */
 
 EP_STAT
-_gdp_gob_append(
+_gdp_gob_append_sync(
 			gdp_gob_t *gob,
 			int n_datums,
 			gdp_datum_t **datums,
@@ -621,7 +623,8 @@ _gdp_gob_append(
 	EP_STAT estat = GDP_STAT_BAD_IOMODE;
 	gdp_req_t *req = NULL;
 
-	estat = append_common(gob, n_datums, datums, prevhash, chan, reqflags, &req);
+	estat = append_common(gob, NULL, n_datums, datums, prevhash,
+						chan, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// send the request to the log server
@@ -655,6 +658,7 @@ fail0:
 EP_STAT
 _gdp_gob_append_async(
 			gdp_gob_t *gob,
+			gdp_gin_t *gin,
 			int n_datums,
 			gdp_datum_t **datums,
 			gdp_hash_t *prevhash,
@@ -668,7 +672,8 @@ _gdp_gob_append_async(
 
 	// deliver results asynchronously
 	reqflags |= GDP_REQ_ASYNCIO;
-	estat = append_common(gob, n_datums, datums, prevhash, chan, reqflags, &req);
+	estat = append_common(gob, gin, n_datums, datums, prevhash,
+						chan, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// arrange for responses to appear as events or callbacks
@@ -803,6 +808,7 @@ fail0:
 EP_STAT
 _gdp_gob_read_by_recno_async(
 			gdp_gob_t *gob,
+			gdp_gin_t *gin,
 			gdp_recno_t recno,
 			uint32_t nrecs,
 			gdp_event_cbfunc_t cbfunc,
@@ -824,6 +830,7 @@ _gdp_gob_read_by_recno_async(
 	estat = _gdp_req_new(GDP_CMD_READ_BY_RECNO, gob, chan,
 						NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, return estat);
+	req->gin = gin;
 
 	msg = req->cpdu->msg;
 	EP_ASSERT_ELSE(msg != NULL, return EP_STAT_ASSERT_ABORT);

@@ -637,7 +637,7 @@ gdp_gin_append(gdp_gin_t *gin, gdp_datum_t *datum, gdp_hash_t *prevhash)
 	if (gin->apndfilter != NULL)
 		estat = gin->apndfilter(datum, gin->apndfpriv);
 	if (EP_STAT_ISOK(estat))
-		estat = _gdp_gob_append(gin->gob, 1, &datum, prevhash,
+		estat = _gdp_gob_append_sync(gin->gob, 1, &datum, prevhash,
 								_GdpChannel, 0);
 	unlock_gin_and_gob(gin, "gdp_gin_append");
 	prstat(estat, gin, "gdp_gin_append");
@@ -662,7 +662,7 @@ gdp_gin_append_async(gdp_gin_t *gin,
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gin_append_async\n");
 	estat = check_and_lock_gin_and_gob(gin, "gdp_gin_append_async");
 	EP_STAT_CHECK(estat, return estat);
-	estat = _gdp_gob_append_async(gin->gob, ndatums, datums, prevhash,
+	estat = _gdp_gob_append_async(gin->gob, gin, ndatums, datums, prevhash,
 							cbfunc, udata, _GdpChannel, 0);
 	unlock_gin_and_gob(gin, "gdp_gin_append_async");
 	prstat(estat, gin, "gdp_gin_append_async");
@@ -804,7 +804,7 @@ gdp_gin_read_by_recno_async(
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gin_read_by_recno_async\n");
 	estat = check_and_lock_gin_and_gob(gin, "gdp_gin_read_by_recno_async");
 	EP_STAT_CHECK(estat, return estat);
-	estat = _gdp_gob_read_by_recno_async(gin->gob, recno, nrecs,
+	estat = _gdp_gob_read_by_recno_async(gin->gob, gin, recno, nrecs,
 							cbfunc, cbarg, _GdpChannel);
 	unlock_gin_and_gob(gin, "gdp_gin_read_by_recno_async");
 	prstat(estat, gin, "gdp_gin_read_by_recno_async");

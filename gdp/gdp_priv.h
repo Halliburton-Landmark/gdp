@@ -377,13 +377,14 @@ EP_STAT			_gdp_gob_read_by_recno(			// read GOB record based on datum
 
 EP_STAT			_gdp_gob_read_by_recno_async(	// read asynchronously
 						gdp_gob_t *gob,
+						gdp_gin_t *gin,
 						gdp_recno_t recno,
 						uint32_t nrecs,
 						gdp_event_cbfunc_t cbfunc,
 						void *cbarg,
 						gdp_chan_t *chan);
 
-EP_STAT			_gdp_gob_append(			// append a record (gdpd shared)
+EP_STAT			_gdp_gob_append_sync(		// append a record (gdpd shared)
 						gdp_gob_t *gob,
 						int n_datums,
 						gdp_datum_t **datums,
@@ -393,6 +394,7 @@ EP_STAT			_gdp_gob_append(			// append a record (gdpd shared)
 
 EP_STAT			_gdp_gob_append_async(		// append asynchronously
 						gdp_gob_t *gob,
+						gdp_gin_t *gin,
 						int n_datums,
 						gdp_datum_t **datums,
 						gdp_hash_t *prevhash,
@@ -667,7 +669,7 @@ struct gdp_req
 	EP_CRYPTO_MD		*digest;	// message digest context
 
 	// these are only of interest in clients, never in gdplogd
-	gdp_gin_t			*gin;		// external GIN handle (client only)
+	gdp_gin_t			*gin;		// GIN handle (client only, may be NULL)
 	struct gev_list		events;		// pending events (see above)
 };
 
