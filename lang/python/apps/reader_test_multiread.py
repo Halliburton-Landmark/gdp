@@ -56,9 +56,9 @@ def main(name_str, start, stop):
         if event is None or event["type"] == gdp.GDP_EVENT_DONE:
             break
         datum = event["datum"]
-        handle = event["gin"]
-        assert handle == gin_handle
-        print datum["buf"].peek
+        # handle = event["gin"]
+        # assert handle == gin_handle
+        print datum["buf"].peek()
 
 if __name__ == "__main__":
 
