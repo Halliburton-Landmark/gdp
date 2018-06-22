@@ -569,25 +569,32 @@ class GDP_GIN(object):
         check_EP_STAT(estat)
 
 
-########    def append_async(self, datum_dict):
-########        """
-########        Async version of append. A writer ought to check return status by
-########            invoking get_next_event, potentially in a different thread
-########        """
-########        datum = GDP_DATUM()
-########
-########        if "data" in datum_dict.keys():
-########            datum.setbuf(datum_dict["data"])
-########
-########        __func = gdp.gdp_gin_append_async
-########        __func.argtypes = [ POINTER(self.gdp_gin_t),
-########                            POINTER(GDP_DATUM.gdp_datum_t),
-########                            c_void_p, c_void_p ]
-########        __func.restype = EP_STAT
-########
-########        estat = __func(self.ptr, datum.ptr, None, None)
-########        check_EP_STAT(estat)
-########
+    def append_async(self, datum, prevhash=None):
+        """
+        Async version of append. A writer ought to check return status
+        by invoking get_next_event, potentially in a different thread.
+
+        [This is different than the C library version: The C-library
+        version expects a list of datuns, but we only support a single
+        datum at a time... at least for the moment]
+        """
+
+        assert isinstance(datum, GDP_DATUM)
+        assert isinstance(prevhash, GDP_HASH) or prevhash is None
+
+        __prevhash_type = c_void_p if prevhash is None \
+                                else POINTER(GDP_HASH.gdp_hash_t)
+        __prevhash_val = None if prevhash is None else prevhash.hash_
+
+        __func = gdp.gdp_gin_append_async
+        __func.argtypes = [ POINTER(self.gdp_gin_t), c_int,
+                            POINTER(POINTER(GDP_DATUM.gdp_datum_t)),
+                            __prevhash_type, c_void_p, c_void_p ]
+        __func.restype = EP_STAT
+
+        estat = __func(self.ptr, c_int(1), byref(datum.ptr),
+                                        __prevhash_val, None, None)
+        check_EP_STAT(estat)
 
 
     ##################################################################
