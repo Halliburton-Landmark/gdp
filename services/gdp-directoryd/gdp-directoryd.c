@@ -53,17 +53,20 @@
 char dguid_s[GDP_NAME_HEX_STRING];
 char eguid_s[GDP_NAME_HEX_STRING];
 
-// TODO mysql_real_query (binary safe) may be faster than submitting hex?
+#define EXPIRE_TIMEOUT_SEC 60
+char query_expire[] = "call blackbox.drop_expired();";
+
 char call_add_nhop_pre[] = "call blackbox.add_nhop (x'";
 char call_add_nhop_mid[] = "', x'";
 char call_add_nhop_end[] = "');";
 
+char call_delete_nhop_pre[] = "call blackbox.delete_nhop (x'";
+char call_delete_nhop_mid[] = "', x'";
+char call_delete_nhop_end[] = "');";
+
 char call_find_nhop_pre[] = "call blackbox.find_nhop (x'";
 char call_find_nhop_mid[] = "', x'";
 char call_find_nhop_end[] = "');";
-
-#define EXPIRE_TIMEOUT_SEC 60
-char query_expire[] = "call blackbox.drop_expired();";
 
 // FIXME approximate size plus margin of error
 #define GDP_QUERY_STRING (3 * (2 * sizeof(gdp_name_t)) + 256)
@@ -262,6 +265,49 @@ int main(int argc, char **argv)
 			strcat(q, call_add_nhop_end);
 			q += sizeof(call_add_nhop_end) - 1;
 			
+		}
+		break;
+
+		case GDP_CMD_DIR_DELETE:
+		{
+			char *q;
+
+			debug(INFO, "id(0x%x) cmd -> delete nhop\n"
+				  "\tdguid[%s]\n"
+				  "\teguid[%s]\n",
+				  ntohs(otw_dir.id),
+				  gdp_printable_name(otw_dir.dguid, _tmp_pname_1),
+				  gdp_printable_name(otw_dir.eguid, _tmp_pname_2));
+
+			// build the query
+
+			strcpy(query, call_delete_nhop_pre);
+			q = query + sizeof(call_delete_nhop_pre) - 1;
+
+			debug(INFO, "-> dguid[");
+			for (int i = 0; i < sizeof(gdp_name_t); i++)
+			{
+				debug(INFO, "%.2x", otw_dir.dguid[i]);
+				sprintf(q + (i * 2), "%.2x", otw_dir.dguid[i]);
+			}
+			debug(INFO, "]\n");
+			q += (2 * sizeof(gdp_name_t));
+			
+			strcat(q, call_delete_nhop_mid);
+			q += sizeof(call_delete_nhop_mid) - 1;
+
+			debug(INFO, "-> eguid[");
+			for (int i = 0; i < sizeof(gdp_name_t); i++)
+			{
+				debug(INFO, "%.2x", otw_dir.eguid[i]);
+				sprintf(q + (i * 2), "%.2x", otw_dir.eguid[i]);
+			}
+			debug(INFO, "]\n");
+			q += (2 * sizeof(gdp_name_t));
+			
+			strcat(q, call_delete_nhop_end);
+			q += sizeof(call_delete_nhop_end) - 1;
+
 		}
 		break;
 

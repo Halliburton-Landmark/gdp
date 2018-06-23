@@ -61,7 +61,7 @@ void help(char *s)
 {
 	printf("Error: %s\n", s);
 	printf("Usage: gdc-test "
-		   "{ { add <eguid> <dguid> | find <oguid> <dguid> }\n");
+		   "{ { add | delete } <eguid> <dguid> | find <oguid> <dguid> }\n");
 	exit(1);
 }
 
@@ -99,6 +99,14 @@ int main(int argc, char *argv[])
 			help("missing parameter(s)");
 		otw_dir.cmd = GDP_CMD_DIR_ADD;
 	}
+	else if (strcmp(argv[1], "delete") == 0)
+	{
+		if (argc > 4)
+			help("extraneous parameter(s)");			
+		if (argc < 4)
+			help("missing parameter(s)");
+		otw_dir.cmd = GDP_CMD_DIR_DELETE;
+	}
 	else
 		help("invalid action");
 	arg_index = 2;
@@ -123,7 +131,7 @@ int main(int argc, char *argv[])
 	//
 	// build request
 	//
-	// { add eguid dguid } | find { oguid dguid }
+	// { { add | delete } eguid dguid | find oguid dguid }
 	//
 	
 	otw_dir.ver = GDP_CHAN_PROTO_VERSION_4;
@@ -136,7 +144,8 @@ int main(int argc, char *argv[])
 	
 	otw_dir.id = htons(dr); // htons comments on expected endianess of id field
 	
-	if (otw_dir.cmd == GDP_CMD_DIR_ADD)
+	if (otw_dir.cmd == GDP_CMD_DIR_ADD ||
+		otw_dir.cmd == GDP_CMD_DIR_DELETE)
 	{
 		// set eguid
 		gdp_parse_name(argv[arg_index], gdp_eguid);
@@ -206,7 +215,7 @@ int main(int argc, char *argv[])
 	{
 		printf("<- eguid nak\n");
 	}
-	else // FOUND or ADD
+	else // FOUND or ADD or DELETE
 	{
 		printf("<- eguid [");
 		for (int i = 0; i < sizeof(gdp_name_t); i++)

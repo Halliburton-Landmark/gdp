@@ -64,7 +64,7 @@ int debug_knob = VERB;
 
 // FIXME temporary until cmd extensions designed and added to gdp_pdu.h
 #define GDP_CMD_DIR_ADD		7
-#define GDP_CMD_DIR_REMOVE	8
+#define GDP_CMD_DIR_DELETE	8
 #define GDP_CMD_DIR_FIND	9
 #define GDP_CMD_DIR_FOUND  10
 
