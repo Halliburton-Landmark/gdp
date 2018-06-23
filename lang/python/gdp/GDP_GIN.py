@@ -27,7 +27,6 @@
 # ----- END LICENSE BLOCK -----
 
 
-import weakref
 import threading
 import time
 import random
@@ -41,22 +40,6 @@ from GDP_DATUM import *
 from GDP_MD import *
 from GDP_OPEN_INFO import *
 
-### From https://stackoverflow.com/questions/19443440/
-class WeakMethod(object):
-    """A callable object. Takes one argument to init: 'object.method'.
-    Once created, call this object -- MyWeakMethod() --
-    and pass args/kwargs as you normally would.
-    """
-    def __init__(self, object_dot_method):
-        self.target = weakref.proxy(object_dot_method.__self__)
-        self.method = weakref.proxy(object_dot_method.__func__)
-        ###Older versions of Python can use 'im_self' and 'im_func'
-        ###in place of '__self__' and '__func__' respectively
-
-    def __call__(self, *args, **kwargs):
-        """Call the method with args and kwargs as needed."""
-        return self.method(self.target, *args, **kwargs)
-### End
 
 class GDP_GIN(object):
 
@@ -134,7 +117,6 @@ class GDP_GIN(object):
             self.ptr = __ptr
             ## Create the instance method 'get_next_event', in addition to
             ## already existing class method
-            # self.get_next_event = WeakMethod(self.__get_next_event)
             self.get_next_event = self.__get_next_event
             self.did_i_create_it = True
 
@@ -142,7 +124,7 @@ class GDP_GIN(object):
 
             if "ptr" in kwargs:
                 self.ptr = kwargs["ptr"]
-                self.get_next_event = WeakMethod(self.__get_next_event)
+                self.get_next_event = self.__get_next_event
                 self.did_i_create_it = False
             else:
                 raise Exception
@@ -628,8 +610,6 @@ class GDP_GIN(object):
             __timeout.tv_nsec = c_uint32(timeout['tv_nsec'])
             __timeout.tv_accuracy = c_float(timeout['tv_accuracy'])
             __func_arg2_type = POINTER(GDP_DATUM.EP_TIME_SPEC)
-
-        # Enable some type checking
 
         __func.argtypes = [__func_arg1_type, __func_arg2_type]
         __func.restype = POINTER(GDP_EVENT.gdp_event_t)
