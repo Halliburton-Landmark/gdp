@@ -86,6 +86,17 @@ create table blackbox.graph
 # stored procedures
 # ==============================================================================
 
+drop procedure if exists blackbox.drop_expired;
+delimiter //
+create procedure blackbox.drop_expired
+(
+)
+begin
+	delete from blackbox.nhops where (ts) < DATE_SUB(NOW(), INTERVAL 5 MINUTE);
+	delete from blackbox.guids where id not in (select origid from blackbox.nhops union select destid from blackbox.nhops);
+end //
+delimiter ;
+
 #
 # blackbox.add_nhop inserts a nhop arrow into the graph
 #

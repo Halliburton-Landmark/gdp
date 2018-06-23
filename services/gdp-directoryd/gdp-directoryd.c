@@ -63,8 +63,7 @@ char call_find_nhop_mid[] = "', x'";
 char call_find_nhop_end[] = "');";
 
 #define EXPIRE_TIMEOUT_SEC 60
-char query_expire[] = "delete from blackbox.nhops "
-	"where (ts) < DATE_SUB(NOW(), INTERVAL 5 MINUTE);";
+char query_expire[] = "call blackbox.drop_expired();";
 
 // FIXME approximate size plus margin of error
 #define GDP_QUERY_STRING (3 * (2 * sizeof(gdp_name_t)) + 256)
