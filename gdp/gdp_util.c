@@ -31,7 +31,7 @@
 */
 
 #include "gdp.h"
-#include "gdp_gclmd.h"
+#include "gdp_md.h"
 
 #include <event2/event.h>
 
@@ -48,7 +48,7 @@
 */
 
 void
-_gdp_newname(gdp_name_t gname, gdp_gclmd_t *gmd)
+_gdp_newname(gdp_name_t gname, gdp_md_t *gmd)
 {
 	if (gmd == NULL)
 	{
@@ -58,7 +58,7 @@ _gdp_newname(gdp_name_t gname, gdp_gclmd_t *gmd)
 	else
 	{
 		uint8_t *mdbuf;
-		size_t mdlen = _gdp_gclmd_serialize(gmd, &mdbuf);
+		size_t mdlen = _gdp_md_serialize(gmd, &mdbuf);
 
 		ep_crypto_md_sha256(mdbuf, mdlen, gname);
 		ep_mem_free(mdbuf);

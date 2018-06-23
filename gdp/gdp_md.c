@@ -1,7 +1,7 @@
 /* vim: set ai sw=4 sts=4 ts=4 :*/
 
 /*
-**  GDP GCL Metadata
+**  GDP Metadata
 **
 **	----- BEGIN LICENSE BLOCK -----
 **	GDP: Global Data Plane Support Library
@@ -32,32 +32,34 @@
 
 #include "gdp.h"
 #include "gdp_priv.h"
-#include "gdp_gclmd.h"
+#include "gdp_md.h"
 #include "gdp_chan.h"		// only for GET16 et al
 
 #include <ep/ep_dbg.h>
 #include <ep/ep_hexdump.h>
 #include <ep/ep_prflags.h>
+#include <ep/ep_string.h>
+#include <ep/ep_xlate.h>
 
 #include <string.h>
 
 
 #define MINMDS		4		// minimum number of metadata entries (must be > 3)
 
-static EP_DBG	Dbg = EP_DBG_INIT("gdp.gcl.metadata", "GCL metadata processing");
+static EP_DBG	Dbg = EP_DBG_INIT("gdp.metadata", "log metadata processing");
 
 
 /*
-**  GDP_GCLMD_NEW --- allocate space for in-client metadata
+**  GDP_MD_NEW --- allocate space for in-client metadata
 */
 
-gdp_gclmd_t *
-gdp_gclmd_new(int nentries)
+gdp_md_t *
+gdp_md_new(int nentries)
 {
-	gdp_gclmd_t *gmd;
+	gdp_md_t *gmd;
 	size_t len = sizeof *gmd;
 
-	gmd = (gdp_gclmd_t *) ep_mem_zalloc(len);
+	gmd = (gdp_md_t *) ep_mem_zalloc(len);
 	if (nentries > MINMDS)
 		gmd->nalloc = nentries;
 	else
@@ -65,21 +67,21 @@ gdp_gclmd_new(int nentries)
 	gmd->nused = 0;
 	gmd->mds = (struct metadatum *)
 				ep_mem_zalloc(gmd->nalloc * sizeof *gmd->mds);
-	ep_dbg_cprintf(Dbg, 21, "gdp_gclmd_new() => %p\n", gmd);
+	ep_dbg_cprintf(Dbg, 21, "gdp_md_new() => %p\n", gmd);
 	return gmd;
 }
 
 
 /*
-**  GDP_GCLMD_FREE --- deallocate space for in-client metadata
+**  GDP_MD_FREE --- deallocate space for in-client metadata
 */
 
 void
-gdp_gclmd_free(gdp_gclmd_t *gmd)
+gdp_md_free(gdp_md_t *gmd)
 {
 	int i;
 
-	ep_dbg_cprintf(Dbg, 21, "gdp_gclmd_free(%p)\n", gmd);
+	ep_dbg_cprintf(Dbg, 21, "gdp_md_free(%p)\n", gmd);
 	if (gmd == NULL)
 		return;
 	if (gmd->databuf != NULL)
@@ -95,16 +97,16 @@ gdp_gclmd_free(gdp_gclmd_t *gmd)
 
 
 /*
-**  GDP_GCLMD_ADD --- add a single metadatum to a metadata list
+**  GDP_MD_ADD --- add a single metadatum to a metadata list
 **
 **		As a special case for use in gdplogd you can pass in NULL
 **		data, which reserves the slot but not the data.  That
-**		can be set later using gdp_gclmd_set.
+**		can be set later using gdp_md_set.
 */
 
 EP_STAT
-gdp_gclmd_add(gdp_gclmd_t *gmd,
-			gdp_gclmd_id_t id,
+gdp_md_add(gdp_md_t *gmd,
+			gdp_md_id_t id,
 			size_t len,
 			const void *data)
 {
@@ -112,17 +114,17 @@ gdp_gclmd_add(gdp_gclmd_t *gmd,
 
 	if (ep_dbg_test(Dbg, 36))
 	{
-		ep_dbg_printf("gdp_gclmd_add(%08x, %zd, %p)\n", id, len, data);
+		ep_dbg_printf("gdp_md_add(%08x, %zd, %p)\n", id, len, data);
 		if (data != NULL)
 			ep_hexdump(data, len, ep_dbg_getfile(), EP_HEXDUMP_ASCII, 0);
 	}
 
-	if (EP_UT_BITSET(GCLMDF_READONLY, gmd->flags))
+	if (EP_UT_BITSET(GDP_MDF_READONLY, gmd->flags))
 		return GDP_STAT_READONLY;
 
 	// end of list is implicit; just ignore explicit ones
 	//XXX: return OK or INFO status code?
-	if (id == GDP_GCLMD_EOLIST)
+	if (id == GDP_MD_EOLIST)
 		return EP_STAT_OK;
 
 	// see if we have room for another entry
@@ -150,7 +152,7 @@ gdp_gclmd_add(gdp_gclmd_t *gmd,
 
 
 /*
-**  _GDP_GCLMD_ADDDATA --- set the pointers into a data block
+**  _GDP_MD_ADDDATA --- set the pointers into a data block
 **
 **		This is intended for internal use only.
 **
@@ -158,7 +160,7 @@ gdp_gclmd_add(gdp_gclmd_t *gmd,
 */
 
 void
-_gdp_gclmd_adddata(gdp_gclmd_t *gmd,
+_gdp_md_adddata(gdp_md_t *gmd,
 			void *_data)
 {
 	int i;
@@ -184,13 +186,13 @@ _gdp_gclmd_adddata(gdp_gclmd_t *gmd,
 
 
 /*
-**  GDP_GCLMD_GET --- get metadata from a metadata list by index
+**  GDP_MD_GET --- get metadata from a metadata list by index
 */
 
 EP_STAT
-gdp_gclmd_get(gdp_gclmd_t *gmd,
+gdp_md_get(gdp_md_t *gmd,
 			int indx,
-			gdp_gclmd_id_t *id,
+			gdp_md_id_t *id,
 			size_t *len,
 			const void **data)
 {
@@ -213,18 +215,18 @@ gdp_gclmd_get(gdp_gclmd_t *gmd,
 
 
 /*
-**  GDP_GCLMD_FIND --- get metadata from a metadata list by name
+**  GDP_MD_FIND --- get metadata from a metadata list by name
 */
 
 EP_STAT
-gdp_gclmd_find(gdp_gclmd_t *gmd,
-		gdp_gclmd_id_t id,
+gdp_md_find(gdp_md_t *gmd,
+		gdp_md_id_t id,
 		size_t *len,
 		const void **data)
 {
 	int indx;
 
-	ep_dbg_cprintf(Dbg, 40, "gdp_gclmd_find, gmd = %p, id = %08x... ", gmd, id);
+	ep_dbg_cprintf(Dbg, 40, "gdp_md_find, gmd = %p, id = %08x... ", gmd, id);
 	if (gmd == NULL)
 		goto fail0;
 
@@ -253,11 +255,11 @@ fail0:
 
 
 /*
-**  _GDP_GCLMD_SERIALIZE --- serialize metadata list
+**  _GDP_MD_SERIALIZE --- serialize metadata list
 */
 
 size_t
-_gdp_gclmd_serialize(gdp_gclmd_t *gmd, uint8_t **obufp)
+_gdp_md_serialize(gdp_md_t *gmd, uint8_t **obufp)
 {
 	int i;
 	size_t slen = 0;
@@ -301,7 +303,7 @@ done:
 
 
 /*
-**  _GDP_GCLMD_DESERIALIZE --- crack open a gdp_buf_t and store the metadata
+**  _GDP_MD_DESERIALIZE --- crack open a gdp_buf_t and store the metadata
 **
 **		The data is serialized as a count of entries, that number
 **		of metadata headers (contains the id and data length),
@@ -313,11 +315,11 @@ done:
 **			smd_len --- ength of smd
 */
 
-gdp_gclmd_t *
-_gdp_gclmd_deserialize(uint8_t *smd, size_t smd_len)
+gdp_md_t *
+_gdp_md_deserialize(const uint8_t *smd, size_t smd_len)
 {
 	int nmd;				// number of metadata entries
-	uint8_t *pbp = smd;
+	const uint8_t *pbp = smd;
 
 	// get the number of metadata entries
 	if (smd_len < 2)
@@ -331,8 +333,8 @@ _gdp_gclmd_deserialize(uint8_t *smd, size_t smd_len)
 		return NULL;
 
 	// allocate and populate the header
-	gdp_gclmd_t *gmd = (gdp_gclmd_t *) ep_mem_zalloc(sizeof *gmd);
-	gmd->flags = GCLMDF_READONLY;
+	gdp_md_t *gmd = (gdp_md_t *) ep_mem_zalloc(sizeof *gmd);
+	gmd->flags = GDP_MDF_READONLY;
 	gmd->nalloc = gmd->nused = nmd;
 
 	// allocate and read in the metadata headers
@@ -358,7 +360,7 @@ _gdp_gclmd_deserialize(uint8_t *smd, size_t smd_len)
 	if (data_left != tlen)
 	{
 		// bad news
-		ep_dbg_cprintf(Dbg, 1, "_gdp_gclmd_deserialize: have %zd, want %zd\n",
+		ep_dbg_cprintf(Dbg, 1, "_gdp_md_deserialize: have %zd, want %zd\n",
 					data_left, tlen);
 		ep_mem_free(gmd->mds);
 		ep_mem_free(gmd);
@@ -380,17 +382,17 @@ _gdp_gclmd_deserialize(uint8_t *smd, size_t smd_len)
 
 	if (ep_dbg_test(Dbg, 24))
 	{
-		ep_dbg_printf("_gdp_gclmd_deserialize:\n  ");
-		gdp_gclmd_print(gmd, ep_dbg_getfile(), 4, 0);
+		ep_dbg_printf("_gdp_md_deserialize:\n  ");
+		gdp_md_dump(gmd, ep_dbg_getfile(), 4, 0);
 	}
 
 	return gmd;
 }
 
 
-static EP_PRFLAGS_DESC	GclmdFlags[] =
+static EP_PRFLAGS_DESC	GdpMdFlags[] =
 {
-	{ GCLMDF_READONLY,	GCLMDF_READONLY,	"READONLY"		},
+	{ GDP_MDF_READONLY,	GDP_MDF_READONLY,	"READONLY"		},
 	{ 0,				0,					NULL			},
 };
 
@@ -401,49 +403,112 @@ static EP_PRFLAGS_DESC	MdatumFlags[] =
 };
 
 void
-gdp_gclmd_print(const gdp_gclmd_t *gmd, FILE *fp, int detail, int indent)
+gdp_md_dump(const gdp_md_t *gmd, FILE *fp, int detail, int indent)
 {
-	indent++;
-	if (detail > 1)
-		fprintf(fp, "GCLMD@%p: ", gmd);
-	if (gmd == NULL)
+	if (fp == NULL)
+		fp = ep_dbg_getfile();
+
+	if (detail < GDP_PR_BASIC)
 	{
-		fprintf(fp, "NULL\n");
-		return;
+		fprintf(fp, "    --------------- Metadata ---------------\n");
+	}
+	else
+	{
+		fprintf(fp, "MD@%p: ", gmd);
+		if (gmd == NULL)
+		{
+			fprintf(fp, "NULL\n");
+			return;
+		}
 	}
 
-	if (detail > 1)
+	if (detail >= GDP_PR_BASIC)
 	{
 		fprintf(fp, "nalloc = %d, nused = %d, databuf = %p\n%sflags = ",
 				gmd->nalloc, gmd->nused, gmd->databuf,
 				_gdp_pr_indent(indent));
-		ep_prflags(gmd->flags, GclmdFlags, fp);
-		fprintf(fp, "\n%smds = %p\n", _gdp_pr_indent(indent), gmd->mds);
-		if (detail > 2)
+		ep_prflags(gmd->flags, GdpMdFlags, fp);
+		fprintf(fp, "\n%smds = %p\n", _gdp_pr_indent(indent + 1), gmd->mds);
+	}
+
+	int i;
+	for (i = 0; i < gmd->nused; i++)
+	{
+		struct metadatum *md = &gmd->mds[i];
+		uint8_t *mdd = md->md_data;
+		if (detail >= GDP_PR_BASIC)
 		{
-			int i;
+			fprintf(fp, "%sid = %08x, len = %" PRIu32 ", flags = ",
+					_gdp_pr_indent(indent),
+					md->md_id, md->md_len);
+			ep_prflags(md->md_flags, MdatumFlags, fp);
+			fprintf(fp, "\n");
 
-			for (i = 0; i < gmd->nused; i++)
+			if (detail >= GDP_PR_BASIC + 1)
+				ep_hexdump(mdd, md->md_len, fp,
+						EP_HEXDUMP_ASCII, 0);
+			continue;
+		}
+
+		// this is the more "user friendly" style output
+		fprintf(fp, "%sMetadata %2d, id 0x%08x, length %" PRIu32,
+				_gdp_pr_indent(indent), i,
+				md->md_id, md->md_len);
+		if (detail > 1)
+		{
+			switch (md->md_id)
 			{
-				fprintf(fp, "%sid = %08x, len = %" PRIu32 ", flags = ",
-						_gdp_pr_indent(indent + 1),
-						gmd->mds[i].md_id, gmd->mds[i].md_len);
-				ep_prflags(gmd->mds[i].md_flags, MdatumFlags, fp);
-				fprintf(fp, "\n");
+				case GDP_MD_XID:
+					fprintf(fp, " (external id)\n%s%.*s\n",
+								_gdp_pr_indent(indent + 1), md->md_len, mdd);
+					break;
 
-				if (detail > 3)
-					ep_hexdump(gmd->mds[i].md_data, gmd->mds[i].md_len, fp,
-							EP_HEXDUMP_ASCII, 0);
+				case GDP_MD_UUID:
+					fprintf(fp, " (uuid)\n%s%.*s\n",
+								_gdp_pr_indent(indent + 1), md->md_len, mdd);
+					break;
+
+				case GDP_MD_CTIME:
+					fprintf(fp, " (creation time)\n%s%.*s\n",
+								_gdp_pr_indent(indent + 1), md->md_len, mdd);
+					break;
+
+				case GDP_MD_CID:
+					fprintf(fp, " (creator)\n%s%.*s\n",
+								_gdp_pr_indent(indent + 1), md->md_len, mdd);
+					break;
+
+				case GDP_MD_PUBKEY:
+					fprintf(fp, " (public key)\n");
+					{
+						int keylen = mdd[2] << 8 | mdd[3];
+						fprintf(fp, "%smd_alg %s (%d), keytype %s (%d), keylen %d\n",
+								_gdp_pr_indent(indent + 1),
+								ep_crypto_md_alg_name(mdd[0]), mdd[0],
+								ep_crypto_keytype_name(mdd[1]), mdd[1],
+								keylen);
+					}
+					if (detail > 1)
+					{
+						EP_CRYPTO_KEY *key;
+
+						key = ep_crypto_key_read_mem(mdd + 4,
+								md->md_len - 4,
+								EP_CRYPTO_KEYFORM_DER,
+								EP_CRYPTO_F_PUBLIC);
+						ep_crypto_key_print(key, stdout, EP_CRYPTO_F_PUBLIC);
+						ep_crypto_key_free(key);
+					}
+					if (detail >= 4)
+						ep_hexdump(mdd + 4, md->md_len - 4,
+								stdout, EP_HEXDUMP_HEX, 0);
+				default:
+					fprintf(fp, "\n%s%s",
+							_gdp_pr_indent(indent + 1), EpChar->lquote);
+					ep_xlate_out(mdd, md->md_len,
+							fp, "", EP_XLATE_PLUS | EP_XLATE_NPRINT);
+					fprintf(fp, "%s\n", EpChar->rquote);
 			}
 		}
-	}
-	else if (detail == 1)
-	{
-		int i;
-
-		for (i = 0; i < gmd->nused; i++)
-			fprintf(fp, "%sMetadata %2d, id %8x, length %" PRIu32 "\n",
-					_gdp_pr_indent(indent),
-					i, gmd->mds[i].md_id, gmd->mds[i].md_len);
 	}
 }

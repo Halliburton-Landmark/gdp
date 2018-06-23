@@ -55,7 +55,7 @@ for details.
 .It Fl N Ar my-name
 Sets the name of this log daemon instance.
 This is the same name used in the
-.Xr gcl-create 8
+.Xr gdp-create 8
 command.
 .Em The name must be unique in the GDP,
 and hence will usually have a structured name such as
@@ -146,58 +146,22 @@ May be useful for some debugging scenarios.
 Default to
 .Li false .
 .
-.It swarm.gdplogd.gcl.abandon-corrupt-tidx
-If set,
-remove corrupt timestamp indexes;
-this disables the ability to search by timestamp
-but does allows other operations to continue.
-Defaults to
+.It swarm.gdplogd.disklog.log-sqlite-errors
+Send any SQLite errors to the system log.
+May be useful for some debugging scenarios.
+Default to
 .Li true .
 .
-.It swarm.gdplogd.gcl.bdb.cachesize
-The size of the Berkeley database cache in kilobytes (1024 bytes).
-Berkeley DB is used for the on-disk timestamp indexes.
-If not set, the Berkeley database default size is used.
-.
-.It swarm.gdplogd.gcl.bdb.pagesize
-The size of the Berkeley database pages in bytes.
-If not set, the Berkeley database default size is used.
-.
-.It swarm.gdplogd.gcl.bdb.private
-If set, use a private database environment.
-This may give a small performance improvement.
-Defaults to
-.Li true .
-.
-.It swarm.gdplogd.gcl.bdb.sync-after-put
-If set, do a database sync operation after every record insertion.
-Should be unneeded.
-Defaults to
-.Li false .
-.
-.It swarm.gdplogd.gcl.bdb.sync-before-close
-If set, do a database sync operation before a database is closed.
-Should be unneeded.
-Defaults to
-.Li false .
-.
-.It swarm.gdplogd.gcl.bdb.sync-write
-If set, always do synchronous database writes.
-Setting this reduces the risk of lost data on crashes,
-but slows the system down considerably.
-Defaults to
-.Li false .
-.
-.It swarm.gdplogd.gcl.dir
+.It swarm.gdplogd.log.dir
 The directory in which physical logs are written.
 Defaults to
-.Qq Pa /var/swarm/gdp/gcls .
+.Qq Pa /var/swarm/gdp/glogs .
 .
-.It swarm.gdplogd.gcl.mode
+.It swarm.gdplogd.gob.mode
 The file mode to use when creating on-disk log files.
 Defaults to 0600.
 .
-.It swarm.gdplogd.gcl.mode
+.It swarm.gdplogd.gob.mode
 The file mode for on-disk GCL storage.
 Defaults to
 .Li 0600 .
@@ -206,7 +170,7 @@ Defaults to
 Sets the name of this instance of
 .Nm .
 This is needed when using
-.Xr gcl-create 8
+.Xr gdp-create 8
 to create a new log.
 .
 .It swarm.gdplogd.index.cachesize
@@ -248,7 +212,7 @@ that does not exist.
 .
 .Sh SEE ALSO
 .Xr gdp 7 ,
-.Xr gcl-create 8
+.Xr gdp-create 8
 .
 .Sh BUGS
 The

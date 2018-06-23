@@ -120,8 +120,8 @@ random_in_range(unsigned int min, unsigned int max)
 int
 main(int argc, char *argv[])
 {
-	gdp_gcl_t *gcl_write;
-	gdp_gcl_t *gcl_read;
+	gdp_gin_t *gin_write;
+	gdp_gin_t *gin_read;
 	int opt;
 	int num_records = 1000;
 	int min_length = 1023;
@@ -203,10 +203,10 @@ main(int argc, char *argv[])
 			//fprintf(stdout, "record length: %lu\n", strlen(&data[(i * max_record_size)]));
 		}
 
-		estat = gdp_gcl_create(NULL, NULL, &gcl_write);
+		estat = gdp_gob_create(NULL, NULL, &gin_write);
 
 		EP_STAT_CHECK(estat, goto fail0);
-		gdp_gcl_print(gcl_write, stdout);
+		gdp_gin_print(gin_write, stdout);
 
 		ep_time_now(&start_time);
 		fprintf(stdout, "Writing data (start_time = %" PRIu64 ":%u)\n",
@@ -217,9 +217,10 @@ main(int argc, char *argv[])
 			size_t dlen = strlen(&data[(i * max_record_size)]);
 
 			datum->recno = i + 1;
+			gdp_buf_reset(datum);
 			gdp_buf_write(datum->dbuf, &data[(i * max_record_size)], dlen);
 
-			estat = gdp_gcl_append(gcl_write, datum);
+			estat = gdp_gin_append(gin_write, datum);
 			gdp_datum_free(datum);
 			EP_STAT_CHECK(estat, goto fail1);
 		}
@@ -228,10 +229,10 @@ main(int argc, char *argv[])
 				end_time.tv_sec, end_time.tv_nsec);
 		get_elapsed_time(&start_time, &end_time, &trial_write_times[t]);
 		print_elapsed_time(stdout, &trial_write_times[t]);
-		memcpy(internal_name, gdp_gcl_getname(gcl_write), sizeof internal_name);
+		memcpy(internal_name, gdp_gin_getname(gin_write), sizeof internal_name);
 		gdp_printable_name(internal_name, printable_name);
-		gdp_gcl_close(gcl_write);
-		estat = gdp_gcl_open(internal_name, GDP_MODE_RO, NULL, &gcl_read);
+		gdp_gin_close(gin_write);
+		estat = gdp_gob_open(internal_name, GDP_MODE_RO, NULL, &gin_read);
 		ep_time_now(&start_time);
 		fprintf(stdout, "Reading data (start_time = %" PRIu64 ":%u)\n",
 				start_time.tv_sec, start_time.tv_nsec);
@@ -239,7 +240,7 @@ main(int argc, char *argv[])
 		{
 			gdp_datum_t *datum = gdp_datum_new();
 
-			estat = gdp_gcl_read(gcl_read, i + 1, datum);
+			estat = gdp_gin_read_by_recno(gin_read, i + 1, datum);
 			EP_STAT_CHECK(estat, goto fail2);
 			size_t dlen = gdp_buf_getlength(datum->dbuf);
 			gdp_buf_read(datum->dbuf, cur_record, dlen);
@@ -280,10 +281,10 @@ main(int argc, char *argv[])
 	goto done;
 
 fail2:
-	gdp_gcl_close(gcl_read);
+	gdp_gin_close(gin_read);
 
 fail1:
-	gdp_gcl_close(gcl_write);
+	gdp_gin_close(gin_write);
 
 fail0:
 done:

@@ -133,16 +133,16 @@ ep_crypto_random_buf(void *buf, size_t n)
 #if EP_OSCF_HAS_ARC4RANDOM
 	arc4random_buf(buf, n);
 #else
-	const char *randfile = "/dev/random";
+	const char *randfile = "/dev/urandom";
 	int rfd = open(randfile, O_RDONLY);
 	if (rfd < 0)
 	{
-		randfile = "/dev/urandom";
+		randfile = "/dev/random";
 		rfd = open(randfile, O_RDONLY);
 	}
 	if (rfd < 0)
 	{
-		EP_ASSERT_FAILURE("ep_crypto_random_buf: cannot open %s: %s",
+		EP_ASSERT_FAILURE("ep_crypto_random_buf: cannot open /dev/urandom or /dev/random: %s",
 					randfile, strerror(errno));
 		abort();
 	}

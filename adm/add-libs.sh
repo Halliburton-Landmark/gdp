@@ -15,6 +15,7 @@ try_lib() {
 	lib=$1
 	candidates=`ls \
 		/lib/lib$lib.* \
+		/lib/*/lib$lib.* \
 		/usr/lib*/lib$lib.* \
 		/usr/lib/*/lib$lib.* \
 		/usr/local/lib*/lib$lib.* \
@@ -28,6 +29,8 @@ try_lib() {
 try_lib db
 try_lib execinfo
 try_lib systemd
+try_lib avahi-client
+try_lib avahi-common
 if ! [ -e /etc/redhat-release ]
 then
 	# for some reason this breaks on redhat

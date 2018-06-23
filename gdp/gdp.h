@@ -54,46 +54,43 @@
 **	Opaque structures
 */
 
-// an open handle on a GCL object instance
-typedef struct gdp_gin		gdp_gcl_t;
+// an open GDP Object Instance (GIN) handle
+typedef struct gdp_gin		gdp_gin_t;
+typedef struct gdp_gin		gdp_gcl_t EP_ATTR_DEPRECATED;	// back compat
 
-// GCL metadata
-typedef struct gdp_gclmd	gdp_gclmd_t;
-typedef uint32_t			gdp_gclmd_id_t;
+// GDP Object metadata
+typedef struct gdp_md		gdp_md_t;
+typedef uint32_t			gdp_md_id_t;
+
+// hash functions and signatures
+typedef struct gdp_buf		gdp_hash_t;		//XXX is this right?
+typedef struct gdp_buf		gdp_sig_t;		//XXX is this right?
 
 // additional information when opening logs (e.g., keys, qos, hints)
-typedef struct gdp_gcl_open_info	gdp_gcl_open_info_t;
+typedef struct gdp_open_info	gdp_open_info_t;
 
 // quality of service information for subscriptions
-typedef struct gdp_sub_qos			gdp_sub_qos_t;
+typedef struct gdp_sub_qos		gdp_sub_qos_t;
 
 /**********************************************************************
 **	Other data types
 */
 
-// the internal name of a GCL (256 bits)
+// the internal name of a GDP Object (256 bits)
 typedef uint8_t				gdp_name_t[32];
 
 #define GDP_NAME_SAME(a, b)	(memcmp((a), (b), sizeof (gdp_name_t)) == 0)
 
-// the printable name of a GCL
-#define GDP_GCL_PNAME_LEN	43			// length of an encoded pname
-typedef char				gdp_pname_t[GDP_GCL_PNAME_LEN + 1];
+// the printable name of a GDP Object
+#define GDP_GOB_PNAME_LEN	43			// length of an encoded pname
+typedef char				gdp_pname_t[GDP_GOB_PNAME_LEN + 1];
 
-// a GCL record number
+// a GOB record number
 typedef int64_t				gdp_recno_t;
 #define PRIgdp_recno		PRId64
 
-// a hash key
-typedef EP_CRYPTO_KEY		gdp_hash_t;
-
 /*
 **	I/O modes
-**
-**		A GCL can only be open for read or write (that is, append)
-**		in any given instance.	There are no r/w instances.	 The other
-**		modes here are for caching; ANY means to return NULL if
-**		no GCLs are in the cache for a given connection.
 */
 
 typedef enum
@@ -106,12 +103,12 @@ typedef enum
 
 	// following are bit masks
 	_GDP_MODE_PEEK =	0x0100,			// "peek": for stats, no ref counting
-										//    in _gdp_gcl_cache_get
+										//    in _gdp_gob_cache_get
 } gdp_iomode_t;
 
 
 /*
-**  GCL Metadata keys
+**  GOB Metadata keys
 **
 **		Although defined as integers, by convention metadata keys are
 **		four ASCII characters, kind of like a file extension.  By further
@@ -121,19 +118,19 @@ typedef enum
 **		zero bytes in the middle are probably a bad idea, albeit legal.
 */
 
-#define GDP_GCLMD_XID		0x00584944	// XID (external id)
-#define GDP_GCLMD_PUBKEY	0x00505542	// PUB (public key)
-#define GDP_GCLMD_CTIME		0x0043544D	// CTM (creation time)
-#define GDP_GCLMD_EXPIRE	0x0058544D	// XTM (expiration date/time)
-#define GDP_GCLMD_CID		0x00434944	// CID (creator id)
-#define GDP_GCLMD_SYNTAX	0x0053594E	// SYN (data syntax: json, xml, etc.)
-#define GDP_GCLMD_LOCATION	0x004C4F43	// LOC (location: lat/long)
-#define GDP_GCLMD_UUID		0x00554944	// UID (unique ID)
+#define GDP_MD_XID			0x00584944	// XID (external id)
+#define GDP_MD_PUBKEY		0x00505542	// PUB (public key)
+#define GDP_MD_CTIME		0x0043544D	// CTM (creation time)
+#define GDP_MD_EXPIRE		0x0058544D	// XTM (expiration date/time)
+#define GDP_MD_CID			0x00434944	// CID (creator id)
+#define GDP_MD_SYNTAX		0x0053594E	// SYN (data syntax: json, xml, etc.)
+#define GDP_MD_LOCATION		0x004C4F43	// LOC (location: lat/long)
+#define GDP_MD_UUID			0x00554944	// UID (unique ID)
 
 
 /*
 **	 Datums
-**		These are the underlying data unit that is passed through a GCL.
+**		These are the underlying data unit that is passed through a GOB.
 */
 
 typedef struct gdp_datum	gdp_datum_t;
@@ -142,7 +139,7 @@ typedef struct gdp_datum	gdp_datum_t;
 /*
 **	Events
 **		gdp_event_t encodes an event.  Every event has a type and may
-**		optionally have a GCL handle and/or a message.  For example,
+**		optionally have a GIN handle and/or a message.  For example,
 **		data (from a subscription) has all three.
 */
 
@@ -151,7 +148,7 @@ typedef struct gdp_event	gdp_event_t;
 // event types
 #define _GDP_EVENT_FREE		0	// internal use: event is free
 #define GDP_EVENT_DATA		1	// 205 returned data
-#define GDP_EVENT_EOS		2	// 205 normal end of subscription
+#define GDP_EVENT_DONE		2	// 205 normal end of async read
 #define GDP_EVENT_SHUTDOWN	3	// 515 subscription terminating because of shutdown
 #define GDP_EVENT_CREATED	4	// 201 successful append, create, or similar
 #define GDP_EVENT_SUCCESS	5	// 200 generic asynchronous success status
@@ -159,13 +156,17 @@ typedef struct gdp_event	gdp_event_t;
 #define GDP_EVENT_MISSING	7	// 430 record is missing
 
 extern gdp_event_t		*gdp_event_next(		// get event (caller must free!)
-							gdp_gcl_t *gcl,			// if set wait for this GCL only
+							gdp_gin_t *gin,			// if set wait for this GIN only
 							EP_TIME_SPEC *timeout);
 
 extern EP_STAT			gdp_event_free(			// free event from gdp_event_next
 							gdp_event_t *gev);		// event to free
 
-extern void				gdp_event_print(		// print event (for debugging)
+extern void				gdp_event_print(		// print event (user access)
+							const gdp_event_t *gev,	// event in question
+							FILE *fp);				// output file
+
+extern void				gdp_event_debug(		// print event (for debugging)
 							const gdp_event_t *gev,	// event in question
 							FILE *fp,				// output file
 							int detail,				// how detailed?
@@ -177,7 +178,7 @@ extern int				gdp_event_gettype(		// get the type of the event
 extern EP_STAT			gdp_event_getstat(		// get status code
 							gdp_event_t *gev);
 
-extern gdp_gcl_t		*gdp_event_getgcl(		// get the GCL of the event
+extern gdp_gin_t		*gdp_event_getgin(		// get the GIN of the event
 							gdp_event_t *gev);
 
 extern gdp_datum_t		*gdp_event_getdatum(	// get the datum of the event
@@ -207,85 +208,88 @@ EP_STAT			gdp_lib_init(
 extern void		*gdp_run_accept_event_loop(
 					void *);				// unused
 
-// create a new GCL
-extern EP_STAT	gdp_gcl_create(
-					gdp_name_t gclname,
+// create a new GOB
+extern EP_STAT	gdp_gin_create(
+					gdp_name_t gobname,
 					gdp_name_t logdname,
-					gdp_gclmd_t *,			// pointer to metadata object
-					gdp_gcl_t **pgcl);
+					gdp_md_t *,				// pointer to metadata object
+					gdp_gin_t **pgin);
 
-// open an existing GCL
-extern EP_STAT	gdp_gcl_open(
-					gdp_name_t name,		// GCL name to open
+// open an existing GOB
+extern EP_STAT	gdp_gin_open(
+					gdp_name_t name,		// GOB name to open
 					gdp_iomode_t rw,		// read/write (append)
-					gdp_gcl_open_info_t *info,	// additional open info
-					gdp_gcl_t **gcl);		// pointer to result GCL handle
+					gdp_open_info_t *info,	// additional open info
+					gdp_gin_t **gin);		// pointer to result GIN handle
 
-// close an open GCL
-extern EP_STAT	gdp_gcl_close(
-					gdp_gcl_t *gcl);		// GCL handle to close
+// close an open GIN
+extern EP_STAT	gdp_gin_close(
+					gdp_gin_t *gin);		// GIN handle to close
 
-// delete and close an open GCL
-extern EP_STAT	gdp_gcl_delete(
-					gdp_gcl_t *gcl);		// GCL handle to delete
+// delete and close an open GIN
+extern EP_STAT	gdp_gin_delete(
+					gdp_gin_t *gin);		// GIN handle to delete
 
-// append to a writable GCL
-extern EP_STAT	gdp_gcl_append(
-					gdp_gcl_t *gcl,			// writable GCL handle
-					gdp_datum_t *);			// message to write
+// append to a writable GIN
+extern EP_STAT	gdp_gin_append(
+					gdp_gin_t *gin,			// writable GIN handle
+					gdp_datum_t *datum,		// message to write
+					gdp_hash_t *prevhash);	// hash of previous record
 
 // async version
-extern EP_STAT gdp_gcl_append_async(
-					gdp_gcl_t *gcl,			// writable GCL handle
-					gdp_datum_t *,			// message to write
+extern EP_STAT gdp_gin_append_async(
+					gdp_gin_t *gin,			// writable GIN handle
+					int32_t n_datums,		// number of datums being written
+					gdp_datum_t **datums,	// list of datums to append
+					gdp_hash_t *prevhash,	// hash of previous record
 					gdp_event_cbfunc_t,		// callback function
 					void *udata);
 
 // synchronous read based on record number
-extern EP_STAT gdp_gcl_read_by_recno(
-					gdp_gcl_t *gcl,			// readable GCL handle
+extern EP_STAT gdp_gin_read_by_recno(
+					gdp_gin_t *gin,			// readable GIN handle
 					gdp_recno_t recno,		// record number
 					gdp_datum_t *datum);	// pointer to result
 
 // async read based on record number
-extern EP_STAT gdp_gcl_read_by_recno_async(
-					gdp_gcl_t *gcl,			// readable GCL handle
+extern EP_STAT gdp_gin_read_by_recno_async(
+					gdp_gin_t *gin,			// readable GIN handle
 					gdp_recno_t recno,		// starting record number
 					int32_t nrecs,			// number of records to read
 					gdp_event_cbfunc_t cbfunc,	// callback function
 					void *cbarg);			// argument to cbfunc
 
 // synchronous read based on timestamp
-extern EP_STAT gdp_gcl_read_by_ts(
-					gdp_gcl_t *gcl,			// readable GCL handle
+extern EP_STAT gdp_gin_read_by_ts(
+					gdp_gin_t *gin,			// readable GIN handle
 					EP_TIME_SPEC *ts,		// timestamp
 					gdp_datum_t *datum);	// pointer to result
 
 // async read based on timestamp
-extern EP_STAT gdp_gcl_read_by_ts_async(
-					gdp_gcl_t *gcl,			// readable GCL handle
+extern EP_STAT gdp_gin_read_by_ts_async(
+					gdp_gin_t *gin,			// readable GIN handle
 					EP_TIME_SPEC *ts,		// starting record number
 					int32_t nrecs,			// number of records to read
 					gdp_event_cbfunc_t cbfunc,	// callback function
 					void *cbarg);			// argument to cbfunc
 
 // synchronous read based on hash
-extern EP_STAT gdp_gcl_read_by_hash(
-					gdp_gcl_t *gcl,			// readable GCL handle
+extern EP_STAT gdp_gin_read_by_hash(
+					gdp_gin_t *gin,			// readable GIN handle
 					gdp_hash_t *hash,		// hash of desired record
 					gdp_datum_t *datum);	// pointer to result
 
-// async read based on timestamp
-extern EP_STAT gdp_gcl_read_by_hash_async(
-					gdp_gcl_t *gcl,			// readable GCL handle
-					gdp_hash_t *hash,		// starting record hash
-					int32_t nrecs,			// number of records to read
+// async read based on hash
+extern EP_STAT gdp_gin_read_by_hash_async(
+					gdp_gin_t *gin,			// readable GIN handle
+					uint32_t n_hashes,		// number of records to fetch
+					gdp_hash_t **hashes,	// list of hashes to fetch
 					gdp_event_cbfunc_t cbfunc,	// callback function
 					void *cbarg);			// argument to cbfunc
 
 // subscribe based on record number
-extern EP_STAT	gdp_gcl_subscribe_by_recno(
-					gdp_gcl_t *gcl,			// readable GCL handle
+extern EP_STAT	gdp_gin_subscribe_by_recno(
+					gdp_gin_t *gin,			// readable GIN handle
 					gdp_recno_t start,		// starting record number
 					int32_t nrecs,			// number of records to retrieve
 					gdp_sub_qos_t *qos,		// quality of service info
@@ -294,8 +298,8 @@ extern EP_STAT	gdp_gcl_subscribe_by_recno(
 					void *cbarg);			// argument passed to callback
 
 // subscribe based on timestamp
-extern EP_STAT	gdp_gcl_subscribe_by_ts(
-					gdp_gcl_t *gcl,			// readable GCL handle
+extern EP_STAT	gdp_gin_subscribe_by_ts(
+					gdp_gin_t *gin,			// readable GIN handle
 					EP_TIME_SPEC *ts,		// starting timestamp
 					int32_t nrecs,			// number of records to retrieve
 					gdp_sub_qos_t *qos,		// quality of service info
@@ -304,8 +308,8 @@ extern EP_STAT	gdp_gcl_subscribe_by_ts(
 					void *cbarg);			// argument passed to callback
 
 // subscribe based on hash
-extern EP_STAT	gdp_gcl_subscribe_by_hash(
-					gdp_gcl_t *gcl,			// readable GCL handle
+extern EP_STAT	gdp_gin_subscribe_by_hash(
+					gdp_gin_t *gin,			// readable GIN handle
 					gdp_hash_t *hash,		// starting record hash
 					int32_t nrecs,			// number of records to retrieve
 					EP_TIME_SPEC *timeout,	// timeout
@@ -314,45 +318,49 @@ extern EP_STAT	gdp_gcl_subscribe_by_hash(
 					void *cbarg);			// argument passed to callback
 
 
-// unsubscribe from a GCL
-extern EP_STAT	gdp_gcl_unsubscribe(
-					gdp_gcl_t *gcl,			// GCL handle
+// unsubscribe from a GIN
+extern EP_STAT	gdp_gin_unsubscribe(
+					gdp_gin_t *gin,			// GIN handle
 					gdp_event_cbfunc_t cbfunc,
 											// callback func (to make unique)
 					void *cbarg);			// callback arg (to make unique)
 // read metadata
-extern EP_STAT	gdp_gcl_getmetadata(
-					gdp_gcl_t *gcl,			// GCL handle
-					gdp_gclmd_t **gmdp);	// out-param for metadata
-
-// create new log segment
-extern EP_STAT	gdp_gcl_newsegment(
-					gdp_gcl_t *gcl);		// GCL handle
+extern EP_STAT	gdp_gin_getmetadata(
+					gdp_gin_t *gin,			// GIN handle
+					gdp_md_t **gmdp);		// out-param for metadata
 
 // set append filter
-extern EP_STAT	gdp_gcl_set_append_filter(
-					gdp_gcl_t *gcl,			// GCL handle
+extern EP_STAT	gdp_gin_set_append_filter(
+					gdp_gin_t *gin,			// GIN handle
 					EP_STAT (*readfilter)(gdp_datum_t *, void *),
 					void *filterdata);
 
 // set read filter
-extern EP_STAT	gdp_gcl_set_read_filter(
-					gdp_gcl_t *gcl,			// GCL handle
+extern EP_STAT	gdp_gin_set_read_filter(
+					gdp_gin_t *gin,			// GIN handle
 					EP_STAT (*readfilter)(gdp_datum_t *, void *),
 					void *filterdata);
 
-// return the name of a GCL
+// return the name of a GIN
 //		XXX: should this be in a more generic "getstat" function?
-extern const gdp_name_t *gdp_gcl_getname(
-					const gdp_gcl_t *gcl);	// open GCL handle
+extern const gdp_name_t *gdp_gin_getname(
+					const gdp_gin_t *gin);	// open GIN handle
+
+// return the hash algorithm
+extern int		gdp_gin_gethashalg(
+					const gdp_gin_t *gin);	// open GIN handle
+
+// return the signature algorithm
+extern int		gdp_gin_getsigalg(
+					const gdp_gin_t *gin);	// open GIN handle
 
 // check to see if a GDP object name is valid
 extern bool		gdp_name_is_valid(
 					const gdp_name_t);
 
-// print a GCL (for debugging)
-extern void		gdp_gcl_print(
-					const gdp_gcl_t *gcl,	// GCL handle to print
+// print a GIN (for debugging)
+extern void		gdp_gin_print(
+					const gdp_gin_t *gin,	// GIN handle to print
 					FILE *fp);
 
 // make a printable GDP object name from a binary version
@@ -376,70 +384,28 @@ EP_STAT			gdp_parse_name(
 					gdp_name_t internal);
 
 // get the number of records in the log
-extern gdp_recno_t	gdp_gcl_getnrecs(
-					const gdp_gcl_t *gcl);	// open GCL handle
+extern gdp_recno_t	gdp_gin_getnrecs(
+					const gdp_gin_t *gin);	// open GIN handle
 
 /*
-**  Following are for back compatibility
-*/
-
-typedef gdp_event_cbfunc_t	gdp_gcl_sub_cbfunc_t;	// back compat
-
-// read from a readable GCL based on record number
-#define gdp_gcl_read		gdp_gcl_read_by_recno
-
-// read from a readable GCL based on timestamp
-#define gdp_gcl_read_ts			gdp_gcl_read_by_ts
-
-// read asynchronously from a GCL based on record number
-extern EP_STAT gdp_gcl_read_async(
-					gdp_gcl_t *gcl,			// readable GCL handle
-					gdp_recno_t recno,		// starting record number
-					gdp_event_cbfunc_t cbfunc,	// callback function
-					void *cbarg);			// argument to cbfunc
-
-// subscribe to a readable GCL
-#define gdp_gcl_subscribe		gdp_gcl_subscribe_by_recno
-
-// subscribe by timestamp
-#define gdp_gcl_subscribe_ts	gdp_gcl_subscribe_by_ts
-
-// read multiple records (no subscriptions)
-#if 0	//XXX OBSOLETE (???)
-extern EP_STAT	gdp_gcl_multiread(
-					gdp_gcl_t *gcl,			// readable GCL handle
-					gdp_recno_t start,		// first record to retrieve
-					int32_t nrecs,			// number of records to retrieve
-					gdp_event_cbfunc_t cbfunc,
-											// callback function for next datum
-					void *cbarg);			// argument passed to callback
-#endif //XXX
-#define gdp_gcl_multiread		gdp_gcl_read_by_recno_async	// BACK COMPAT
-
-// read multiple records starting from timestamp (no subscriptions)
-#define gdp_gcl_multiread_ts	gdp_gcl_read_by_ts_async
-
-
-
-/*
-**  GCL Open Information
+**  GOB Open Information
 */
 
 // get a new open information structure
-gdp_gcl_open_info_t	*gdp_gcl_open_info_new(void);
+gdp_open_info_t		*gdp_open_info_new(void);
 
 // free that structure
-void				gdp_gcl_open_info_free(
-						gdp_gcl_open_info_t *info);
+void				gdp_open_info_free(
+						gdp_open_info_t *info);
 
 // set the signing key
-EP_STAT				gdp_gcl_open_info_set_signing_key(
-						gdp_gcl_open_info_t *info,
+EP_STAT				gdp_open_info_set_signing_key(
+						gdp_open_info_t *info,
 						EP_CRYPTO_KEY *skey);
 
-// set the signing callback function
-EP_STAT				gdp_gcl_open_info_set_signkey_cb(
-						gdp_gcl_open_info_t *info,
+// set the callback function to read a signing key from a user
+EP_STAT				gdp_open_info_set_signkey_cb(
+						gdp_open_info_t *info,
 						EP_STAT (*signkey_cb)(
 							gdp_name_t gname,
 							void *signkey_udata,
@@ -447,8 +413,8 @@ EP_STAT				gdp_gcl_open_info_set_signkey_cb(
 						void *signkey_udata);
 
 // set the caching behavior
-EP_STAT				gdp_gcl_open_info_set_caching(
-						gdp_gcl_open_info_t *info,
+EP_STAT				gdp_open_info_set_caching(
+						gdp_open_info_t *info,
 						bool keep_in_cache);
 
 /*
@@ -456,37 +422,37 @@ EP_STAT				gdp_gcl_open_info_set_caching(
 */
 
 // create a new metadata set
-gdp_gclmd_t		*gdp_gclmd_new(
+gdp_md_t		*gdp_md_new(
 					int entries);
 
 // free a metadata set
-void			gdp_gclmd_free(gdp_gclmd_t *gmd);
+void			gdp_md_free(gdp_md_t *gmd);
 
 // add an entry to a metadata set
-EP_STAT			gdp_gclmd_add(
-					gdp_gclmd_t *gmd,
-					gdp_gclmd_id_t id,
+EP_STAT			gdp_md_add(
+					gdp_md_t *gmd,
+					gdp_md_id_t id,
 					size_t len,
 					const void *data);
 
 // get an entry from a metadata set by index
-EP_STAT			gdp_gclmd_get(
-					gdp_gclmd_t *gmd,
+EP_STAT			gdp_md_get(
+					gdp_md_t *gmd,
 					int indx,
-					gdp_gclmd_id_t *id,
+					gdp_md_id_t *id,
 					size_t *len,
 					const void **data);
 
 // get an entry from a metadata set by id
-EP_STAT			gdp_gclmd_find(
-					gdp_gclmd_t *gmd,
-					gdp_gclmd_id_t id,
+EP_STAT			gdp_md_find(
+					gdp_md_t *gmd,
+					gdp_md_id_t id,
 					size_t *len,
 					const void **data);
 
 // print metadata set (for debugging)
-void			gdp_gclmd_print(
-					const gdp_gclmd_t *gmd,
+void			gdp_md_dump(
+					const gdp_md_t *gmd,
 					FILE *fp,
 					int detail,
 					int indent);
@@ -503,6 +469,22 @@ void			gdp_datum_free(gdp_datum_t *);
 
 // reset a datum to clean state
 void			gdp_datum_reset(gdp_datum_t *);
+
+// copy contents of one datum into another
+extern void		gdp_datum_copy(
+					gdp_datum_t *to,
+					const gdp_datum_t *from);
+
+// compute hash of a datum for a given log
+gdp_hash_t		*gdp_datum_hash(
+						gdp_datum_t *datum,
+						gdp_gin_t *gin);
+
+// check datum for equality to hash
+bool			gdp_datum_hash_equal(
+						gdp_datum_t *datum,
+						const gdp_gin_t *gin,
+						const gdp_hash_t *hash);
 
 // print out data record
 extern void		gdp_datum_print(
@@ -534,16 +516,92 @@ extern gdp_buf_t *gdp_datum_getbuf(
 					const gdp_datum_t *datum);
 
 // get the signature from a datum
-extern gdp_buf_t *gdp_datum_getsig(
+extern gdp_sig_t *gdp_datum_getsig(
 					const gdp_datum_t *datum);
 
-// get the signature digest algorithm from a datum
-extern short	gdp_datum_getsigmdalg(
-					const gdp_datum_t *datum);
 
-// copy contents of one datum into another
-extern void		gdp_datum_copy(
-					gdp_datum_t *to,
-					const gdp_datum_t *from);
+/*
+**  Hashes
+*/
+
+// create a new hash structure
+extern gdp_hash_t	*gdp_hash_new(
+						int alg,				// hash algorithm
+						void *hashbytes,		// if set, initial bytes
+						size_t hashlen);		// length of hashbytes
+
+// free a hash structure
+extern void			gdp_hash_free(
+						gdp_hash_t *hash);
+
+// reset a hash structure
+extern void			gdp_hash_reset(
+						gdp_hash_t *hash);
+
+// set the hash value; implies gdp_hash_reset
+extern void			gdp_hash_set(
+						gdp_hash_t *hash,		// existing hash
+						void *hashbytes,		// actual hash buffer
+						size_t hashlen);		// length of hashbytes
+
+// get the length of a hash
+extern size_t		gdp_hash_getlength(
+						gdp_hash_t *hash);
+
+// get the actual hash value (and optionally length)
+extern void			*gdp_hash_getptr(
+						gdp_hash_t *hash,
+						size_t *hashlen_ptr);
+
+// compare two hash structures
+extern bool			gdp_hash_equal(
+						const gdp_hash_t *a,
+						const gdp_hash_t *b);
+
+
+/*
+**  Signatures
+*/
+
+// create a new empty signature structure
+extern gdp_sig_t	*gdp_sig_new(
+						int alg,				// signature algorithm
+						void *sigbytes,			// if set, initial bytes
+						size_t siglen);			// length of sigbytes
+
+// free a signature structure
+extern void			gdp_sig_free(
+						gdp_sig_t *sig);
+
+// reset a signature structure
+extern void			gdp_sig_reset(
+						gdp_sig_t *sig);
+
+// set a signature; implies gdp_sig_reset
+extern void			gdp_sig_set(
+						gdp_sig_t *sig,			// existing signature
+						void *sigbytes,			// actual signature value
+						size_t siglen);			// length of sigbytes
+
+// copy on signature into another
+extern void			gdp_sig_copy(
+						gdp_sig_t *from,
+						gdp_sig_t *to);
+
+// duplicate a signature into a new structure
+extern gdp_sig_t	*gdp_sig_dup(
+						gdp_sig_t *sig);
+
+// get the length of a signature (not the number of key bits!)
+extern size_t		gdp_sig_getlength(
+						gdp_sig_t *sig);
+
+// get the actual signature (and length)
+extern void			*gdp_sig_getptr(
+						gdp_sig_t *sig,
+						size_t *siglen_ptr);
+
+
+
 
 #endif // _GDP_H_

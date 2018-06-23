@@ -48,6 +48,7 @@ case "$OS" in
 	package libdb-dev
 	package libevent-dev
 	package libevent-pthreads
+	package libsqlite3-dev
 	package libssl-dev
 	package uuid-dev
 	package lighttpd

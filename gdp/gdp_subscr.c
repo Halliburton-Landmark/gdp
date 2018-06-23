@@ -178,7 +178,7 @@ subscr_poker_thread(void *chan_)
 							strerror(errno));
 					continue;
 				}
-				gob->flags |= GCLF_ISLOCKED;
+				gob->flags |= GOBF_ISLOCKED;
 				_gdp_req_lock(req);
 
 				if (!EP_UT_BITSET(GDP_REQ_CLT_SUBSCR, req->flags))
@@ -212,13 +212,13 @@ subscr_poker_thread(void *chan_)
 
 
 /*
-**	_GDP_GCL_SUBSCRIBE_BY_RECNO --- subscribe to a GCL
+**	_GDP_GIN_SUBSCRIBE_BY_RECNO --- subscribe to a GCL
 **
 **		This also implements multiread.
 */
 
 EP_STAT
-_gdp_gcl_subscribe(gdp_gin_t *gin,
+_gdp_gin_subscribe(gdp_gin_t *gin,
 		gdp_cmd_t cmd,
 		gdp_recno_t start,
 		int32_t numrecs,
@@ -306,7 +306,7 @@ _gdp_gcl_subscribe(gdp_gin_t *gin,
 				if (istat != 0)
 				{
 					EP_STAT spawn_stat = ep_stat_from_errno(istat);
-					ep_log(spawn_stat, "_gdp_gcl_subscribe: thread spawn failure");
+					ep_log(spawn_stat, "_gdp_gin_subscribe: thread spawn failure");
 				}
 			}
 			ep_thr_mutex_unlock(&_GdpSubscriptionMutex);
@@ -318,7 +318,7 @@ fail0:
 }
 
 EP_STAT
-_gdp_gcl_unsubscribe(gdp_gin_t *gin,
+_gdp_gin_unsubscribe(gdp_gin_t *gin,
 		gdp_event_cbfunc_t cbfunc,
 		void *cbarg,
 		uint32_t reqflags)
@@ -330,12 +330,13 @@ _gdp_gcl_unsubscribe(gdp_gin_t *gin,
 	if (!GDP_GIN_ASSERT_ISLOCKED(gin))
 		return EP_STAT_ASSERT_ABORT;
 
-	ep_dbg_cprintf(Dbg, 1, "_gdp_gcl_unsubscribe(%s) cbfunc=%p cbarg=%p\n",
+	ep_dbg_cprintf(Dbg, 1, "_gdp_gin_unsubscribe(%s) cbfunc=%p cbarg=%p\n",
 			gin->gob->pname, cbfunc, cbarg);
 
 	estat = _gdp_req_new(GDP_CMD_UNSUBSCRIBE, gin->gob, _GdpChannel, NULL,
 						reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
+	req->gin = gin;
 
 	GDP_MSG_CHECK(req->cpdu, return EP_STAT_ASSERT_ABORT);
 

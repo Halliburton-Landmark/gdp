@@ -67,4 +67,11 @@ extern void				_gdp_event_trigger_pending(
 EP_STAT					_gdp_event_free_all(
 								gdp_gin_t *gin);
 
+// print event (for debugging)
+void					_gdp_event_dump(
+								const gdp_event_t *gev,
+								FILE *fp,
+								int detail,
+								int indent);
+
 #endif // _GDP_EVENT_H_

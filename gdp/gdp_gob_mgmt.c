@@ -91,7 +91,7 @@ _gdp_gob_new(gdp_name_t gob_name, gdp_gob_t **pgob)
 	}
 	ep_thr_mutex_unlock(&_GobFreeListMutex);
 
-	if (gob != NULL && !EP_ASSERT(!EP_UT_BITSET(GCLF_INUSE, gob->flags)))
+	if (gob != NULL && !EP_ASSERT(!EP_UT_BITSET(GOBF_INUSE, gob->flags)))
 		gob = NULL;
 
 	if (gob == NULL)
@@ -114,15 +114,26 @@ _gdp_gob_new(gdp_name_t gob_name, gdp_gob_t **pgob)
 	gob->nrecs = 0;
 	NGobsAllocated++;
 
+	// determine the digest algorithm for hashes and signatures
+	{
+		const char *hashalg = ep_adm_getstrparam("swarm.gdp.gob.hashalg", "sha256");
+		gob->hashalg = ep_crypto_md_alg_byname(hashalg);
+		if (gob->hashalg < 0)
+		{
+			ep_dbg_cprintf(Dbg, 1, "_gdp_gob_new: unknown hashalg %s\n", hashalg);
+			gob->hashalg = EP_CRYPTO_MD_SHA256;
+		}
+	}
+
 	// create a name if we don't have one passed in
 	if (gob_name == NULL || !gdp_name_is_valid(gob_name))
-		_gdp_newname(gob->name, gob->gclmd);	//XXX bogus: gob->gclmd isn't set yet
+		_gdp_newname(gob->name, gob->gob_md);	//FIXME: gob->gob_md isn't set yet
 	else
 		memcpy(gob->name, gob_name, sizeof gob->name);
 	gdp_printable_name(gob->name, gob->pname);
 
 	// success
-	gob->flags = GCLF_INUSE | GCLF_PENDING;
+	gob->flags = GOBF_INUSE | GOBF_PENDING;
 	*pgob = gob;
 	ep_dbg_cprintf(Dbg, 28, "_gdp_gob_new => %p (%s)\n",
 			gob, gob->pname);
@@ -152,19 +163,19 @@ _gdp_gob_free(gdp_gob_t **pgob)
 	if (gob == NULL)
 		return;
 	*pgob = NULL;
-	if (!EP_ASSERT(EP_UT_BITSET(GCLF_INUSE, gob->flags)))
+	if (!EP_ASSERT(EP_UT_BITSET(GOBF_INUSE, gob->flags)))
 		return;
 	GDP_GOB_ASSERT_ISLOCKED(gob);
 
 	// this is a forced free, so ignore existing refcnts, etc.
-	gob->flags |= GCLF_DROPPING;
+	gob->flags |= GOBF_DROPPING;
 	gob->refcnt = 0;
 
-	if (EP_UT_BITSET(GCLF_INCACHE, gob->flags))
+	if (EP_UT_BITSET(GOBF_INCACHE, gob->flags))
 	{
 		// drop it from the name -> handle cache and the LRU list
 		_gdp_gob_cache_drop(gob, false);
-		EP_ASSERT(!EP_UT_BITSET(GCLF_INCACHE, gob->flags));
+		EP_ASSERT(!EP_UT_BITSET(GOBF_INCACHE, gob->flags));
 	}
 
 	// release any remaining requests
@@ -174,9 +185,9 @@ _gdp_gob_free(gdp_gob_t **pgob)
 	if (gob->freefunc != NULL)
 		(*gob->freefunc)(gob);
 	gob->freefunc = NULL;
-	if (gob->gclmd != NULL)
-		gdp_gclmd_free(gob->gclmd);
-	gob->gclmd = NULL;
+	if (gob->gob_md != NULL)
+		gdp_md_free(gob->gob_md);
+	gob->gob_md = NULL;
 	if (gob->digest != NULL)
 		ep_crypto_md_free(gob->digest);
 	gob->digest = NULL;
@@ -212,13 +223,14 @@ _gdp_gob_free(gdp_gob_t **pgob)
 
 EP_PRFLAGS_DESC	_GdpGobFlags[] =
 {
-	{ GCLF_DROPPING,		GCLF_DROPPING,			"DROPPING"			},
-	{ GCLF_INCACHE,			GCLF_INCACHE,			"INCACHE"			},
-	{ GCLF_ISLOCKED,		GCLF_ISLOCKED,			"ISLOCKED"			},
-	{ GCLF_INUSE,			GCLF_INUSE,				"INUSE"				},
-	{ GCLF_DEFER_FREE,		GCLF_DEFER_FREE,		"DEFER_FREE"		},
-	{ GCLF_KEEPLOCKED,		GCLF_KEEPLOCKED,		"KEEPLOCKED"		},
-	{ GCLF_PENDING,			GCLF_PENDING,			"PENDING"			},
+	{ GOBF_DROPPING,		GOBF_DROPPING,			"DROPPING"			},
+	{ GOBF_INCACHE,			GOBF_INCACHE,			"INCACHE"			},
+	{ GOBF_ISLOCKED,		GOBF_ISLOCKED,			"ISLOCKED"			},
+	{ GOBF_INUSE,			GOBF_INUSE,				"INUSE"				},
+	{ GOBF_DEFER_FREE,		GOBF_DEFER_FREE,		"DEFER_FREE"		},
+	{ GOBF_KEEPLOCKED,		GOBF_KEEPLOCKED,		"KEEPLOCKED"		},
+	{ GOBF_PENDING,			GOBF_PENDING,			"PENDING"			},
+	{ GOBF_SIGNING,			GOBF_SIGNING,			"SIGNING"			},
 	{ 0, 0, NULL }
 };
 
@@ -264,9 +276,9 @@ _gdp_gob_dump(
 				char tbuf[40];
 				struct tm tm;
 
-				fprintf(fp, "%sfreefunc = %p, gclmd = %p, digest = %p\n",
+				fprintf(fp, "%sfreefunc = %p, gob_md = %p, digest = %p\n",
 						_gdp_pr_indent(indent),
-						gob->freefunc, gob->gclmd, gob->digest);
+						gob->freefunc, gob->gob_md, gob->digest);
 				gmtime_r(&gob->utime, &tm);
 				strftime(tbuf, sizeof tbuf, "%Y-%m-%d %H:%M:%S", &tm);
 				fprintf(fp, "%sutime = %s, x = %p\n",
@@ -292,8 +304,8 @@ _gdp_gob_lock_trace(
 	//XXX cheat: _ep_thr_mutex_lock is a libep-private interface
 	if (_ep_thr_mutex_lock(&gob->mutex, file, line, id) == 0)
 	{
-		EP_ASSERT(!EP_UT_BITSET(GCLF_ISLOCKED, gob->flags));
-		gob->flags |= GCLF_ISLOCKED;
+		EP_ASSERT(!EP_UT_BITSET(GOBF_ISLOCKED, gob->flags));
+		gob->flags |= GOBF_ISLOCKED;
 	}
 }
 
@@ -309,8 +321,8 @@ _gdp_gob_unlock_trace(
 		int line,
 		const char *id)
 {
-	EP_ASSERT(EP_UT_BITSET(GCLF_ISLOCKED, gob->flags));
-	gob->flags &= ~GCLF_ISLOCKED;
+	EP_ASSERT(EP_UT_BITSET(GOBF_ISLOCKED, gob->flags));
+	gob->flags &= ~GOBF_ISLOCKED;
 
 	//XXX cheat: _ep_thr_mutex_unlock is a libep-private interface
 	_ep_thr_mutex_unlock(&gob->mutex, file, line, id);
@@ -402,25 +414,26 @@ _gdp_mutex_check_isunlocked(
 
 #undef _gdp_gob_incref
 
-void
+gdp_gob_t *
 _gdp_gob_incref(gdp_gob_t *gob)
 {
-	_gdp_gob_incref_trace(gob, __FILE__, __LINE__, "gob");
+	return _gdp_gob_incref_trace(gob, __FILE__, __LINE__, "gob");
 }
 
-void
+gdp_gob_t *
 _gdp_gob_incref_trace(
 		gdp_gob_t *gob,
 		const char *file,
 		int line,
 		const char *id)
 {
-	EP_ASSERT_ELSE(GDP_GOB_ISGOOD(gob), return);
+	EP_ASSERT_ELSE(GDP_GOB_ISGOOD(gob), return gob);
 	GDP_GOB_ASSERT_ISLOCKED(gob);
 
 	gob->refcnt++;
 	ep_dbg_cprintf(Dbg, 51, "_gdp_gob_incref(%p): %d [%s %s:%d]\n",
 				gob, gob->refcnt, id, file, line);
+	return gob;
 }
 
 
@@ -465,17 +478,16 @@ _gdp_gob_decref_trace(
 
 	ep_dbg_cprintf(Dbg, 51, "_gdp_gob_decref(%p): %d [%s %s:%d]\n",
 			gob, gob->refcnt, id, file, line);
-	if (gob->refcnt == 0 && !EP_UT_BITSET(GCLF_DEFER_FREE, gob->flags))
+	if (gob->refcnt == 0 && !EP_UT_BITSET(GOBF_DEFER_FREE, gob->flags))
 	{
-		EP_ASSERT(!keeplocked && !EP_UT_BITSET(GCLF_KEEPLOCKED, gob->flags));
+		EP_ASSERT(!keeplocked && !EP_UT_BITSET(GOBF_KEEPLOCKED, gob->flags));
 		_gdp_gob_free(&gob);
 	}
-	else if (!EP_UT_BITSET(GCLF_ISLOCKED, gob->flags))
+	else if (!GDP_GOB_ASSERT_ISLOCKED(gob))
 	{
-		ep_dbg_cprintf(Dbg, 1,
-				"_gdp_gob_decref(%p, %s) not locked at %s:%d\n",
-				gob, id, file, line);
-	} else if (!keeplocked && !EP_UT_BITSET(GCLF_KEEPLOCKED, gob->flags))
+		// avoid next clause
+	}
+	else if (!keeplocked && !EP_UT_BITSET(GOBF_KEEPLOCKED, gob->flags))
 		_gdp_gob_unlock_trace(gob, file, line, id);
 }
 

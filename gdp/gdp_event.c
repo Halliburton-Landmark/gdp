@@ -135,7 +135,7 @@ gdp_event_free(gdp_event_t *gev)
 */
 
 gdp_event_t *
-gdp_event_next(gdp_gcl_t *gin, EP_TIME_SPEC *timeout)
+gdp_event_next(gdp_gin_t *gin, EP_TIME_SPEC *timeout)
 {
 	gdp_event_t *gev;
 	EP_TIME_SPEC *abs_to = NULL;
@@ -395,9 +395,9 @@ _gdp_event_add_from_req(gdp_req_t *req)
 		evtype = GDP_EVENT_DATA;
 		break;
 
-	  case GDP_ACK_DELETED:
+	  case GDP_ACK_END_OF_RESULTS:
 		// end of subscription
-		evtype = GDP_EVENT_EOS;
+		evtype = GDP_EVENT_DONE;
 		req->flags &= ~GDP_REQ_PERSIST;
 		break;
 
@@ -406,7 +406,7 @@ _gdp_event_add_from_req(gdp_req_t *req)
 		evtype = GDP_EVENT_CREATED;
 		break;
 
-	  case GDP_NAK_S_LOSTSUB:
+	  case GDP_NAK_S_LOST_SUBSCR:
 		evtype = GDP_EVENT_SHUTDOWN;
 		req->flags &= ~GDP_REQ_PERSIST;
 		break;
@@ -449,7 +449,8 @@ _gdp_event_add_from_req(gdp_req_t *req)
 	gev->datum = gdp_datum_new();
 	if (msg->cmd == GDP_ACK_CONTENT)
 	{
-		_gdp_datum_from_pb(gev->datum, msg, msg->ack_content->datum);
+		EP_ASSERT(msg->ack_content->dl->n_d == 1);		//FIXME: should handle multiples
+		_gdp_datum_from_pb(gev->datum, msg->ack_content->dl->d[0], msg->sig);
 	}
 
 	// schedule the event for delivery
@@ -475,12 +476,21 @@ _gdp_event_add_from_req(gdp_req_t *req)
 */
 
 void
-gdp_event_print(const gdp_event_t *gev, FILE *fp, int detail, int indent)
+gdp_event_print(const gdp_event_t *gev, FILE *fp)
+{
+	_gdp_event_dump(gev, fp, GDP_PR_PRETTY, 0);
+}
+
+void
+_gdp_event_dump(const gdp_event_t *gev, FILE *fp, int detail, int indent)
 {
 	gdp_recno_t recno = -1;
 	char ebuf[100];
 
-	if (detail > GDP_PR_BASIC + 1)
+	if (fp == NULL)
+		fp = ep_dbg_getfile();
+
+	if (detail >= GDP_PR_BASIC + 1)
 		fprintf(fp, "Event type %d, cbarg %p, stat %s\n",
 				gev->type, gev->udata,
 				ep_stat_tostr(gev->stat, ebuf, sizeof ebuf));
@@ -500,7 +510,7 @@ gdp_event_print(const gdp_event_t *gev, FILE *fp, int detail, int indent)
 		fprintf(fp, "Data created\n");
 		break;
 
-	  case GDP_EVENT_EOS:
+	  case GDP_EVENT_DONE:
 		fprintf(fp, "End of data\n");
 		break;
 
@@ -509,29 +519,21 @@ gdp_event_print(const gdp_event_t *gev, FILE *fp, int detail, int indent)
 		break;
 
 	  case GDP_EVENT_SUCCESS:
-		if (detail > GDP_PR_BASIC + 1)
-			fprintf(fp, "Generic success\n");
-		else
-			fprintf(fp, "Success: %s\n",
+		fprintf(fp, "Success: %s\n",
 					ep_stat_tostr(gev->stat, ebuf, sizeof ebuf));
 		break;
 
 	  case GDP_EVENT_FAILURE:
-		if (detail > GDP_PR_BASIC + 1)
-			fprintf(fp, "Generic failure\n");
-		else
-			fprintf(fp, "Failure: %s\n",
+		fprintf(fp, "Failure: %s\n",
 					ep_stat_tostr(gev->stat, ebuf, sizeof ebuf));
 		break;
 
 	  case GDP_EVENT_MISSING:
-		fprintf(fp, "Record %" PRIgdp_recno " missing\n",
-				recno);
+		fprintf(fp, "Record %" PRIgdp_recno " missing\n", recno);
 		break;
 
 	  default:
-		if (detail > 0)
-			fprintf(fp, "Unknown event type %d: %s\n",
+		fprintf(fp, "Unknown event type %d: %s\n",
 					gev->type, ep_stat_tostr(gev->stat, ebuf, sizeof ebuf));
 		break;
 	}
@@ -550,8 +552,8 @@ gdp_event_gettype(gdp_event_t *gev)
 }
 
 
-gdp_gcl_t *
-gdp_event_getgcl(gdp_event_t *gev)
+gdp_gin_t *
+gdp_event_getgin(gdp_event_t *gev)
 {
 	EP_ASSERT_POINTER_VALID(gev);
 	return gev->gin;

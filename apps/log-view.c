@@ -142,23 +142,23 @@ show_metadata(int nmds, FILE *dfp, size_t *foffp, int plev)
 					i, mdhdrs[i].md_id, mdhdrs[i].md_len);
 			switch (mdhdrs[i].md_id)
 			{
-				case GDP_GCLMD_XID:
+				case GDP_MD_XID:
 					printf(" (external id)\n    %s\n", mdata);
 					break;
 
-				case GDP_GCLMD_UUID:
+				case GDP_MD_UUID:
 					printf(" (uuid)\n    %s\n", mdata);
 					break;
 
-				case GDP_GCLMD_CTIME:
+				case GDP_MD_CTIME:
 					printf(" (creation time)\n    %s\n", mdata);
 					break;
 
-				case GDP_GCLMD_CID:
+				case GDP_MD_CID:
 					printf(" (creator)\n    %s\n", mdata);
 					break;
 
-				case GDP_GCLMD_PUBKEY:
+				case GDP_MD_PUBKEY:
 					printf(" (public key)\n");
 					{
 						int keylen = mdata[2] << 8 | mdata[3];
@@ -195,15 +195,15 @@ show_metadata(int nmds, FILE *dfp, size_t *foffp, int plev)
 				fprintf(stdout, "%s\n", EpChar->rquote);
 			}
 		}
-		else if (mdhdrs[i].md_id == GDP_GCLMD_XID)
+		else if (mdhdrs[i].md_id == GDP_MD_XID)
 		{
 			fprintf(stdout, "\tExternal name: %s\n", mdata);
 		}
-		else if (mdhdrs[i].md_id == GDP_GCLMD_CID)
+		else if (mdhdrs[i].md_id == GDP_MD_CID)
 		{
 			fprintf(stdout, "\tCreator:       %s\n", mdata);
 		}
-		else if (mdhdrs[i].md_id == GDP_GCLMD_CTIME)
+		else if (mdhdrs[i].md_id == GDP_MD_CTIME)
 		{
 			fprintf(stdout, "\tCreation Time: %s\n", mdata);
 		}
@@ -745,12 +745,12 @@ list_gcls(const char *gcl_dir_name, int plev, int list_flags)
 			*p = '\0';
 
 			// strip off segment number if it exists
-			if (strlen(dent->d_name) > GDP_GCL_PNAME_LEN &&
-					dent->d_name[GDP_GCL_PNAME_LEN] == '-')
-				dent->d_name[GDP_GCL_PNAME_LEN] = '\0';
+			if (strlen(dent->d_name) > GDP_GOB_PNAME_LEN &&
+					dent->d_name[GDP_GOB_PNAME_LEN] == '-')
+				dent->d_name[GDP_GOB_PNAME_LEN] = '\0';
 
 			// see if we've already printed this
-			if (ep_hash_insert(seenhash, GDP_GCL_PNAME_LEN, dent->d_name, "")
+			if (ep_hash_insert(seenhash, GDP_GOB_PNAME_LEN, dent->d_name, "")
 					!= NULL)
 				continue;
 

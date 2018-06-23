@@ -39,6 +39,151 @@
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.crypto", "cryptographic operations for GDP");
 
+
+/**********  Support for hash functions  **********/
+
+/*
+**  Allocate/Free/Reset hashes
+**		Resetting leaves the data structure in an empty state.
+*/
+
+gdp_hash_t *
+gdp_hash_new(int alg, void *hashbytes, size_t hashlen)
+{
+	gdp_buf_t *hashbuf = gdp_buf_new();
+	if (hashbytes != NULL)
+		gdp_buf_write(hashbuf, hashbytes, hashlen);
+	return (gdp_hash_t *) hashbuf;
+}
+
+void
+gdp_hash_free(gdp_hash_t *hash)
+{
+	gdp_buf_free((gdp_buf_t *) hash);
+}
+
+void
+gdp_hash_reset(gdp_hash_t *hash)
+{
+	gdp_buf_reset((gdp_buf_t *) hash);
+}
+
+size_t
+gdp_hash_getlength(gdp_hash_t *hash)
+{
+	return gdp_buf_getlength((gdp_buf_t *) hash);
+}
+
+void
+gdp_hash_set(gdp_hash_t *hash, void *hashbytes, size_t hashlen)
+{
+	gdp_buf_t *hashbuf = (gdp_buf_t *) hash;
+	gdp_buf_reset(hashbuf);
+	gdp_buf_write(hashbuf, hashbytes, hashlen);
+}
+
+void *
+gdp_hash_getptr(gdp_hash_t *hash, size_t *hashlen_ptr)
+{
+	gdp_buf_t *hashbuf = (gdp_buf_t *) hash;
+	size_t l = gdp_buf_getlength(hashbuf);
+	if (hashlen_ptr != NULL)
+		*hashlen_ptr = l;
+	return gdp_buf_getptr(hashbuf, l);
+}
+
+gdp_buf_t *
+_gdp_hash_getbuf(gdp_hash_t *hash)
+{
+	return (gdp_buf_t *) hash;
+}
+
+
+bool
+gdp_hash_equal(const gdp_hash_t *a1, const gdp_hash_t *b1)
+{
+	gdp_buf_t *a = (gdp_buf_t *) a1;
+	gdp_buf_t *b = (gdp_buf_t *) b1;
+	size_t l = gdp_buf_getlength(a);
+
+	return (l == gdp_buf_getlength(b)) &&
+		(memcmp(gdp_buf_getptr(a, l), gdp_buf_getptr(b, l), l) == 0);
+}
+
+
+/**********  Support for signatures  **********/
+
+/*
+**  Allocate/Free/Reset signatures
+*/
+
+gdp_sig_t *
+gdp_sig_new(int al, void *sigbytes, size_t siglen)
+{
+	gdp_buf_t *sigbuf = gdp_buf_new();
+	if (sigbytes != NULL)
+		gdp_buf_write(sigbuf, sigbytes, siglen);
+	return (gdp_sig_t *) sigbuf;
+}
+
+void
+gdp_sig_free(gdp_sig_t *sig)
+{
+	gdp_buf_free((gdp_buf_t *) sig);
+}
+
+void
+gdp_sig_reset(gdp_sig_t *sig)
+{
+	gdp_buf_reset((gdp_buf_t *) sig);
+}
+
+size_t
+gdp_sig_getlength(gdp_sig_t *sig)
+{
+	return gdp_buf_getlength((gdp_buf_t *) sig);
+}
+
+void *
+gdp_sig_getptr(gdp_sig_t *sig, size_t *siglen)
+{
+	gdp_buf_t *sigbuf = (gdp_buf_t *) sig;
+	size_t l = gdp_buf_getlength(sigbuf);
+	if (siglen != NULL)
+		*siglen = l;
+	return gdp_buf_getptr(sigbuf, l);
+}
+
+gdp_buf_t *
+_gdp_sig_getbuf(gdp_sig_t *sig)
+{
+	return (gdp_buf_t *) sig;
+}
+
+gdp_sig_t *
+gdp_sig_dup(gdp_sig_t *sig)
+{
+	return (gdp_sig_t *) gdp_buf_dup((gdp_buf_t *) sig);
+}
+
+void
+gdp_sig_copy(gdp_sig_t *from, gdp_sig_t *to)
+{
+	gdp_buf_reset((gdp_buf_t *) to);
+	gdp_buf_copy((gdp_buf_t *) from, (gdp_buf_t *) to);
+}
+
+void
+gdp_sig_set(gdp_sig_t *sig, void *sigbytes, size_t siglen)
+{
+	gdp_buf_reset((gdp_buf_t *) sig);
+	gdp_buf_write((gdp_buf_t *) sig, sigbytes, siglen);
+}
+
+
+
+/**********  Miscellaneous support  **********/
+
 /*
 **  Read a secret key
 **

@@ -26,25 +26,25 @@
 #  ----- END LICENSE BLOCK -----
 #
 
+#ALL=	gdp-create gdp-writer gdp-reader gdp-rest rw-bench log-view
 BINALL_ZC=	gdp-zcbrowse
-#ALL=	gcl-create gdp-writer gdp-reader gdp-rest rw-bench log-view
-BINALL=		gcl-create \
+BINALL=		\
 		log-exists \
 		log-mirror \
+		gdp-create \
 		gdp-reader \
 		gdp-writer \
 		$(BINALL_ZC) \
 
 SBINALL_ZC= 	gdp-zcpublish
 SBINALL=	\
-		log-view \
 		gdp-find-xname \
-		gdp-log-check \
 		gdp-name-xlate \
-		gdp-newsegment \
 		gdp-delete \
 		$(SBINALL_ZC) \
+#		gdp-log-check \
 #		gdp-rest \
+#		log-view \
 
 MAN1ALL=	gdp-reader.1 \
 		gdp-writer.1 \
@@ -57,10 +57,12 @@ MAN5ALL=
 
 MAN7ALL=
 
-MAN8ALL=	gcl-clone.8 \
-		gcl-create.8 \
+MAN8ALL=	\
+		gdp-create.8 \
+		gdp-delete.8 \
 		gdp-log-check.8 \
-		log-view.8 \
+#		gcl-clone.8 \
+#		log-view.8 \
 
 MANALL=		${MAN1ALL} ${MAN3ALL} ${MAN5ALL} ${MAN7ALL} ${MAN8ALL}
 
@@ -109,7 +111,6 @@ LIBJANSSON=	-ljansson
 LIBEVENT2=	-levent -levent_pthreads -pthread
 LIBCRYPTO=	-lcrypto
 LIBPROTO_C=	-lprotobuf-c
-LIBAVAHI=	-lavahi-client -lavahi-common
 LIBADD=		`sh ../adm/add-libs.sh`
 INCS=		${INCSEARCH} ${INCGDP} ${INCEP}
 LDFLAGS+=	${LIBSEARCH}
@@ -118,7 +119,6 @@ LDLIBS=		${LIBGDP} \
 		${LIBEVENT2} \
 		${LIBCRYPTO} \
 		${LIBPROTO_C} \
-		${LIBAVAHI} \
 		${LIBJANSSON} \
 		${LIBADD}
 PG=

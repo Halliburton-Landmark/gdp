@@ -154,14 +154,14 @@ logd_advertise_all(gdp_chan_t *chan, int cmd, void *adata_unused)
 									challenge_cb, &advert);
 
 		// ... and all of my logs
-		EP_STAT tstat = GdpDiskImpl.foreach(advertise_one, &advert);
+		EP_STAT tstat = GdpSqliteImpl.foreach(advertise_one, &advert);
 		if (EP_STAT_SEVERITY(tstat) > EP_STAT_SEVERITY(estat))
 			estat = tstat;
 	}
 	else
 	{
 		// withdraw log advertisements ...
-		estat = GdpDiskImpl.foreach(withdraw_one, &advert);
+		estat = GdpSqliteImpl.foreach(withdraw_one, &advert);
 
 		// ... and finally myself
 		EP_STAT tstat = _gdp_chan_withdraw(chan, _GdpMyRoutingName, &advert);

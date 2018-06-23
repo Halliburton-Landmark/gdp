@@ -1,17 +1,21 @@
 #!/bin/sh
-{ test -r /usr/local/etc/gdp.conf.sh && . /usr/local/etc/gdp.conf.sh; } ||
-	{ test -r /etc/gdp.conf.sh && . /etc/gdp.conf.sh; }
-
 #
 #  Wrapper for starting up gdplogd
 #
+
+# allow environment to give us a different configuration; local overrides
+: ${GDP_VER=}
+{ test -r /etc/gdp.conf.sh && . /etc/gdp.conf.sh; }
+{ test -r /usr/local/etc/gdp.conf.sh && . /usr/local/etc/gdp.conf.sh; }
+{ test -r /etc/gdp${GDP_VER}.conf.sh && . /etc/gdp${GDP_VER}.conf.sh; }
+{ test -r /usr/local/etc/gdp${GDP_VER}.conf.sh && . /usr/local/etc/gdp${GDP_VER}.conf.sh; }
 
 # configure defaults
 : ${GDP_ROOT:=/usr}
 : ${GDP_LOG_DIR:=/var/log/gdp}
 : ${GDP_USER:=gdp}
 : ${GDPLOGD_ARGS:="-D*=10"}
-: ${GDPLOGD_BIN:=$GDP_ROOT/sbin/gdplogd}
+: ${GDPLOGD_BIN:=$GDP_ROOT/sbin/gdplogd$GDP_VER}
 : ${GDPLOGD_LOG:=$GDP_LOG_DIR/gdplogd.log}
 : ${LLOGGER:="llogger -s3"}
 

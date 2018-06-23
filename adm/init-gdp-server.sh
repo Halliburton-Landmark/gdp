@@ -9,9 +9,6 @@
 #	it is not dependent on a particular version of Linux (or
 #	for that matter, Linux at all).
 #
-#	It does **not** install system binaries.  Compiling and
-#	installing should be done using "make install".
-#
 #	XXX  This assumes the Berkeley-based routers.  If you have
 #	XXX  your own router you'll need to modify $EP_PARAMS/gdp
 #	XXX  after this completes.
@@ -28,15 +25,21 @@
 # we assume this is in the adm directory
 cd `dirname $0`/..
 GDP_SRC_ROOT=`pwd`
+TMP=/tmp
 . adm/common-support.sh
 
-## compile utilities, possibly not as root
+## compile code and utilities, possibly not as root
+make
 (cd util && make)
 
+. adm/gdp-version.sh
+: ${GDP_VER=$GDP_VERSION_MAJOR}
 : ${GDPLOGD_LOG:=$GDP_LOG_DIR/gdplogd.log}
+: ${GDPLOGD_BIN:=$GDP_ROOT/sbin/gdplogd$GDP_VER}
 : ${GDP_REST_INSTALL:=false}
+export GDP_VER
 
-if [ ! -x $GDP_ROOT/sbin/gdplogd ]
+if [ -z "$GDP_VER" -a ! -x $GDPLOGD_BIN ]
 then
 	warn "It appears the GDP log server (gdplogd) is not yet"
 	warn "installed in $GDP_ROOT/sbin.  It should be installed by"
@@ -49,6 +52,11 @@ fi
 test `whoami` = "root" || exec sudo GDP_REST_INSTALL=$GDP_REST_INSTALL $0 "$@"
 
 info "GDP_ROOT=$GDP_ROOT"
+if [ ! -z "$GDP_VER" ]
+then
+	warn "Installing $GDPLOGD_BIN but not associated documentation."
+	cp gdplogd/gdplogd $GDPLOGD_BIN
+fi
 
 ## create "gdp" user
 if ! grep -q "^${GDP_USER}:" /etc/passwd
@@ -93,46 +101,54 @@ mkfile_gdp $GDP_REST_LOG
 ## set up default runtime administrative parameters
 hostname=`hostname`
 
-if [ ! -f $EP_PARAMS/gdp ]
+# determine default router set --- customized for Berkeley servers!!!
+routers=`echo gdp-01 gdp-02 gdp-03 gdp-04 |
+		tr ' ' '\n' |
+		grep -v $hostname |
+		shuf |
+		tr '\n' ';' |
+		sed -e 's/;/.eecs.berkeley.edu; /g' -e 's/; $//' `
+if echo $hostname | grep -q '^gdp-0'
 then
-	# determine default router set
-	routers=`echo gdp-01 gdp-02 gdp-03 gdp-04 |
-			tr ' ' '\n' |
-			grep -v $hostname |
-			shuf |
-			tr '\n' ';' |
-			sed -e 's/;/.eecs.berkeley.edu; /g' -e 's/; $//' `
-	if echo $hostname | grep -q '^gdp-0'
-	then
-		routers="127.0.0.1; $routers"
-	fi
-
-	# create the parameters file
-	info "Creating $EP_PARAMS/gdp"
-	{
-		echo "swarm.gdp.routers=$routers"
-		echo "#libep.time.accuracy=0.5"
-		echo "#libep.thr.mutex.type=errorcheck"
-		echo "libep.dbg.file=stdout"
-	} > $EP_PARAMS/gdp
-	chown ${GDP_USER}:${GDP_GROUP} $EP_PARAMS/gdp
-	cat $EP_PARAMS/gdp
-else
-	warn "$EP_PARAMS/gdp already exists; check consistency" 1>&2
+	routers="127.0.0.1; $routers"
 fi
 
+info "Creating $EP_PARAMS/gdp"
+{
+	echo "swarm.gdp.routers=$routers"
+	echo "#libep.time.accuracy=0.5"
+	echo "#libep.thr.mutex.type=errorcheck"
+	echo "libep.dbg.file=stdout"
+} > $TMP/gdp.params
+if [ ! -f $EP_PARAMS/gdp ]
+then
+	cp $TMP/gdp.params $EP_PARAMS/gdp
+	chown ${GDP_USER}:${GDP_GROUP} $EP_PARAMS/gdp
+	cat $EP_PARAMS/gdp
+elif cmp $TMP/gdp.params $EP_PARAMS/gdp
+then
+	rm $TMP/gdp.params
+else
+	warn "$EP_PARAMS/gdp already exists; check consistency" 1>&2
+	diff -u $TMP/gdp.params $EP_PARAMS/gdp
+fi
+
+info "Creating $EP_PARAMS/gdplogd"
+{
+	echo "swarm.gdplogd.gdpname=edu.berkeley.eecs.$hostname.gdplogd"
+	echo "swarm.gdplogd.runasuser=gdp"
+} > $TMP/gdplogd.params
 if [ ! -f $EP_PARAMS/gdplogd ]
 then
-	info "Creating $EP_PARAMS/gdplogd"
-	{
-		echo "swarm.gdplogd.gdpname=edu.berkeley.eecs.$hostname.gdplogd"
-		echo "swarm.gdplogd.gcl.dir=$GDPLOGD_DATADIR"
-		echo "swarm.gdplogd.runasuser=gdp"
-	} > $EP_PARAMS/gdplogd
+	cp $TMP/gdplogd.params $EP_PARAMS/gdplogd
 	chown ${GDP_USER}:${GDP_GROUP} $EP_PARAMS/gdplogd
 	cat $EP_PARAMS/gdplogd
+elif cmp $TMP/gdplogd.params $EP_PARAMS/gdplogd
+then
+	rm $TMP/gdplogd.params
 else
 	warn "$EP_PARAMS/gdplogd already exists; check consistency" 1>&2
+	diff -u $TMP/gdplogd.params $EP_PARAMS/gdplogd
 fi
 
 info "Installing utility programs"
@@ -165,14 +181,16 @@ if [ "$INITSYS" = "systemd" ]
 then
 	info "Installing and enabling systemd service files"
 	info "gdplogd.service ..."
-	adm/customize.sh adm/gdplogd.service.template /etc/systemd/system
+	adm/customize.sh adm/gdplogd.service.template $TMP
+	cp $TMP/gdplogd.service /etc/systemd/system/gdplogd$GDP_VER.service
+	rm $TMP/gdplogd.service
 	if $GDP_REST_INSTALL
 	then
 		info "gdp-rest.service ..."
 		adm/customize.sh adm/gdp-rest.service.template /etc/systemd/system
 	fi
 	systemctl daemon-reload
-	systemctl enable gdplogd
+	systemctl enable gdplogd$GDP_VER
 	if $GDP_REST_INSTALL
 	then
 		systemctl enable gdp-rest

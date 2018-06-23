@@ -59,10 +59,10 @@ main(int argc, char **argv)
 	int opt;
 	bool show_usage = false;
 	EP_STAT estat;
-	gdp_gcl_t *gcl;
+	gdp_gin_t *gin;
 	char *gdpd_addr = NULL;
 	char buf[200];
-	gdp_name_t gcliname;
+	gdp_name_t gdpiname;
 
 	while ((opt = getopt(argc, argv, "D:G:")) > 0)
 	{
@@ -98,25 +98,25 @@ main(int argc, char **argv)
 	// allow thread to settle to avoid interspersed debug output
 	ep_time_nanosleep(INT64_C(100000000));
 
-	estat = gdp_parse_name(argv[0], gcliname);
+	estat = gdp_parse_name(argv[0], gdpiname);
 	if (!EP_STAT_ISOK(estat))
 		ep_app_fatal("Cannot parse log name %s", argv[0]);
-	estat = gdp_gcl_open(gcliname, GDP_MODE_RO, NULL, &gcl);
+	estat = gdp_gin_open(gdpiname, GDP_MODE_RO, NULL, &gin);
 	EP_STAT_CHECK(estat, goto fail1);
 
-	gdp_gclmd_t *md;
-	estat = gdp_gcl_getmetadata(gcl, &md);
+	gdp_md_t *md;
+	estat = gdp_gin_getmetadata(gin, &md);
 	EP_STAT_CHECK(estat, goto fail2);
 
 	int indx;
 	for (indx = 0; EP_STAT_ISOK(estat); indx++)
 	{
-		gdp_gclmd_id_t id;
+		gdp_md_id_t id;
 		size_t len;
 		const void *data;
 
-		estat = gdp_gclmd_get(md, indx, &id, &len, &data);
-		if (EP_STAT_ISOK(estat) && id == GDP_GCLMD_XID)
+		estat = gdp_md_get(md, indx, &id, &len, &data);
+		if (EP_STAT_ISOK(estat) && id == GDP_MD_XID)
 		{
 			// found the name
 			printf("%.*s\n", (int) len, (const char *) data);
@@ -128,7 +128,7 @@ main(int argc, char **argv)
 		printf("No name found\n");
 
 fail2:
-	// close GCLs / release resources
+	// close logs / release resources
 	//XXX someday
 
 	if (false)

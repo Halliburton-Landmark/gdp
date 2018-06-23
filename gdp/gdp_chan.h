@@ -96,6 +96,7 @@ typedef struct gdp_adcert		gdp_adcert_t;		// advertising cert
 **		4	4	sequence number, "more fragments" bit, frag offset [5]
 **		8	2	fragment length (= F) [6]
 **		10	2	payload (SDU) length (= P) [6]
+**				--- following depend on address format in octet 2 ---
 **		12	4	flow id (optional) [7]
 **		12	32	destination address (optional) [7]
 **		44	32	source address (optional) [7]
@@ -309,96 +310,5 @@ void			_gdp_chan_unlock(			// unlock the channel
 
 void			_gdp_chan_drain_input(		// drain all input from channel
 						gdp_chan_t *chan);
-
-
-/*
-**  Low level bit twiddling support for cracking protocol
-*/
-
-#define PUT8(v) \
-		{ \
-			*pbp++ = ((v) & 0xff); \
-		}
-#define PUT16(v) \
-		{ \
-			*pbp++ = ((v) >> 8) & 0xff; \
-			*pbp++ = ((v) & 0xff); \
-		}
-#define PUT24(v) \
-		{ \
-			*pbp++ = ((v) >> 16) & 0xff; \
-			*pbp++ = ((v) >> 8) & 0xff; \
-			*pbp++ = ((v) & 0xff); \
-		}
-#define PUT32(v) \
-		{ \
-			*pbp++ = ((v) >> 24) & 0xff; \
-			*pbp++ = ((v) >> 16) & 0xff; \
-			*pbp++ = ((v) >> 8) & 0xff; \
-			*pbp++ = ((v) & 0xff); \
-		}
-#define PUT48(v) \
-		{ \
-			*pbp++ = ((v) >> 40) & 0xff; \
-			*pbp++ = ((v) >> 32) & 0xff; \
-			*pbp++ = ((v) >> 24) & 0xff; \
-			*pbp++ = ((v) >> 16) & 0xff; \
-			*pbp++ = ((v) >> 8) & 0xff; \
-			*pbp++ = ((v) & 0xff); \
-		}
-#define PUT64(v) \
-		{ \
-			*pbp++ = ((v) >> 56) & 0xff; \
-			*pbp++ = ((v) >> 48) & 0xff; \
-			*pbp++ = ((v) >> 40) & 0xff; \
-			*pbp++ = ((v) >> 32) & 0xff; \
-			*pbp++ = ((v) >> 24) & 0xff; \
-			*pbp++ = ((v) >> 16) & 0xff; \
-			*pbp++ = ((v) >> 8) & 0xff; \
-			*pbp++ = ((v) & 0xff); \
-		}
-
-#define GET8(v) \
-		{ \
-				v  = *pbp++; \
-		}
-#define GET16(v) \
-		{ \
-				v  = *pbp++ << 8; \
-				v |= *pbp++; \
-		}
-#define GET24(v) \
-		{ \
-				v  = *pbp++ << 16; \
-				v |= *pbp++ << 8; \
-				v |= *pbp++; \
-		}
-#define GET32(v) \
-		{ \
-				v  = *pbp++ << 24; \
-				v |= *pbp++ << 16; \
-				v |= *pbp++ << 8; \
-				v |= *pbp++; \
-		}
-#define GET48(v) \
-		{ \
-				v  = ((uint64_t) *pbp++) << 40; \
-				v |= ((uint64_t) *pbp++) << 32; \
-				v |= ((uint64_t) *pbp++) << 24; \
-				v |= ((uint64_t) *pbp++) << 16; \
-				v |= ((uint64_t) *pbp++) << 8; \
-				v |= ((uint64_t) *pbp++); \
-		}
-#define GET64(v) \
-		{ \
-				v  = ((uint64_t) *pbp++) << 56; \
-				v |= ((uint64_t) *pbp++) << 48; \
-				v |= ((uint64_t) *pbp++) << 40; \
-				v |= ((uint64_t) *pbp++) << 32; \
-				v |= ((uint64_t) *pbp++) << 24; \
-				v |= ((uint64_t) *pbp++) << 16; \
-				v |= ((uint64_t) *pbp++) << 8; \
-				v |= ((uint64_t) *pbp++); \
-		}
 
 #endif // _GDP_CHAN_H_

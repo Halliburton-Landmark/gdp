@@ -1,7 +1,7 @@
 /* vim: set ai sw=4 sts=4 ts=4 : */
 
 /*
-**  GDP-WRITER --- writes records to a GCL
+**  GDP-WRITER --- writes records to a log
 **
 **		This reads the records one line at a time from standard input
 **		and assumes they are text, but there is no text requirement
@@ -116,7 +116,7 @@ showstat(gdp_event_t *gev)
 
 
 EP_STAT
-write_record(gdp_datum_t *datum, gdp_gcl_t *gcl)
+write_record(gdp_datum_t *datum, gdp_gin_t *gin)
 {
 	EP_STAT estat;
 
@@ -141,20 +141,20 @@ write_record(gdp_datum_t *datum, gdp_gcl_t *gcl)
 	LOG("W");
 	if (AsyncIo)
 	{
-		estat = gdp_gcl_append_async(gcl, datum, showstat, NULL);
+		estat = gdp_gin_append_async(gin, 1, &datum, NULL, showstat, NULL);
 		EP_STAT_CHECK(estat, return estat);
 
 		// return value will be printed asynchronously
 	}
 	else
 	{
-		estat = gdp_gcl_append(gcl, datum);
+		estat = gdp_gin_append(gin, datum, NULL);
 
 		if (EP_STAT_ISOK(estat))
 		{
 			// print the return value (shows the record number assigned)
 			if (!Quiet)
-				gdp_datum_print(datum, stdout, 0);
+				gdp_datum_print(datum, stdout, GDP_DATUM_PRMETAONLY);
 		}
 		else if (!Quiet)
 		{
@@ -221,8 +221,8 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	gdp_gcl_t *gcl;
-	gdp_name_t gcliname;
+	gdp_gin_t *gin;
+	gdp_name_t gdpiname;
 	int opt;
 	EP_STAT estat;
 	char *gdpd_addr = NULL;
@@ -230,7 +230,7 @@ main(int argc, char **argv)
 	bool one_record = false;
 	char *log_file_name = NULL;
 	char *signing_key_file = NULL;
-	gdp_gcl_open_info_t *info;
+	gdp_open_info_t *info;
 
 	// collect command-line arguments
 	while ((opt = getopt(argc, argv, "1aD:G:iK:L:q")) > 0)
@@ -304,13 +304,13 @@ main(int argc, char **argv)
 	ep_time_nanosleep(INT64_C(100000000));
 
 	// set up any open information
-	info = gdp_gcl_open_info_new();
+	info = gdp_open_info_new();
 
 	if (signing_key_file != NULL)
 	{
-		gdp_gcl_open_info_set_signkey_cb(info, signkey_cb, signing_key_file);
+		gdp_open_info_set_signkey_cb(info, signkey_cb, signing_key_file);
 
-#if 0	// old code: keep as an example of gdp_gcl_open_info_set_signing_key
+#if 0	// old code: keep as an example of gdp_open_info_set_signing_key
 		FILE *fp;
 		EP_CRYPTO_KEY *skey;
 
@@ -329,24 +329,24 @@ main(int argc, char **argv)
 			goto fail1;
 		}
 
-		estat = gdp_gcl_open_info_set_signing_key(info, skey);
+		estat = gdp_open_info_set_signing_key(info, skey);
 		EP_STAT_CHECK(estat, goto fail1);
 #endif
 	}
 
-	// open a GCL with the provided name
-	gdp_parse_name(argv[0], gcliname);
-	estat = gdp_gcl_open(gcliname, GDP_MODE_AO, info, &gcl);
+	// open a GDP object with the provided name
+	gdp_parse_name(argv[0], gdpiname);
+	estat = gdp_gin_open(gdpiname, GDP_MODE_AO, info, &gin);
 	EP_STAT_CHECK(estat, goto fail1);
 
 	if (!Quiet)
 	{
 		gdp_pname_t pname;
 
-		// dump the internal version of the GCL to facilitate testing
+		// dump the internal version of the GDP object to facilitate testing
 		printf("GDPname: %s (%" PRIu64 " recs)\n",
-				gdp_printable_name(*gdp_gcl_getname(gcl), pname),
-				gdp_gcl_getnrecs(gcl));
+				gdp_printable_name(*gdp_gin_getname(gin), pname),
+				gdp_gin_getnrecs(gin));
 
 		// OK, ready to go!
 		fprintf(stdout, "\nStarting to read input\n");
@@ -365,7 +365,7 @@ main(int argc, char **argv)
 			while ((l = fread(buf, 1, sizeof buf, stdin)) > 0)
 				gdp_buf_write(gdp_datum_getbuf(datum), buf, l);
 
-			estat = write_record(datum, gcl);
+			estat = write_record(datum, gin);
 		}
 		else
 		{
@@ -380,10 +380,11 @@ main(int argc, char **argv)
 					*p++ = '\0';
 
 				// first copy the text buffer into the datum buffer
+				gdp_datum_reset(datum);
 				gdp_buf_write(gdp_datum_getbuf(datum), buf, strlen(buf));
 
 				// write the record to the log
-				estat = write_record(datum, gcl);
+				estat = write_record(datum, gin);
 				if (!EP_STAT_ISOK(estat) && !KeepGoing)
 					break;
 			}
@@ -398,11 +399,11 @@ main(int argc, char **argv)
 		sleep(1);
 
 	// tell the GDP that we are done
-	gdp_gcl_close(gcl);
+	gdp_gin_close(gin);
 
 fail1:
 	if (info != NULL)
-		gdp_gcl_open_info_free(info);
+		gdp_open_info_free(info);
 
 fail0:
 	;			// avoid compiler error

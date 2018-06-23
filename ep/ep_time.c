@@ -185,7 +185,18 @@ ep_time_before(EP_TIME_SPEC *a, EP_TIME_SPEC *b)
 
 
 /*
-**  EP_TIME_FROM_NANOSEC --- convert nanoseconds to a EP_TIME_SPEC
+**  EP_TIME_TO_NSEC --- convert EP_TIME_SPEC to integer nanoseconds
+*/
+
+int64_t
+ep_time_to_nsec(EP_TIME_SPEC *tv)
+{
+	return (tv->tv_sec * ONESECOND) + tv->tv_nsec;
+}
+
+
+/*
+**  EP_TIME_FROM_NSEC --- convert nanoseconds to a EP_TIME_SPEC
 */
 
 void
@@ -193,6 +204,7 @@ ep_time_from_nsec(int64_t nsec, EP_TIME_SPEC *tv)
 {
 	tv->tv_sec = nsec / ONESECOND;
 	tv->tv_nsec = nsec % ONESECOND;
+	//tv->tv_accuracy = 0;		TODO: is this right?
 }
 
 

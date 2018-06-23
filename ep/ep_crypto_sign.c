@@ -37,10 +37,10 @@
 */
 
 #include <ep/ep.h>
-#include <ep_crypto.h>
-#include <ep_dbg.h>
+#include <ep/ep_crypto.h>
+#include <ep/ep_dbg.h>
 
-//static EP_DBG	Dbg = EP_DBG_INIT("libep.crypto.sign", "cryptographic signatures");
+static EP_DBG	Dbg = EP_DBG_INIT("libep.crypto.sign", "cryptographic signature generation");
 
 
 /*
@@ -81,6 +81,8 @@ ep_crypto_sign_new(EP_CRYPTO_KEY *skey, int md_alg_id)
 				"cannot initialize digest for signing");
 		return NULL;
 	}
+	ep_dbg_cprintf(Dbg, 64, "ep_crypto_sign_new(%d) => %p\n",	//DEBUG
+			md_alg_id, md);					//DEBUG
 	return md;
 }
 
@@ -94,6 +96,8 @@ ep_crypto_sign_update(EP_CRYPTO_MD *md, void *dbuf, size_t dbufsize)
 {
 	int istat;
 
+	ep_dbg_cprintf(Dbg, 64, "ep_crypto_sign_update(%p, %zd)\n",	//DEBUG
+			md, dbufsize);					//DEBUG
 	istat = EVP_DigestSignUpdate(md, dbuf, dbufsize);
 	if (istat != 1)
 	{
@@ -121,6 +125,8 @@ ep_crypto_sign_final(EP_CRYPTO_MD *md, void *_sbuf, size_t *sbufsize)
 	int istat;
 	uint8_t *sbuf = (uint8_t *) _sbuf;
 
+	ep_dbg_cprintf(Dbg, 64, "ep_crypto_sign_final(%p, %zd)\n",	//DEBUG
+			md, *sbufsize);					//DEBUG
 	istat = EVP_DigestSignFinal(md, sbuf, sbufsize);
 	if (istat != 1)
 	{

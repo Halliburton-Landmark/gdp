@@ -89,11 +89,11 @@ _gdp_invoke(gdp_req_t *req)
 		if (ep_dbg_test(Dbg, 11))
 		{
 			ep_dbg_printf("%s", _gdp_pr_indent(1));
-			_gdp_pdu_dump(req->cpdu, ep_dbg_getfile(), 2);
+			_gdp_pdu_dump(req->cpdu, ep_dbg_getfile(), 1);
 		}
 	}
 	EP_ASSERT_ELSE(req->state == GDP_REQ_ACTIVE, return EP_STAT_ASSERT_ABORT);
-	//EP_ASSERT(ep_thr_mutex_islocked(&req->mutex));
+	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex);
 
 	// scale timeout to milliseconds
 	delta_to = ep_adm_getlongparam("swarm.gdp.invoke.timeout", 10000L);
@@ -122,7 +122,6 @@ _gdp_invoke(gdp_req_t *req)
 		*/
 
 		// wait until we receive a result
-		ep_dbg_cprintf(Dbg, 37, "_gdp_invoke: waiting on %p\n", req);
 		ep_time_deltanow(&delta_ts, &abs_to);
 		estat = EP_STAT_OK;
 		req->state = GDP_REQ_WAITING;
@@ -134,7 +133,9 @@ _gdp_invoke(gdp_req_t *req)
 				_gdp_gob_unlock(req->gob);
 
 			// cond_wait will unlock the mutex
+			ep_dbg_cprintf(Dbg, 37, "_gdp_invoke: waiting on %p\n", req);
 			int e = ep_thr_cond_wait(&req->cond, &req->mutex, &abs_to);
+			ep_dbg_cprintf(Dbg, 37, "_gdp_invoke: continuing %p\n", req);
 
 			// re-acquire GOB lock
 			if (req->gob != NULL)
@@ -348,7 +349,7 @@ ack_success(gdp_req_t *req)
 
 	// if this is an open response, the GOB is now fully open
 	if (gob != NULL)
-		gob->flags &= ~GCLF_PENDING;
+		gob->flags &= ~GOBF_PENDING;
 
 fail0:
 	return estat;
@@ -389,16 +390,33 @@ ack_data_content(gdp_req_t *req)
 	EP_ASSERT_ELSE(req->rpdu->msg->body_case ==
 						GDP_MESSAGE__BODY_ACK_CONTENT,
 				return EP_STAT_ASSERT_ABORT);
+	GdpMessage__AckContent *payload = req->rpdu->msg->ack_content;
+
+	// if we returned zero content, handle specially
+	//TODO: should put all datums into event queue here rather than
+	//TODO: up the call stack.
+	if (payload->dl->n_d != 1)
+	{
+		if (ep_dbg_test(Dbg, 1))
+		{
+			ep_dbg_printf("ack_data_content: %zd datums in ",
+					payload->dl->n_d);
+			_gdp_req_dump(req, NULL, GDP_PR_BASIC, 0);
+		}
+		if (payload->dl->n_d < 1)
+			return GDP_STAT_RECORD_MISSING;		//XXX better choice?
+		//XXX should we return an error here?
+	}
+	GdpDatum *datum = payload->dl->d[payload->dl->n_d - 1];
 
 	// hack to try to "self heal" in case we get out of sync
-	GdpMessage__AckContent *payload = req->rpdu->msg->ack_content;
-	if (payload->datum->recno > 0 &&
-			((gdp_recno_t) req->gob->nrecs) < payload->datum->recno)
-		req->gob->nrecs = payload->datum->recno;
+	if (datum->recno > 0 &&
+			((gdp_recno_t) req->gob->nrecs) < datum->recno)
+		req->gob->nrecs = datum->recno;
 
 	// keep track of how many more records we expect
 	if (req->numrecs > 0)
-		req->numrecs--;
+		req->numrecs--;			//XXX payload->dl->n_d?
 
 #if 0 //TODO: IMPLEMENT ME
 	// do read filtering if requested
@@ -665,7 +683,7 @@ static dispatch_ent_t	DispatchTable[256] =
 	NOENT,				// 188
 	NOENT,				// 189
 	NOENT,				// 190
-	NOENT,				// 191
+	{ ack_success,		"ACK_END_OF_RESULTS",	GDP_STAT_ACK_END_OF_RESULTS	},	// 191
 
 	{ nak_client,		"NAK_C_BADREQ",			GDP_STAT_NAK_BADREQ			},	// 192
 	{ nak_client,		"NAK_C_UNAUTH",			GDP_STAT_NAK_UNAUTH			},	// 193
@@ -827,8 +845,8 @@ _gdp_req_dispatch(gdp_req_t *req, int cmd)
 	if (ep_dbg_test(Dbg, 28) || ep_dbg_test(DbgCmdTrace, 28))
 	{
 		flockfile(ep_dbg_getfile());
-		ep_dbg_printf("_gdp_req_dispatch >>> %s",
-				_gdp_proto_cmd_name(cmd));
+		ep_dbg_printf("_gdp_req_dispatch(%p -> %p) >>> %s",
+				req, req->gob, _gdp_proto_cmd_name(cmd));
 		if (pname[0] != '\0')
 			ep_dbg_printf("(%s)", req->gob->pname);
 		if (req->gob != NULL && ep_dbg_test(Dbg, 70))

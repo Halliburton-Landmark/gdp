@@ -101,16 +101,16 @@ _gdp_acknak_from_estat(EP_STAT estat, gdp_cmd_t def)
 	{
 		int d = EP_STAT_DETAIL(estat);
 
-		if (EP_STAT_ISOK(estat))
+		if (!EP_STAT_ISFAIL(estat))
 		{
-			if (d >= 200 && d < (200 + GDP_ACK_MAX - GDP_ACK_MIN))
+			if (d >= 200 && d <= (200 + GDP_ACK_MAX - GDP_ACK_MIN))
 				resp = (gdp_cmd_t) (d - 200 + GDP_ACK_MIN);
 		}
-		else if (d >= 400 && d < (400 + GDP_NAK_C_MAX - GDP_NAK_C_MIN))
+		else if (d >= 400 && d <= (400 + GDP_NAK_C_MAX - GDP_NAK_C_MIN))
 			resp = (gdp_cmd_t) (d - 400 + GDP_NAK_C_MIN);
-		else if (d >= 500 && d < (500 + GDP_NAK_S_MAX - GDP_NAK_S_MIN))
+		else if (d >= 500 && d <= (500 + GDP_NAK_S_MAX - GDP_NAK_S_MIN))
 				resp = (gdp_cmd_t) (d - 500 + GDP_NAK_S_MIN);
-		else if (d >= 600 && d < (600 + GDP_NAK_R_MAX - GDP_NAK_R_MIN))
+		else if (d >= 600 && d <= (600 + GDP_NAK_R_MAX - GDP_NAK_R_MIN))
 			resp = (gdp_cmd_t) (d - 600 + GDP_NAK_R_MIN);
 	}
 
@@ -133,7 +133,7 @@ _gdp_acknak_from_estat(EP_STAT estat, gdp_cmd_t def)
 **		This usually only applies to gdplogd.
 */
 
-static EP_THR_MUTEX		GclCreateMutex			EP_THR_MUTEX_INITIALIZER;
+static EP_THR_MUTEX		GdpCreateMutex			EP_THR_MUTEX_INITIALIZER;
 
 static void
 process_cmd(void *cpdu_)
@@ -143,7 +143,6 @@ process_cmd(void *cpdu_)
 	EP_STAT estat;
 	gdp_gob_t *gob = NULL;
 	gdp_req_t *req = NULL;
-	int resp;
 
 	GDP_MSG_CHECK(cpdu, return);
 	cmd = cpdu->msg->cmd;
@@ -154,7 +153,7 @@ process_cmd(void *cpdu_)
 
 	// create has too many special cases, so we single thread it
 	if (cmd == GDP_CMD_CREATE)
-		ep_thr_mutex_lock(&GclCreateMutex);
+		ep_thr_mutex_lock(&GdpCreateMutex);
 
 	estat = _gdp_gob_cache_get(cpdu->dst, GGCF_NOCREATE, &gob);
 	if (gob != NULL)
@@ -176,9 +175,12 @@ process_cmd(void *cpdu_)
 	estat = _gdp_req_dispatch(req, cmd);
 	if (ep_dbg_test(Dbg, 59))
 	{
-		ep_dbg_printf("process_cmd: after dispatch, ");
-		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+		char ebuf[100];
+		ep_dbg_printf("process_cmd: dispatch => %s\n    ",
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 1);
 	}
+	bool response_already_sent = EP_STAT_IS_SAME(estat, GDP_STAT_RESPONSE_SENT);
 
 	// make sure request or GOB haven't gotten fubared
 	EP_THR_MUTEX_ASSERT_ISLOCKED(&req->mutex);
@@ -206,25 +208,26 @@ process_cmd(void *cpdu_)
 
 	// cmd_open and cmd_create can return a new GOB in the req
 	if (gob == NULL && req->gob != NULL)
+		gob = _gdp_gob_incref(req->gob);
+
+	if (!response_already_sent)
 	{
-		gob = req->gob;
-		_gdp_gob_incref(gob);
+		// figure out potential response code
+		// we compute even if unused so we can log server errors
+		int resp;
+		resp = _gdp_acknak_from_estat(estat, req->rpdu->msg->cmd);
+
+		if (resp >= GDP_NAK_S_MIN && resp <= GDP_NAK_S_MAX)
+		{
+			ep_log(estat, "process_cmd(%s): server error",
+					_gdp_proto_cmd_name(cmd));
+		}
+
+		// send response PDU if appropriate
+		req->rpdu->msg->cmd = (GdpMsgCode) resp;
+		req->stat = _gdp_pdu_out(req->rpdu, req->chan, NULL);
+		//XXX anything to do with estat here?
 	}
-
-	// figure out potential response code
-	// we compute even if unused so we can log server errors
-	resp = _gdp_acknak_from_estat(estat, req->rpdu->msg->cmd);
-
-	if (resp >= GDP_NAK_S_MIN && resp <= GDP_NAK_S_MAX)
-	{
-		ep_log(estat, "process_cmd(%s): server error",
-				_gdp_proto_cmd_name(cmd));
-	}
-
-	// send response PDU if appropriate
-	req->rpdu->msg->cmd = (GdpMsgCode) resp;
-	req->stat = _gdp_pdu_out(req->rpdu, req->chan, NULL);
-	//XXX anything to do with estat here?
 
 	EP_ASSERT(gob == req->gob);
 	if (gob != NULL)
@@ -266,7 +269,7 @@ fail0:
 	}
 
 	if (cmd == GDP_CMD_CREATE)
-		ep_thr_mutex_unlock(&GclCreateMutex);
+		ep_thr_mutex_unlock(&GdpCreateMutex);
 
 	ep_dbg_cprintf(Dbg, 40, "process_cmd <<< done\n");
 }
@@ -399,9 +402,11 @@ process_resp(void *rpdu_)
 			rpdu, gdp_printable_name(rpdu->src, rpdu_pname), gob,
 			ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
-	// check estat here?
+
+	// check estat here, or is just checking gob enough?
 	if (gob == NULL)
 	{
+		// gob was not in cache
 		char ebuf[200];
 
 		estat = find_req_in_channel_list(rpdu, chan, &req);
@@ -452,12 +457,15 @@ process_resp(void *rpdu_)
 	}
 	else
 	{
+		// gob was found in cache
 		GDP_GOB_ASSERT_ISLOCKED(gob);
 
 		// find the corresponding request
 		ep_dbg_cprintf(DbgProcResp, 23,
 				"process_resp: searching gob %p for rid %" PRIgdp_rid "\n",
 				gob, rpdu->msg->rid);
+
+		// find request to which this PDU applies
 		req = _gdp_req_find(gob, rpdu->msg->rid);
 		if (ep_dbg_test(DbgProcResp, 51))
 		{
@@ -614,21 +622,16 @@ process_resp(void *rpdu_)
 
 	// free up resources
 	gob = req->gob;
-	if (gob != NULL)
-	{
-		// use a shadow variable so req does not lose gob
-		GDP_GOB_ASSERT_ISLOCKED(gob);
-		_gdp_gob_decref(&gob, true);
-		gob = req->gob;
-	}
-
 	if (EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
 		_gdp_req_unlock(req);
 	else
-		_gdp_req_free(&req);
-
+		_gdp_req_free(&req);		// also decref's req->gob (leaves locked)
 	if (gob != NULL)
-		_gdp_gob_unlock(gob);
+	{
+		if (!GDP_GOB_ASSERT_ISLOCKED(gob) || !EP_ASSERT(gob->refcnt > 0))
+			_gdp_gob_dump(gob, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+		_gdp_gob_decref(&gob, false);	// ref from _gdp_gob_cache_get
+	}
 
 	ep_dbg_cprintf(DbgProcResp, 40, "process_resp <<< done\n");
 }

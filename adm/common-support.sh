@@ -144,7 +144,7 @@ configure_defaults() {
     : ${GDP_LOG_DIR:=/var/log/gdp}
     : ${GDP_VAR:=/var/swarm/gdp}
     : ${GDP_KEYS_DIR:=$GDP_ETC/keys}
-    : ${GDPLOGD_DATADIR:=$GDP_VAR/gcls}
+    : ${GDPLOGD_DATADIR:=$GDP_VAR/glogs}
 }
 
 

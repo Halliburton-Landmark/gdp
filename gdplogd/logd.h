@@ -167,16 +167,38 @@ struct gob_phys_stats
 	int64_t			size;			// size in bytes
 };
 
+typedef struct gdp_result_ctx	gdp_result_ctx_t;
+
+// callback for dispatching results of reads
+typedef EP_STAT		gdp_result_cb_t(
+							EP_STAT estat,
+							gdp_datum_t *datum,
+							gdp_result_ctx_t *cb_ctx);
+
 // the service switch entry
 struct gob_phys_impl
 {
 	EP_STAT		(*init)(void);
+	EP_STAT		(*read_by_hash)(
+						gdp_gob_t *gob,
+						gdp_hash_t *hash,
+						gdp_result_cb_t *cb,
+						void *cb_ctx);
 	EP_STAT		(*read_by_recno)(
 						gdp_gob_t *gob,
-						gdp_datum_t *datum);
+						gdp_recno_t startrec,
+						uint32_t maxrecs,
+						gdp_result_cb_t *cb,
+						void *cb_ctx);
+	EP_STAT		(*read_by_timestamp)(
+						gdp_gob_t *gob,
+						EP_TIME_SPEC *start_time,
+						uint32_t maxrecs,
+						gdp_result_cb_t *cb,
+						void *cb_ctx);
 	EP_STAT		(*create)(
 						gdp_gob_t *pgob,
-						gdp_gclmd_t *gmd);
+						gdp_md_t *gmd);
 	EP_STAT		(*open)(
 						gdp_gob_t *gob);
 	EP_STAT		(*close)(
@@ -186,9 +208,7 @@ struct gob_phys_impl
 						gdp_datum_t *datum);
 	EP_STAT		(*getmetadata)(
 						gdp_gob_t *gob,
-						gdp_gclmd_t **gmdp);
-	EP_STAT		(*newsegment)(
-						gdp_gob_t *gob);
+						gdp_md_t **gmdp);
 	EP_STAT		(*remove)(
 						gdp_gob_t *gob);
 	EP_STAT		(*foreach)(
@@ -199,16 +219,13 @@ struct gob_phys_impl
 	void		(*getstats)(
 						gdp_gob_t *gob,
 						struct gob_phys_stats *stats);
-	EP_STAT		(*ts_to_recno)(
-						gdp_gob_t *gob,
-						gdp_datum_t *datum);
 	bool		(*recno_exists)(
 						gdp_gob_t *gob,
 						gdp_recno_t recno);
 };
 
 // known implementations
-extern struct gob_phys_impl		GdpDiskImpl;
+extern struct gob_phys_impl		GdpSqliteImpl;
 
 
 __END_DECLS

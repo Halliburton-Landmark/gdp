@@ -27,9 +27,9 @@
 #
 
 # Version number of library.  All others are derived from here.
-GDP_VERSION_MAJOR=	0
-GDP_VERSION_MINOR=	9
-GDP_VERSION_PATCH=	2
+GDP_VERSION_MAJOR=	2
+GDP_VERSION_MINOR=	0
+GDP_VERSION_PATCH=	0
 
 # These are generally changed on make command line
 DESTDIR=
@@ -82,11 +82,11 @@ OBJS_MOST=	\
 	gdp_crypto.o \
 	gdp_datum.o \
 	gdp_event.o \
-	gdp_gclmd.o \
 	gdp_gob_cache.o \
 	gdp_gob_mgmt.o \
 	gdp_gob_ops.o \
 	gdp_main.o \
+	gdp_md.o \
 	gdp_msg.o \
 	gdp_name.o \
 	gdp_pdu.o \
@@ -113,7 +113,7 @@ PUBHFILES=	\
 PRIVHFILES=	\
 	gdp_chan.h \
 	gdp_event.h \
-	gdp_gclmd.h \
+	gdp_md.h \
 	gdp_pdu.h \
 	gdp_priv.h \
 	gdp.pb-c.h \

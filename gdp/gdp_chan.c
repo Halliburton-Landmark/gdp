@@ -156,6 +156,26 @@ _gdp_chan_unlock(gdp_chan_t *chan)
 **			path to the destination.
 */
 
+static EP_PRFLAGS_DESC	L4Flags[] =
+{
+	// address type portion
+	{ GDP_PKT_ADDR_TYPE_2FULL,	GDP_PKT_ADDR_TYPE_MASK,	"2FULL"			},
+
+	// packet type portion
+	{ GDP_PKT_TYPE_REGULAR,		GDP_PKT_TYPE_MASK,		"REGULAR"		},
+	{ GDP_PKT_TYPE_FORWARD,		GDP_PKT_TYPE_MASK,		"FORWARD"		},
+	{ GDP_PKT_TYPE_ADVERTISE,	GDP_PKT_TYPE_MASK,		"ADVERTISE"		},
+	{ GDP_PKT_TYPE_WITHDRAW,	GDP_PKT_TYPE_MASK,		"WITHDRAW"		},
+	{ GDP_PKT_TYPE_NAK_NOROUTE,	GDP_PKT_TYPE_MASK,		"NAK_NOROUTE"	},
+	{ GDP_PKT_TYPE_NAK_PACKET,	GDP_PKT_TYPE_MASK,		"NAK_PACKET"	},
+	{ GDP_PKT_TYPE_ACK_PACKET,	GDP_PKT_TYPE_MASK,		"ACK_PACKET"	},
+
+	// flags portion
+	{ GDP_PKT_TYPE_RELIABLE,	GDP_PKT_TYPE_RELIABLE,	"RELIABLE"		},
+	{ GDP_PKT_TYPE_SSEQ,		GDP_PKT_TYPE_SSEQ,		"SSEQ"			},
+	{ 0,						0,						NULL			}
+};
+
 static EP_STAT
 read_header(gdp_chan_t *chan,
 		gdp_buf_t *ibuf,
@@ -237,8 +257,8 @@ read_header(gdp_chan_t *chan,
 	ttl &= 0x3f;
 	uint32_t seq_mf_foff;
 	GET32(seq_mf_foff);		// seqno, more frags bit, and frag offset
-	uint16_t seqno = (seq_mf_foff >> GDP_PKT_SEQNO_SHIFT) & GDP_PKT_SEQNO_MASK;
-	uint16_t frag_off = seq_mf_foff & GDP_PKT_SEQNO_FOFF_MASK;
+//	uint16_t seqno = (seq_mf_foff >> GDP_PKT_SEQNO_SHIFT) & GDP_PKT_SEQNO_MASK;
+//	uint16_t frag_off = seq_mf_foff & GDP_PKT_SEQNO_FOFF_MASK;
 	uint16_t frag_len;
 	GET16(frag_len);		// fragment length
 	GET16(payload_len);		// length of opaque payload (reassembled)
@@ -261,12 +281,15 @@ read_header(gdp_chan_t *chan,
 	if (ep_dbg_test(Dbg, 55))
 	{
 		gdp_pname_t src_p, dst_p;
-		ep_dbg_printf("read_header(%zd): flags 0x%02x, paylen %zd\n"
+		ep_dbg_printf("read_header(%zd): paylen %zd\n"
 					"    src %s\n"
-					"    dst %s\n",
-				hdr_len, flags, payload_len,
+					"    dst %s\n"
+					"    flags ",
+				hdr_len, payload_len,
 				gdp_printable_name(*src, src_p),
 				gdp_printable_name(*dst, dst_p));
+			ep_prflags(flags, L4Flags, NULL);
+			ep_dbg_printf("\n");
 	}
 
 	// check for router meta-commands (type)
@@ -277,8 +300,12 @@ read_header(gdp_chan_t *chan,
 	}
 	else if ((flags & GDP_PKT_TYPE_MASK) != GDP_PKT_TYPE_REGULAR)
 	{
-		ep_dbg_cprintf(Dbg, 1, "read_header: PDU router type = %02x\n",
-					flags & GDP_PKT_TYPE_MASK);
+		if (ep_dbg_test(Dbg, 1))
+		{
+			ep_dbg_printf("read_header: PDU router type = ");
+			ep_prflags(flags & GDP_PKT_TYPE_MASK, L4Flags, NULL);
+			ep_dbg_printf("\n");
+		}
 		estat = GDP_STAT_PDU_CORRUPT;
 		goto done;
 	}
@@ -854,7 +881,7 @@ send_helper(gdp_chan_t *chan,
 	EP_STAT estat = EP_STAT_OK;
 	int i;
 	size_t payload_len = 0;
-	uint16_t seqno = 0;			//FIXME
+	uint16_t seqno = 0;			//FIXME: should be useful
 
 	if (payload != NULL)
 		payload_len = gdp_buf_getlength(payload);
@@ -863,10 +890,11 @@ send_helper(gdp_chan_t *chan,
 	{
 		gdp_pname_t src_printable;
 		gdp_pname_t dst_printable;
-		ep_dbg_printf("send_helper:\n\tsrc %s\n\tdst %s\n\tpayload %p ",
+		ep_dbg_printf("send_helper:\n\tsrc %s\n\tdst %s\n\tflags ",
 				gdp_printable_name(src, src_printable),
-				gdp_printable_name(dst, dst_printable),
-				payload);
+				gdp_printable_name(dst, dst_printable));
+		ep_prflags(tos, L4Flags, NULL);
+		ep_dbg_printf("\n\tpayload %p ", payload);
 		if (payload == NULL)
 			ep_dbg_printf("(no payload)\n");
 		else
@@ -951,6 +979,12 @@ send_helper(gdp_chan_t *chan,
 	}
 
 fail0:
+	if (!EP_STAT_ISOK(estat) && ep_dbg_test(Dbg, 4))
+	{
+		char ebuf[100];
+		ep_dbg_printf("send_helper failure: %s\n",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
 	bufferevent_unlock(chan->bev);
 	return estat;
 }

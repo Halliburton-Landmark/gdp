@@ -65,7 +65,7 @@ ep_stat_from_errno(int uerrno)
 {
 	if (uerrno == 0)
 		return EP_STAT_OK;
-	return EP_STAT_NEW(ERROR, EP_REGISTRY_EPLIB,
+	return EP_STAT_NEW(EP_STAT_SEV_ERROR, EP_REGISTRY_EPLIB,
 			EP_STAT_MOD_ERRNO, (uint32_t) uerrno);
 }
 
@@ -205,7 +205,7 @@ ep_stat_tostr(EP_STAT stat,
 	{
 		EP_STAT xstat;
 
-		xstat = EP_STAT_NEW(OK,
+		xstat = EP_STAT_NEW(EP_STAT_SEV_OK,
 				EP_STAT_REGISTRY(stat),
 				EP_STAT_MODULE(stat),
 				0);

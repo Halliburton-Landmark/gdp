@@ -61,7 +61,7 @@
 # define GDP_MIN_KEY_LEN		1024
 #endif // GDP_MIN_KEY_LEN
 
-static EP_DBG	Dbg = EP_DBG_INIT("gdp.gcl-create", "Create new log app");
+static EP_DBG	Dbg = EP_DBG_INIT("gdp-create", "Create new log");
 
 
 const char *
@@ -69,7 +69,7 @@ select_logd_name(void)
 {
 	const char *p;
 
-	p = ep_adm_getstrparam("swarm.gdp.gcl-create.server", NULL);
+	p = ep_adm_getstrparam("swarm.gdp.gdp-create.server", NULL);
 	if (p == NULL)
 	{
 		// seed the random number generator
@@ -101,7 +101,7 @@ usage(void)
 	fprintf(stderr, "Usage: %s [-C creator] [-D dbgspec] [-e key_enc_alg]\n"
 			"\t[-G gdpd_addr] [-q] [-s logd_name] [-S]\n"
 			"\t[-h] [-k keytype] [-K keyfile] [-b keybits] [-c curve]\n"
-			"\t[<mdid>=<metadata>...] [gcl_name]\n"
+			"\t[<mdid>=<metadata>...] [log_name]\n"
 			"    -C  set name of log creator (owner; for metadata)\n"
 			"    -D  set debugging flags\n"
 			"    -e  set secret key encryption algorithm\n"
@@ -120,7 +120,7 @@ usage(void)
 			"    creator is the id of the creator, formatted as an email address\n"
 			"    logd_name is the name of the log server to host this log\n"
 			"    metadata ids are (by convention) four letters or digits\n"
-			"    gcl_name is the name of the log to create\n",
+			"    log_name is the name of the log to create\n",
 			ep_app_getprogname());
 	exit(EX_USAGE);
 }
@@ -129,13 +129,13 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	gdp_name_t gcliname;			// internal name of GCL
-	const char *gclxname = NULL;	// external name of GCL
+	gdp_name_t gobiname;			// internal name of GCL
+	const char *gobxname = NULL;	// external name of GCL
 	gdp_name_t logdiname;			// internal name of log daemon
 	const char *logdxname = NULL;	// external name of log daemon
 	const char *cname = NULL;		// creator/owner name (for metadata)
-	gdp_gcl_t *gcl = NULL;
-	gdp_gclmd_t *gmd = NULL;
+	gdp_gin_t *gin = NULL;
+	gdp_md_t *gmd = NULL;
 	int opt;
 	EP_STAT estat;
 	char *gdpd_addr = NULL;
@@ -256,10 +256,10 @@ main(int argc, char **argv)
 		usage();
 
 	// collect any metadata
-	gmd = gdp_gclmd_new(0);
+	gmd = gdp_md_new(0);
 	while (argc > 0 && (p = strchr(argv[0], '=')) != NULL)
 	{
-		gdp_gclmd_id_t mdid = 0;
+		gdp_md_id_t mdid = 0;
 		int i;
 
 		p++;
@@ -270,7 +270,7 @@ main(int argc, char **argv)
 			mdid = (mdid << 8) | (unsigned) argv[0][i];
 		}
 
-		gdp_gclmd_add(gmd, mdid, strlen(p), p);
+		gdp_md_add(gmd, mdid, strlen(p), p);
 
 		argc--;
 		argv++;
@@ -285,7 +285,7 @@ main(int argc, char **argv)
 
 	// name is optional ; if omitted one will be created
 	if (argc-- > 0)
-		gclxname = *argv++;
+		gobxname = *argv++;
 
 	if (show_usage || argc > 0)
 		usage();
@@ -306,19 +306,19 @@ main(int argc, char **argv)
 		logdxname = select_logd_name();
 	gdp_parse_name(logdxname, logdiname);
 
-	if (gclxname != NULL)
+	if (gobxname != NULL)
 	{
-		gdp_parse_name(gclxname, gcliname);
+		gdp_parse_name(gobxname, gobiname);
 		if (!skip_existence_test)
 		{
 			// make sure it doesn't already exist
-			estat = gdp_gcl_open(gcliname, GDP_MODE_RO, NULL, &gcl);
+			estat = gdp_gin_open(gobiname, GDP_MODE_RO, NULL, &gin);
 			if (EP_STAT_ISOK(estat))
 			{
 				// oops, we shouldn't be able to open it
-				(void) gdp_gcl_close(gcl);
+				(void) gdp_gin_close(gin);
 				if (!quiet)
-					ep_app_error("Cannot create %s: already exists", gclxname);
+					ep_app_error("Cannot create %s: already exists", gobxname);
 				exit(EX_CANTCREAT);
 			}
 		}
@@ -335,7 +335,7 @@ main(int argc, char **argv)
 
 		ep_time_now(&tv);
 		ep_time_format(&tv, timestring, sizeof timestring, EP_TIME_FMT_DEFAULT);
-		gdp_gclmd_add(gmd, GDP_GCLMD_CTIME, strlen(timestring), timestring);
+		gdp_md_add(gmd, GDP_MD_CTIME, strlen(timestring), timestring);
 	}
 
 	// creator id
@@ -402,7 +402,7 @@ main(int argc, char **argv)
 			cname = cnamebuf;
 		}
 		ep_dbg_cprintf(Dbg, 1, "Creating log as %s\n", cname);
-		gdp_gclmd_add(gmd, GDP_GCLMD_CID, strlen(cname), cname);
+		gdp_md_add(gmd, GDP_MD_CID, strlen(cname), cname);
 	}
 
 	/**************************************************************
@@ -605,7 +605,7 @@ main(int argc, char **argv)
 			exit(EX_SOFTWARE);
 		}
 
-		gdp_gclmd_add(gmd, GDP_GCLMD_PUBKEY,
+		gdp_md_add(gmd, GDP_MD_PUBKEY,
 				EP_STAT_TO_INT(estat) + 4, der_buf);
 	}
 
@@ -614,20 +614,20 @@ main(int argc, char **argv)
 	*/
 
 	gdp_parse_name(logdxname, logdiname);
-	if (gclxname == NULL)
+	if (gobxname == NULL)
 	{
 		// create a new GCL handle with a new name based on metadata
-		estat = gdp_gcl_create(NULL, logdiname, gmd, &gcl);
+		estat = gdp_gin_create(NULL, logdiname, gmd, &gin);
 	}
 	else
 	{
 		// save the external name as metadata
 		if (gmd == NULL)
-			gmd = gdp_gclmd_new(0);
-		gdp_gclmd_add(gmd, GDP_GCLMD_XID, strlen(gclxname), gclxname);
+			gmd = gdp_md_new(0);
+		gdp_md_add(gmd, GDP_MD_XID, strlen(gobxname), gobxname);
 
 		// create a GCL with the provided name
-		estat = gdp_gcl_create(gcliname, logdiname, gmd, &gcl);
+		estat = gdp_gin_create(gobiname, logdiname, gmd, &gin);
 	}
 	EP_STAT_CHECK(estat, goto fail1);
 
@@ -641,7 +641,7 @@ main(int argc, char **argv)
 		size_t len;
 		gdp_pname_t pbuf;
 
-		gdp_printable_name(*gdp_gcl_getname(gcl), pbuf);
+		gdp_printable_name(*gdp_gin_getname(gin), pbuf);
 		len = strlen(keyfile) + sizeof pbuf + 6;
 		finalkeyfile = (char *) ep_mem_malloc(len);
 		snprintf(finalkeyfile, len, "%s/%s.pem", keyfile, pbuf);
@@ -668,15 +668,15 @@ main(int argc, char **argv)
 
 		// this output gets parsed by gdp-rest --- don't change it!
 		printf("Created new GCL %s\n\ton log server %s\n",
-				gdp_printable_name(*gdp_gcl_getname(gcl), pname), logdxname);
+				gdp_printable_name(*gdp_gin_getname(gin), pname), logdxname);
 	}
 
-	gdp_gcl_close(gcl);
+	gdp_gin_close(gin);
 
 fail1:
 	// free metadata, if set
 	if (gmd != NULL)
-		gdp_gclmd_free(gmd);
+		gdp_md_free(gmd);
 	// if tempkeyfile did not get consumed (renamed), remove it
 	if (tempkeyfile != NULL)
 	{

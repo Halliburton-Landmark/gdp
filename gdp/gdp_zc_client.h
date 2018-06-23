@@ -28,6 +28,15 @@
 **  ----- END LICENSE BLOCK -----
 */
 
+#ifndef EP_OSCF_USE_ZEROCONF
+# ifdef __has_include
+#  if __has_include("avahi-common/simple-watch.h")
+#   define EP_OSCF_USE_ZEROCONF		1	// include Avahi headers
+#  else
+#   define EP_OSCF_USE_ZEROCONF		0	// no Avahi headers
+#  endif
+# endif
+#endif
 #ifndef GDP_OSCF_USE_ZEROCONF
 # define GDP_OSCF_USE_ZEROCONF		1	// default to zeroconf on
 #endif

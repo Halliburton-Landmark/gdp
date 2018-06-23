@@ -86,9 +86,9 @@ associated man pages for details.
 The gdp-writer program reads records from the standard input
 and writes to the target log.  It is invoked as:
 
-	gdp-writer gcl-name
+	gdp-writer log-name
 
-The _gcl-name_ is the name of the GCL to be appended to.  Lines are
+The _log-name_ is the name of the GCL to be appended to.  Lines are
 read from the input and written to the log, where each input
 line creates one log record.  See the gdp-writer(1) man page
 for more details.
@@ -96,7 +96,7 @@ for more details.
 The gdp-reader program reads records from the log and writes
 them to the standard output.  It is invoked as:
 
-	gdp-reader [-f firstrec] [-n nrecs] [-s] [-t] [-v] gcl-name
+	gdp-reader [-f firstrec] [-n nrecs] [-s] [-t] [-v] log-name
 
 The `-f` and `-n` flags specify the first record number (starting
 from 1) and the maximum number of records to read.  By default
@@ -132,9 +132,10 @@ GDP is installed in the standard system directories) and
 when linking.
 
 There is also a binding for Python in `lang/python` which is well
-tested, a binding for Java in `lang/java` which is lightly tested,
-and a binding for JavaScript in `lang/js` which is incomplete.
-Documentation for the Python bindings is in `lang/python/README`.
+tested.  Documentation is in `lang/python/README`.  There are also
+binding for Java in `lang/java` and JavaScript in `lang/js`, both
+of which have not been maintained and probably do not work at the
+present time.
 
 Implementation Status
 ---------------------
@@ -142,17 +143,19 @@ Implementation Status
 There are many functions that are not yet working.  This list
 focuses primarily on items that will require incompatible changes,
 at least internally (that is, recompilation may be necessary).
-Some changes will probably require API modifications (i.e, you'll
-have to change your code).
+We hope we have the API in a reasonably good state, but we are
+not ready to guarantee that there will be no more flag days.
 
 This list is probably incomplete.
 
-* The security model is minimal at this time, consisting only of
-signatures on every append request.  This is too slow for a large
-system.  An updated mechanism will probably use hash chains.
+* The security model is incomplete.  The extensions for hash
+chains have been started but are incomplete.  Signatures should
+still work, but signatures on every append request is too slow for
+a large system.
 
 * Similarly, acknowledgements (server to client) should be signed
-(or otherwise validated).
+(or otherwise validated).  The wire protocol has been updated to
+accommodate this, but it isn't implemented.
 
 * Log names, which should ultimately be the hash of the log
 metadata, are essentially random.  This means that at some point
@@ -161,34 +164,37 @@ will change).  This will require a log name directory service
 (to allow human-friendly names), which in turn probably requires
 the Control Plane interface.
 
-* Log Replication has not been integrated.
+* Log Replication has not been integrated.  This is needed for
+better durability.
 
 * Log Migration does not exist.
 
 * Log Expiration is not implemented.  This means that all data in
 all logs last forever.
 
-* The current PDU (Protocol Data Unit) format has too much overhead
-for typical use.  To fix this, the protocol used between clients and
-servers to the routers will change, probably requiring recompilation
-at a minimum, and likely a flag day.
+* The current PDU (Protocol Data Unit) format has been radically
+updated to allow future flexibility, but new features (such as
+header compression) still don't exist.  It all works with the
+updated router infrastructure which should be faster than the old
+version, but there is still a lot to do.
 
-* The routing background (in a different repository) is known to
-have significant scaling limitations.
-
-* The router-to-router protocol (in a different repository) is
-inadequate for a variety of reasons.  Changing this will require
-a "flag day" when all routers must be upgraded simultaneously.
+* The maximum size of a PDU has been reduced in the hopes that
+it would improve performance.  This means that individual writes
+to the GDP can no longer be particularly large (e.g., entire
+videos).  Changing this back to allow large writes would entail
+another flag day.  Also, at the moment the failures if you write
+an overly-large record are obscure at best.
 
 * There is no Control Plane interface.  This means that functions
 that should be automated (e.g., log placement, directory service)
 must be done manually.  This may change how end users and
-applications interact with the system.
+applications interact with the system.  The log creation service
+exists, but is a complete hack and needs to be cleaned up.
 
-* The on-disk representation needs to be updated to reduce the
-overhead, include information needed for the new security model,
-log replication, log expiration, and possibly others.  This means
-that old logs will not be readable after the change.
+* The on-disk representation has been updated to allow for richer
+semantics, but performance and reliability testing remain to be
+done.  It isn't clear that the new format is more compact than
+the old format, but it does more.
 
 **YOU HAVE BEEN WARNED!!!**
 

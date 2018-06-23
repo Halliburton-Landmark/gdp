@@ -43,26 +43,30 @@ def main(name_str, keyfile):
                                 flags=gdp.EP_CRYPTO_F_SECRET)
 
     # Create a GDP_NAME object from a python string provided as argument
-    gcl_name = gdp.GDP_NAME(name_str)
+    _name = gdp.GDP_NAME(name_str)
 
     # There's a GCL with the given name, so let's open it
-    gcl_handle = gdp.GDP_GCL(gcl_name, gdp.GDP_MODE_AO,
+    gin_handle = gdp.GDP_GIN(_name, gdp.GDP_MODE_AO,
                                 open_info={'skey':skey})
 
+    datum = gdp.GDP_DATUM()
     while True:
-
         line = sys.stdin.readline().strip()  # read from stdin
-        # Create a minimalist datum dictionary
-        datum = {"data": line}
-        gcl_handle.append(datum)           # Write this datum to the GCL
+        datum["buf"].reset()
+        datum["buf"].write(line)
+        gin_handle.append(datum)           # Write this datum to the GCL
 
 
 if __name__ == "__main__":
 
-    if len(sys.argv) < 3:
-        print "Usage: %s <gcl_name> <signing-key-file>" % sys.argv[0]
+    if len(sys.argv) < 2:
+        print "Usage: %s <_name> [<signing-key-file>]" % sys.argv[0]
         sys.exit(1)
 
-    # Change this to point to a gdp_router
+    name = sys.argv[1]
+    keyfile = None
+    if len(sys.argv)>2:
+        keyfile = sys.argv[2]
+
     gdp.gdp_init()
-    main(sys.argv[1], sys.argv[2])
+    main(name, keyfile)

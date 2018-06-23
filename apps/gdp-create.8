@@ -1,11 +1,11 @@
 .Dd August 2, 2015
-.Dt GCL-CREATE 8
+.Dt GDP-CREATE 8
 .Os Swarm-GDP
 .Sh NAME
-.Nm gcl-create
+.Nm gdp-create
 .Nd create new GDP log
 .Sh SYNOPSIS
-.Nm gcl-create
+.Nm gdp-create
 .Op Fl C Ar creator-name
 .Op Fl D Ar debug-spec
 .Op Fl e Ar key-crypto
@@ -21,7 +21,7 @@
 .Op Ar mdid = Ar metadata
 .Op Ar external-name
 .Sh DESCRIPTION
-.Nm gcl-create
+.Nm gdp-create
 creates a new GDP log on a given log server.
 In its default mode it also creates a public/secret keypair
 associated with this log, with the public key stored in the log metadata.
@@ -35,7 +35,7 @@ The metadata name is stored as a 32-bit number and is generally represented
 by four characters.
 .Pp
 In addition to user metadata,
-.Nm gcl-create
+.Nm gdp-create
 adds metadata for the log creation time,
 the public half of the signing key in DER format,
 and the human-readable name.
@@ -147,7 +147,7 @@ is a way to ensure that a log exists without give an error if it already exists.
 The name of the log daemon on which to create the physical instantiation
 of the log.
 If not specified, the value of the
-.Va swarm.gdp.gcl-create.server
+.Va swarm.gdp.gdp-create.server
 administrative will be used.
 If that is not set,
 it will default to one of the servers at Berkeley.
@@ -235,7 +235,7 @@ Defaults to
 .Li ec .
 Overridden by
 .Fl k .
-.It swarm.gdp.gcl-create.server
+.It swarm.gdp.gdp-create.server
 The default server on which to create logs.
 Overridden by
 .Fl s .
@@ -248,8 +248,8 @@ Overridden by
 .Sh EXAMPLES
 .Bl -bullet
 .It
-To create a GCL on a default server:
-.Dl gcl-create edu.berkeley.cs.eric.log00
+To create a GDP log on a default server:
+.Dl gdp-create edu.berkeley.cs.eric.log00
 The secret key will be written into a a file named
 .Pa KEYS/<something>.pem ,
 where
@@ -258,9 +258,9 @@ is the base-64-encoded internal name of the log, e.g.,
 .Li 1KZy5jy1QpghTe8QBmDQGqdz3a_9tVP3qp6uxlOeJdk.pem .
 The password for encrypting this key will be read from the standard input.
 .It
-To create a GCL on log server named edu.berkeley.eecs.gdp-01 using defaults:
+To create a GDP log on log server named edu.berkeley.eecs.gdp-01 using defaults:
 .Dl logd=edu.berkeley.eecs.gdp-01.gdplogd
-.Dl gcl-create -s $logd edu.berkeley.cs.eric.log01
+.Dl gdp-create -s $logd edu.berkeley.cs.eric.log01
 .It
 To create a log named
 .Li $newlog
@@ -269,15 +269,15 @@ on the server named
 encrypted with a 1024-bit RSA key,
 leaving the unencrypted key in a file named
 .Pa mykey.pem :
-.Dl gcl-create -k RSA -b 1024 -e none -K mykey.pem $newlog
+.Dl gdp-create -k RSA -b 1024 -e none -K mykey.pem $newlog
 .It
 To create a log with user-specified metadata:
-.Dl gcl-create Qo "MYMD=My special metadata" Qc $newlog
+.Dl gdp-create Qo "MYMD=My special metadata" Qc $newlog
 .It
 To create a log without a human-friendly name using sha-224
 as the hash (message digest) algorithm:
-.Dl gcl-create -h sha224
-.Nm gcl-create
+.Dl gdp-create -h sha224
+.Nm gdp-create
 will print the base-64-encoded name of the new log.
 You should be careful to record that,
 since it is your only way to access the log.

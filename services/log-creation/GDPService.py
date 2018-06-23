@@ -2,20 +2,22 @@
 
 """
 
-A library to perform network related operations (setting up TCP connections,
-parsing incoming PDUs, sending out replies, etc) for a GDP service.
+A library to perform network related operations (setting up TCP
+connections, parsing incoming PDUs, sending out replies, etc) for
+a GDP service.
 
-To use GDPService for your own service, at the very minimum, you need to
-subclass GDPService and override the method 'request_handler'. Then, you need
-to create an instance of this service with the 256-bit GDP address that this
-service should listen on and the address of a GDP router (as a
-"IP-address:port" string).
+To use GDPService for your own service, at the very minimum, you
+need to subclass GDPService and override the method 'request_handler'.
+Then, you need to create an instance of this service with the 256-bit
+GDP address that this service should listen on and the address of
+a GDP router (as a "IP-address:port" string).
 
-Any GDP PDU destined to the GDP address specified for at the instantiation time
-is parsed and passed as a dictionary to the 'request_handler'. This request
-handler should act on the received data and return a python dictionary
-containing field=>value pairs for a PDU to be sent as a reply. GDPService adds
-some defaults (such as source address, destination address, etc) unless these
+Any GDP PDU destined to the GDP address specified for at the
+instantiation time is parsed and passed as a dictionary to the
+'request_handler'. This request handler should act on the received
+data and return a python dictionary containing field=>value pairs
+for a PDU to be sent as a reply. GDPService adds some defaults
+(such as source address, destination address, etc) unless these
 are overridden in the response dictionary.
 
 """
@@ -52,10 +54,10 @@ def pprint(d):
 
 class GDPProtocol(Protocol):
 
-    """ An instance of this class is created for every connection """
-
-    # this is the conventional GDP address of a router
-    GDPROUTER_ADDRESS = (chr(255) + chr(0)) * 16
+    """
+    An instance of this class is created for every connection. But
+    then, we only have one connection to maintain.
+    """
 
     def __init__(self, req_handler, GDPaddrs):
         """ The GDP address for the service end point """
@@ -66,13 +68,27 @@ class GDPProtocol(Protocol):
         self.advertising_call = None
 
 
+    def __make_ad(self, addr):
+        """return a string that corresponds to an advertisement message"""
+        # XXX: what dst address should we be using for advertising?
+        # It appears that the clients send their own address as both
+        # source and destination in the latest version of GDP library
+
+        # see gdp/gdp_chan.h for format details.
+        # These hard-coded values correspond to advertising a single
+        # address to the routing layer [the PDU is 76 octet long].
+        # TODO change the hard-coded values to something more general.
+        ad = ('\x04' + '\x13' + '\x40' + '\x0f' +
+                '\x00'*4 + '\x00'*2 + '\x00'*2 +
+                 addr + addr)
+        return ad
+
+
     def advertise(self):
         # Send the advertisement messages, do network I/O in reactor thread
         logging.info("%r, Advertising %d names", self, len(self.GDPaddrs))
         for addr in self.GDPaddrs:
-            advertisement = ('\x03' + '\x00' * 2 + '\x01' +
-                            self.GDPROUTER_ADDRESS + addr +
-                            '\x00' * 4 + '\x00' * 4 + '\x00'*4 )
+            advertisement = self.__make_ad(addr)
             reactor.callFromThread(self.transport.write, advertisement)
 
 
@@ -122,42 +138,37 @@ class GDPProtocol(Protocol):
                 else:
                     return data[l + n - l1]
 
+            # check the version number
             if (l + 1) > (l1 + l2):
                 break       # can't figure out the version
-
-            # check the version number
             version = __get_byte_num(0)
 
-            if version == '\x02':
+            if version == '\x02' or version == '\x03':
                 logging.warning("Someone is using old version number")
-                logging.info("buflen: %d, datalen: %d, seekptr: %d, "
-                            "version: %d", l1, l2, l, ord(__get_byte_num(0)))
 
-            if version != '\x02' and version != '\x03':   # bogus version number
+            if version != '\x04':
                 self.terminateConnection("bogus version number")
                 logging.info("buflen: %d, datalen: %d, seekptr: %d, "
-                            "version: %d", l1, l2, l, ord(__get_byte_num(0)))
+                        "version: %d", l1, l2, l, ord(__get_byte_num(0)))
                 break
 
-            if (l + 80) > (l1 + l2):
+            # calculate the header length.
+            if (l + 2) > (l1 + l2):
+                break       # can't figure out the header length
+            hdr_len = (ord(__get_byte_num(1)) & 0x3f)*4
+
+            # rest of the header
+            if (l + hdr_len) > (l1 + l2):
                 # incomplete header for the current message
-                # we need at least 80 bytes to figure out the length of
-                #   this PDU
+                # we need at least "hdr_len" bytes for the header of
+                # this PDU. TODO make this compatible with flow-id, etc.
                 break
 
-            # calculate lengths we need to find if we received full PDU
-            sig_len = (ord(__get_byte_num(72)) & 0x0f) * 256 + \
-                            ord(__get_byte_num(73))
-            opt_len = 4 * ord(__get_byte_num(74))
-
-            len_arr = [__get_byte_num(idx) for idx in xrange(76, 80)]
-            data_len = 0
-            for __t in len_arr:
-                data_len = data_len * 256 + ord(__t)
+            ## length of the actual payload after the header
+            data_len = ord(__get_byte_num(10))*256 + ord(__get_byte_num(11))
 
             # pdu_len is the total length of the PDU
-            pdu_len = 80 + opt_len + data_len + sig_len
-
+            pdu_len = hdr_len + data_len
             if (l + pdu_len) > (l1 + l2):
                 break     # incomplete message
 
@@ -181,8 +192,7 @@ class GDPProtocol(Protocol):
 
             # Work on this PDU, all the PDU processing logic goes here;
             # this gets called in a separate worker thread.
-            reactor.callInThread(self.process_PDU,
-                                    message, opt_len, sig_len, data_len)
+            reactor.callInThread(self.process_PDU, message, hdr_len, data_len)
 
             # End of while loop
 
@@ -197,11 +207,11 @@ class GDPProtocol(Protocol):
                     data, l - l1, (l1 + l2) - l)    # just a buffer
             else:       # case 2
                 self.buffer = (buffer(self.buffer, l, l1 - l) +
-                               buffer(data, 0, len(data)))  # Expensive string
+                           buffer(data, 0, len(data)))  # Expensive string
             # if len(self.buffer)>0: assert ord(self.buffer[0])==2
 
 
-    def process_PDU(self, message, opt_len, sig_len, data_len):
+    def process_PDU(self, message, hdr_len, data_len):
         """
         Act on a PDU that is already parsed. All the PDU processing
         logic goes here.
@@ -218,45 +228,38 @@ class GDPProtocol(Protocol):
 
         # create a dictionary
         msg_dict = {}
-        msg_dict['fmt'] = message[0]
-        msg_dict['ttl'] = ord(message[1])
-        msg_dict['res'] = message[2]
-        msg_dict['cmd'] = ord(message[3])
+        msg_dict['ver'] = message[0]
+        msg_dict['hdr_len'] = hdr_len       # byte index 1
 
-        msg_dict['dst'] = message[4:36]
-        msg_dict['src'] = message[36:68]
+        msg_dict['addr_format'] = ord(message[2]) & 0x07
+        msg_dict['flags'] = (ord(message[2]) & 0x18)>>3
+        msg_dict['type'] = (ord(message[2]) & 0xe0)>>5
+        if msg_dict['addr_format'] != 0:
+            logging.warning("addr formats not implemented yet")
+            return
+        if msg_dict['type'] != 0:
+            logging.warning('only regular traffic supported for now')
+            return
 
-        msg_dict['rid'] = struct.unpack("!I", message[68:72])[0]
+        msg_dict['ttl'] = ord(message[3]) & 0x3f
 
-        msg_dict['sigalg'] = ord(message[72])>>4
-        msg_dict['siglen'] = (ord(message[72]) & 0x0f) * 256 + ord(message[73])
-        msg_dict['siginfo'] = message[72:74]
-        assert msg_dict['siglen'] == sig_len
+        for i in xrange(4,10):
+            if message[i] != '\x00':
+                logging.warning("Fragments not implemented yet")
+                return
+        msg_dict['data_len'] = data_len     # byte index 10, 11
 
-        msg_dict['olen'] = 4*ord(message[74])
-        assert msg_dict['olen'] == opt_len
+        msg_dict['dst'] = message[12:12+32]
+        msg_dict['src'] = message[44:44+32]
 
-        msg_dict['flags'] = message[75]
-
-        msg_dict['dlen'] = struct.unpack("!I", message[76:80])[0]
-        assert msg_dict['dlen'] == data_len
-
-        ctr = 80
-        if msg_dict['olen'] != 0:
-            msg_dict['options'] = message[ctr:ctr+msg_dict['olen']]
-        ctr += msg_dict['olen']
-
-        msg_dict['data'] = message[ctr:80+ctr+msg_dict['dlen']]
-        ctr += msg_dict['dlen']
-
-        msg_dict['sig'] = message[ctr:]
+        msg_dict['data'] = message[hdr_len:]
+        assert len(msg_dict['data']) == data_len
 
         # get the response dictionary
-        # msg_dictuest_handler is to be supplied by GDPProtocolFactory, which
-        #   in turn gets it from GDPService
+        # request_handler is to be supplied by GDPProtocolFactory,
+        # which in turn gets it from GDPService
         # XXX: What all information should be made available here?
-        keys = set(msg_dict.keys()) & set(['cmd', 'dst', 'src', 'flags',
-                                                'rid', 'data', 'options'])
+        keys = set(msg_dict.keys()) & set(['dst', 'src', 'data'])
         data = {k: msg_dict[k] for k in keys}
         logging.debug("Incoming:\n%s", pprint(data))
         resp = self.request_handler(data)
@@ -274,56 +277,46 @@ class GDPProtocol(Protocol):
         destination is a 256 bit address. This should *not* be called
         from the reactor thread.
 
-        Qpen question: what all fields should be accepted from the caller?
-        So far: cmd, dst, src, flags, rid, data, options
+        Qpen question: what all fields should be accepted from the
+        caller? So far: dst, src, data.
+        Note that 'data' is a serialized protobuf message.
         """
 
         assert threading.currentThread().getName() != "ReactorThr"
 
         msg = {}
-        msg['fmt'] = '\x03'
-        msg['ttl'] = chr(0)                     # FIXME
-        msg['res'] = '\x00'
-        msg['cmd'] = chr(data['cmd'])           # mandatory
+        msg['ver'] = '\x04'
+        msg['hdr_len'] = '\x13'     # enough to hold two full addrs
+
+        msg['addr_format'] = 0 & 0x07
+        msg['flags'] = 0 & 0x03
+        msg['type'] = 0 & 0x07
+
+        _byte_2 = chr(msg['type']<<5 & msg['flags']<<3 & msg['addr_format'])
+
+        msg['ttl'] = '\x0f'                  # FIXME
+
+        msg['seq_frag'] = '\x00'*6
+
+        msg['data_len'] = struct.pack("!H", len(data.get('data', '')))
 
         # make sure we do have a source and a destination
         assert 'src' in data.keys() + kwargs.keys()
         assert 'dst' in data.keys() + kwargs.keys()
         msg['dst'] = str(data.get('dst', kwargs['dst']))
         msg['src'] = str(data.get('src', kwargs['src']))
-
-        # XXX: The following are from protocol ver 0x02
-        # These are replaced by siginfo
-        # msg['sigalg'] = '\x00'
-        # msg['siglen'] = chr(0)
-        msg['siginfo'] = '\x00\x00'
-
-        assert len(data.get('options', ''))%4 == 0
-        msg['olen'] = chr(len(data.get('options', ''))/4)
-        msg['flags'] = str(data.get('flags', '\x00'))
-
-        msg['rid'] = struct.pack("!I", data.get('rid', 0))
-
-        msg['dlen'] = struct.pack("!I", len(data.get('data', '')))
-
-        msg['options'] = str(data.get('options', ''))
         msg['data'] = str(data.get('data', ''))
-        msg['sig'] = ''
 
         # some assertions (all may not be be necessary)
-        valid_size = {  'fmt': 1, 'ttl': 1, 'res': 1, 'cmd': 1,
-                        'dst': 32, 'src': 32,
-                        'siginfo': 2, 'olen': 1, 'flags': 1,
-                        'rid': 4, 'dlen': 4}
+        valid_size = {  'data_len': 2,
+                        'dst': 32, 'src': 32 }
         for k in valid_size.keys():
             assert len(msg[k]) == valid_size[k]
 
-        message = ( msg['fmt'] + msg['ttl'] + msg['res'] + msg['cmd'] +
+        message = ( msg['ver'] + msg['hdr_len'] + _byte_2 +
+                    msg['ttl'] + msg['seq_frag'] + msg['data_len'] +
                     msg['dst'] + msg['src'] +
-                    msg['rid'] +
-                    msg['siginfo'] + msg['olen'] + msg['flags'] +
-                    msg['dlen'] +
-                    msg['options'] + msg['data'] + msg['sig'] )
+                    msg['data'])
 
         ## the following gets called in the reactor thread
         reactor.callFromThread(self.transport.write, message)
@@ -345,24 +338,26 @@ class GDPProtocolFactory(ReconnectingClientFactory):
     def clientConnectionLost(self, connector, reason):
         logging.error("Conenction lost: %r", reason)
         self.protocol.advertising_call.stop()
-        ReconnectingClientFactory.clientConnectionLost(self, connector, reason)
+        ReconnectingClientFactory.clientConnectionLost(
+                                                self, connector, reason)
 
     def clientConnectionFailed(self, connector, reason):
         logging.error("Connection failed: %r", reason)
-        ReconnectingClientFactory.clientConnectionFailed(self,
-                                                            connector, reason)
+        ReconnectingClientFactory.clientConnectionFailed(
+                                                self, connector, reason)
 
 class GDPService(object):
     """
-    A generic GDP Service. In a perfect world, all GDP services should
-    be subclasses of this class.
+    A generic GDP Service. In a perfect world, all GDP services
+    should be subclasses of this class.
 
-    To implement your own GDP service, override the 'request_handler' method
-    and put your service's request processing logic.
+    To implement your own GDP service, override the
+    'request_handler' method and put your service's request
+    processing logic.
 
-    One can also override 'setup' to do service specific startup functions.
-    These functions are called *before* establishing connection to the
-    GDP router.
+    One can also override 'setup' to do service specific startup
+    functions. These functions are called *before* establishing
+    connection to the GDP router.
     """
 
 
@@ -381,16 +376,19 @@ class GDPService(object):
         self.router_port = int(t[1])
         self.GDPaddrs = GDPaddrs
 
-        ProtocolFactory = GDPProtocolFactory(self.request_handler, GDPaddrs)
+        ProtocolFactory = GDPProtocolFactory(self.request_handler,
+                                                GDPaddrs)
 
         ## Call service specific setup code
         self.setup()
 
-        ## Establish connection to the router (the reactor isn't running
-        ## yet, so this will only get established when 'start()' is called.
+        ## Establish connection to the router (the reactor isn't
+        ## running yet, so this will only get established when
+        ## 'start()' is called.
         logging.debug("Connecting to host:%s, port:%d",
-                            self.router_host, self.router_port)
-        reactor.connectTCP(self.router_host, self.router_port, ProtocolFactory)
+                        self.router_host, self.router_port)
+        reactor.connectTCP(self.router_host,
+                        self.router_port, ProtocolFactory)
 
 
     def setup(self):
@@ -401,11 +399,9 @@ class GDPService(object):
     def request_handler(self,req):
         """
         Receive a request (dictionary), with the following keys:
-            cmd = Command field in GDP PDU
             src = Source GDP address (256 bit)
             dst = Destination GDP address,
-            rid = Request ID
-            data = Actual payload
+            data = actual payload (a protobuf that is yet to be parsed)
         Ideally, a GDP service will override this method
         """
         pass

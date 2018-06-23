@@ -63,11 +63,11 @@ gdp_printable_name(const gdp_name_t internal, gdp_pname_t external)
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		strcpy(external, "(unknown)");
 	}
-	else if (EP_STAT_TO_INT(estat) != GDP_GCL_PNAME_LEN)
+	else if (EP_STAT_TO_INT(estat) != GDP_GOB_PNAME_LEN)
 	{
 		ep_dbg_cprintf(Dbg, 2,
 				"gdp_printable_name: ep_b64_encode length failure (%d != %d)\n",
-				EP_STAT_TO_INT(estat), GDP_GCL_PNAME_LEN);
+				EP_STAT_TO_INT(estat), GDP_GOB_PNAME_LEN);
 	}
 	return external;
 }
@@ -93,7 +93,7 @@ gdp_print_name(const gdp_name_t name, FILE *fp)
 **	GDP_PARSE_NAME --- parse a (possibily human-friendly) GDP object name
 **
 **		An externally printable version of an internal name must be
-**		exactly GDP_GCL_PNAME_LEN (43) characters long and contain only
+**		exactly GDP_GOB_PNAME_LEN (43) characters long and contain only
 **		valid URL-Base64 characters.  These are base64 decoded.
 **		All other names are considered human-friendly and are
 **		sha256-encoded to get the internal name.
@@ -102,7 +102,7 @@ gdp_print_name(const gdp_name_t name, FILE *fp)
 EP_STAT
 gdp_parse_name(const char *ext, gdp_name_t name)
 {
-	if (strlen(ext) != GDP_GCL_PNAME_LEN ||
+	if (strlen(ext) != GDP_GOB_PNAME_LEN ||
 			!EP_STAT_ISOK(gdp_internal_name(ext, name)))
 	{
 		// must be human-oriented name
@@ -145,9 +145,9 @@ gdp_internal_name(const gdp_pname_t external, gdp_name_t internal)
 {
 	EP_STAT estat;
 
-	if (strlen(external) != GDP_GCL_PNAME_LEN)
+	if (strlen(external) != GDP_GOB_PNAME_LEN)
 	{
-		estat = GDP_STAT_GCL_NAME_INVALID;
+		estat = GDP_STAT_GDP_NAME_INVALID;
 	}
 	else
 	{

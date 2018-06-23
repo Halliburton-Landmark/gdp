@@ -118,7 +118,7 @@ typedef struct _ep_stat
 
 // constructors for status code
 #define EP_STAT_NEW(s, r, m, d) \
-			((EP_STAT) { ((((EP_STAT_SEV_ ## s) & ((1U << _EP_STAT_SEVBITS) - 1)) << _EP_STAT_SEVSHIFT) | \
+			((EP_STAT) { ((((s) & ((1U << _EP_STAT_SEVBITS) - 1)) << _EP_STAT_SEVSHIFT) | \
 				      (((r) & ((1U << _EP_STAT_REGBITS) - 1)) << _EP_STAT_REGSHIFT) | \
 				      (((m) & ((1U << _EP_STAT_MODBITS) - 1)) << _EP_STAT_MODSHIFT) | \
 				      (((d) & ((1U << _EP_STAT_DETBITS) - 1)))) } )
@@ -167,7 +167,7 @@ extern EP_STAT	ep_stat_from_errno(int uerrno);
 
 // common status code definitions
 #define _EP_STAT_INTERNAL(sev, mod, code) \
-		EP_STAT_NEW(sev, EP_REGISTRY_EPLIB, mod, code)
+		EP_STAT_NEW(EP_STAT_SEV_ ## sev, EP_REGISTRY_EPLIB, mod, code)
 
 #include <ep/ep_statcodes.h>
 

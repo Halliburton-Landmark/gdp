@@ -1,7 +1,7 @@
 /* vim: set ai sw=4 sts=4 ts=4 :*/
 
 /*
-**  GDP_GCLMD.H --- headers for GCL metadata
+**  GDP_MD.H --- headers for GDP metadata
 **
 **		THESE DEFINITIONS ARE PRIVATE!
 **
@@ -46,7 +46,7 @@
 
 struct metadatum
 {
-	gdp_gclmd_id_t		md_id;			// identifier (uint32_t)
+	gdp_md_id_t			md_id;			// identifier (uint32_t)
 	uint32_t			md_len;			// data length (only 24 bits!)
 	void				*md_data;		// pointer to data
 	uint32_t			md_flags;		// see below
@@ -55,7 +55,7 @@ struct metadatum
 #define MDF_OWNDATA		0x00000001		// we own the data field
 
 
-struct gdp_gclmd
+struct gdp_md
 {
 	int					nalloc;			// number of datums allocated
 	int					nused;			// number of datums in use
@@ -64,23 +64,23 @@ struct gdp_gclmd
 	uint32_t			flags;			// see below
 };
 
-#define GCLMDF_READONLY	0x00000001		// metadata list cannot be modified
+#define GDP_MDF_READONLY	0x00000001	// metadata list cannot be modified
 
 
 //XXX this doesn't belong here
-#define GDP_GCLMD_EOLIST	0			// id: end of metadata list
+#define GDP_MD_EOLIST	0				// id: end of metadata list
 
 // serialize an internal data structure to a network buffer
-size_t			_gdp_gclmd_serialize(
-					gdp_gclmd_t *gmd,			// metadata to serialize
+size_t			_gdp_md_serialize(
+					gdp_md_t *gmd,			// metadata to serialize
 					uint8_t **obufp);			// dynamically allocated output
 
 // deserialize a network buffer to an internal data structure
-gdp_gclmd_t		*_gdp_gclmd_deserialize(
-					uint8_t *smd,				// serialized metadata
+gdp_md_t		*_gdp_md_deserialize(
+					const uint8_t *smd,			// serialized metadata
 					size_t smd_len);			// length of smd
 
 // bulk load data into a metadata structure using existing names & lengths
-void			_gdp_gclmd_adddata(
-					gdp_gclmd_t *gmd,
+void			_gdp_md_adddata(
+					gdp_md_t *gmd,
 					void *data);
