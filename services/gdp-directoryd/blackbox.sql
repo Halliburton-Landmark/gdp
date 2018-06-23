@@ -122,6 +122,26 @@ begin
 delimiter ;
 
 #
+# blackbox.delete_nhop deletes a nhop arrow from the graph
+#
+drop procedure if exists blackbox.delete_nhop;
+delimiter //
+create procedure blackbox.delete_nhop
+(
+	IN dguid BINARY(32),
+	IN eguid BINARY(32)
+)
+begin
+	set @did = NULL;
+	set @eid = NULL;
+	select id into @did from blackbox.guids where guid = dguid;
+	select id into @eid from blackbox.guids where guid = eguid;
+	# delete @eid -> @did path to graph with latest timestamp
+	delete from blackbox.nhops where origid = @eid and destid = @did;
+	end //
+delimiter ;
+
+#
 # blackbox.find_nhop returns the best nhop from oguid towards dguid, if any
 #
 drop procedure if exists blackbox.find_nhop;
