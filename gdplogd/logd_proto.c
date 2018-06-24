@@ -39,6 +39,8 @@
 #include <ep/ep_assert.h>
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.proto", "GDP Log Daemon protocol");
+static EP_DBG	DbgSignatureOverride = EP_DBG_INIT("gdplogd.sig.override",
+									"Request signature check override");
 
 #define GET_PAYLOAD(req, where, bodycase)									\
 			{																\
@@ -493,9 +495,11 @@ static EP_STAT
 verify_req_signature(gdp_req_t *req)
 {
 	//TODO: IMPLEMENT_ME XXX
-	//return EP_STAT_OK;						//DEBUG
 	//return GDP_STAT_NAK_UNAUTH;				//DEBUG
-	return GDP_STAT_NOT_IMPLEMENTED;
+	if (ep_dbg_test(DbgSignatureOverride, 101))
+		return EP_STAT_OK;
+	else
+		return GDP_STAT_NOT_IMPLEMENTED;
 }
 
 EP_STAT
