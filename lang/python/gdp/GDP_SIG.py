@@ -55,12 +55,12 @@ class GDP_SIG(object):
             else:
                 size = c_size_t(0)
                 buf = None
-            self.sig_ = __func(alg, buf, size)
+            self.ptr = __func(alg, buf, size)
             self.did_i_create_it = True
 
         else:
             if "ptr" in kwargs:
-                self.sig_ = kwargs["ptr"]
+                self.ptr = kwargs["ptr"]
                 self.did_i_create_it = False
             else:
                 raise Exception
@@ -71,14 +71,14 @@ class GDP_SIG(object):
         if self.did_i_create_it:
             __func = gdp.gdp_sig_free
             __func.argtypes = [POINTER(self.gdp_sig_t)]
-            __func(self.sig_)
+            __func(self.ptr)
 
 
     def reset(self):
         """Reset the sig structure"""
         __func = gdp.gdp_sig_reset
         __func.argtypes = [POINTER(self.gdp_sig_t)]
-        __func(self.sig_)
+        __func(self.ptr)
 
 
     def set(self, sigbytes):
@@ -89,7 +89,7 @@ class GDP_SIG(object):
 
         size = c_size_t(len(sigbytes))
         tmp_buf = create_string_buffer(sigbytes, len(sigbytes))
-        written_bytes = __func(self.sig_, byref(tmp_buf), size)
+        written_bytes = __func(self.ptr, byref(tmp_buf), size)
 
 
     def getlength(self):
@@ -99,7 +99,7 @@ class GDP_SIG(object):
         __func.argtypes = [POINTER(self.gdp_sig_t)]
         __func.restype = c_size_t
 
-        ret = __func(self.sig_)
+        ret = __func(self.ptr)
         return ret
 
 
@@ -113,7 +113,7 @@ class GDP_SIG(object):
         __func.restype = c_void_p
 
         siglen = c_size_t()
-        sigptr = __func(self.sig_, byref(siglen))
+        sigptr = __func(self.ptr, byref(siglen))
         sigbytes = string_at(sigptr, siglen.value)
 
         return sigbytes

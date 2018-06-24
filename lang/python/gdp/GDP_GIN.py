@@ -45,19 +45,17 @@ class GDP_GIN(object):
     file handle in various ways.
 
     Note that get_next_event is both a class method (for events on any of
-    the GCL's) as well as an instance method (for events on a particular
-    GCL). The auto-generated documentation might not show this, but
+    the GIN's) as well as an instance method (for events on a particular
+    GIN). The auto-generated documentation might not show this, but
     something to keep in mind.
     """
 
     class gdp_gin_t(Structure):
-
         "Corresponds to gdp_gin_t structure exported by C library"
         pass
 
 
-    # XXX: Check if this works.
-    # More details here:
+    # XXX: Check if this works. More details here:
     # http://python.net/crew/theller/ctypes/tutorial.html#callback-functions
     # The first argument, I believe, is the return type, which I think is void*
     gdp_gin_sub_cbfunc_t = CFUNCTYPE(c_void_p, POINTER(gdp_gin_t),
@@ -70,15 +68,12 @@ class GDP_GIN(object):
 
         name=<name-of-gin>, iomode=<mode>
         name is a GDP_NAME object for the GDP object
-        mode is one of the following: GDP_MODE_ANY, GDP_MODE_RO, GDP_MODE_AO,
-                                      GDP_MODE_RA
-        open_info is a dictionary. It contains extra information, such as the
-        private signature key, etc. The key may be optional, depending on
-        how the log was created and if a log-server is set up to reject
-        unsigned appends, for example.
-
-        Here is the (incomplete) list of keys and their description:
-        'skey': an instance of EP_CRYPTO_KEY containing the signature key
+        mode is one of the following: GDP_MODE_ANY, GDP_MODE_RO,
+                                      GDP_MODE_AO, GDP_MODE_RA
+        open_info is a dictionary. It contains extra information
+        such as the private signature key, etc. The key may be
+        optional, depending on how the log was created and if a
+        log-server is set up to reject unsigned appends, for example.
         """
 
         if len(kwargs)==0:
@@ -106,8 +101,7 @@ class GDP_GIN(object):
                                POINTER(POINTER(self.gdp_gin_t))]
             __func.restype = EP_STAT
 
-            estat = __func(_name_ctypes, iomode,
-                                __gdp_open_info.gdp_open_info_ptr,
+            estat = __func(_name_ctypes, iomode, __gdp_open_info.ptr,
                                 pointer(__ptr))
             check_EP_STAT(estat)
 
@@ -179,7 +173,7 @@ class GDP_GIN(object):
         __func.restype = EP_STAT
 
         estat = __func(_name_ctypes, logd_name_ctypes,
-                            md.gdp_md_ptr, throwaway_ptr)
+                            md.ptr, throwaway_ptr)
         check_EP_STAT(estat)
         return
 
@@ -536,7 +530,7 @@ class GDP_GIN(object):
 
         __prevhash_type = c_void_p if prevhash is None \
                                 else POINTER(GDP_HASH.gdp_hash_t)
-        __prevhash_val = None if prevhash is None else prevhash.hash_
+        __prevhash_val = None if prevhash is None else prevhash.ptr
 
         __func = gdp.gdp_gin_append
         __func.argtypes = [POINTER(self.gdp_gin_t),
@@ -563,7 +557,7 @@ class GDP_GIN(object):
 
         __prevhash_type = c_void_p if prevhash is None \
                                 else POINTER(GDP_HASH.gdp_hash_t)
-        __prevhash_val = None if prevhash is None else prevhash.hash_
+        __prevhash_val = None if prevhash is None else prevhash.ptr
 
         __func = gdp.gdp_gin_append_async
         __func.argtypes = [ POINTER(self.gdp_gin_t), c_int,

@@ -49,11 +49,11 @@ class GDP_BUF(object):
             __func = gdp.gdp_buf_new
             __func.argtypes = []
             __func.restype = POINTER(self.gdp_buf_t)
-            self.buf = __func()
+            self.ptr = __func()
             self.did_i_create_it = True
         else:
             if "ptr" in kwargs:
-                self.buf = kwargs["ptr"]
+                self.ptr = kwargs["ptr"]
                 self.did_i_create_it = False
             else:
                 raise Exception
@@ -63,7 +63,7 @@ class GDP_BUF(object):
         if self.did_i_create_it:
             __func = gdp.gdp_buf_free
             __func.argtypes = [POINTER(self.gdp_buf_t)]
-            __func(self.buf)
+            __func(self.ptr)
 
 
     def reset(self):
@@ -72,7 +72,7 @@ class GDP_BUF(object):
         __func.argtypes = [POINTER(self.gdp_buf_t)]
         __func.restype = c_int
 
-        ret = __func(self.buf)
+        ret = __func(self.ptr)
         return int(ret)
 
 
@@ -83,7 +83,7 @@ class GDP_BUF(object):
         __func.argtypes = [POINTER(self.gdp_buf_t)]
         __func.restype = c_size_t
 
-        ret = __func(self.buf)
+        ret = __func(self.ptr)
         return ret
 
 
@@ -96,7 +96,7 @@ class GDP_BUF(object):
 
         dlen = self.getlength()
         tmp_buf = create_string_buffer(dlen)
-        read_bytes = __func(self.buf, byref(tmp_buf), dlen)
+        read_bytes = __func(self.ptr, byref(tmp_buf), dlen)
 
         return string_at(tmp_buf, read_bytes)
 
@@ -110,7 +110,7 @@ class GDP_BUF(object):
 
         dlen = self.getlength()
         tmp_buf = create_string_buffer(dlen)
-        peeked_bytes = __func(self.buf, byref(tmp_buf), dlen)
+        peeked_bytes = __func(self.ptr, byref(tmp_buf), dlen)
 
         return string_at(tmp_buf, peeked_bytes)
 
@@ -123,7 +123,7 @@ class GDP_BUF(object):
         __func.restype = c_int
 
         dlen = self.getlength()
-        ret = __func(self.buf, dlen)
+        ret = __func(self.ptr, dlen)
 
         return int(ret)
 
@@ -136,4 +136,4 @@ class GDP_BUF(object):
 
         size = c_size_t(len(data))
         tmp_buf = create_string_buffer(data, len(data))
-        __func(self.buf, byref(tmp_buf), size)
+        __func(self.ptr, byref(tmp_buf), size)
