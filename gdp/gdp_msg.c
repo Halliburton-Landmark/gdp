@@ -156,13 +156,6 @@ _gdp_msg_new(gdp_cmd_t cmd, gdp_rid_t rid, gdp_seqno_t seqno)
 						msg->cmd_subscribe_by_hash);
 		break;
 
-	case GDP_ACK_SUCCESS:
-		msg->body_case = GDP_MESSAGE__BODY_ACK_SUCCESS;
-		msg->ack_success = (GdpMessage__AckSuccess *)
-					ep_mem_zalloc(sizeof *msg->ack_success);
-		gdp_message__ack_success__init(msg->ack_success);
-		break;
-
 	case GDP_ACK_CHANGED:
 		msg->body_case = GDP_MESSAGE__BODY_ACK_CHANGED;
 		msg->ack_changed = (GdpMessage__AckChanged *)
@@ -187,10 +180,20 @@ _gdp_msg_new(gdp_cmd_t cmd, gdp_rid_t rid, gdp_seqno_t seqno)
 	default:
 		if (cmd >= GDP_NAK_C_MIN && cmd <= GDP_NAK_S_MAX)
 		{
+			// other negative acknowledgement
 			msg->body_case = GDP_MESSAGE__BODY_NAK;
 			msg->nak = (GdpMessage__NakGeneric *)
 						ep_mem_zalloc(sizeof *msg->nak);
 			gdp_message__nak_generic__init(msg->nak);
+		}
+		else if (cmd >= GDP_ACK_MIN && cmd <= GDP_ACK_MAX)
+		{
+			// other positive acknowledgement
+			msg->body_case = GDP_MESSAGE__BODY_ACK_SUCCESS;
+			msg->ack_success = (GdpMessage__AckSuccess *)
+						ep_mem_zalloc(sizeof *msg->ack_success);
+			gdp_message__ack_success__init(msg->ack_success);
+			break;
 		}
 		else
 		{
