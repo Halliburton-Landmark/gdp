@@ -190,6 +190,9 @@ ep_stat_from_sqlite_result_code(int rc)
 		case SQLITE_WARNING:
 			sev = EP_STAT_SEV_WARN;
 			break;
+
+		case SQLITE_CANTOPEN:
+			return GDP_STAT_NAK_NOTFOUND;
 	}
 
 	return EP_STAT_NEW(sev, registry, module, rc & 0x00ff);
