@@ -538,7 +538,6 @@ cmd_delete(gdp_req_t *req)
 	// we will force a close and delete now
 	req->gob->freefunc = NULL;
 	gob_delete(req->gob);
-	req->gob = NULL;
 
 	if (ep_dbg_test(Dbg, 10))
 	{

@@ -104,6 +104,9 @@ gob_close(gdp_gob_t *gob)
 void
 gob_delete(gdp_gob_t *gob)
 {
+	// arrange to remove the GOB from the cache
+	gob->flags &= ~GOBF_DEFER_FREE;
+
 	if (gob->x == NULL)
 		return;
 
