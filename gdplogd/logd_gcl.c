@@ -213,7 +213,14 @@ get_open_handle(gdp_req_t *req)
 		estat = _gdp_gob_cache_get(req->cpdu->dst, GGCF_CREATE, &req->gob);
 		_gdp_req_lock(req);
 		if (EP_STAT_ISOK(estat) && EP_UT_BITSET(GOBF_PENDING, req->gob->flags))
+		{
 			estat = do_physical_open(req->gob, NULL);
+			if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOTFOUND))
+			{
+				// router sent us a reference to a log that we don't own
+				_gdp_gob_free(&req->gob);
+			}
+		}
 		if (!EP_STAT_ISOK(estat) && req->gob != NULL)
 			_gdp_gob_decref(&req->gob, false);
 		if (ep_dbg_test(Dbg, 40))
