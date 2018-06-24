@@ -1046,7 +1046,7 @@ _gdp_chan_advertise(
 	{
 		char ebuf[100];
 
-		ep_dbg_printf("_gdp_advertise => %s\n",
+		ep_dbg_printf("_gdp_chan_advertise => %s\n",
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 
@@ -1060,11 +1060,25 @@ _gdp_chan_withdraw(
 			gdp_name_t gname,
 			void *adata)
 {
+	EP_STAT estat;
 	gdp_pname_t pname;
 
 	ep_dbg_cprintf(Dbg, 39, "_gdp_chan_withdraw(%s)\n",
 			gdp_printable_name(gname, pname));
-	return GDP_STAT_NOT_IMPLEMENTED;
+	gdp_buf_t *payload = gdp_buf_new();
+	gdp_buf_write(payload, gname, sizeof (gdp_name_t));
+	estat = send_helper(chan, NULL, _GdpMyRoutingName, gname,
+						NULL, GDP_PKT_TYPE_WITHDRAW);
+
+	if (ep_dbg_test(Dbg, 21))
+	{
+		char ebuf[100];
+
+		ep_dbg_printf("_gdp_chan_withdraw => %s\n",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
+
+	return estat;
 }
 
 
