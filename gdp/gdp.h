@@ -202,6 +202,7 @@ extern EP_STAT	gdp_init(
 
 // pre-initialize the library (gdp_init does this -- rarely needed)
 EP_STAT			gdp_lib_init(
+					const char *progname,
 					const char *my_routing_name);
 
 // run event loop (normally run from gdp_init; never returns)

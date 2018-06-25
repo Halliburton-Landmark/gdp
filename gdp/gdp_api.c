@@ -395,7 +395,7 @@ gdp_init(const char *router_addr)
 		goto done;
 
 	// set up global state, event loop, etc. (shared with gdplogd)
-	estat = gdp_lib_init(NULL);
+	estat = gdp_lib_init(NULL, NULL);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	chanx = (gdp_chan_x_t *) ep_mem_zalloc(sizeof *chanx);

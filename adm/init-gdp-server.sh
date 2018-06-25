@@ -29,6 +29,7 @@ TMP=/tmp
 . adm/common-support.sh
 
 ## compile code and utilities, possibly not as root
+info "Compiling GDP code and utilities"
 make
 (cd util && make)
 
@@ -39,24 +40,10 @@ make
 : ${GDP_REST_INSTALL:=false}
 export GDP_VER
 
-if [ -z "$GDP_VER" -a ! -x $GDPLOGD_BIN ]
-then
-	warn "It appears the GDP log server (gdplogd) is not yet"
-	warn "installed in $GDP_ROOT/sbin.  It should be installed by"
-	warn "\"sudo make install\""
-	info "Press <return> to continue, ^C to abort"
-	read nothing
-fi
-
 ## be sure we're running as root
 test `whoami` = "root" || exec sudo GDP_REST_INSTALL=$GDP_REST_INSTALL $0 "$@"
 
-info "GDP_ROOT=$GDP_ROOT"
-if [ ! -z "$GDP_VER" ]
-then
-	warn "Installing $GDPLOGD_BIN but not associated documentation."
-	cp gdplogd/gdplogd $GDPLOGD_BIN
-fi
+info "Preparing install into GDP_ROOT=$GDP_ROOT"
 
 ## create "gdp" user
 if ! grep -q "^${GDP_USER}:" /etc/passwd
@@ -76,7 +63,9 @@ then
 	mkdir_gdp sbin
 	mkdir_gdp lib
 fi
-mkdir_gdp /var/swarm/gdp/glogs
+
+echo "Installing gdplogd:"
+(cd $GDP_SRC_ROOT/gdplogd && make install)
 
 # convert /etc/gdp/ep_adm_params => /etc/ep_adm_params
 if [ `basename $GDP_ETC` = "gdp" ]
@@ -95,6 +84,9 @@ mkdir_gdp $GDP_LOG_DIR
 mkdir_gdp $GDP_VAR
 mkdir_gdp $GDP_KEYS_DIR 0750
 mkdir_gdp $GDPLOGD_DATADIR 0750
+mkdir_gdp /var/swarm
+mkdir_gdp /var/swarm/gdp
+mkdir_gdp /var/swarm/gdp/glogs
 
 mkfile_gdp $GDPLOGD_LOG
 mkfile_gdp $GDP_REST_LOG
@@ -126,7 +118,7 @@ then
 	cp $TMP/gdp.params $EP_PARAMS/gdp
 	chown ${GDP_USER}:${GDP_GROUP} $EP_PARAMS/gdp
 	cat $EP_PARAMS/gdp
-elif cmp $TMP/gdp.params $EP_PARAMS/gdp
+elif cmp -s $TMP/gdp.params $EP_PARAMS/gdp
 then
 	rm $TMP/gdp.params
 else
@@ -144,7 +136,7 @@ then
 	cp $TMP/gdplogd.params $EP_PARAMS/gdplogd
 	chown ${GDP_USER}:${GDP_GROUP} $EP_PARAMS/gdplogd
 	cat $EP_PARAMS/gdplogd
-elif cmp $TMP/gdplogd.params $EP_PARAMS/gdplogd
+elif cmp -s $TMP/gdplogd.params $EP_PARAMS/gdplogd
 then
 	rm $TMP/gdplogd.params
 else

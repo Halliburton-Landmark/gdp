@@ -932,10 +932,9 @@ siginfo(int sig, short what, void *arg)
 static EP_THR_MUTEX		GdpInitMutex	EP_THR_MUTEX_INITIALIZER;
 
 EP_STAT
-gdp_lib_init(const char *myname)
+gdp_lib_init(const char *progname, const char *myname)
 {
 	EP_STAT estat = EP_STAT_OK;
-	const char *progname;
 
 	ep_dbg_cprintf(Dbg, 4, "_gdp_lib_init(%s)\n\t%s\n",
 			myname == NULL ? "NULL" : myname,
@@ -957,7 +956,8 @@ gdp_lib_init(const char *myname)
 	}
 
 	ep_adm_readparams("gdp");
-	progname = ep_app_getprogname();
+	if (progname == NULL)
+		progname = ep_app_getprogname();
 	if (progname != NULL)
 		ep_adm_readparams(progname);
 	ep_crypto_init(0);
