@@ -125,6 +125,7 @@ class GDP_EVENT:
 
         gin_ptr = __func(self.ptr)
         gin = _gdp.GDP_GIN(None, None, ptr=gin_ptr)
+        gin.event = self # garbage collection workaround
         return gin
 
 
@@ -135,6 +136,7 @@ class GDP_EVENT:
         __func.restype = POINTER(_gdp.GDP_DATUM.gdp_datum_t)
         datum_ptr = __func(self.ptr)
         datum = _gdp.GDP_DATUM(ptr=datum_ptr)
+        datum.event = self # garbage collection workaround
         return datum
 
     def getudata(self):

@@ -200,7 +200,9 @@ class GDP_DATUM:
         __func.restype = POINTER(GDP_BUF.gdp_buf_t)
 
         gdp_buf_ptr = __func(self.ptr)
-        return GDP_BUF(ptr=gdp_buf_ptr)
+        gdp_buf = GDP_BUF(ptr=gdp_buf_ptr)
+        gdp_buf.datum = self    # garbage collection workaround
+        return gdp_buf
 
 
     # def setbuf(self, data):
