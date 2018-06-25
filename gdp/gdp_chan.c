@@ -911,6 +911,13 @@ send_helper(gdp_chan_t *chan,
 		return GDP_STAT_DEAD_DAEMON;
 	}
 
+	if (payload_len > UINT16_MAX)
+	{
+		ep_dbg_cprintf(Dbg, 1, "send_helper: payload_len = %zd, max %d\n",
+				payload_len, UINT16_MAX);
+		return GDP_STAT_PDU_TOO_LONG;
+	}
+
 	// build the header in memory
 	char pb[MAX_HEADER_LENGTH];
 	char *pbp = pb;
