@@ -25,6 +25,12 @@
 #	OR MODIFICATIONS.
 # ----- END LICENSE BLOCK -----
 
+
+## XXX XXX XXX
+## XXX Obsolete. Needs update to the latest API version (ver 2)
+## XXX XXX XXX
+
+
 """
 An example program that logs some system information periodically.
 This is just an example program that can be used as a starting point.

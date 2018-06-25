@@ -26,6 +26,10 @@
 #	OR MODIFICATIONS.
 # ----- END LICENSE BLOCK -----
 
+## XXX XXX XXX
+## XXX Obsolete. Needs update to the latest API version (ver 2)
+## XXX XXX XXX
+
 
 """
 A REST interface for a key-value store. Returns JSON encoded data.

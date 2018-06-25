@@ -60,7 +60,7 @@ class GDP_OPEN_INFO:
         __func1.argtypes = []
         __func1.restype = POINTER(self.gdp_open_info_t)
 
-        self.gdp_open_info_ptr = __func1()
+        self.ptr = __func1()
 
         # read the open_info dictionary and set appropriate fields
         #   based on the key name.
@@ -73,7 +73,7 @@ class GDP_OPEN_INFO:
 
             __func2.restype = EP_STAT
 
-            estat = __func2(self.gdp_open_info_ptr, skey.key_ptr)
+            estat = __func2(self.ptr, skey.key_ptr)
             check_EP_STAT(estat)
 
 
@@ -85,4 +85,4 @@ class GDP_OPEN_INFO:
         __func = gdp.gdp_open_info_free
         __func.argtypes = [POINTER(self.gdp_open_info_t)]
 
-        __func(self.gdp_open_info_ptr)
+        __func(self.ptr)

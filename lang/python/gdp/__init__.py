@@ -31,37 +31,23 @@
 A Python API for libgdp. Uses ctypes and shared library versions of
 libgdp and libep.
 
-This package exports two classes, and a few utility functions.
-- GDP_NAME:     represents names in GDP
-- GDP_GCL :     represents a GCL file handle
+This package exports a number of classes, and a few utility functions.
+Here is a very brief summary, but please see the detailed C-api docs.
 
-The first thing that you will need to do is call `gdp_init`. `gdp_init`
-sets up the connection to a remote `gdp_router`. Example:
+- GDP_NAME:      a name in GDP
+- GDP_GIN :      a GDP instance
+- GDP_EVENT:     an asynchronous event
+- GDP_DATUM:     a GDP datum: (kind of) a record in memory
+- GDP_HASH:      a cryptographic hash
+- GDP_SIG:       a signature
+- GDP_BUF:       a generic buffer
+- GDP_MD:	     a metadata object
+- GDP_OPEN_INFO: information regarding metadata
 
-```
-gdp_init("127.0.0.1:8007")
-```
-
-Next, you would like to have a `GDP_NAME` object that represents the
-names in GDP. The reason for a `GDP_NAME` object is that each name can
-have multiple representations.
-
-To create a `GDP_NAME`, use the following:
-```
-gcl_name = GDP_NAME(some_name)
-```
-`some_name` could be either a human readable name that is then hashed
-using SHA256, or it could be an internal name represented as a python
-binary string, or it could also be a printable GDP name. (For more
-details on this, look at the C API documentation)
-
-Once you have the GDP_NAME, you can use it to open `GDP_GCL` objects,
-which behave like a file handle in some certain sense.
-
-The unit of reading/writing from a `GDP_GCL` is a datum, which is a
-python dictionary. `GDP_GCL` supports append, reading by record number,
-or subscriptions. For more details, look at the sample programs
-provided.
+Note that a number of methods take a NULL/None value, which implies
+that the underlying C-library makes a decision on what value to
+use (based on configuration parameters or defaults). Providing a
+non-null argument is simply a way to override these defaults.
 
 """
 
@@ -89,7 +75,7 @@ from GDP_MD import GDP_MD
 from EP_CRYPTO import EP_CRYPTO_KEY, \
     EP_CRYPTO_KEYFORM_UNKNOWN, EP_CRYPTO_KEYFORM_PEM, EP_CRYPTO_KEYFORM_DER, \
     EP_CRYPTO_F_PUBLIC, EP_CRYPTO_F_SECRET
-# from GDPcache import GDPcache
+from GDPcache import GDPcache
 
 __all__ = [GDP_MODE_ANY, GDP_MODE_RO, GDP_MODE_AO, GDP_MODE_RA,
            _GDP_EVENT_FREE, GDP_EVENT_DATA, GDP_EVENT_DONE,
@@ -107,5 +93,5 @@ __all__ = [GDP_MODE_ANY, GDP_MODE_RO, GDP_MODE_AO, GDP_MODE_RA,
            EP_CRYPTO_KEY,
            EP_CRYPTO_KEYFORM_UNKNOWN, EP_CRYPTO_KEYFORM_PEM,
            EP_CRYPTO_KEYFORM_DER,
-           EP_CRYPTO_F_PUBLIC, EP_CRYPTO_F_SECRET]
-           # GDPcache ]
+           EP_CRYPTO_F_PUBLIC, EP_CRYPTO_F_SECRET,
+           GDPcache ]

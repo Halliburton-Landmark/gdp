@@ -53,14 +53,6 @@ class GDP_DATUM:
     class gdp_datum_t(Structure):
         pass
 
-    # Python representation of this is a dictionary, with the exact same fields
-    class EP_TIME_SPEC(Structure):
-        pass
-
-    EP_TIME_SPEC._fields_ = [("tv_sec", c_int64),
-                               ("tv_nsec", c_uint32),
-                               ("tv_accuracy", c_float)]
-
     def __init__(self, **kwargs):
         """
         Constructor: Two ways of creating a new pythong GDP datum object:
@@ -141,9 +133,8 @@ class GDP_DATUM:
 
 
     def gethash(self, gin):
-        """
-        Compute the hash of the datum for a given log?
-        """
+        """ Compute the hash of the datum for a given log? """
+
         assert isinstance(gin, GDP_GIN)
         __func = gdp.gdp_datum_hash
         __func.argtypes = [POINTER(self.gdp_datum_t),
@@ -169,13 +160,13 @@ class GDP_DATUM:
     def getts(self):
         """
         Return the timestamp associated with this GDP_DATUM in the form of a
-            dictionary. The keys are: tv_sec, tv_nsec and tv_accuracy
+        dictionary. The keys are: tv_sec, tv_nsec and tv_accuracy
         """
 
-        ts = self.EP_TIME_SPEC()
+        ts = EP_TIME_SPEC()
         __func = gdp.gdp_datum_getts
         __func.argtypes = [
-            POINTER(self.gdp_datum_t), POINTER(self.EP_TIME_SPEC)]
+            POINTER(self.gdp_datum_t), POINTER(EP_TIME_SPEC)]
         # ignore the return value
 
         __func(self.ptr, byref(ts))
@@ -189,7 +180,10 @@ class GDP_DATUM:
         return ret
 
     def getdlen(self):
-        "Returns the length of the data associated with this GDP_DATUM"
+        """
+        Returns the length of the data in GDP_BUF associated with
+        this GDP_DATUM.
+        """
 
         __func = gdp.gdp_datum_getdlen
         __func.argtypes = [POINTER(self.gdp_datum_t)]
@@ -199,13 +193,7 @@ class GDP_DATUM:
         return ret
 
     def getbuf(self):
-        """
-        Return the data associated with this GDP_DATUM. Internally, it queries
-        a buffer for the data, and returns whatever it has read so far from
-        the buffer.
-
-        Effectively drains the buffer too.
-        """
+        """ Return the GDP_BUF associated with this GDP_DATUM. """
 
         __func = gdp.gdp_datum_getbuf
         __func.argtypes = [POINTER(self.gdp_datum_t)]

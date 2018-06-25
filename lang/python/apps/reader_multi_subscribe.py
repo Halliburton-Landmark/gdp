@@ -26,6 +26,10 @@
 # ----- END LICENSE BLOCK -----
 
 
+## XXX XXX XXX
+## XXX Obsolete. Needs update to the latest API version (ver 2)
+## XXX XXX XXX
+
 """
 A simple program to demonstrate subscriptions to multiple logs
 """

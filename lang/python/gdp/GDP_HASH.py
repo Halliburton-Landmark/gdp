@@ -56,12 +56,12 @@ class GDP_HASH(object):
                 size = c_size_t(0)
                 buf = None
 
-            self.hash_ = __func(alg, buf, size)
+            self.ptr = __func(alg, buf, size)
             self.did_i_create_it = True
 
         else:
             if "ptr" in kwargs:
-                self.hash_ = kwargs["ptr"]
+                self.ptr = kwargs["ptr"]
                 self.did_i_create_it = False
             else:
                 raise Exception
@@ -71,14 +71,14 @@ class GDP_HASH(object):
         if self.did_i_create_it:
             __func = gdp.gdp_hash_free
             __func.argtypes = [POINTER(self.gdp_hash_t)]
-            __func(self.hash_)
+            __func(self.ptr)
 
 
     def reset(self):
         """Reset the hash structure"""
         __func = gdp.gdp_hash_reset
         __func.argtypes = [POINTER(self.gdp_hash_t)]
-        __func(self.hash_)
+        __func(self.ptr)
 
 
     def set(self, hashbytes):
@@ -89,7 +89,7 @@ class GDP_HASH(object):
 
         size = c_size_t(len(hashbytes))
         tmp_buf = create_string_buffer(hashbytes, len(hashbytes))
-        written_bytes = __func(self.hash_, byref(tmp_buf), size)
+        written_bytes = __func(self.ptr, byref(tmp_buf), size)
 
 
     def getlength(self):
@@ -99,7 +99,7 @@ class GDP_HASH(object):
         __func.argtypes = [POINTER(self.gdp_hash_t)]
         __func.restype = c_size_t
 
-        ret = __func(self.hash_)
+        ret = __func(self.ptr)
         return ret
 
 
@@ -113,7 +113,7 @@ class GDP_HASH(object):
         __func.restype = c_void_p
 
         hashlen = c_size_t()
-        hashptr = __func(self.hash_, byref(hashlen))
+        hashptr = __func(self.ptr, byref(hashlen))
         hashbytes = string_at(hashptr, hashlen.value)
 
         return hashbytes
@@ -125,5 +125,5 @@ class GDP_HASH(object):
         __func.argtypes = [POINTER(self.gdp_hash_t), POINTER(self.gdp_hash_t)]
         __func.restype = c_bool
 
-        ret = __func(self.hash_, other.hash_)
+        ret = __func(self.ptr, other.ptr)
         return ret

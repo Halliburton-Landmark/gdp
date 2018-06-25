@@ -64,7 +64,7 @@ class GDP_MD:
             # gdp_md_add (sure it's a bit inefficient, but
             # how often do we need the absolute best performance
             # for gdp_md_t creation?).
-            self.gdp_md_ptr = __func(c_int(0))
+            self.ptr = __func(c_int(0))
             self.did_i_create_it = True
 
         else:
@@ -72,7 +72,7 @@ class GDP_MD:
             # passing in a pointer (i.e. memory managed by
             # someone else)
             if "ptr" in kwargs:
-                self.gdp_md_ptr = kwargs["ptr"]
+                self.ptr = kwargs["ptr"]
                 self.did_i_create_it = False
             else:
                 raise Exception
@@ -85,7 +85,7 @@ class GDP_MD:
             __func = gdp.gdp_md_free
             __func.argtypes = [POINTER(self.gdp_md_t)]
 
-            __func(self.gdp_md_ptr)
+            __func(self.ptr)
 
 
     def dump(self, fh, detail, indent):
@@ -102,7 +102,7 @@ class GDP_MD:
         __func.argtypes = [POINTER(self.gdp_md_t), FILE_P, c_int, c_int]
         # ignore the return value
 
-        __func(self.gdp_md_ptr, __fh, detail, indent)
+        __func(self.ptr, __fh, detail, indent)
 
 
     def add(self, md_id, data):
@@ -116,7 +116,7 @@ class GDP_MD:
         size = c_size_t(len(data))
         tmp_buf = create_string_buffer(data, len(data))
 
-        estat = __func(self.gdp_md_ptr, gdp_md_id_t(md_id),
+        estat = __func(self.ptr, gdp_md_id_t(md_id),
                                 size, byref(tmp_buf))
         check_EP_STAT(estat)
 
@@ -135,7 +135,7 @@ class GDP_MD:
         data_ptr = c_void_p()
         _index = c_int(index)
 
-        estat = __func(self.gdp_md_ptr, _index, byref(md_id),
+        estat = __func(self.ptr, _index, byref(md_id),
                                 byref(dlen), byref(data_ptr))
         check_EP_STAT(estat)
 
@@ -155,7 +155,7 @@ class GDP_MD:
         dlen = c_size_t()
         data_ptr = c_void_p()
 
-        estat = __func(self.gdp_md_ptr, gdp_md_id_t(md_id),
+        estat = __func(self.ptr, gdp_md_id_t(md_id),
                                 byref(dlen), byref(data_ptr))
         check_EP_STAT(estat)
 

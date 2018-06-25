@@ -68,7 +68,7 @@ class GDPcache:
         gdp.gdp_init()      # No side-effects of calling this multiple times
         # gdp.dbg_set("*=20")
         self.logname = logname
-        self.lh = gdp.GDP_GCL(gdp.GDP_NAME(logname), gdp.GDP_MODE_RO)
+        self.lh = gdp.GDP_GIN(gdp.GDP_NAME(logname), gdp.GDP_MODE_RO)
         self.limit = limit
         self.cache = {}     # recno => record cache   (limited size)
         self.atime = {}     # recno => time of access (same size as cache)
@@ -80,10 +80,10 @@ class GDPcache:
     def __cleanup(self):
         """
         Make sure that we adhere to the size limit on cache. However, as
-            an optimization, we never delete the smallest and the largest
-            record number we know of. In addition, the limit is a *soft*
-            limit, meaning that we avoid doing cleanup as soon as we are
-            just one above the limit, for example.
+        an optimization, we never delete the smallest and the largest
+        record number we know of. In addition, the limit is a *soft*
+        limit, meaning that we avoid doing cleanup as soon as we are
+        just one above the limit, for example.
         """
 
         # A quick return for the case we don't need cleanup for
@@ -108,6 +108,7 @@ class GDPcache:
     def __time(self, datum):        # cache for tMap
         """ give us the time function. A way to switch between the log-server
             timestamps and the timestamps in data """
+        assert isinstance(datum, gdp.GDP_DATUM)
         return datum['ts']['tv_sec'] + (datum['ts']['tv_nsec']*1.0/10**9)
 
 
@@ -120,7 +121,7 @@ class GDPcache:
             return self.cache[recno]
 
         try:
-            datum = self.lh.read(recno)
+            datum = self.lh.read_by_recno(recno)
         except gdp.MISC.EP_STAT_SEV_ERROR as e:
             datum = None
             if "Berkeley:Swarm-GDP:404" not in e.msg:
@@ -144,12 +145,12 @@ class GDPcache:
         numRecords = 0
         usingMultiread = False
         if step == 1:
-            self.lh.multiread(start, num)
+            self.lh.read_by_recno_async(start, num)
             usingMultiread = True
         else:
             # do lots of multireads of size 1
             for i in xrange(start, start+num, step):
-                self.lh.read_async(i)
+                self.lh.read_by_recno_async(i)
                 numRecords += 1
         ret = []
         while usingMultiread or numRecords>0:
@@ -161,10 +162,10 @@ class GDPcache:
                     numRecords -= 1
                     continue
 
-            if event['type'] == gdp.GDP_EVENT_EOS and usingMultiread:
+            if event['type'] == gdp.GDP_EVENT_DONE and usingMultiread:
                 break
 
-            if event["type"] not in [gdp.GDP_EVENT_EOS, gdp.GDP_EVENT_DATA]:
+            if event["type"] not in [gdp.GDP_EVENT_DONE, gdp.GDP_EVENT_DATA]:
                 print "Unknown event type", event
 
             numRecords -= 1
@@ -218,8 +219,6 @@ class GDPcache:
 
 
     def __find_left_gap_boundary(self, start, end):
-        """
-        """
 
         # assert self.__read(start) is not None
         # assert self.__read(end) is None
