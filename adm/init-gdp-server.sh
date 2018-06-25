@@ -76,6 +76,7 @@ then
 	mkdir_gdp sbin
 	mkdir_gdp lib
 fi
+mkdir_gdp /var/swarm/gdp/glogs
 
 # convert /etc/gdp/ep_adm_params => /etc/ep_adm_params
 if [ `basename $GDP_ETC` = "gdp" ]
