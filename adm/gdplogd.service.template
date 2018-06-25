@@ -14,7 +14,7 @@ User=@GDP_USER@
 # give router time to start up
 #ExecStartPre=/bin/sleep 20
 ExecStartPre=/bin/sleep 2
-ExecStart=/bin/sh @GDP_ROOT@/sbin/gdplogd-wrapper.sh
+ExecStart=/bin/sh @GDP_ROOT@/sbin/gdplogd@GDP_VER@-wrapper.sh
 Restart=always
 
 StandardOutput=syslog

@@ -156,12 +156,12 @@ cd $GDP_SRC_ROOT
 (cd util && make install)
 
 info "Installing gdplogd wrapper script"
-install -o ${GDP_USER} adm/gdplogd-wrapper.sh $GDP_ROOT/sbin
+install -o ${GDP_USER} adm/gdplogd-wrapper.sh $GDP_ROOT/sbin/gdplogd${GDP_VER}-wrapper.sh
 
 if $GDP_REST_INSTALL
 then
 	info "Installing gdp-rest wrapper script"
-	install -o ${GDP_USER} adm/gdp-rest-wrapper.sh $GDP_ROOT/sbin
+	install -o ${GDP_USER} adm/gdp-rest-wrapper.sh $GDP_ROOT/sbin/gdp-rest${GDP_VER}-wrapper.sh
 fi
 
 if [ -d /etc/rsyslog.d ]
