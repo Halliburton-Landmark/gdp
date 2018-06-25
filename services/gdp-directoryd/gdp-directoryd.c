@@ -329,9 +329,10 @@ int main(int argc, char **argv)
 
 		if (otw_dir.cmd != GDP_CMD_DIR_FIND)
 		{
-			otw_dir_len = sendto(fd_listen, (uint8_t *) &otw_dir.ver,
-								 otw_dir_len, 0,
-								 (struct sockaddr *)&si_rem, sizeof(si_rem));
+			debug(INFO, "nhop add|delete done (ack disabled)");
+			/* otw_dir_len = sendto(fd_listen, (uint8_t *) &otw_dir.ver, */
+			/* 					 otw_dir_len, 0, */
+			/* 					 (struct sockaddr *)&si_rem, sizeof(si_rem)); */
 		}
 		else
 		{
@@ -359,12 +360,12 @@ int main(int argc, char **argv)
 					debug(INFO, "\teguid[%s]\n",
 						  gdp_printable_name(otw_dir.eguid, _tmp_pname_1));
 
-					printf("<- eguid[");
+					debug(INFO, "<- eguid[");
 					for (int i = 0; i < sizeof(gdp_name_t); i++)
 					{
-						printf("%.2x", (uint8_t) otw_dir.eguid[i]);
+						debug(INFO, "%.2x", (uint8_t) otw_dir.eguid[i]);
 					}
-					printf("]\n");
+					debug(INFO, "]\n");
 				}
 			}
 
