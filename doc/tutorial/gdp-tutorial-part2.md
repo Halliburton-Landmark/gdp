@@ -77,11 +77,11 @@ tree.
 
 ## Creating logs
 
-The main mechanism to create a log is using `gcl-create` (should be in your
+The main mechanism to create a log is using `gdp-create` (should be in your
 system path after `make install-*`). For example,
 
 ```
-gcl-create -k none org.example.project.log17a
+gdp-create -k none org.example.project.log17a
 ```
 
 will create a log named `org.example.project.log17a` on one of the default
@@ -89,10 +89,10 @@ log-servers at Berkeley.
 
 Although you can create logs with any name, please stick to this convention
 (with "project" being the project name or the user name, as appropriate) so we
-can avoid name collisions. `-k none` means that `gcl-create` will not attempt to
+can avoid name collisions. `-k none` means that `gdp-create` will not attempt to
 create a new signature key for signing appended data.  Although crucial to the
 operation, key-management is better deferred to a stage when you are familiar
-with the basic operations of the GDP.  Also, note that `gcl-create` has several
+with the basic operations of the GDP.  Also, note that `gdp-create` has several
 other command-line options that will be useful later on.
 
 Note that if you don't explicitly specify log-placement, a log-server at
@@ -117,7 +117,7 @@ The package `gdp` should be installed in your system path for python packages.
 Once you have the required dependencies for compilation installed, something
 like `make install-python` from the root of repository should do the trick (note
 that running with `sudo` may be required). Note that this also installs the
-client side C libraries and various utilities (such as `gcl-create`) in system
+client side C libraries and various utilities (such as `gdp-create`) in system
 path.
 
 ## Appending data
@@ -153,7 +153,7 @@ which could be initialized using a human readable name.
 
 ```python
 >>> # Create a GDP_NAME object from a human readable python string
->>> gcl_name = gdp.GDP_NAME("edu.berkeley.eecs.mor.01")
+>>> gin_name = gdp.GDP_NAME("edu.berkeley.eecs.mor.01")
 ```
 
 Once we have a `GDP_NAME`, we can use this to open a handle to a log/GCL. A log
@@ -163,18 +163,22 @@ to open the GCL in read-only mode (`gdp.GDP_MODE_RO`), or append-only mode
 
 ```python
 >>> # assume that this log already exists.
->>> gcl_handle = gdp.GDP_GCL(gcl_name, gdp.GDP_MODE_RA)
+>>> gin_handle = gdp.GDP_GIN(gin_name, gdp.GDP_MODE_RA)
 ```
 
 Next, let's append a few records to the log. The unit of read/write to a log is
 called a record--data with some automatically generated metadata--represented
-as a python dictionary. The special key `data` represents the data we wish to
-append to the log, and its value should be a python (binary) string.
+by a `GDP_DATUM` object. The `GDP_DATUM` object contains a `GDP_BUF` that holds
+the actual data. (Please see the C-api for more details on the behavior of
+buffer objects, and such).
+
 
 ```python
+>>> d = gdp.GDP_DATUM()
 >>> for idx in xrange(10):
-...   datum = {"data": "Hello world " + str(idx)}
-...   gcl_handle.append(datum)
+...   d["buf"].reset()
+...   d["buf"].write("Hello world " + str(idx)}
+...   gin_handle.append(d)
 ```
 
 That's it. Ideally, it should finish without throwing any errors, resulting in
@@ -186,23 +190,23 @@ Look at `/lang/python/apps/writer_test.py` for a full example.
 
 Next, let's read some data back and see if it matches what we wrote. Note that
 we need to tell what record number we want to read, and record numbers start
-from 1. To read data, we just use `read` method of the GDP_GCL instance with
-the record number.
+from 1. To read data, we just use `read_by_recno` method of the GDP_GIN instance
+with the record number.
 
 ```python
 >>> for idx in xrange(1,11):
-...   datum = gcl_handle.read(idx)
-...   print datum
-{'recno': 1, 'data': 'Hello world 0', 'ts': {'tv_sec': 1442965633, 'tv_accuracy': 0.5, 'tv_nsec': 424722000L}}
-{'recno': 2, 'data': 'Hello world 1', 'ts': {'tv_sec': 1442965633, 'tv_accuracy': 0.5, 'tv_nsec': 425629000L}}
-{'recno': 3, 'data': 'Hello world 2', 'ts': {'tv_sec': 1442965633, 'tv_accuracy': 0.5, 'tv_nsec': 426345000L}}
-{'recno': 4, 'data': 'Hello world 3', 'ts': {'tv_sec': 1442965633, 'tv_accuracy': 0.5, 'tv_nsec': 427150000L}}
-{'recno': 5, 'data': 'Hello world 4', 'ts': {'tv_sec': 1442965633, 'tv_accuracy': 0.5, 'tv_nsec': 427989000L}}
-{'recno': 6, 'data': 'Hello world 5', 'ts': {'tv_sec': 1442965633, 'tv_accuracy': 0.5, 'tv_nsec': 428745000L}}
-{'recno': 7, 'data': 'Hello world 6', 'ts': {'tv_sec': 1442965633, 'tv_accuracy': 0.5, 'tv_nsec': 429484000L}}
-{'recno': 8, 'data': 'Hello world 7', 'ts': {'tv_sec': 1442965633, 'tv_accuracy': 0.5, 'tv_nsec': 430200000L}}
-{'recno': 9, 'data': 'Hello world 8', 'ts': {'tv_sec': 1442965633, 'tv_accuracy': 0.5, 'tv_nsec': 431135000L}}
-{'recno': 10, 'data': 'Hello world 9', 'ts': {'tv_sec': 1442965633, 'tv_accuracy': 0.5, 'tv_nsec': 431962000L}}
+...   datum = gin_handle.read_by_recno(idx)
+...   print datum["recno"], datum["buf"].peek()
+(1, 'Hello world 0')
+(2, 'Hello world 1')
+(3, 'Hello world 2')
+(4, 'Hello world 3')
+(5, 'Hello world 4')
+(6, 'Hello world 5')
+(7, 'Hello world 6')
+(8, 'Hello world 7')
+(9, 'Hello world 8')
+(10, 'Hello world 9')
 ```
 
 So far, we saw how to read and write data by record number. However, most of
@@ -215,12 +219,12 @@ Look at `/lang/python/apps/reader_test.py` for a full example.
 ## Subscriptions
 
 Next, let's see how can we subscribe to a log to get new data from a log as it
-gets appended. For this, we use `subscribe` method of the `gdp.GDP_GCL`
+gets appended. For this, we use `subscribe_by_recno` method of the `gdp.GDP_GIN`
 instance.
 
 ```python
 >>> # ignore the parameters for the moment
->>> gcl_handle.subscribe(0, 0, None)
+>>> gin_handle.subscribe_by_recno(0, 0, None)
 ```
 
 This subscription returns events, that we need to process in order to get
@@ -229,31 +233,31 @@ notified of the data as it appears.
 ```python
 >>> while True:
 ...   # this blocks until there is a new event
-...   event = gcl_handle.get_next_event(None)
-...   # Event is a dictionary itself.
+...   event = gin_handle.get_next_event(None)
+...   # Events can be used to get the associated datum
 ...   if event["type"] == gdp.GDP_EVENT_DATA:
 ...     datum = event["datum"]
-...     print datum
+...     print datum["buf"].peek()
 ...   else: 
 ...     # we ignore other event types for simplicity
 ...     break
 ```
 
-In the above code, `event` itself is a dictionary that has `datum` as the key
-containing the latest data. In order to see the above code in action, open
-another python console (while this is running), and append some new data to the
-log just the way you saw above.
+In the above code, `event` is an object of type `GDP_EVENT`, which can be used
+to get the associated `GDP_DATUM` (and then `GDP_BUF`). In order to see the
+above code in action, open another python console (while this is running), and
+append some new data to the log just the way you saw above.
 
 Look at `/lang/python/apps/reader_test_subscribe.py` for a full example.
 
-## Multiread
+## Reading multiple records at a time
 
 Reading one record at a time can be very inefficient, especially when reading
-large amount of data. For this, we support `multiread` to read a range of
-records at a time. The interface is similar to `subscribe` in some
-sense--events are returned as a result of a `multiread` call. 
+large amount of data. For this, we support asynchronous reads to read a range of
+records at a time. The interface is similar to `subscribe_by_recno` in some
+sense--events are returned as a result of an asynchronous call. 
 
-Look at `/lang/python/apps/reader_test_multiread.py` for a full example.
+Look at `/lang/python/apps/reader_test_async.py` for a full example.
 
 
 ## Asynchronous write
