@@ -143,13 +143,14 @@ ep_crypto_random_buf(void *buf, size_t n)
 	if (rfd < 0)
 	{
 		EP_ASSERT_FAILURE("ep_crypto_random_buf: cannot open /dev/urandom or /dev/random: %s",
-					randfile, strerror(errno));
+					strerror(errno));
 		abort();
 	}
-	if (read(rfd, buf, n) < n)
+	int i = read(rfd, buf, n);
+	if (i < n)
 	{
-		EP_ASSERT_FAILURE("ep_crypto_random_buf: cannot read %s: %s",
-					randfile, strerror(errno));
+		EP_ASSERT_FAILURE("ep_crypto_random_buf: cannot read %s (%d): %s",
+					randfile, i, strerror(errno));
 		abort();
 	}
 	close(rfd);
