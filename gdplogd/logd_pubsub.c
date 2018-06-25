@@ -273,7 +273,7 @@ sub_end_all_subscriptions(
 		gdp_pname_t dst_p;
 		ep_dbg_printf("sub_end_all_subscriptions: rid %" PRIgdp_rid " dst %s\n    ",
 				rid, gdp_printable_name(dest, dst_p));
-		_gdp_gob_dump(gob, ep_dbg_getfile(), GDP_PR_BASIC, 0);
+		_gdp_gob_dump(gob, ep_dbg_getfile(), GDP_PR_BASIC, 1);
 	}
 
 	GDP_GOB_ASSERT_ISLOCKED(gob);

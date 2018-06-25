@@ -607,8 +607,6 @@ fail0:
 
 /*
 **  _GDP_GOB_APPEND_SYNC --- shared operation for synchronous append to a GOB
-**
-**		Used both in GDP client library and gdpd.
 */
 
 EP_STAT
@@ -627,7 +625,7 @@ _gdp_gob_append_sync(
 						chan, reqflags, &req);
 	EP_STAT_CHECK(estat, goto fail0);
 
-	// send the request to the log server
+	// send the request to the log server and wait for response
 	estat = _gdp_invoke(req);
 	EP_STAT_CHECK(estat, goto fail1);
 

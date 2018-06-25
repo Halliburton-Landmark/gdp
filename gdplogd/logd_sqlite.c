@@ -190,6 +190,9 @@ ep_stat_from_sqlite_result_code(int rc)
 		case SQLITE_WARNING:
 			sev = EP_STAT_SEV_WARN;
 			break;
+
+		case SQLITE_CANTOPEN:
+			return GDP_STAT_NAK_NOTFOUND;
 	}
 
 	return EP_STAT_NEW(sev, registry, module, rc & 0x00ff);
@@ -752,12 +755,12 @@ sqlite_open(gdp_gob_t *gob)
 	phase = "sqlite3_open_v2";
 	rc = sqlite3_open_v2(db_path, &phys->db, SQLITE_OPEN_READWRITE, NULL);
 	if (rc != SQLITE_OK)
-		goto fail1;
+		goto fail2;
 
 	phase = "sqlite3_extended_result_codes";
 	rc = sqlite3_extended_result_codes(phys->db, 1);
 	if (rc != SQLITE_OK)
-		goto fail1;
+		goto fail2;
 
 	// verify that db is actually one we understand (application_id)
 	// and it's the correct version (user_version)
