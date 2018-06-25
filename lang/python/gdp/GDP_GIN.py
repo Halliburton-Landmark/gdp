@@ -223,7 +223,7 @@ class GDP_GIN(object):
     def print_to_file(self, fh):
         """
         Print this GDP object to a file. Could be sys.stdout
-            The actual printing is done by the C library
+        The actual printing is done by the C library
         """
         __fh = PyFile_AsFile(fh)
         __func = gdp.gdp_gin_print
@@ -246,7 +246,6 @@ class GDP_GIN(object):
         If query_param is 'dict', we assume it is query by timestamp.
         If query_param is 'str', we assume it is query by hash.
         """
-
 
         if isinstance(query_param, int):
             __query_param = gdp_recno_t(query_param)
@@ -291,45 +290,15 @@ class GDP_GIN(object):
         return datum
 
 
-    def read_by_recno(self, recno):
-        """
-        Returns a datum dictionary. The dictionary has the following keys:
-        - recno: the record number for this GDP
-        - ts   : the timestamp, which itself is a dictionary with the keys
-                    being tv_sec, tv_nsec, tv_accuracy
-        - data : the actual data associated with this datum.
-        ...
-        """
-        return self.__read(recno)
-
-
-    def read_by_hash(self, hashbytes):
-        """ Takes a hash instead of recno """
-        return self.__read(hashbytes)
-
-
-    def read_by_ts(self, tsdict):
-        """
-        Same as 'read', but takes a time-stamp dictionary instead of
-        a record number. The time-stamp dictionary has the following
-        fields:
-        - tv_sec: seconds since epoch (an integer)
-        - tv_nsec: nano seconds (an integer)
-        - tv_accuracy: accuracy (a float)
-        """
-        # the internal implementation is the same, we don't really
-        # need two different functions. The only reason is to make
-        # it clear to the user that reading by record number has
-        # a different meaning than reading by timestamp (especially
-        # when we don't trust the log-server to provide correct
-        # timestamps.
-        return self.__read(tsdict)
-
-
     def __read_async(self, start, numrecs, cbfunc, cbarg):
         """
         same as __read, except that this is the async version (and
-        enables querying multiple records at once)
+        enables querying multiple records at once).
+
+        Additionally, this does not return a GDP_DATUM; instead,
+        the user is supposed to ask for events (see `get_next_event`).
+
+        For now, callback functionality is not very well tested.
         """
 
         if isinstance(start, int):
@@ -384,20 +353,55 @@ class GDP_GIN(object):
         return estat
 
 
+    def read_by_recno(self, recno):
+        """Returns a GDP_DATUM object corresponding to specified recno"""
+        return self.__read(recno)
+
+
+    def read_by_hash(self, hashbytes):
+        """Same as read_by_recno, except takes a hash instead of recno"""
+        return self.__read(hashbytes)
+
+
+    def read_by_ts(self, tsdict):
+        """
+        Same as 'read_by_recno', but takes a time-stamp dictionary
+        instead of a record number.
+        The time-stamp dictionary has the following fields:
+        - tv_sec: seconds since epoch (an integer)
+        - tv_nsec: nano seconds (an integer)
+        - tv_accuracy: accuracy (a float)
+        """
+        return self.__read(tsdict)
+
+
     def read_by_recno_async(self, start, numrecs):
-        """ For now, callbacks are not exposed to end-user. Events are
-        generated instead.  """
+        """
+        Asynchronous version of `read_by_recno` that supports reading
+        multiple records at a time.
+        For now, callbacks are not exposed to end-user. Events are
+        generated instead.
+        """
         return self.__read_async(start, numrecs, None, None)
 
 
     def read_by_hash_async(self, starthash, numrecs):
-        """ Read a number of records by specifying the initial hash """
+        """
+        Asynchronous version of `read_by_hash` that supports reading
+        multiple records at a time.
+        For now, callbacks are not exposed to end-user. Events are
+        generated instead.
+        """
         return self.__read_async(starthash, numrecs, None, None)
 
 
     def read_by_ts_async(self, startdict, numrecs):
-        """ Same as read_async, except that the starting point of multiread
-        is a timestamp dictionary rather than a record number.  """
+        """
+        Asynchronous version of `read_by_ts` that supports reading
+        multiple records at a time.
+        For now, callbacks are not exposed to end-user. Events are
+        generated instead.
+        """
         return self.__read_async(startdict, numrecs, None, None)
 
 
@@ -408,10 +412,12 @@ class GDP_GIN(object):
     def __subscribe(self, start, numrecs, timeout, cbfunc, cbarg):
         """
         This works somewhat similar to the subscribe in GDP C api.
-        callback functions is experimental. Events are better for now.
+        Callback function support is experimental. Please use the
+        events interface if possible.
 
-        'start' could either be an 'int' (to represent record number),
-        a 'str' (for a hash), or a 'dict' (to represent a timestamp)
+        If `start` is 'int', we assume it is subscription by record number.
+        If `start` is 'dict', we assume it is subscription by timestamp.
+        If `start` is 'str', we assume it is subscription by hash.
         """
 
         if isinstance(start, int):
@@ -476,7 +482,8 @@ class GDP_GIN(object):
 
     def subscribe_by_recno(self, start, numrecs, timeout):
         """
-        Subscriptions. Refer to the C-API for more details
+        Subscriptions by a record number.
+        Refer to the C-API for more details.
         For now, callbacks are not exposed to end-user. Events are
         generated instead.
         """
@@ -489,16 +496,12 @@ class GDP_GIN(object):
 
 
     def subscribe_by_ts(self, startdict, numrecs, timeout):
-        """
-        Same as subscribe, except that the starting point of subscription
-        is a timestamp dictionary rather than a record number.
-        (See also: 'read_ts')
-        """
+        """Subscriptions, but by a timestamp dictionary instead of recno"""
         return self.__subscribe(startdict, numrecs, timeout, None, None)
 
 
     def unsubscribe(self, cbfunc=None, cbarg=None):
-        """ Terminate the subscription.  """
+        """ Terminates existing subscription.  """
 
         # casting the python function to the callback function
         if cbfunc == None:
@@ -523,7 +526,10 @@ class GDP_GIN(object):
     ##################################################################
 
     def append(self, datum, prevhash=None):
-        """ Write a datum to the GCL.  """
+        """
+        Write a datum to the GCL. If prevhash is not supplied, the
+        C library inserts a reasonable value.
+        """
 
         assert isinstance(datum, GDP_DATUM)
         assert isinstance(prevhash, GDP_HASH) or prevhash is None
