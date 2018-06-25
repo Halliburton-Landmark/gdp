@@ -26,9 +26,12 @@
 #  ----- END LICENSE BLOCK -----
 #
 
+# temporarily "gdplogd2" during transition, eventually "gdplogd"	XXX
+GDPLOGD=	gdplogd2
+
 BINALL=
 
-SBINALL=	gdplogd
+SBINALL=	${GDPLOGD}
 
 SCRIPTS=
 
@@ -145,7 +148,7 @@ logd_version.o: logd_version.c ${OBJS_MOST} Makefile
 		-D_VERSION_INFO_="\"`sh ../adm/get-version-info.sh`\"" \
 		-c logd_version.c
 
-gdplogd: ${OBJS} ${LIBDEPS}
+${GDPLOGD}: ${OBJS} ${LIBDEPS}
 	${CC} -o $@ ${LDFLAGS} ${OBJS} ${LDLIBS}
 
 clean:
