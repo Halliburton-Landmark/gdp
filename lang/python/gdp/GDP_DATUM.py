@@ -133,9 +133,8 @@ class GDP_DATUM:
 
 
     def gethash(self, gin):
-        """
-        Compute the hash of the datum for a given log?
-        """
+        """ Compute the hash of the datum for a given log? """
+
         assert isinstance(gin, GDP_GIN)
         __func = gdp.gdp_datum_hash
         __func.argtypes = [POINTER(self.gdp_datum_t),
@@ -161,7 +160,7 @@ class GDP_DATUM:
     def getts(self):
         """
         Return the timestamp associated with this GDP_DATUM in the form of a
-            dictionary. The keys are: tv_sec, tv_nsec and tv_accuracy
+        dictionary. The keys are: tv_sec, tv_nsec and tv_accuracy
         """
 
         ts = EP_TIME_SPEC()
@@ -181,7 +180,10 @@ class GDP_DATUM:
         return ret
 
     def getdlen(self):
-        "Returns the length of the data associated with this GDP_DATUM"
+        """
+        Returns the length of the data in GDP_BUF associated with
+        this GDP_DATUM.
+        """
 
         __func = gdp.gdp_datum_getdlen
         __func.argtypes = [POINTER(self.gdp_datum_t)]
@@ -191,13 +193,7 @@ class GDP_DATUM:
         return ret
 
     def getbuf(self):
-        """
-        Return the data associated with this GDP_DATUM. Internally, it queries
-        a buffer for the data, and returns whatever it has read so far from
-        the buffer.
-
-        Effectively drains the buffer too.
-        """
+        """ Return the GDP_BUF associated with this GDP_DATUM. """
 
         __func = gdp.gdp_datum_getbuf
         __func.argtypes = [POINTER(self.gdp_datum_t)]
