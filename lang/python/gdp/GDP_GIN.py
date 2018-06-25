@@ -268,14 +268,14 @@ class GDP_GIN(object):
             # TODO check whether the following commented out version
             # works when the C-library implements this functionality.
 
-            # __query_param = GDP_DATUM.EP_TIME_SPEC()
+            # __query_param = EP_TIME_SPEC()
             # __query_param.tv_sec = c_int64(query_param['tv_sec'])
             # __query_param.tv_nsec = c_uint32(query_param['tv_nsec'])
             # __query_param.tv_accuracy = c_float(query_param['tv_accuracy'])
 
             # __func = gdp.gdp_gin_read_by_ts
             # __func.argtypes = [POINTER(self.gdp_gin_t),
-            #                         POINTER(GDP_DATUM.EP_TIME_SPEC),
+            #                         POINTER(EP_TIME_SPEC),
             #                         POINTER(GDP_DATUM.gdp_datum_t)]
             # __func.restype = EP_STAT
 
@@ -320,11 +320,11 @@ class GDP_GIN(object):
             ## commented out version works when the underlying
             ## C-library implements this functionality.
 
-            # __start = GDP_DATUM.EP_TIME_SPEC()
+            # __start = EP_TIME_SPEC()
             # __start.tv_sec = c_int64(start['tv_sec'])
             # __start.tv_nsec = c_uint32(start['tv_nsec'])
             # __start.tv_accuracy = c_float(start['tv_accuracy'])
-            # __start_type = POINTER(GDP_DATUM.EP_TIME_SPEC)
+            # __start_type = POINTER(EP_TIME_SPEC)
             # __func = gdp.gdp_gin_read_by_ts_async
 
         else:
@@ -433,12 +433,12 @@ class GDP_GIN(object):
         elif isinstance(start, dict):
             raise NotImplementedError
 
-            # __start = GDP_DATUM.EP_TIME_SPEC()
+            # __start = EP_TIME_SPEC()
             # __start.tv_sec = c_int64(start['tv_sec'])
             # __start.tv_nsec = c_uint32(start['tv_nsec'])
             # __start.tv_accuracy = c_float(start['tv_accuracy'])
 
-            # __start_type = POINTER(GDP_DATUM.EP_TIME_SPEC)
+            # __start_type = POINTER(EP_TIME_SPEC)
             # __func = gdp.gdp_gin_subscribe_ts
 
         else:
@@ -452,7 +452,7 @@ class GDP_GIN(object):
         if timeout == None:
             __timeout = None
         else:
-            __timeout = GDP_DATUM.EP_TIME_SPEC()
+            __timeout = EP_TIME_SPEC()
             __timeout.tv_sec = c_int64(timeout['tv_sec'])
             __timeout.tv_nsec = c_uint32(timeout['tv_nsec'])
             __timeout.tv_accuracy = c_float(timeout['tv_accuracy'])
@@ -465,11 +465,11 @@ class GDP_GIN(object):
 
         if cbfunc == None:
             __func.argtypes = [POINTER(self.gdp_gin_t), __start_type,
-                                c_int32, POINTER(GDP_DATUM.EP_TIME_SPEC),
+                                c_int32, POINTER(EP_TIME_SPEC),
                                 c_void_p, c_void_p]
         else:
             __func.argtypes = [POINTER(self.gdp_gin_t), __start_type,
-                                c_int32, POINTER(GDP_DATUM.EP_TIME_SPEC),
+                                c_int32, POINTER(EP_TIME_SPEC),
                                 self.gdp_gin_sub_cbfunc_t, c_void_p]
 
         __func.restype = EP_STAT
@@ -602,11 +602,11 @@ class GDP_GIN(object):
             __timeout = None
             __func_arg2_type = c_void_p
         else:
-            __timeout = GDP_DATUM.EP_TIME_SPEC()
+            __timeout = EP_TIME_SPEC()
             __timeout.tv_sec = c_int64(timeout['tv_sec'])
             __timeout.tv_nsec = c_uint32(timeout['tv_nsec'])
             __timeout.tv_accuracy = c_float(timeout['tv_accuracy'])
-            __func_arg2_type = POINTER(GDP_DATUM.EP_TIME_SPEC)
+            __func_arg2_type = POINTER(EP_TIME_SPEC)
 
         __func.argtypes = [__func_arg1_type, __func_arg2_type]
         __func.restype = POINTER(GDP_EVENT.gdp_event_t)

@@ -31,18 +31,10 @@ from MISC import *
 
 class GDP_EVENT:
 
-    """ represents a GDP event """
+    """ A class that represents a GDP event """
 
     class gdp_event_t(Structure):
         pass
-
-    # Python representation of this is a dictionary, with the exact same fields
-    class EP_TIME_SPEC(Structure):
-        pass
-
-    EP_TIME_SPEC._fields_ = [("tv_sec", c_int64),
-                               ("tv_nsec", c_uint32),
-                               ("tv_accuracy", c_float)]
 
     def __init__(self, **kwargs):
         """

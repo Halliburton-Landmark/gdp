@@ -53,14 +53,6 @@ class GDP_DATUM:
     class gdp_datum_t(Structure):
         pass
 
-    # Python representation of this is a dictionary, with the exact same fields
-    class EP_TIME_SPEC(Structure):
-        pass
-
-    EP_TIME_SPEC._fields_ = [("tv_sec", c_int64),
-                               ("tv_nsec", c_uint32),
-                               ("tv_accuracy", c_float)]
-
     def __init__(self, **kwargs):
         """
         Constructor: Two ways of creating a new pythong GDP datum object:
@@ -172,10 +164,10 @@ class GDP_DATUM:
             dictionary. The keys are: tv_sec, tv_nsec and tv_accuracy
         """
 
-        ts = self.EP_TIME_SPEC()
+        ts = EP_TIME_SPEC()
         __func = gdp.gdp_datum_getts
         __func.argtypes = [
-            POINTER(self.gdp_datum_t), POINTER(self.EP_TIME_SPEC)]
+            POINTER(self.gdp_datum_t), POINTER(EP_TIME_SPEC)]
         # ignore the return value
 
         __func(self.ptr, byref(ts))

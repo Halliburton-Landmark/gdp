@@ -120,6 +120,14 @@ class EP_STAT(Structure):
 EP_STAT._fields_ = [("code", c_ulong)]
 
 
+class EP_TIME_SPEC(Structure):
+    pass
+EP_TIME_SPEC._fields_ = [("tv_sec", c_int64),
+                           ("tv_nsec", c_uint32),
+                           ("tv_accuracy", c_float)]
+
+
+
 # converting EP_STAT error codes to string
 def ep_stat_tostr(ep): 
     """ returns string representation of estat """
