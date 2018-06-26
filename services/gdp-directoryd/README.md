@@ -6,14 +6,11 @@ several supporting packages including the OCGraph plugin.
 
 ## MariaDB Installation
 
-For Ubuntu 16.04, install the following packages:
+For Ubuntu 16.04, install the following packages, and restart so plugin loads:
 
-    $ apt install \
-  	  	  MariaDB-server \
-  	  	  libMariaDB2 \
-  	  	  libMariaDB-client-lgpl-dev \
-	  	  libMariaDB-client-lgpl-dev-compat \
-	  	  MariaDB-plugin-oqgraph
+    $ apt install mariadb-server libmariadb2 libmariadb-client-lgpl-dev \
+          libmariadb-client-lgpl-dev-compat mariadb-plugin-oqgraph
+    $ sudo service mysql restart
 
 ## MariaDB Configuration
 
@@ -21,7 +18,7 @@ The database will be configured for localhost access ONLY, but a
 production installation should also replace the default "testblackbox"
 password (both within setup.sql and the directory daemon source code
 later in these instructions so they match!), before proceeding to the
-following two commands:
+following commands:
 
     $ sudo mysql -v --show-warnings < setup.sql
     $ sudo mysql -v --show-warnings < blackbox.sql
