@@ -47,7 +47,7 @@ __BEGIN_DECLS
 // change these as necessary
 #define EP_VERSION_MAJOR	3
 #define EP_VERSION_MINOR	0
-#define EP_VERSION_PATCH	0
+#define EP_VERSION_PATCH	1
 
 #define __EP_STRING(x)		#x
 #define __EP_VER_CONCAT(a, b, c)					\
