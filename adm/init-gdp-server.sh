@@ -128,7 +128,7 @@ fi
 
 info "Creating $EP_PARAMS/gdplogd"
 {
-	echo "swarm.gdplogd.gdpname=edu.berkeley.eecs.$hostname.gdplogd"
+	echo "swarm.gdplogd.gdpname=edu.berkeley.eecs.$hostname.gdplogd.physical"
 	echo "swarm.gdplogd.runasuser=gdp"
 } > $TMP/gdplogd.params
 if [ ! -f $EP_PARAMS/gdplogd ]
