@@ -158,7 +158,7 @@ begin
 	set @eid = NULL;
 	select id into @oid from blackbox.guids where guid = oguid;
 	select id into @did from blackbox.guids where guid = dguid;
-	select linkid into @eid from blackbox.graph where latch='breadth_first' and origid = @oid and destid = @did and seq = 1 limit 1;
+	select linkid into @eid from blackbox.graph where latch='dijkstras' and origid = @oid and destid = @did and seq = 1 limit 1;
     select guid into @nguid from blackbox.guids where id = @eid;
 	select @nguid;
 end //
