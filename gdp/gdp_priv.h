@@ -540,6 +540,7 @@ void			_gdp_gob_pr_stats(			// print (debug) GOB statistics
 						FILE *fp);
 
 
+
 /*
 **  GOB Open Information
 */
@@ -740,6 +741,16 @@ void			_gdp_req_dump(				// print (debug) request
 
 void			_gdp_req_pr_stats(			// print (debug) statistics
 						FILE *fp);
+
+EP_STAT			_gdp_req_ack_resp(			// helper: create ACK response
+						gdp_req_t *req,			// active request
+						gdp_cmd_t ack_type);	// actual ACK command
+
+EP_STAT			_gdp_req_nak_resp(			// helper: create NAK response
+						gdp_req_t *req,			// active request
+						gdp_cmd_t nak_type,		// actual NAK command
+						const char *detail,		// text detail
+						EP_STAT estat);			// status code detail
 
 
 /*

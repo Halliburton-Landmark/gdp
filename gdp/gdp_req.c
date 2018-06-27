@@ -685,6 +685,81 @@ _gdp_req_pr_stats(FILE *fp)
 }
 
 
+/*
+**  _GDP_REQ_ACK_RESP --- helper routine for returning ACK responses
+*/
+
+EP_STAT
+_gdp_req_ack_resp(
+			gdp_req_t *req,
+			gdp_cmd_t ack_type)
+{
+	gdp_msg_t *msg;
+
+	if (req->rpdu != NULL)
+	{
+		ep_dbg_cprintf(Dbg, 1, "_gdp_req_ack_resp: flushing old rpdu %p\n",
+				req->rpdu);
+		_gdp_pdu_free(&req->rpdu);
+	}
+	msg = _gdp_msg_new(ack_type, req->cpdu->msg->rid, req->cpdu->msg->seqno);
+	req->rpdu = _gdp_pdu_new(msg, req->cpdu->dst, req->cpdu->src);
+	return EP_STAT_OK;
+}
+
+
+/*
+**	_GDP_REQ_NAK_RESP --- helper routine for returning NAK responses
+*/
+
+EP_STAT
+_gdp_req_nak_resp(gdp_req_t *req,
+			gdp_cmd_t nak_type,
+			const char *detail,
+			EP_STAT estat)
+{
+	gdp_pname_t pname;
+	char text_message[250];
+	gdp_msg_t *msg;
+	char ebuf[80];
+
+	// a bit of a hack
+	if (nak_type == 0)
+		nak_type = _gdp_acknak_from_estat(estat, GDP_NAK_S_INTERNAL);
+
+	gdp_printable_name(req->cpdu->dst, pname);
+	snprintf(text_message, sizeof text_message, "%s: %s: %s",
+			detail, pname, ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	if (GDP_CMD_IS_S_NAK(nak_type))
+	{
+		// server error (rather than client error)
+		ep_log(estat, "%s: %s", detail, pname);
+	}
+	else
+	{
+		ep_dbg_cprintf(Dbg, 1, "%s\n", text_message);
+	}
+	if (req->rpdu != NULL)
+	{
+		ep_dbg_cprintf(Dbg, 1, "gdpd_nak_resp: flushing old rpdu %p\n",
+				req->rpdu);
+		_gdp_pdu_free(&req->rpdu);
+	}
+
+	ep_dbg_cprintf(Dbg, 10,
+				"gdpd_nak_resp: sending %s (%s)\n",
+				_gdp_proto_cmd_name(nak_type),
+				text_message);
+	msg = _gdp_msg_new(nak_type, req->cpdu->msg->rid, req->cpdu->msg->seqno);
+	req->rpdu = _gdp_pdu_new(msg, req->cpdu->dst, req->cpdu->src);
+	GdpMessage__NakGeneric *nak = msg->nak;
+	nak->ep_stat = EP_STAT_TO_INT(estat);
+	nak->description = ep_mem_strdup(text_message);
+
+	return estat;
+}
+
+
 /***********************************************************************
 **
 **	Request ID handling

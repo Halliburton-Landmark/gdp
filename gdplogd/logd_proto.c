@@ -62,80 +62,6 @@ static EP_DBG	DbgSignatureOverride = EP_DBG_INIT("gdplogd.sig.override",
 				payload = msg->where;										\
 			}
 
-/*
-**	GDPD_NAK_RESP --- helper routine for returning NAK responses
-*/
-
-static EP_STAT
-gdpd_nak_resp(gdp_req_t *req,
-			gdp_cmd_t nak_type,
-			const char *detail,
-			EP_STAT estat)
-{
-	gdp_pname_t pname;
-	char text_message[250];
-	gdp_msg_t *msg;
-	char ebuf[80];
-
-	// a bit of a hack
-	if (nak_type == 0)
-		nak_type = _gdp_acknak_from_estat(estat, GDP_NAK_S_INTERNAL);
-
-	gdp_printable_name(req->cpdu->dst, pname);
-	snprintf(text_message, sizeof text_message, "%s: %s: %s",
-			detail, pname, ep_stat_tostr(estat, ebuf, sizeof ebuf));
-	if (GDP_CMD_IS_S_NAK(nak_type))
-	{
-		// server error (rather than client error)
-		ep_log(estat, "%s: %s", detail, pname);
-	}
-	else
-	{
-		ep_dbg_cprintf(Dbg, 1, "%s\n", text_message);
-	}
-	if (req->rpdu != NULL)
-	{
-		ep_dbg_cprintf(Dbg, 1, "gdpd_nak_resp: flushing old rpdu %p\n",
-				req->rpdu);
-		_gdp_pdu_free(&req->rpdu);
-	}
-
-	ep_dbg_cprintf(Dbg, 10,
-				"gdpd_nak_resp: sending %s (%s)\n",
-				_gdp_proto_cmd_name(nak_type),
-				text_message);
-	msg = _gdp_msg_new(nak_type, req->cpdu->msg->rid, req->cpdu->msg->seqno);
-	req->rpdu = _gdp_pdu_new(msg, req->cpdu->dst, req->cpdu->src);
-	GdpMessage__NakGeneric *nak = msg->nak;
-	nak->ep_stat = EP_STAT_TO_INT(estat);
-	nak->description = ep_mem_strdup(text_message);
-
-	return estat;
-}
-
-
-/*
-**  GDPD_ACK_RESP --- helper routine for returning ACK responses
-*/
-
-static EP_STAT
-gdpd_ack_resp(
-			gdp_req_t *req,
-			gdp_cmd_t ack_type)
-{
-	gdp_msg_t *msg;
-
-	if (req->rpdu != NULL)
-	{
-		ep_dbg_cprintf(Dbg, 1, "gdpd_ack_resp: flushing old rpdu %p\n",
-				req->rpdu);
-		_gdp_pdu_free(&req->rpdu);
-	}
-	msg = _gdp_msg_new(ack_type, req->cpdu->msg->rid, req->cpdu->msg->seqno);
-	req->rpdu = _gdp_pdu_new(msg, req->cpdu->dst, req->cpdu->src);
-	return EP_STAT_OK;
-}
-
 
 /*
 **	Stub
@@ -244,8 +170,8 @@ cmd_ping(gdp_req_t *req)
 
 done:
 	if (EP_STAT_ISOK(estat))
-		return gdpd_ack_resp(req, GDP_ACK_SUCCESS);
-	return gdpd_nak_resp(req, GDP_NAK_S_LOST_SUBSCR,
+		return _gdp_req_ack_resp(req, GDP_ACK_SUCCESS);
+	return _gdp_req_nak_resp(req, GDP_NAK_S_LOST_SUBSCR,
 					"cmd_ping: lost subscription",
 					estat);
 }
@@ -272,7 +198,7 @@ cmd_create(gdp_req_t *req)
 	if (!GDP_NAME_SAME(req->cpdu->dst, _GdpMyRoutingName))
 	{
 		// this is directed to a GOB, not to the daemon
-		return gdpd_nak_resp(req, GDP_NAK_C_BADREQ,
+		return _gdp_req_nak_resp(req, GDP_NAK_C_BADREQ,
 						"cmd_create: log name required",
 						GDP_STAT_NAK_CONFLICT);
 	}
@@ -292,7 +218,7 @@ cmd_create(gdp_req_t *req)
 						payload->logname.len, sizeof gobname);
 			ep_dbg_printf("\tpname %s\n", payload->logname.data);
 		}
-		estat = gdpd_nak_resp(req, GDP_NAK_C_BADREQ,
+		estat = _gdp_req_nak_resp(req, GDP_NAK_C_BADREQ,
 						"cmd_create: improper log name",
 						GDP_STAT_GDP_NAME_INVALID);
 		goto fail0;
@@ -302,7 +228,7 @@ cmd_create(gdp_req_t *req)
 	// make sure we aren't creating a log with our name
 	if (GDP_NAME_SAME(gobname, _GdpMyRoutingName))
 	{
-		estat = gdpd_nak_resp(req, GDP_NAK_C_FORBIDDEN,
+		estat = _gdp_req_nak_resp(req, GDP_NAK_C_FORBIDDEN,
 				"cmd_create: cannot create a log with same name as logd",
 				GDP_STAT_GDP_NAME_INVALID);
 		goto fail0;
@@ -321,7 +247,7 @@ cmd_create(gdp_req_t *req)
 	// collect metadata
 	if (payload->metadata->data.len == 0)
 	{
-		estat = gdpd_nak_resp(req, GDP_NAK_C_BADOPT,
+		estat = _gdp_req_nak_resp(req, GDP_NAK_C_BADOPT,
 						"cmd_create: metadata required",
 						GDP_STAT_METADATA_REQUIRED);
 		goto fail0;
@@ -341,7 +267,7 @@ cmd_create(gdp_req_t *req)
 	estat = gob->x->physimpl->create(gob, gob->gob_md);
 	if (!EP_STAT_ISOK(estat))
 	{
-		estat = gdpd_nak_resp(req, GDP_NAK_S_INTERNAL,
+		estat = _gdp_req_nak_resp(req, GDP_NAK_S_INTERNAL,
 						"cmd_create: physical create failure",
 						estat);
 		goto fail1;
@@ -363,7 +289,7 @@ fail1:
 fail0:
 	if (EP_STAT_ISOK(estat))
 	{
-		gdpd_ack_resp(req, GDP_ACK_CREATED);
+		_gdp_req_ack_resp(req, GDP_ACK_CREATED);
 	}
 	char ebuf[60];
 	if (gob != NULL)
@@ -398,13 +324,13 @@ cmd_open(gdp_req_t *req)
 	estat = get_open_handle(req);
 	if (!EP_STAT_ISOK(estat))
 	{
-		estat = gdpd_nak_resp(req, GDP_NAK_S_INTERNAL,
+		estat = _gdp_req_nak_resp(req, GDP_NAK_S_INTERNAL,
 							"cmd_open: could not open GOB", estat);
 		return estat;
 	}
 
 	// set up the response
-	gdpd_ack_resp(req, GDP_ACK_SUCCESS);
+	_gdp_req_ack_resp(req, GDP_ACK_SUCCESS);
 	GdpMessage__AckSuccess *resp = req->rpdu->msg->ack_success;
 
 	gob = req->gob;
@@ -460,12 +386,12 @@ cmd_close(gdp_req_t *req)
 	estat = get_open_handle(req);
 	if (!EP_STAT_ISOK(estat))
 	{
-		return gdpd_nak_resp(req, GDP_NAK_C_BADREQ,
+		return _gdp_req_nak_resp(req, GDP_NAK_C_BADREQ,
 							"cmd_close: GOB not open", estat);
 	}
 
 	// set up the response
-	gdpd_ack_resp(req, GDP_ACK_SUCCESS);
+	_gdp_req_ack_resp(req, GDP_ACK_SUCCESS);
 	GdpMessage__AckSuccess *resp = req->rpdu->msg->ack_success;
 
 	//return number of records
@@ -511,19 +437,19 @@ cmd_delete(gdp_req_t *req)
 	estat = get_open_handle(req);
 	if (!EP_STAT_ISOK(estat))
 	{
-		return gdpd_nak_resp(req, GDP_NAK_C_BADREQ,
+		return _gdp_req_nak_resp(req, GDP_NAK_C_BADREQ,
 							"cmd_delete: GOB not open", estat);
 	}
 
 	estat = verify_req_signature(req);
 	if (!EP_STAT_ISOK(estat))
 	{
-		return gdpd_nak_resp(req, GDP_NAK_C_UNAUTH,
+		return _gdp_req_nak_resp(req, GDP_NAK_C_UNAUTH,
 							"cmd_delete: signature failure", estat);
 	}
 
 	// set up the response
-	gdpd_ack_resp(req, GDP_ACK_DELETED);
+	_gdp_req_ack_resp(req, GDP_ACK_DELETED);
 	GdpMessage__AckSuccess *resp = req->rpdu->msg->ack_success;
 
 	// return number of records
@@ -556,7 +482,7 @@ make_read_acknak_pdu(gdp_req_t *req, EP_STAT estat)
 	if (EP_STAT_ISOK(estat))
 	{
 		// OK, the next record exists: send it
-		gdpd_ack_resp(req, GDP_ACK_CONTENT);
+		_gdp_req_ack_resp(req, GDP_ACK_CONTENT);
 		GdpMessage__AckContent *resp = req->rpdu->msg->ack_content;
 		resp->dl->n_d = 1;		//FIXME: should handle multiples
 		EP_ASSERT(resp->dl->d == NULL);
@@ -568,7 +494,7 @@ make_read_acknak_pdu(gdp_req_t *req, EP_STAT estat)
 	else if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOTFOUND))
 	{
 		// no results found matching query
-		gdpd_ack_resp(req, GDP_NAK_C_NOTFOUND);
+		_gdp_req_ack_resp(req, GDP_NAK_C_NOTFOUND);
 		GdpMessage__NakGeneric *resp = req->rpdu->msg->nak;
 		resp->ep_stat = EP_STAT_TO_INT(estat);
 		resp->recno = req->nextrec;
@@ -576,7 +502,7 @@ make_read_acknak_pdu(gdp_req_t *req, EP_STAT estat)
 	else if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_LOST_SUBSCR))
 	{
 		// found some results, but no more to come
-		gdpd_ack_resp(req, GDP_ACK_END_OF_RESULTS);
+		_gdp_req_ack_resp(req, GDP_ACK_END_OF_RESULTS);
 		GdpMessage__NakGeneric *resp = req->rpdu->msg->nak;
 		resp->ep_stat = EP_STAT_TO_INT(estat);
 		resp->recno = req->nextrec;
@@ -584,7 +510,7 @@ make_read_acknak_pdu(gdp_req_t *req, EP_STAT estat)
 	else
 	{
 		// some other failure
-		gdpd_ack_resp(req, GDP_NAK_S_INTERNAL);
+		_gdp_req_ack_resp(req, GDP_NAK_S_INTERNAL);
 		GdpMessage__NakGeneric *resp = req->rpdu->msg->nak;
 		resp->ep_stat = EP_STAT_TO_INT(estat);
 		resp->recno = req->nextrec;
@@ -612,7 +538,7 @@ cmd_read_by_recno(gdp_req_t *req)
 	estat = get_open_handle(req);
 	if (!EP_STAT_ISOK(estat))
 	{
-		return gdpd_nak_resp(req, GDP_NAK_S_INTERNAL,
+		return _gdp_req_nak_resp(req, GDP_NAK_S_INTERNAL,
 							"cmd_read_by_recno: GOB open failure", estat);
 	}
 
@@ -649,7 +575,7 @@ cmd_read_by_ts(gdp_req_t *req)
 	estat = get_open_handle(req);
 	if (!EP_STAT_ISOK(estat))
 	{
-		return gdpd_nak_resp(req, GDP_NAK_S_INTERNAL,
+		return _gdp_req_nak_resp(req, GDP_NAK_S_INTERNAL,
 							"cmd_read_by_ts: GOB open failure", estat);
 	}
 
@@ -756,7 +682,7 @@ cmd_append(gdp_req_t *req)
 	estat = get_open_handle(req);
 	if (!EP_STAT_ISOK(estat))
 	{
-		return gdpd_nak_resp(req, GDP_NAK_C_BADREQ,
+		return _gdp_req_nak_resp(req, GDP_NAK_C_BADREQ,
 							"cmd_append: GOB not open", estat);
 	}
 
@@ -773,7 +699,7 @@ cmd_append(gdp_req_t *req)
 	// validate record number
 	if (pbd->recno <= 0)
 	{
-		estat = gdpd_nak_resp(req, GDP_NAK_C_BADOPT,
+		estat = _gdp_req_nak_resp(req, GDP_NAK_C_BADOPT,
 						"cmd_append: recno must be > 0",
 						GDP_STAT_NAK_BADOPT);
 		goto fail0;
@@ -805,7 +731,7 @@ cmd_append(gdp_req_t *req)
 				snprintf(mbuf, sizeof mbuf,
 						"cmd_append: duplicate record number %" PRIgdp_recno,
 						pbd->recno);
-				estat = gdpd_nak_resp(req, GDP_NAK_C_CONFLICT,
+				estat = _gdp_req_nak_resp(req, GDP_NAK_C_CONFLICT,
 						mbuf, GDP_STAT_RECORD_DUPLICATED);
 				goto fail0;
 			}
@@ -818,7 +744,7 @@ cmd_append(gdp_req_t *req)
 			snprintf(mbuf, sizeof mbuf,
 					"cmd_append: record number %" PRIgdp_recno " missing",
 					pbd->recno);
-			estat = gdpd_nak_resp(req, GDP_NAK_C_FORBIDDEN,
+			estat = _gdp_req_nak_resp(req, GDP_NAK_C_FORBIDDEN,
 					mbuf, GDP_STAT_RECNO_SEQ_ERROR);
 			goto fail0;
 		}
@@ -914,7 +840,7 @@ cmd_append(gdp_req_t *req)
 		// update the server's view of the number of records
 		req->gob->nrecs++;
 
-		gdpd_ack_resp(req, GDP_ACK_SUCCESS);
+		_gdp_req_ack_resp(req, GDP_ACK_SUCCESS);
 		GdpMessage__AckSuccess *resp = req->rpdu->msg->ack_success;
 		resp->recno = req->gob->nrecs;
 		resp->ts = pbd->ts;
@@ -922,7 +848,7 @@ cmd_append(gdp_req_t *req)
 	}
 	else
 	{
-		estat = gdpd_nak_resp(req, GDP_MSG_CODE__CMD_NONE,
+		estat = _gdp_req_nak_resp(req, GDP_MSG_CODE__CMD_NONE,
 						"cmd_append: append failure",
 						estat);
 	}
@@ -930,7 +856,7 @@ cmd_append(gdp_req_t *req)
 	if (false)
 	{
 fail1:
-		estat = gdpd_nak_resp(req, GDP_NAK_C_FORBIDDEN,
+		estat = _gdp_req_nak_resp(req, GDP_NAK_C_FORBIDDEN,
 						"cmd_append",
 						GDP_STAT_NAK_FORBIDDEN);
 		req->rpdu->msg->nak->recno = req->gob->nrecs;
@@ -1059,7 +985,7 @@ cmd_subscribe_by_recno(gdp_req_t *req)
 	estat = get_open_handle(req);
 	if (!EP_STAT_ISOK(estat))
 	{
-		return gdpd_nak_resp(req, GDP_NAK_C_BADREQ,
+		return _gdp_req_nak_resp(req, GDP_NAK_C_BADREQ,
 							"cmd_subscribe: GOB not open", estat);
 	}
 
@@ -1094,7 +1020,7 @@ cmd_subscribe_by_recno(gdp_req_t *req)
 
 	if (req->numrecs < 0)
 	{
-		return gdpd_nak_resp(req, GDP_NAK_C_BADOPT,
+		return _gdp_req_nak_resp(req, GDP_NAK_C_BADOPT,
 							"cmd_subscribe: numrecs cannot be negative",
 							GDP_STAT_NAK_BADOPT);
 	}
@@ -1194,7 +1120,7 @@ cmd_subscribe_by_recno(gdp_req_t *req)
 
 	if (EP_STAT_ISOK(estat) && req->rpdu == NULL)
 	{
-		gdpd_ack_resp(req, GDP_ACK_SUCCESS);
+		_gdp_req_ack_resp(req, GDP_ACK_SUCCESS);
 		// ... if we want to fill in some info later....
 		//GdpMessage__AckSuccess *resp = req->rpdu->msg->ack_success;
 	}
@@ -1222,7 +1148,7 @@ cmd_multiread(gdp_req_t *req)
 	estat = get_open_handle(req);
 	if (!EP_STAT_ISOK(estat))
 	{
-		return gdpd_nak_resp(req, GDP_NAK_C_BADREQ,
+		return _gdp_req_nak_resp(req, GDP_NAK_C_BADREQ,
 							"cmd_multiread: GOB not open", estat);
 	}
 
@@ -1287,7 +1213,7 @@ cmd_unsubscribe(gdp_req_t *req)
 	estat = get_open_handle(req);
 	if (!EP_STAT_ISOK(estat))
 	{
-		return gdpd_nak_resp(req, GDP_NAK_C_BADREQ,
+		return _gdp_req_nak_resp(req, GDP_NAK_C_BADREQ,
 							"cmd_unsubscribe: GOB not open", estat);
 	}
 
@@ -1295,7 +1221,7 @@ cmd_unsubscribe(gdp_req_t *req)
 	sub_end_all_subscriptions(req->gob, req->cpdu->src, req->cpdu->msg->rid);
 
 	// send the ack
-	gdpd_ack_resp(req, GDP_ACK_SUCCESS);
+	_gdp_req_ack_resp(req, GDP_ACK_SUCCESS);
 
 	if (ep_dbg_test(Dbg, 10))
 	{
@@ -1321,7 +1247,7 @@ cmd_getmetadata(gdp_req_t *req)
 	estat = get_open_handle(req);
 	if (!EP_STAT_ISOK(estat))
 	{
-		estat = gdpd_nak_resp(req, GDP_NAK_S_INTERNAL,
+		estat = _gdp_req_nak_resp(req, GDP_NAK_S_INTERNAL,
 							"cmd_getmetadata: GOB open failure", estat);
 		goto fail0;
 	}
@@ -1335,7 +1261,7 @@ cmd_getmetadata(gdp_req_t *req)
 	{
 		uint8_t *mdbuf;
 		size_t mdlen = _gdp_md_serialize(gmd, &mdbuf);
-		gdpd_ack_resp(req, GDP_ACK_SUCCESS);
+		_gdp_req_ack_resp(req, GDP_ACK_SUCCESS);
 		GdpMessage__AckSuccess *resp = req->rpdu->msg->ack_success;
 		resp->metadata.data = mdbuf;
 		resp->metadata.len = mdlen;
@@ -1343,7 +1269,7 @@ cmd_getmetadata(gdp_req_t *req)
 	}
 	else
 	{
-		gdpd_nak_resp(req, GDP_NAK_S_INTERNAL,
+		_gdp_req_nak_resp(req, GDP_NAK_S_INTERNAL,
 					"cannot get log metadata", estat);
 	}
 
@@ -1375,7 +1301,7 @@ cmd_fwd_append(gdp_req_t *req)
 	if (!GDP_NAME_SAME(req->cpdu->dst, _GdpMyRoutingName))
 	{
 		// this is directed to a GOB, not to the daemon
-		return gdpd_nak_resp(req, GDP_NAK_C_BADREQ,
+		return _gdp_req_nak_resp(req, GDP_NAK_C_BADREQ,
 							"cmd_create: log name required",
 							GDP_STAT_NAK_CONFLICT);
 	}
@@ -1388,7 +1314,7 @@ cmd_fwd_append(gdp_req_t *req)
 		i = gdp_buf_read(req->cpdu->datum->dbuf, gobname, sizeof gobname);
 		if (i < sizeof req->cpdu->dst)
 		{
-			return gdpd_nak_resp(req, GDP_NAK_S_INTERNAL,
+			return _gdp_req_nak_resp(req, GDP_NAK_S_INTERNAL,
 								"cmd_fwd_append: gobname required",
 								GDP_STAT_GDP_NAME_INVALID);
 		}
