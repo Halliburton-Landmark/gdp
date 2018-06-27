@@ -238,15 +238,14 @@ class GDPProtocol(Protocol):
             logging.warning("addr formats not implemented yet")
             return
         if msg_dict['type'] != 0:
-            logging.warning('only regular traffic supported for now')
-            return
+            logging.warning('non-regular traffic; behavior undefined')
 
         msg_dict['ttl'] = ord(message[3]) & 0x3f
 
         for i in xrange(4,10):
             if message[i] != '\x00':
                 logging.warning("Fragments not implemented yet")
-                return
+
         msg_dict['data_len'] = data_len     # byte index 10, 11
 
         msg_dict['dst'] = message[12:12+32]
@@ -259,7 +258,7 @@ class GDPProtocol(Protocol):
         # request_handler is to be supplied by GDPProtocolFactory,
         # which in turn gets it from GDPService
         # XXX: What all information should be made available here?
-        keys = set(msg_dict.keys()) & set(['dst', 'src', 'data'])
+        keys = set(msg_dict.keys()) & set(['dst', 'src', 'data', 'type'])
         data = {k: msg_dict[k] for k in keys}
         logging.debug("Incoming:\n%s", pprint(data))
         resp = self.request_handler(data)

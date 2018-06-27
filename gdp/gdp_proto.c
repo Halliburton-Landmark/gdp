@@ -816,7 +816,8 @@ cmd_not_implemented(gdp_req_t *req)
 		funlockfile(ep_dbg_getfile());
 	}
 
-	return GDP_STAT_NOT_IMPLEMENTED;
+	return _gdp_req_nak_resp(req, GDP_NAK_C_BADREQ,
+					"Command not implemented", GDP_STAT_NOT_IMPLEMENTED);
 }
 
 
