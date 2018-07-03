@@ -175,6 +175,14 @@ class GDP_GIN(object):
         estat = __func(_name_ctypes, logd_name_ctypes,
                             md.ptr, throwaway_ptr)
         check_EP_STAT(estat)
+
+        # close this gin/gob to prevent side-effects
+        __func = gdp.gdp_gin_close
+        __func.argtypes = [POINTER(cls.gdp_gin_t)]
+        __func.restype = EP_STAT
+
+        estat = __func(throwaway_ptr)
+        check_EP_STAT(estat)
         return
 
 
