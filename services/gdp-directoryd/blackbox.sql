@@ -46,7 +46,6 @@ drop table if exists blackbox.guids;
 #
 # blackbox.guids holds guid<->id assignments (oqgraph supports bigint id)
 #
-# TODO: when a guid id has no entries in nhops, it may (not must) be deleted
 create table blackbox.guids
 (
 	guid BINARY(32) not null,
@@ -62,6 +61,7 @@ create table blackbox.nhops
 (
 	origid bigint unsigned not null,
 	destid bigint unsigned not null,
+	gdprid bigint unsigned not null,
 	ts TIMESTAMP,
 	primary key (origid, destid),
 	key (destid)
@@ -104,20 +104,25 @@ drop procedure if exists blackbox.add_nhop;
 delimiter //
 create procedure blackbox.add_nhop
 (
+	IN eguid BINARY(32),
 	IN dguid BINARY(32),
-	IN eguid BINARY(32)
+	IN rguid BINARY(32)
 )
 begin
-	set @did = NULL;
 	set @eid = NULL;
-	# guid id assignment (hence insert ignore rather than replace)
-	insert ignore into blackbox.guids (guid) values (dguid);
-	select id into @did from blackbox.guids where guid = dguid;
-	# guid id assignment (hence insert ignore rather than replace)
+	set @did = NULL;
+	set @rid = NULL;
+	#
+	# guid id assignment and refresh via insert ignore to avoid renumbering
+	#
 	insert ignore into blackbox.guids (guid) values (eguid);
 	select id into @eid from blackbox.guids where guid = eguid;
+	insert ignore into blackbox.guids (guid) values (dguid);
+	select id into @did from blackbox.guids where guid = dguid;
+	insert ignore into blackbox.guids (guid) values (rguid);
+	select id into @rid from blackbox.guids where guid = rguid;
 	# (re)add @eid -> @did path to graph with latest timestamp
-	replace into blackbox.nhops (origid, destid, ts) values (@eid, @did, CURRENT_TIMESTAMP);
+	replace into blackbox.nhops (origid, destid, gdprid, ts) values (@eid, @did, @rid, CURRENT_TIMESTAMP);
 	end //
 delimiter ;
 
@@ -128,16 +133,35 @@ drop procedure if exists blackbox.delete_nhop;
 delimiter //
 create procedure blackbox.delete_nhop
 (
+	IN eguid BINARY(32),
 	IN dguid BINARY(32),
-	IN eguid BINARY(32)
+	IN rguid BINARY(32)
 )
 begin
-	set @did = NULL;
 	set @eid = NULL;
+	set @did = NULL;
+	set @rid = NULL;
 	select id into @did from blackbox.guids where guid = dguid;
 	select id into @eid from blackbox.guids where guid = eguid;
-	# delete @eid -> @did path to graph with latest timestamp
-	delete from blackbox.nhops where origid = @eid and destid = @did;
+	select id into @rid from blackbox.guids where guid = rguid;
+	# delete @eid -> @did path from graph
+	delete from blackbox.nhops where origid = @eid and destid = @did and gdprid = @rid;
+	end //
+delimiter ;
+
+#
+# blackbox.flush_nhops deletes all nhop arrows owned by rguid from the graph
+#
+drop procedure if exists blackbox.flush_nhops;
+delimiter //
+create procedure blackbox.flush_nhops
+(
+	IN rguid BINARY(32)
+)
+begin
+	set @rid = NULL;
+	select id into @rid from blackbox.guids where guid = rguid;
+	delete from blackbox.nhops where gdprid = @rid;
 	end //
 delimiter ;
 
@@ -171,13 +195,19 @@ delimiter ;
 delete from guids;
 delete from nhops;
 
-call add_nhop (x'A1', x'A2');
-call add_nhop (x'A2', x'A3');
-call add_nhop (x'A2', x'A5');
-call add_nhop (x'A3', x'A4');
-call add_nhop (x'A4', x'A5');
-call add_nhop (x'A5', x'A6');
-call add_nhop (x'A7', x'A8');
+# add_nhop(eguid, dguid, rguid)
+call add_nhop(x'A1', x'A2', x'F1');
+call add_nhop(x'A2', x'A3', x'F1');
+call add_nhop(x'A2', x'A5', x'F1');
+call add_nhop(x'A3', x'A4', x'F1');
+call add_nhop(x'A4', x'A5', x'F1');
+call add_nhop(x'A5', x'A6', x'F1');
+call add_nhop(x'A7', x'A8', x'F1');
+call add_nhop(x'A6', x'A5', x'F1');
+call add_nhop(x'A5', x'A2', x'F1');
+call add_nhop(x'A8', x'A9', x'F9');
+call add_nhop(x'A9', x'B1', x'F9');
+
 select * from nhops;
 select HEX(guid),id from guids;
 
@@ -191,6 +221,17 @@ call find_nhop(x'A6', x'A2');  # answer is HEX(GUID) x'A5'
 select HEX(@nguid);
 
 call find_nhop(x'A1', x'A8');  # answer is the Empty set
+
+call delete_nhop(x'A2', x'A5', x'F1');
+
+call find_nhop(x'A2', x'A6');  # answer is HEX(GUID) x'A3'
+select HEX(@nguid);
+
+select * from nhops;
+call flush_nhops(x'F1');
+select * from nhops;
+call find_nhop(x'A8', x'B1');  # answer is HEX(GUID) x'A9'
+select HEX(@nguid);
 
 delete from guids;
 delete from nhops;

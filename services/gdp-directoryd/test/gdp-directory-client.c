@@ -46,10 +46,8 @@
 #include "gdp/gdp.h"
 #include "../gdp-directoryd.h"
 
-// gdp-04
-// #define DIRECTORY_IP "128.32.62.174"
-// gdp-03
-#define DIRECTORY_IP "128.32.33.232"
+// gdp-01 hosts the test blackbox
+#define DIRECTORY_IP "128.32.33.233"
 
 gdp_name_t gdp_eguid;
 gdp_name_t gdp_dguid;
@@ -60,8 +58,10 @@ otw_dir_t otw_dir;
 void help(char *s)
 {
 	printf("Error: %s\n", s);
-	printf("Usage: gdc-test "
-		   "{ { add | delete } <eguid> <dguid> | find <oguid> <dguid> }\n");
+	printf("Usage: gdc-test <options>\n"
+		   "\t{ add | delete } <eguid> <dguid> <rguid>\n"
+		   "\tfind <oguid> <dguid>\n"
+		   "\tflush <rguid>\n");
 	exit(1);
 }
 
@@ -93,19 +93,27 @@ int main(int argc, char *argv[])
 	}
 	else if (strcmp(argv[1], "add") == 0)
 	{
-		if (argc > 4)
+		if (argc > 5)
 			help("extraneous parameter(s)");			
-		if (argc < 4)
+		if (argc < 5)
 			help("missing parameter(s)");
 		otw_dir.cmd = GDP_CMD_DIR_ADD;
 	}
 	else if (strcmp(argv[1], "delete") == 0)
 	{
-		if (argc > 4)
+		if (argc > 5)
 			help("extraneous parameter(s)");			
-		if (argc < 4)
+		if (argc < 5)
 			help("missing parameter(s)");
 		otw_dir.cmd = GDP_CMD_DIR_DELETE;
+	}
+	else if (strcmp(argv[1], "flush") == 0)
+	{
+		if (argc > 3)
+			help("extraneous parameter(s)");			
+		if (argc < 3)
+			help("missing parameter(s)");
+		otw_dir.cmd = GDP_CMD_DIR_FLUSH;
 	}
 	else
 		help("invalid action");
@@ -131,8 +139,6 @@ int main(int argc, char *argv[])
 	//
 	// build request
 	//
-	// { { add | delete } eguid dguid | find oguid dguid }
-	//
 	
 	otw_dir.ver = GDP_CHAN_PROTO_VERSION_4;
 
@@ -143,9 +149,40 @@ int main(int argc, char *argv[])
 		close(fd_dr);
 	
 	otw_dir.id = htons(dr); // htons comments on expected endianess of id field
-	
-	if (otw_dir.cmd == GDP_CMD_DIR_ADD ||
-		otw_dir.cmd == GDP_CMD_DIR_DELETE)
+
+	switch (otw_dir.cmd)
+	{
+
+	case GDP_CMD_DIR_FIND:
+	{
+		// eguid will be filled if reply cmd field is GDP_CMD_DIR_FOUND
+		memset(&otw_dir.eguid[0], 0x00, sizeof(gdp_name_t));
+
+		// first parameter is the find oguid
+		gdp_parse_name(argv[arg_index], gdp_oguid);
+		memcpy(&otw_dir.oguid[0], gdp_oguid, sizeof(gdp_name_t));
+		printf("-> oguid [");
+		for (int i = 0; i < sizeof(gdp_name_t); i++)
+		{
+			printf("%.2x", otw_dir.oguid[i]);
+		}
+		printf("]\n");
+		arg_index++;
+
+		// second parameter is the find dguid
+		gdp_parse_name(argv[arg_index], gdp_dguid);
+		memcpy(&otw_dir.dguid[0], gdp_dguid, sizeof(gdp_name_t));
+		printf("-> dguid [");
+		for (int i = 0; i < sizeof(gdp_name_t); i++)
+		{
+			printf("%.2x", otw_dir.dguid[i]);
+		}
+		printf("]\n");
+		arg_index++;
+	}
+	break;
+
+	case GDP_CMD_DIR_ADD:
 	{
 		// set eguid
 		gdp_parse_name(argv[arg_index], gdp_eguid);
@@ -157,45 +194,105 @@ int main(int argc, char *argv[])
 		}
 		printf("]\n");
 		arg_index++;
-	}
-	else
-		memset(&otw_dir.eguid[0], 0x00, sizeof(gdp_name_t));
 
-	// set required dguid
-	gdp_parse_name(argv[arg_index], gdp_dguid);
-	memcpy(&otw_dir.dguid[0], gdp_dguid, sizeof(gdp_name_t));
-	printf("-> dguid [");
-	for (int i = 0; i < sizeof(gdp_name_t); i++)
-	{
-		printf("%.2x", otw_dir.dguid[i]);
-	}
-	printf("]\n");
-	arg_index++;
+		// set dguid
+		gdp_parse_name(argv[arg_index], gdp_dguid);
+		memcpy(&otw_dir.dguid[0], gdp_dguid, sizeof(gdp_name_t));
+		printf("-> dguid [");
+		for (int i = 0; i < sizeof(gdp_name_t); i++)
+		{
+			printf("%.2x", otw_dir.dguid[i]);
+		}
+		printf("]\n");
+		arg_index++;
 
-	if (otw_dir.cmd == GDP_CMD_DIR_FIND)
-	{
-		// set required oguid
+		// set rguid in oguid field
 		gdp_parse_name(argv[arg_index], gdp_oguid);
 		memcpy(&otw_dir.oguid[0], gdp_oguid, sizeof(gdp_name_t));
-		printf("-> oguid [");
+		printf("-> rguid [");
 		for (int i = 0; i < sizeof(gdp_name_t); i++)
 		{
 			printf("%.2x", otw_dir.oguid[i]);
 		}
 		printf("]\n");
 		arg_index++;
-		
-		// connection-oriented udp - hardwired destination, simply send
-		otw_dir_len = send(fd_connect, (uint8_t *) &otw_dir.ver,
-						   sizeof(otw_dir_t), 0);
-		printf("id(0x%x) send len %d\n", ntohs(otw_dir.id), otw_dir_len);
 	}
-	else
+	break;
+
+	case GDP_CMD_DIR_DELETE:
 	{
+		// set eguid
+		gdp_parse_name(argv[arg_index], gdp_eguid);
+	    memcpy(&otw_dir.eguid[0], gdp_eguid, sizeof(gdp_name_t));
+		printf("-> eguid [");
+		for (int i = 0; i < sizeof(gdp_name_t); i++)
+		{
+			printf("%.2x", otw_dir.eguid[i]);
+		}
+		printf("]\n");
+		arg_index++;
+
+		// set dguid
+		gdp_parse_name(argv[arg_index], gdp_dguid);
+		memcpy(&otw_dir.dguid[0], gdp_dguid, sizeof(gdp_name_t));
+		printf("-> dguid [");
+		for (int i = 0; i < sizeof(gdp_name_t); i++)
+		{
+			printf("%.2x", otw_dir.dguid[i]);
+		}
+		printf("]\n");
+		arg_index++;
+
+		// set rguid in oguid field
+		gdp_parse_name(argv[arg_index], gdp_oguid);
+		memcpy(&otw_dir.oguid[0], gdp_oguid, sizeof(gdp_name_t));
+		printf("-> rguid [");
+		for (int i = 0; i < sizeof(gdp_name_t); i++)
+		{
+			printf("%.2x", otw_dir.oguid[i]);
+		}
+		printf("]\n");
+		arg_index++;
+	}
+	break;
+
+	case GDP_CMD_DIR_FLUSH:
+	{
+		// set eguid
+		gdp_parse_name(argv[arg_index], gdp_eguid);
+	    memcpy(&otw_dir.eguid[0], gdp_eguid, sizeof(gdp_name_t));
+		printf("-> rguid [");
+		for (int i = 0; i < sizeof(gdp_name_t); i++)
+		{
+			printf("%.2x", otw_dir.eguid[i]);
+		}
+		printf("]\n");
+		arg_index++;
+
 		// connection-oriented udp - hardwired destination, simply send
 		otw_dir_len = send(fd_connect, (uint8_t *) &otw_dir.ver,
-						   offsetof(otw_dir_t, oguid), 0);
-		printf("id(0x%x) send len %d\n", ntohs(otw_dir.id), otw_dir_len);
+						   offsetof(otw_dir_t, dguid), 0);
+		printf("id(0x%x) send len %lu\n", ntohs(otw_dir.id),
+			   offsetof(otw_dir_t, dguid));
+
+		// flush does not send a reply
+		close(fd_connect);
+		return 0;
+	}
+	break;
+
+	} // switch
+
+	// connection-oriented udp - hardwired destination, simply send
+	otw_dir_len = send(fd_connect, (uint8_t *) &otw_dir.ver,
+					   sizeof(otw_dir_t), 0);
+	printf("id(0x%x) send len %d\n", ntohs(otw_dir.id), otw_dir_len);
+
+	// only find sends a reply
+	if (otw_dir.cmd != GDP_CMD_DIR_FIND)
+	{
+		close(fd_connect);
+		return 0;
 	}
 
 	printf("...awaiting reply...\n");
@@ -206,16 +303,30 @@ int main(int argc, char *argv[])
 	if (otw_dir_len < 0)
 		fail("recv");
 
-	if (otw_dir_len < offsetof(otw_dir_t, oguid))
+	if (otw_dir_len < sizeof(otw_dir))
 		fail("short");
 
 	printf("id(0x%x) recv len %d\n", ntohs(otw_dir.id), otw_dir_len);
 		
+	printf("<- oguid [");
+	for (int i = 0; i < sizeof(gdp_name_t); i++)
+	{
+		printf("%.2x", otw_dir.oguid[i]);
+	}
+	printf("]\n");
+
+	printf("<- dguid [");
+	for (int i = 0; i < sizeof(gdp_name_t); i++)
+	{
+		printf("%.2x", otw_dir.dguid[i]);
+	}
+	printf("]\n");
+
 	if (otw_dir.cmd == GDP_CMD_DIR_FIND)
 	{
 		printf("<- eguid nak\n");
 	}
-	else // FOUND or ADD or DELETE
+	else // GDP_CMD_DIR_FOUND
 	{
 		printf("<- eguid [");
 		for (int i = 0; i < sizeof(gdp_name_t); i++)
@@ -225,23 +336,6 @@ int main(int argc, char *argv[])
 		printf("]\n");
 	}
 
-	printf("<- dguid [");
-	for (int i = 0; i < sizeof(gdp_name_t); i++)
-	{
-		printf("%.2x", otw_dir.dguid[i]);
-	}
-	printf("]\n");
-
-	if (otw_dir.cmd == GDP_CMD_DIR_FOUND || otw_dir.cmd == GDP_CMD_DIR_FIND)
-	{
-		printf("<- oguid [");
-		for (int i = 0; i < sizeof(gdp_name_t); i++)
-		{
-			printf("%.2x", otw_dir.oguid[i]);
-		}
-		printf("]\n");
-	}
-	
 	close(fd_connect);
 	return 0;
 }

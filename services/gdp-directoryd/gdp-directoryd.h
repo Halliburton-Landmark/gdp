@@ -67,6 +67,7 @@ int debug_knob = VERB;
 #define GDP_CMD_DIR_DELETE	8
 #define GDP_CMD_DIR_FIND	9
 #define GDP_CMD_DIR_FOUND  10
+#define GDP_CMD_DIR_FLUSH  11
 
 // FIXME eventually maintain this in gdp_chan.h or other appropriate shared .h
 typedef struct __attribute__((packed)) otw_dir_s
