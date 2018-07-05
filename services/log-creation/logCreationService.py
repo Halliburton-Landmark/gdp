@@ -22,7 +22,7 @@ import logging
 import os
 import sys
 
-SERVICE_NAMES = ['logcreationservice']
+SERVICE_NAME = gdp.GDP_NAME('logcreationservice').internal_name()
 DEFAULT_ROUTER_PORT = 8007
 DEFAULT_ROUTER_HOST = "172.30.0.1"
 
@@ -57,7 +57,8 @@ class logCreationService(GDPService):
         """
 
         ## First call the __init__ of GDPService
-        super(logCreationService, self).__init__(router, GDPaddrs)
+        super(logCreationService, self).__init__(SERVICE_NAME,
+                                                        router, GDPaddrs)
 
         ## Setup instance specific constants
         self.GDPaddrs = GDPaddrs

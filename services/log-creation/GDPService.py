@@ -59,13 +59,14 @@ class GDPProtocol(Protocol):
     then, we only have one connection to maintain.
     """
 
-    def __init__(self, req_handler, GDPaddrs):
+    def __init__(self, servicename, req_handler, GDPaddrs):
         """ The GDP address for the service end point """
 
         self.GDPaddrs = GDPaddrs
         self.request_handler = req_handler
         self.buffer = ""
         self.advertising_call = None
+        self.myaddr = servicename
 
 
     def __make_ad(self, addr):
@@ -80,14 +81,14 @@ class GDPProtocol(Protocol):
         # TODO change the hard-coded values to something more general.
         ad = ('\x04' + '\x13' + '\x40' + '\x0f' +
                 '\x00'*4 + '\x00'*2 + '\x00'*2 +
-                 addr + addr)
+                 addr + self.myaddr)
         return ad
 
 
     def advertise(self):
         # Send the advertisement messages, do network I/O in reactor thread
         logging.info("%r, Advertising %d names", self, len(self.GDPaddrs))
-        for addr in self.GDPaddrs:
+        for addr in [self.myaddr] + self.GDPaddrs:
             advertisement = self.__make_ad(addr)
             reactor.callFromThread(self.transport.write, advertisement)
 
@@ -324,14 +325,16 @@ class GDPProtocol(Protocol):
 
 class GDPProtocolFactory(ReconnectingClientFactory):
 
-    def __init__(self, req_handler, GDPaddrs):
+    def __init__(self, servicename, req_handler, GDPaddrs):
         "Initialize with the request handler and list of GDP addresses"
         self.GDPaddrs = GDPaddrs
         self.request_handler = req_handler
         self.protocol = None
+        self.myaddr = servicename
 
     def buildProtocol(self, remoteaddr):
-        self.protocol = GDPProtocol(self.request_handler, self.GDPaddrs)
+        self.protocol = GDPProtocol(self.myaddr,
+                                    self.request_handler, self.GDPaddrs)
         return self.protocol
 
     def clientConnectionLost(self, connector, reason):
@@ -360,7 +363,7 @@ class GDPService(object):
     """
 
 
-    def __init__(self, router, GDPaddrs):
+    def __init__(self, servicename, router, GDPaddrs):
         """
         router: ip:port for a GDP router/switch that we connect to
         GDPaddrs: list of 256 bit GDP addresses that we listen to
@@ -374,9 +377,10 @@ class GDPService(object):
         self.router_host = t[0]
         self.router_port = int(t[1])
         self.GDPaddrs = GDPaddrs
+        self.myaddr = servicename
 
-        ProtocolFactory = GDPProtocolFactory(self.request_handler,
-                                                GDPaddrs)
+        ProtocolFactory = GDPProtocolFactory(self.myaddr,
+                                        self.request_handler, GDPaddrs)
 
         ## Call service specific setup code
         self.setup()
