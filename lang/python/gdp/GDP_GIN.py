@@ -556,18 +556,23 @@ class GDP_GIN(object):
         check_EP_STAT(estat)
 
 
-    def append_async(self, datum, prevhash=None):
+    def append_async(self, datum_list, prevhash=None):
         """
         Async version of append. A writer ought to check return status
         by invoking get_next_event, potentially in a different thread.
 
-        [This is different than the C library version: The C-library
-        version expects a list of datuns, but we only support a single
-        datum at a time... at least for the moment]
+        [This is different from append_async, which only takes a
+        single datum]
         """
 
-        assert isinstance(datum, GDP_DATUM)
+        assert isinstance(datum_list, list)
         assert isinstance(prevhash, GDP_HASH) or prevhash is None
+
+        ## ctypes magic.
+        ## See https://stackoverflow.com/questions/47086852/
+        py_ptr_list = [x.ptr for x in datum_list]
+        n = len(datum_list)
+        _ptrs = (POINTER(GDP_DATUM.gdp_datum_t)*n)(*py_ptr_list)
 
         __prevhash_type = c_void_p if prevhash is None \
                                 else POINTER(GDP_HASH.gdp_hash_t)
@@ -579,7 +584,7 @@ class GDP_GIN(object):
                             __prevhash_type, c_void_p, c_void_p ]
         __func.restype = EP_STAT
 
-        estat = __func(self.ptr, c_int(1), byref(datum.ptr),
+        estat = __func(self.ptr, c_int(n), _ptrs,
                                         __prevhash_val, None, None)
         check_EP_STAT(estat)
 
