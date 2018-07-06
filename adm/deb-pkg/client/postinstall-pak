@@ -1,24 +1,32 @@
-#!/bin/sh
+######################################################################
+#
+#  This file is appended to common/postinstall-pak to make
+#  the client-specific postinstall-pak.
+#
+######################################################################
 
-set -e
+if [ ! -e $EP_PARAMS/gdp-create ]
+then
+	echo "Creating $EP_PARAMS/gdp-create."
+	echo "# The default location for creating logs." > $EP_PARAMS/gdp-create
+	chown $GDP_USER:$GDP_GROUP $EP_PARAMS/gdp-create
 
-ETCDIR="/etc/ep_adm_params"
-
-echo "Creating appropriate directories..."
-[ -d $ETCDIR ] || mkdir $ETCDIR
-
-if [ ! -r /etc/ep_adm_params/gdp ]; then
-    mkdir -p /etc/ep_adm_params
-    echo '# The list of sites to contact to find a GDP router' \
-        > /etc/ep_adm_params/gdp
-    echo '#    Please add local routers at the FRONT of this list' \
-        >> /etc/ep_adm_params/gdp
-    echo `shuf -e gdp-01.eecs.berkeley.edu \
-        gdp-02.eecs.berkeley.edu \
-        gdp-03.eecs.berkeley.edu \
-        gdp-04.eecs.berkeley.edu ` | \
-        sed -e 's/ /; /g' -e 's/^/swarm.gdp.routers=/' \
-            >> /etc/ep_adm_params/gdp
+	# if we have an already-installed gdplogd, default there.
+	if [ -r $EP_PARAMS/gdplogd ]
+	then
+		logserver=`grep '^swarm.gdplogd.gdpname *=' $EP_PARAMS/gdplogd |
+			sed 's/[^=]*= *//'`
+	else
+		logserver=''
+	fi
+	if [ -z "$logserver" ]
+	then
+		echo "WARNING: no default log creation server found."
+		echo "Edit $EP_PARAMS/gdp-create to change this."
+		logserver=$revdomain.gdplogd
+		echo "#swarm.gdp.gdp-create.server=$logserver" >> $EP_PARAMS/gdp-create
+	else
+		echo "WARNING: defaulting to creating logs on local log server."
+		echo "swarm.gdp.gdp-create.server=$logserver" >> $EP_PARAMS/gdp-create
+	fi
 fi
-
-exit 0

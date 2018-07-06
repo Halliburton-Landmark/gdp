@@ -45,7 +45,6 @@ case "$OS" in
     "ubuntu" | "debian" | "raspbian")
 	sudo apt-get update
 	sudo apt-get clean
-	package libdb-dev
 	package libevent-dev
 	package libevent-pthreads
 	package libsqlite3-dev

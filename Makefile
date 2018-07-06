@@ -77,12 +77,13 @@ clean:
 	(cd examples;	${MAKE} clean)
 	rm -f ${CLEANEXTRA}
 
+# Install code used by GDP-based application developers
 install-client:
 	(cd ep;		${MAKE} install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
 	(cd gdp;	${MAKE} install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
 	(cd apps;	${MAKE} install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
 
-# Should util be part of this subtarget?
+# Install code used by the log server
 install-gdplogd:
 	(cd gdplogd;	${MAKE} install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
 	(cd util;	${MAKE} install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})

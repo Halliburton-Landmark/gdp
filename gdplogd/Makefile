@@ -27,7 +27,8 @@
 #
 
 # temporarily "gdplogd2" during transition, eventually "gdplogd"	XXX
-GDPLOGD=	gdplogd2
+VER=		2
+GDPLOGD=	gdplogd${VER}
 
 BINALL=
 
@@ -173,6 +174,7 @@ install-override:	${ALLDIRS} ${PUBALL}
 	test -z "${MAN5ALL}" || ${INSTALL} ${MAN5ALL} ${MANDIR}/man5
 	test -z "${MAN7ALL}" || ${INSTALL} ${MAN7ALL} ${MANDIR}/man7
 	test -z "${MAN8ALL}" || ${INSTALL} ${MAN8ALL} ${MANDIR}/man8
+	cd ../adm && make VER=${VER} install-gdplogd-wrapper
 
 ${ALLDIRS}:
 	${MKDIR} $@
