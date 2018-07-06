@@ -267,7 +267,7 @@ cmd_create(gdp_req_t *req)
 	estat = gob->x->physimpl->create(gob, gob->gob_md);
 	if (!EP_STAT_ISOK(estat))
 	{
-		estat = _gdp_req_nak_resp(req, GDP_NAK_S_INTERNAL,
+		estat = _gdp_req_nak_resp(req, 0,
 						"cmd_create: physical create failure",
 						estat);
 		goto fail1;
@@ -324,7 +324,7 @@ cmd_open(gdp_req_t *req)
 	estat = get_open_handle(req);
 	if (!EP_STAT_ISOK(estat))
 	{
-		estat = _gdp_req_nak_resp(req, GDP_NAK_S_INTERNAL,
+		estat = _gdp_req_nak_resp(req, 0,
 							"cmd_open: could not open GOB", estat);
 		return estat;
 	}
@@ -538,7 +538,7 @@ cmd_read_by_recno(gdp_req_t *req)
 	estat = get_open_handle(req);
 	if (!EP_STAT_ISOK(estat))
 	{
-		return _gdp_req_nak_resp(req, GDP_NAK_S_INTERNAL,
+		return _gdp_req_nak_resp(req, 0,
 							"cmd_read_by_recno: GOB open failure", estat);
 	}
 
@@ -575,7 +575,7 @@ cmd_read_by_ts(gdp_req_t *req)
 	estat = get_open_handle(req);
 	if (!EP_STAT_ISOK(estat))
 	{
-		return _gdp_req_nak_resp(req, GDP_NAK_S_INTERNAL,
+		return _gdp_req_nak_resp(req, 0,
 							"cmd_read_by_ts: GOB open failure", estat);
 	}
 
@@ -848,7 +848,7 @@ cmd_append(gdp_req_t *req)
 	}
 	else
 	{
-		estat = _gdp_req_nak_resp(req, GDP_MSG_CODE__CMD_NONE,
+		estat = _gdp_req_nak_resp(req, 0,
 						"cmd_append: append failure",
 						estat);
 	}
@@ -1247,7 +1247,7 @@ cmd_getmetadata(gdp_req_t *req)
 	estat = get_open_handle(req);
 	if (!EP_STAT_ISOK(estat))
 	{
-		estat = _gdp_req_nak_resp(req, GDP_NAK_S_INTERNAL,
+		estat = _gdp_req_nak_resp(req, 0,
 							"cmd_getmetadata: GOB open failure", estat);
 		goto fail0;
 	}
@@ -1269,7 +1269,7 @@ cmd_getmetadata(gdp_req_t *req)
 	}
 	else
 	{
-		_gdp_req_nak_resp(req, GDP_NAK_S_INTERNAL,
+		_gdp_req_nak_resp(req, 0,
 					"cannot get log metadata", estat);
 	}
 

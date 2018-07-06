@@ -692,6 +692,8 @@ fail0:
 		exitstat = EX_OK;
 	else if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOROUTE))
 		exitstat = EX_NOHOST;
+	else if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_CONFLICT))
+		exitstat = EX_CANTCREAT;
 	else if (EP_STAT_ISABORT(estat))
 		exitstat = EX_SOFTWARE;
 	else
