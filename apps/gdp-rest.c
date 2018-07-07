@@ -69,14 +69,15 @@ EP_HASH			*OpenGclCache;			// cache of open GCLs
 gdp_open_info_t *shared_gdp_open_info;
 
 // most gdp-create parameters are available through gdp-rest
-#define GCL_C_PARAM_SERV_e		0
-#define GCL_C_PARAM_SERV_K		1
-#define GCL_C_PARAM_SERV_MAX	2
+#define GCL_C_PARAM_SERV_S		0
+#define GCL_C_PARAM_SERV_e		1
+#define GCL_C_PARAM_SERV_K		2
+#define GCL_C_PARAM_SERV_MAX	3
 #define GCL_C_PARAM_MAX			(GCL_C_PARAM_SERV_MAX + 7)
 
 const char *exec_gdp_create_param[GCL_C_PARAM_MAX] =
 {
-	/* 2 server controlled: */ "-e", "-K",
+	/* 3 server controlled: */ "-S", "-e", "-K",
 	/* 7 client options:  */ "-C", "-D", "-h", "-k", "-b", "-c", "-s"
 	/* options not supported via RESTful interface: "-q" */
 };
@@ -477,6 +478,7 @@ process_gdp_create_req(scgi_request *req, const char *gclxname,
 	options[opt++] = exec_gdp_create;
 		
 	// then add server controlled parameters
+	options[opt++] = exec_gdp_create_param[GCL_C_PARAM_SERV_S];
 	options[opt++] = exec_gdp_create_param[GCL_C_PARAM_SERV_e];
 	options[opt++] = "none";
 	options[opt++] = exec_gdp_create_param[GCL_C_PARAM_SERV_K];
