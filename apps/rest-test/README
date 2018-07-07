@@ -18,16 +18,16 @@ To run the the gdp-rest-testcases.py tests:
 # when properly configured to do so (see below).
 
 # The gdp-rest-01.eecs.berkeley.edu host is not serving as a permanent
-# home for GCLs. For development and test purposes, gdplogd is started
-# befores the test suite run, but is always stopped at the end of each
-# test run, after which all GCLs are cleaned off gdp-rest-01! Since
-# active keys will be on gdp-rest-01 permanently, care should be taken
-# to only clean up test keys! TODO: given the live and test
-# binaries/libraries on the same host, it has proven difficult to
-# isolate the test bed completely without cutting off the production
-# services too; it would perhaps be useful to enhance gdp_init() so
-# development binaries could selectively limit or disable zeroconf
-# discovery of the real GDP.
+# home for GCLs. For development and test purposes, gdplogd2 is
+# started before the test suite is run, but is always stopped at the
+# end of each test run, after which all GCLs are cleaned off
+# gdp-rest-01! Since active keys will be on gdp-rest-01 permanently,
+# care should be taken to only clean up test keys! Note that the
+# gdp-rest-01 gdplogd2-wrapper.sh script has been customized such that
+# gdplogd2 prefers connecting to gdp-01, causing RESTful unit tests to
+# travel from gdp-rest-01 out through the first default router
+# (usually gdp-03), then through gdp-01, before reaching gdp-rest-01's
+# gdplogd2 test instance.
 
 #
 # gdp-rest-01 development testbed
@@ -80,8 +80,8 @@ $ ./gdp-rest-testcases.py
 
 # when done with development:
 #
-# 1) do not commit your test_auth changes to the test script!
-# 2) remove your test_auth entry from /etc/lighttpd/.plainauth
+# 1) do not commit your edited test_auth username,password to the test script!
+# 2) remove any temporarily added test_auth entry from /etc/lighttpd/.plainauth
 # 3) disable /gdp/v2/gcl (sudo systemctl disable --now gdp-rest-v2.service)
 # 4) restart lighttpd (sudo systemctl restart lighttpd.service)
 #

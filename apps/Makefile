@@ -3,7 +3,7 @@
 #	Applications for the Global Data Plane
 #	From the Ubiquitous Swarm Lab, 490 Cory Hall, U.C. Berkeley.
 #
-#	Copyright (c) 2015-2017, Regents of the University of California.
+#	Copyright (c) 2015-2018, Regents of the University of California.
 #	All rights reserved.
 #
 #	Permission is hereby granted, without written agreement and without
@@ -42,8 +42,8 @@ SBINALL=	\
 		gdp-name-xlate \
 		gdp-delete \
 		$(SBINALL_ZC) \
+		gdp-rest \
 #		gdp-log-check \
-#		gdp-rest \
 #		log-view \
 
 MAN1ALL=	gdp-reader.1 \

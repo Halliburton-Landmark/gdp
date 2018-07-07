@@ -11,7 +11,7 @@
 **	Applications for the Global Data Plane
 **	From the Ubiquitous Swarm Lab, 490 Cory Hall, U.C. Berkeley.
 **
-**	Copyright (c) 2015-2017, Regents of the University of California.
+**	Copyright (c) 2015-2018, Regents of the University of California.
 **	All rights reserved.
 **
 **	Permission is hereby granted, without written agreement and without
@@ -66,7 +66,7 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.rest", "RESTful interface to GDP");
 const char		*GclUriPrefix;			// prefix on all REST calls
 EP_HASH			*OpenGclCache;			// cache of open GCLs
 
-gdp_gob_open_info_t *shared_gob_open_info;
+gdp_open_info_t *shared_gdp_open_info;
 
 // most gdp-create parameters are available through gdp-rest
 #define GCL_C_PARAM_SERV_e		0
@@ -447,7 +447,7 @@ error501(scgi_request *req, const char *detail)
 
 
 /*
-**  PROCESS_GCL_CREATE_REQ --- create new GCL via gdp-create, parse stdout msg
+**  PROCESS_GDP_CREATE_REQ --- create new log via gdp-create, parse stdout msg
 */
 
 EP_STAT
@@ -590,6 +590,7 @@ process_gdp_create_req(scgi_request *req, const char *gclxname,
 	if (exit_code == EX_OK)
 	{
 		ssize_t bytes;
+		char *created;
 		char obuf[GCL_C_OUT_BUF_SIZE];
 
 		bytes = read(o_pipe[STDIN_FILENO], obuf, sizeof obuf - 1);
@@ -618,32 +619,44 @@ process_gdp_create_req(scgi_request *req, const char *gclxname,
 			return estat;
 		}
 
+		obuf[bytes - 1] = '\0';	// terminate obuf
+
+		// validate input (i.e. find "Created new GCL ...", which is not first)
+		created = strstr((const char *)obuf, "Created");
+		if (created == NULL)
+		{
+			estat = gdp_failure(req, "500", "Internal Server Error", "ss",
+								"detail", "gdp-rest pipe read created",
+								"read", obuf);
+			close(o_pipe[STDIN_FILENO]);
+			return estat;
+		}
+		
 		// gdp-create EX_OK output is kept stable to permit string extraction
-		obuf[GCL_C_OUT_GCL_NAME_END] = '\0'; // terminate a newline of line 1
-		obuf[bytes - 1] = '\0';	// terminate at newline of line 2
+		created[GCL_C_OUT_GCL_NAME_END] = '\0'; // terminate a newline of line 1
 
 		// new
-		j_temp = json_string(&obuf[GCL_C_OUT_GCL_NAME]);
+		j_temp = json_string(&created[GCL_C_OUT_GCL_NAME]);
 		if (j_temp == NULL)
 		{
-			estat = error500(req, "gdp-rest response gob_name", EIO);
+			estat = error500(req, "gdp-rest response gcl_name", EIO);
 			json_decref(j_resp);
 			close(o_pipe[STDIN_FILENO]);
 			return estat;
 		}
 		// steal j_temp
-		if ((json_object_set_new_nocheck(j_resp, "gob_name", j_temp)) == -1)
+		if ((json_object_set_new_nocheck(j_resp, "gcl_name", j_temp)) == -1)
 		{
 			estat = gdp_failure(req, "500", "Internal Server Error", "ss",
 								"detail", "gdp-rest response",
-								"gob_name", &obuf[GCL_C_OUT_GCL_NAME]);
+								"gcl_name", &created[GCL_C_OUT_GCL_NAME]);
 			json_decref(j_temp);
 			json_decref(j_resp);
 			close(o_pipe[STDIN_FILENO]);
 			return estat;
 		}
 		// new
-		j_temp = json_string(&obuf[GCL_C_OUT_LOGD_NAME]);
+		j_temp = json_string(&created[GCL_C_OUT_LOGD_NAME]);
 		if (j_temp == NULL)
 		{
 			estat = error500(req, "gdp-rest response logd_name", EIO);
@@ -656,7 +669,7 @@ process_gdp_create_req(scgi_request *req, const char *gclxname,
 		{
 			estat = gdp_failure(req, "500", "Internal Server Error", "ss",
 								"detail", "gdp-rest response",
-								"gdplogd_name", &obuf[GCL_C_OUT_LOGD_NAME]);
+								"gdplogd_name", &created[GCL_C_OUT_LOGD_NAME]);
 			json_decref(j_temp);
 			json_decref(j_resp);
 			close(o_pipe[STDIN_FILENO]);
@@ -700,7 +713,7 @@ process_gdp_create_req(scgi_request *req, const char *gclxname,
 
 
 /*
-**  A_NEW_GOB --- create new GOB
+**  A_NEW_GOB --- create new GDP Object
 */
 
 EP_STAT
@@ -756,14 +769,14 @@ a_new_gob(scgi_request *req)
 		options_max += json_array_size(j_meta);
 	}
 
-	estat = process_gob_create_req(req, gobxname, j, j_meta, options_max);
+	estat = process_gdp_create_req(req, gobxname, j, j_meta, options_max);
 
 	json_decref(j);
 	return estat;
 }
 
 /*
-**  A_SHOW_GCL --- show information about a GCL
+**  A_SHOW_GOB --- show information about a GDP Object
 */
 
 EP_STAT
@@ -785,10 +798,10 @@ a_append(scgi_request *req, gdp_name_t gobiname, gdp_datum_t *datum)
 
 	ep_dbg_cprintf(Dbg, 5, "=== Append value to GCL\n");
 
-	estat = gdp_gob_open(gobiname, GDP_MODE_AO, shared_gob_open_info, &gin);
+	estat = gdp_gin_open(gobiname, GDP_MODE_AO, shared_gdp_open_info, &gin);
 	EP_STAT_CHECK(estat, goto fail_open);
 
-	estat = gdp_gin_append(gin, datum);
+	estat = gdp_gin_append(gin, datum, NULL);
 	EP_STAT_CHECK(estat, goto fail_append);
 	
 	{
@@ -860,10 +873,10 @@ a_read_datum(scgi_request *req, gdp_name_t gobiname, gdp_recno_t recno)
 	gdp_gin_t *gin = NULL;
 	gdp_datum_t *datum = gdp_datum_new();
 
-	estat = gdp_gob_open(gobiname, GDP_MODE_RO, shared_gob_open_info, &gin);
+	estat = gdp_gin_open(gobiname, GDP_MODE_RO, shared_gdp_open_info, &gin);
 	EP_STAT_CHECK(estat, goto fail_open);
 
-	estat = gdp_gin_read(gin, recno, datum);
+	estat = gdp_gin_read_by_recno(gin, recno, datum);
 	if (!EP_STAT_ISOK(estat))
 		goto fail_read;
 
@@ -955,7 +968,7 @@ a_read_datum(scgi_request *req, gdp_name_t gobiname, gdp_recno_t recno)
 
 
 /*
-**  GIN_DO_GET --- helper routine for GET method on a GCL
+**  GOB_DO_GET --- helper routine for GET method on a GDP Object
 **
 **		Have to look at query to figure out the semantics.
 **		The query's the thing / wherein I'll catch the
@@ -963,7 +976,7 @@ a_read_datum(scgi_request *req, gdp_name_t gobiname, gdp_recno_t recno)
 */
 
 EP_STAT
-gin_do_get(scgi_request *req, gdp_name_t gobiname, struct qkvpair *qkvs)
+gob_do_get(scgi_request *req, gdp_name_t gobiname, struct qkvpair *qkvs)
 {
 	EP_STAT estat;
 	char *qrecno = find_query_kv("recno", qkvs);
@@ -992,7 +1005,7 @@ gin_do_get(scgi_request *req, gdp_name_t gobiname, struct qkvpair *qkvs)
 	}
 	else
 	{
-		estat = a_show_gcl(req, gobiname);
+		estat = a_show_gob(req, gobiname);
 	}
 
 	return estat;
@@ -1030,8 +1043,8 @@ pfx_gcl(scgi_request *req, char *uri)
 		case SCGI_METHOD_POST:
 			// fall-through
 		case SCGI_METHOD_PUT:
-			// create a new GCL
-			estat = a_new_gcl(req);
+			// create a new GDP Object
+			estat = a_new_gob(req);
 			break;
 
 		case SCGI_METHOD_GET:
@@ -1061,7 +1074,7 @@ pfx_gcl(scgi_request *req, char *uri)
 		switch (req->request_method)
 		{
 		case SCGI_METHOD_GET:
-			estat = gcl_do_get(req, gcliname, qkvs);
+			estat = gob_do_get(req, gcliname, qkvs);
 			break;
 
 		case SCGI_METHOD_POST:
@@ -1115,7 +1128,7 @@ pfx_post(scgi_request *req, char *uri)
 
 
 json_t			*KeyValStore = NULL;
-gdp_gcl_t		*KeyValGcl = NULL;
+gdp_gin_t		*KeyValGcl = NULL;
 const char		*KeyValStoreName;
 gdp_name_t		KeyValInternalName;
 
@@ -1157,11 +1170,11 @@ kv_initialize(void)
 
 	// open the "KeyVal" GCL
 	gdp_parse_name(KeyValStoreName, KeyValInternalName);
-	estat = gdp_gcl_open(KeyValInternalName, GDP_MODE_AO, NULL, &KeyValGcl);
+	estat = gdp_gin_open(KeyValInternalName, GDP_MODE_AO, NULL, &KeyValGcl);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// read all the data
-	estat = gdp_gcl_multiread(KeyValGcl, 1, 0, NULL, NULL);
+	estat = gdp_gin_read_by_recno_async(KeyValGcl, 1, 0, NULL, NULL);
 	EP_STAT_CHECK(estat, goto fail1);
 	while ((gev = gdp_event_next(KeyValGcl, 0)) != NULL)
 	{
@@ -1180,7 +1193,7 @@ kv_initialize(void)
 	}
 
 	// now start up the subscription (will be read in main loop)
-	estat = gdp_gcl_subscribe(KeyValGcl, 0, 0, NULL, NULL, NULL);
+	estat = gdp_gin_subscribe_by_recno(KeyValGcl, 0, 0, NULL, NULL, NULL);
 	goto done;
 
 fail0:
@@ -1381,7 +1394,7 @@ main(int argc, char **argv, char **env)
 			break;
 
 		case 'C':						// (development) gcl-create alternative
-			exec_gcl_create = optarg;
+			exec_gdp_create = optarg;
 			break;
 
 		default:
@@ -1428,8 +1441,8 @@ main(int argc, char **argv, char **env)
 					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		}
 
-		shared_gcl_open_info = gdp_gob_open_info_new();
-		estat = gdp_gob_open_info_set_caching(shared_gcl_open_info, true);
+		shared_gdp_open_info = gdp_open_info_new();
+		estat = gdp_open_info_set_caching(shared_gdp_open_info, true);
 
 		if (!EP_STAT_ISOK(estat))
 		{

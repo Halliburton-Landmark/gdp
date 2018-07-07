@@ -78,36 +78,35 @@ if test_auth == None:
 
 json_header = { 'Content-type': 'application/json' }
 
-# clean up test GCLs (defined to be gdp-rest-01 local GCLs), while
-# being careful to only remove keys which go with test GCLs, as all
-# other keys are for real GCLs located in the real GDP.
-def clean_gcls_and_keys():
+# clean up test logs (defined to be gdp-rest-01 local logs), while
+# being careful to only remove keys which go with test logs, as all
+# other keys are for real logs located in the real GDP.
+def clean_glogs_and_keys():
     output = subprocess.check_output([ "sudo", "-g", "gdp", "-u", "gdp",
                                        "/usr/bin/find",
-                                       "/var/swarm/gdp/gcls/", 
-                                       "-type", "f", "-name", "*.gdpndx" ])
+                                       "/var/swarm/gdp/glogs/", 
+                                       "-type", "f", "-name", "*.glog" ])
 
     lines = output.splitlines()
     for line in lines:
-        # find <gcl_id> in /var/swarm/gdp/gcls/<gcl_id>.gdpndx
-        gcl_id = line[24:-7]
+        # find <glog_id> in /var/swarm/gdp/glogs/<glog_id>.glog
+        glog_id = line[25:-5]
         # check expectations, where file removal is involved
-        if len(gcl_id) == 43:
-            print "Info: remove local GCL {}...".format(gcl_id),
+        if len(glog_id) == 43:
+            print "Info: remove local GCL {}...".format(glog_id),
             subprocess.call([ "sudo", "-g", "gdp", "-u", "gdp",
-                              "/usr/bin/find", "/var/swarm/gdp/gcls/", 
-                              "-type", "f", "-name", gcl_id + "*",
+                              "/usr/bin/find", "/var/swarm/gdp/glogs/", 
+                              "-type", "f", "-name", glog_id + "*",
                               "-exec", "/bin/rm", "-f", "{}", ";"])
             print "done"
-            print "Info: remove local key {}...".format(gcl_id),
+            print "Info: remove local key {}...".format(glog_id),
             subprocess.call([ "sudo", "-g", "gdp", "-u", "gdp",
                               "/usr/bin/find", "/etc/gdp/keys/", 
-                              "-type", "f", "-name", gcl_id + ".pem",
+                              "-type", "f", "-name", glog_id + ".pem",
                               "-exec", "/bin/rm", "-f", "{}", ";"])
             print "done"
         else:
-            print "Error: cleanup has unexpected gcl_id: {}".format(gcl_id)
-
+            print "Error: cleanup has unexpected glog_id: {}".format(glog_id)
 
 def page_display(p):
     if p != None:
@@ -913,19 +912,19 @@ def test_post_12():
 #
 # preclean gdp-rest-01 v2 testbed (aborted test runs)
 #
-print "Info: stopping gdplogd.service (purge GCL cache from prior test runs)"
-subprocess.call("sudo systemctl stop gdplogd.service", shell=True)
+print "Info: stopping gdplogd2.service (purge GCL cache from prior test runs)"
+subprocess.call("sudo systemctl stop gdplogd2.service", shell=True)
 print "Info: stop gdp-rest-v2.service (purge GCL cache from prior test runs)"
 subprocess.call("sudo systemctl stop gdp-rest-v2.service", shell=True)
-print "Info: clean local GCLs (and their keys, but not production keys)"
-clean_gcls_and_keys()
+print "Info: clean local logs (and their keys, but not production keys)"
+clean_glogs_and_keys()
 
 #
 # start v2 testbed
 #
-print "Info: start gdplogd.service (sudo systemctl)"
-if subprocess.call("sudo systemctl start gdplogd.service", shell=True) != 0:
-    print "Error: sudo systemctl start gdplogd.service failed"
+print "Info: start gdplogd2.service (sudo systemctl)"
+if subprocess.call("sudo systemctl start gdplogd2.service", shell=True) != 0:
+    print "Error: sudo systemctl start gdplogd2.service failed"
     sys.exit(1)
 #
 log.seek(0, os.SEEK_END)
@@ -972,9 +971,9 @@ test_post_10()
 test_post_11()
 test_post_12()
 
-print "Info: stopping gdplogd.service (sudo systemctl) ...",
-if subprocess.call("sudo systemctl stop gdplogd.service", shell=True) != 0:
-    print "\nError: systemctl stop gdplogd.service failed"
+print "Info: stopping gdplogd2.service (sudo systemctl) ...",
+if subprocess.call("sudo systemctl stop gdplogd2.service", shell=True) != 0:
+    print "\nError: systemctl stop gdplogd2.service failed"
 else:
     print "stopped"
 
@@ -984,7 +983,7 @@ if subprocess.call("sudo systemctl stop gdp-rest-v2.service", shell=True) != 0:
 else:
     print "stopped"
 
-clean_gcls_and_keys()
+clean_glogs_and_keys()
 
 dn.close()
 log.close()
