@@ -559,7 +559,7 @@ main(int argc, char **argv)
 		int fd;
 		FILE *fp;
 
-		if ((fd = open(localkeyfile, O_WRONLY|O_CREAT|O_TRUNC, 0600)) < 0 ||
+		if ((fd = open(localkeyfile, O_WRONLY|O_CREAT|O_TRUNC, 0400)) < 0 ||
 				(fp = fdopen(fd, "w")) == NULL)
 		{
 			ep_app_error("Cannot create %s", localkeyfile);
