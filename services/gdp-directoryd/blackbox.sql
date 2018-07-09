@@ -61,7 +61,6 @@ create table blackbox.nhops
 (
 	origid bigint unsigned not null,
 	destid bigint unsigned not null,
-	gdprid bigint unsigned not null,
 	ts TIMESTAMP,
 	primary key (origid, destid),
 	key (destid)
@@ -98,20 +97,18 @@ end //
 delimiter ;
 
 #
-# blackbox.add_nhop inserts a nhop arrow into the graph
+# blackbox.add_nhop inserts a nexthop arrow from eguid to dguid
 #
 drop procedure if exists blackbox.add_nhop;
 delimiter //
 create procedure blackbox.add_nhop
 (
 	IN eguid BINARY(32),
-	IN dguid BINARY(32),
-	IN rguid BINARY(32)
+	IN dguid BINARY(32)
 )
 begin
 	set @eid = NULL;
 	set @did = NULL;
-	set @rid = NULL;
 	#
 	# guid id assignment and refresh via insert ignore to avoid renumbering
 	#
@@ -119,73 +116,65 @@ begin
 	select id into @eid from blackbox.guids where guid = eguid;
 	insert ignore into blackbox.guids (guid) values (dguid);
 	select id into @did from blackbox.guids where guid = dguid;
-	insert ignore into blackbox.guids (guid) values (rguid);
-	select id into @rid from blackbox.guids where guid = rguid;
-	# (re)add @eid -> @did path to graph with latest timestamp
-	replace into blackbox.nhops (origid, destid, gdprid, ts) values (@eid, @did, @rid, CURRENT_TIMESTAMP);
+	# replace ensures timestamp update if row exists
+	replace into blackbox.nhops (origid, destid, ts) values (@eid, @did, CURRENT_TIMESTAMP);
 	end //
 delimiter ;
 
 #
-# blackbox.delete_nhop deletes a nhop arrow from the graph
+# blackbox.find_nhop returns best nexthop eguid from eguid towards dguid, if any
+#
+drop procedure if exists blackbox.find_nhop;
+delimiter //
+create procedure blackbox.find_nhop
+(
+	IN eguid BINARY(32),
+	IN dguid BINARY(32)
+)
+begin
+	set @oid = NULL;
+	set @did = NULL;
+	set @eid = NULL;
+	select id into @oid from blackbox.guids where guid = eguid;
+	select id into @did from blackbox.guids where guid = dguid;
+	select linkid into @eid from blackbox.graph where latch='dijkstras' and origid = @oid and destid = @did and seq = 1 limit 1;
+	select guid from blackbox.guids where id = @eid;
+end //
+delimiter ;
+
+#
+# blackbox.delete_nhop deletes a nexthop arrow from eguid to dguid, if any
 #
 drop procedure if exists blackbox.delete_nhop;
 delimiter //
 create procedure blackbox.delete_nhop
 (
 	IN eguid BINARY(32),
-	IN dguid BINARY(32),
-	IN rguid BINARY(32)
+	IN dguid BINARY(32)
 )
 begin
 	set @eid = NULL;
 	set @did = NULL;
-	set @rid = NULL;
 	select id into @did from blackbox.guids where guid = dguid;
 	select id into @eid from blackbox.guids where guid = eguid;
-	select id into @rid from blackbox.guids where guid = rguid;
-	# delete @eid -> @did path from graph
-	delete from blackbox.nhops where origid = @eid and destid = @did and gdprid = @rid;
+	delete from blackbox.nhops where origid = @eid and destid = @did;
 	end //
 delimiter ;
 
 #
-# blackbox.flush_nhops deletes all nhop arrows owned by rguid from the graph
+# blackbox.flush_nhops deletes all nexthop arrows from eguid to any guid, if any
 #
 drop procedure if exists blackbox.flush_nhops;
 delimiter //
 create procedure blackbox.flush_nhops
 (
-	IN rguid BINARY(32)
+	IN eguid BINARY(32)
 )
 begin
-	set @rid = NULL;
-	select id into @rid from blackbox.guids where guid = rguid;
-	delete from blackbox.nhops where gdprid = @rid;
-	end //
-delimiter ;
-
-#
-# blackbox.find_nhop returns the best nhop from oguid towards dguid, if any
-#
-drop procedure if exists blackbox.find_nhop;
-delimiter //
-create procedure blackbox.find_nhop
-(
-	IN oguid BINARY(32),
-	IN dguid BINARY(32)
-)
-begin
-	declare continue handler for sqlstate '02000' set @nguid = NULL;
-	set @oid = NULL;
-	set @did = NULL;
 	set @eid = NULL;
-	select id into @oid from blackbox.guids where guid = oguid;
-	select id into @did from blackbox.guids where guid = dguid;
-	select linkid into @eid from blackbox.graph where latch='dijkstras' and origid = @oid and destid = @did and seq = 1 limit 1;
-    select guid into @nguid from blackbox.guids where id = @eid;
-	select @nguid;
-end //
+	select id into @eid from blackbox.guids where guid = eguid;
+	delete from blackbox.nhops where origid = @eid;
+	end //
 delimiter ;
 
 # ==============================================================================
@@ -195,43 +184,45 @@ delimiter ;
 delete from guids;
 delete from nhops;
 
-# add_nhop(eguid, dguid, rguid)
-call add_nhop(x'A1', x'A2', x'F1');
-call add_nhop(x'A2', x'A3', x'F1');
-call add_nhop(x'A2', x'A5', x'F1');
-call add_nhop(x'A3', x'A4', x'F1');
-call add_nhop(x'A4', x'A5', x'F1');
-call add_nhop(x'A5', x'A6', x'F1');
-call add_nhop(x'A7', x'A8', x'F1');
-call add_nhop(x'A6', x'A5', x'F1');
-call add_nhop(x'A5', x'A2', x'F1');
-call add_nhop(x'A8', x'A9', x'F9');
-call add_nhop(x'A9', x'B1', x'F9');
+call add_nhop(x'A1', x'A2');
+call add_nhop(x'A2', x'A3');
+call add_nhop(x'A3', x'A4');
+call add_nhop(x'A4', x'A5');
+call add_nhop(x'A5', x'A6');
+
+call add_nhop(x'A7', x'A8');
+call add_nhop(x'A8', x'A9');
+call add_nhop(x'A9', x'B1');
+call add_nhop(x'A9', x'B2');
+call add_nhop(x'A9', x'B3');
+
+# add shortcut from A2 directly to A5
+call add_nhop(x'A2', x'A5');
+
+# add path from A6 to A2 via A5
+call add_nhop(x'A6', x'A5');
+call add_nhop(x'A5', x'A2');
 
 select * from nhops;
-select HEX(guid),id from guids;
+select HEX(guid),guid,id from guids;
 
-call find_nhop(x'A1', x'A6');  # answer is HEX(guid) x'A2'
-select HEX(@nguid);
+call find_nhop(x'A1', x'A6');  # answer is HEX(guid) x'A2' aka \242
 
-call find_nhop(x'A2', x'A6');  # answer is HEX(GUID) x'A5'
-select HEX(@nguid);
+call find_nhop(x'A1', x'A6');  # answer is HEX(guid) x'A2' aka \242
 
-call find_nhop(x'A6', x'A2');  # answer is HEX(GUID) x'A5'
-select HEX(@nguid);
+call find_nhop(x'A2', x'A6');  # answer is HEX(GUID) x'A5' aka \245
+
+call find_nhop(x'A6', x'A2');  # answer is HEX(GUID) x'A5' aka \245
 
 call find_nhop(x'A1', x'A8');  # answer is the Empty set
 
-call delete_nhop(x'A2', x'A5', x'F1');
+call delete_nhop(x'A2', x'A5');
+call find_nhop(x'A2', x'A6');  # answer has changed to HEX(GUID) x'A3' aka \243
 
-call find_nhop(x'A2', x'A6');  # answer is HEX(GUID) x'A3'
-select HEX(@nguid);
-
-select * from nhops;
-call flush_nhops(x'F1');
-select * from nhops;
-call find_nhop(x'A8', x'B1');  # answer is HEX(GUID) x'A9'
-select HEX(@nguid);
+call find_nhop(x'A7', x'B1');  # answer is HEX(GUID) x'A8' aka \250
+call flush_nhops(x'A9');
+call find_nhop(x'A7', x'B1');  # answer is the Empty set
+call find_nhop(x'A7', x'A9');  # answer is HEX(GUID) x'A8' aka \250
 
 delete from guids;
 delete from nhops;

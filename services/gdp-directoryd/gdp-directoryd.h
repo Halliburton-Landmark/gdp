@@ -77,6 +77,5 @@ typedef struct __attribute__((packed)) otw_dir_s
 	uint16_t id;
 	uint8_t eguid[sizeof(gdp_name_t)];
 	uint8_t dguid[sizeof(gdp_name_t)];
-	uint8_t oguid[sizeof(gdp_name_t)];
 } otw_dir_t;
 

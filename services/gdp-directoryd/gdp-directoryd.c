@@ -64,12 +64,12 @@ char call_delete_nhop_pre[] = "call blackbox.delete_nhop (x'";
 char call_delete_nhop_sep[] = "', x'";
 char call_delete_nhop_end[] = "');";
 
-char call_flush_nhop_pre[] = "call blackbox.flush_nhops (x'";
-char call_flush_nhop_end[] = "');";
-
 char call_find_nhop_pre[] = "call blackbox.find_nhop (x'";
 char call_find_nhop_sep[] = "', x'";
 char call_find_nhop_end[] = "');";
+
+char call_flush_nhop_pre[] = "call blackbox.flush_nhops (x'";
+char call_flush_nhop_end[] = "');";
 
 // FIXME approximate size plus margin of error
 #define GDP_QUERY_STRING (3 * (2 * sizeof(gdp_name_t)) + 256)
@@ -186,58 +186,16 @@ int main(int argc, char **argv)
 		switch (otw_dir.cmd)
 		{
 
-		case GDP_CMD_DIR_FIND:
-		{
-			char *q;
-			
-			debug(INFO, "id(0x%x) cmd -> find nhop\n"
-				  "\toguid[%s]\n"
-				  "\tdguid[%s]\n",
-				  ntohs(otw_dir.id),
-				  gdp_printable_name(otw_dir.oguid, _tmp_pname_1),
-				  gdp_printable_name(otw_dir.dguid, _tmp_pname_2));
-
-			// build the query
-
-			strcpy(query, call_find_nhop_pre);
-			q = query + sizeof(call_find_nhop_pre) - 1;
-
-			debug(INFO, "-> oguid[");
-			for (int i = 0; i < sizeof(gdp_name_t); i++)
-			{
-				debug(INFO, "%.2x", otw_dir.oguid[i]);
-				sprintf(q + (i * 2), "%.2x", otw_dir.oguid[i]);
-			}
-			debug(INFO, "]\n");
-			q += (2 * sizeof(gdp_name_t));
-			
-			strcat(q, call_find_nhop_sep);
-			q += sizeof(call_find_nhop_sep) - 1;
-
-			debug(INFO, "-> dguid[");
-			for (int i = 0; i < sizeof(gdp_name_t); i++)
-			{
-				debug(INFO, "%.2x", otw_dir.dguid[i]);
-				sprintf(q + (i * 2), "%.2x", otw_dir.dguid[i]);
-			}
-			debug(INFO, "]\n");
-			q += (2 * sizeof(gdp_name_t));
-			
-			strcat(q, call_find_nhop_end);
-			q += sizeof(call_find_nhop_end) - 1;
-		}
-		break;
-
 		case GDP_CMD_DIR_ADD:
 		{
 			char *q;
 
 			debug(INFO, "id(0x%x) cmd -> add nhop\n"
-				  "\tdguid[%s]\n"
-				  "\teguid[%s]\n",
+				  "\teguid[%s]\n"
+				  "\tdguid[%s]\n",
 				  ntohs(otw_dir.id),
-				  gdp_printable_name(otw_dir.dguid, _tmp_pname_1),
-				  gdp_printable_name(otw_dir.eguid, _tmp_pname_2));
+				  gdp_printable_name(otw_dir.eguid, _tmp_pname_1),
+				  gdp_printable_name(otw_dir.dguid, _tmp_pname_2));
 
 			// build the query
 
@@ -265,18 +223,6 @@ int main(int argc, char **argv)
 			debug(INFO, "]\n");
 			q += (2 * sizeof(gdp_name_t));
 
-			strcat(q, call_add_nhop_sep);
-			q += sizeof(call_add_nhop_sep) - 1;
-
-			debug(INFO, "-> rguid[");
-			for (int i = 0; i < sizeof(gdp_name_t); i++)
-			{
-				debug(INFO, "%.2x", otw_dir.oguid[i]);
-				sprintf(q + (i * 2), "%.2x", otw_dir.oguid[i]);
-			}
-			debug(INFO, "]\n");
-			q += (2 * sizeof(gdp_name_t));
-
 			strcat(q, call_add_nhop_end);
 			q += sizeof(call_add_nhop_end) - 1;
 			
@@ -288,11 +234,11 @@ int main(int argc, char **argv)
 			char *q;
 
 			debug(INFO, "id(0x%x) cmd -> delete nhop\n"
-				  "\tdguid[%s]\n"
-				  "\teguid[%s]\n",
+				  "\teguid[%s]\n"
+				  "\tdguid[%s]\n",
 				  ntohs(otw_dir.id),
-				  gdp_printable_name(otw_dir.dguid, _tmp_pname_1),
-				  gdp_printable_name(otw_dir.eguid, _tmp_pname_2));
+				  gdp_printable_name(otw_dir.eguid, _tmp_pname_1),
+				  gdp_printable_name(otw_dir.dguid, _tmp_pname_2));
 
 			// build the query
 
@@ -320,21 +266,51 @@ int main(int argc, char **argv)
 			debug(INFO, "]\n");
 			q += (2 * sizeof(gdp_name_t));
 
-			strcat(q, call_delete_nhop_sep);
-			q += sizeof(call_delete_nhop_sep) - 1;
-
-			debug(INFO, "-> rguid[");
-			for (int i = 0; i < sizeof(gdp_name_t); i++)
-			{
-				debug(INFO, "%.2x", otw_dir.oguid[i]);
-				sprintf(q + (i * 2), "%.2x", otw_dir.oguid[i]);
-			}
-			debug(INFO, "]\n");
-			q += (2 * sizeof(gdp_name_t));
-
 			strcat(q, call_delete_nhop_end);
 			q += sizeof(call_delete_nhop_end) - 1;
 
+		}
+		break;
+
+		case GDP_CMD_DIR_FIND:
+		{
+			char *q;
+			
+			debug(INFO, "id(0x%x) cmd -> find nhop\n"
+				  "\teguid[%s]\n"
+				  "\tdguid[%s]\n",
+				  ntohs(otw_dir.id),
+				  gdp_printable_name(otw_dir.eguid, _tmp_pname_1),
+				  gdp_printable_name(otw_dir.dguid, _tmp_pname_2));
+
+			// build the query
+
+			strcpy(query, call_find_nhop_pre);
+			q = query + sizeof(call_find_nhop_pre) - 1;
+
+			debug(INFO, "-> eguid[");
+			for (int i = 0; i < sizeof(gdp_name_t); i++)
+			{
+				debug(INFO, "%.2x", otw_dir.eguid[i]);
+				sprintf(q + (i * 2), "%.2x", otw_dir.eguid[i]);
+			}
+			debug(INFO, "]\n");
+			q += (2 * sizeof(gdp_name_t));
+			
+			strcat(q, call_find_nhop_sep);
+			q += sizeof(call_find_nhop_sep) - 1;
+
+			debug(INFO, "-> dguid[");
+			for (int i = 0; i < sizeof(gdp_name_t); i++)
+			{
+				debug(INFO, "%.2x", otw_dir.dguid[i]);
+				sprintf(q + (i * 2), "%.2x", otw_dir.dguid[i]);
+			}
+			debug(INFO, "]\n");
+			q += (2 * sizeof(gdp_name_t));
+			
+			strcat(q, call_find_nhop_end);
+			q += sizeof(call_find_nhop_end) - 1;
 		}
 		break;
 
@@ -343,7 +319,7 @@ int main(int argc, char **argv)
 			char *q;
 
 			debug(INFO, "id(0x%x) cmd -> flush nhops\n"
-				  "\trguid[%s]\n",
+				  "\teguid[%s]\n",
 				  ntohs(otw_dir.id),
 				  gdp_printable_name(otw_dir.eguid, _tmp_pname_1));
 
@@ -352,7 +328,7 @@ int main(int argc, char **argv)
 			strcpy(query, call_flush_nhop_pre);
 			q = query + sizeof(call_flush_nhop_pre) - 1;
 
-			debug(INFO, "-> rguid[");
+			debug(INFO, "-> eguid[");
 			for (int i = 0; i < sizeof(gdp_name_t); i++)
 			{
 				debug(INFO, "%.2x", otw_dir.eguid[i]);
