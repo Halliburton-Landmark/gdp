@@ -1,11 +1,7 @@
 /* vim: set ai sw=4 sts=4 ts=4 : */
 
 /*
-**  GDP-READER --- read and prints records from a GCL
-**
-**		This makes the naive assumption that all data values are ASCII
-**		text.  Ultimately they should all be encrypted, but for now
-**		I wanted to keep the code simple.
+**  GDP-READER --- read and print records from a GDP log
 **
 **		Unfortunately it isn't that simple, since it is possible to read
 **		using all the internal mechanisms.  The -c, -m, and -s flags
@@ -14,12 +10,12 @@
 **		There are two ways of reading.  The first is to get individual
 **		records in a loop (as implemented in do_simpleread), and the
 **		second is to request a batch of records (as implemented in
-**		do_multiread); these are returned as events that are collected
-**		after the initial command completes or as callbacks that are
-**		invoked in a separate thread.  There are two interfaces for the
-**		event/callback techniques; one only reads existing data, and the
-**		other ("subscriptions") will wait for data to be appended by
-**		another client.
+**		do_async_read or do_subscribe); these are returned as events
+**		that are collected after the initial command completes or as
+**		callbacks that are invoked in a separate thread.  There are two
+**		interfaces for the event/callback techniques; one only reads
+**		existing data, and the other ("subscriptions") will wait for
+**		data to be appended by another client.
 **
 **	----- BEGIN LICENSE BLOCK -----
 **	Applications for the Global Data Plane
@@ -120,7 +116,7 @@ printdatum(gdp_datum_t *datum, FILE *fp)
 
 
 /*
-**  DO_SIMPLEREAD --- read from a GCL using the one-record-at-a-time call
+**  DO_SIMPLEREAD --- read from a log using the one-record-at-a-time call
 */
 
 EP_STAT
@@ -203,13 +199,17 @@ done:
 
 
 /*
-**  Multiread and Subscriptions.
+**  Async Read and Subscriptions.
 */
 
 EP_STAT
-print_event(gdp_event_t *gev, bool subscribe)
+print_event(gdp_event_t *gev)
 {
 	EP_STAT estat = gdp_event_getstat(gev);
+	const char *op = gdp_event_getudata(gev);
+
+	if (op == NULL)
+		op = "Unknown";
 
 	// decode it
 	switch (gdp_event_gettype(gev))
@@ -224,8 +224,7 @@ print_event(gdp_event_t *gev, bool subscribe)
 		// "end of subscription": no more data will be returned
 		if (!Quiet)
 		{
-			ep_app_info("End of %s",
-					subscribe ? "Subscription" : "Multiread");
+			ep_app_info("End of %s", op);
 		}
 		estat = EP_STAT_END_OF_FILE;
 		break;
@@ -233,8 +232,7 @@ print_event(gdp_event_t *gev, bool subscribe)
 	  case GDP_EVENT_SHUTDOWN:
 		// log daemon has shut down, meaning we lose our subscription
 		estat = GDP_STAT_DEAD_DAEMON;
-		ep_app_message(estat, "%s terminating because of log daemon shutdown",
-				subscribe ? "Subscription" : "Multiread");
+		ep_app_message(estat, "%s terminating because of log daemon shutdown", op);
 		break;
 
 	  case GDP_EVENT_CREATED:
@@ -258,26 +256,25 @@ print_event(gdp_event_t *gev, bool subscribe)
 
 
 void
-multiread_cb(gdp_event_t *gev)
+read_cb(gdp_event_t *gev)
 {
-	(void) print_event(gev, false);
+	(void) print_event(gev);
 	gdp_event_free(gev);
 }
 
 
 /*
-**  DO_MULTIREAD --- subscribe or multiread
+**  DO_SUBSCRIBE --- subscribe to a log, possibly using callbacks
 **
 **		This routine handles calls that return multiple values via the
 **		event interface.  They might include subscriptions.
 */
 
 EP_STAT
-do_multiread(gdp_gin_t *gin,
+do_subscribe(gdp_gin_t *gin,
 		gdp_recno_t firstrec,
 		const char *dtstr,
 		int32_t numrecs,
-		bool subscribe,
 		bool use_callbacks)
 {
 	EP_STAT estat;
@@ -285,7 +282,7 @@ do_multiread(gdp_gin_t *gin,
 	EP_TIME_SPEC ts;
 
 	if (use_callbacks)
-		cbfunc = multiread_cb;
+		cbfunc = read_cb;
 
 	// are we reading by record number or by timestamp?
 	if (dtstr != NULL)
@@ -300,41 +297,20 @@ do_multiread(gdp_gin_t *gin,
 		}
 	}
 
-	if (subscribe)
-	{
-		// start up a subscription
-		if (dtstr == NULL)
-			estat = gdp_gin_subscribe_by_recno(gin, firstrec, numrecs,
-									NULL, cbfunc, NULL);
-		else
-			estat = gdp_gin_subscribe_by_ts(gin, &ts, numrecs,
-									NULL, cbfunc, NULL);
-	}
+	// start up a subscription
+	if (dtstr == NULL)
+		estat = gdp_gin_subscribe_by_recno(gin, firstrec, numrecs,
+								NULL, cbfunc, "Subscription");
 	else
-	{
-#if 0
-		// make the flags more user-friendly
-		if (firstrec == 0)
-			firstrec = 1;
+		estat = gdp_gin_subscribe_by_ts(gin, &ts, numrecs,
+								NULL, cbfunc, "Subscription");
 
-		// start up a multiread
-		if (dtstr == NULL)
-			estat = gdp_gin_multiread(gin, firstrec, numrecs, cbfunc, NULL);
-		else
-			estat = gdp_gin_multiread_ts(gin, &ts, numrecs, cbfunc, NULL);
-#else
-		ep_app_error("Multiread not implemented; use async read");
-		return GDP_STAT_NOT_IMPLEMENTED;
-#endif
-	}
-
-	// check to make sure the subscribe/multiread succeeded; if not, bail
+	// check to make sure the subscribe succeeded; if not, bail
 	if (!EP_STAT_ISOK(estat))
 	{
 		char ebuf[200];
 
-		ep_app_fatal("Cannot %s:\n\t%s",
-				subscribe ? "subscribe" : "multiread",
+		ep_app_fatal("Cannot subscribe: %s",
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 
@@ -356,7 +332,7 @@ do_multiread(gdp_gin_t *gin,
 			gdp_event_t *gev = gdp_event_next(NULL, 0);
 
 			// print it
-			estat = print_event(gev, subscribe);
+			estat = print_event(gev);
 
 			// don't forget to free the event!
 			gdp_event_free(gev);
@@ -388,7 +364,7 @@ do_async_read(gdp_gin_t *gin,
 	gdp_event_cbfunc_t cbfunc = NULL;
 
 	if (use_callbacks)
-		cbfunc = multiread_cb;
+		cbfunc = read_cb;
 
 	// make the flags more user-friendly
 	if (firstrec == 0)
@@ -401,8 +377,9 @@ do_async_read(gdp_gin_t *gin,
 		numrecs -= firstrec - 1;
 	}
 
-	// issue the multiread commands without reading results
-	estat = gdp_gin_read_by_recno_async(gin, firstrec, numrecs, cbfunc, NULL);
+	// issue the async read command without reading results yet
+	estat = gdp_gin_read_by_recno_async(gin, firstrec, numrecs,
+							cbfunc, "Async Read");
 	if (!EP_STAT_ISOK(estat))
 	{
 		char ebuf[100];
@@ -423,7 +400,7 @@ do_async_read(gdp_gin_t *gin,
 			gdp_event_t *gev = gdp_event_next(NULL, 0);
 
 			// print it
-			estat = print_event(gev, false);
+			estat = print_event(gev);
 
 			// don't forget to free the event!
 			gdp_event_free(gev);
@@ -433,7 +410,7 @@ do_async_read(gdp_gin_t *gin,
 	}
 	else
 	{
-		// hang for an minute waiting for events
+		// hang for 60 seconds waiting for events
 		sleep(60);
 	}
 
@@ -470,7 +447,7 @@ usage(void)
 {
 	fprintf(stderr,
 			"Usage: %s [-a] [-c] [-d datetime] [-D dbgspec] [-f firstrec]\n"
-			"  [-G router_addr] [-m] [-L logfile] [-M] [-n nrecs]\n"
+			"  [-G router_addr] [-L logfile] [-M] [-n nrecs]\n"
 			"  [-s] [-t] [-v] log_name\n"
 			"    -a  read asynchronously\n"
 			"    -c  use callbacks\n"
@@ -479,7 +456,6 @@ usage(void)
 			"    -f  first record number to read (from 1)\n"
 			"    -G  IP host to contact for gdp_router\n"
 			"    -L  set logging file name (for debugging)\n"
-			"    -m  use multiread\n"
 			"    -M  show log metadata\n"
 			"    -n  set number of records to read (default all)\n"
 			"    -q  be quiet (don't print any metadata)\n"
@@ -503,7 +479,6 @@ main(int argc, char **argv)
 	int opt;
 	char *gdpd_addr = NULL;
 	bool subscribe = false;
-	bool multiread = false;
 	bool async = false;
 	bool use_callbacks = false;
 	bool showmetadata = false;
@@ -514,13 +489,12 @@ main(int argc, char **argv)
 	gdp_iomode_t open_mode = GDP_MODE_RO;
 	const char *dtstr = NULL;
 
-	setlinebuf(stdout);								//DEBUG
-	//char outbuf[65536];							//DEBUG
-	//setbuffer(stdout, outbuf, sizeof outbuf);		//DEBUG
+	ep_lib_init(EP_LIB_USEPTHREADS);	// initialize app errors, etc.
 
 	// parse command-line options
 	while ((opt = getopt(argc, argv, "aAcd:D:f:G:L:mMn:qstv")) > 0)
 	{
+		errno = 0;						// avoid misleading messages
 		switch (opt)
 		{
 		  case 'A':				// hidden flag for debugging only
@@ -561,8 +535,9 @@ main(int argc, char **argv)
 			break;
 
 		  case 'm':
-			// turn on multi-read (see also -s)
-			multiread = true;
+			// multiread: obsolete
+			ep_app_warn("Multiread (-m) is deprecated; using Async (-a)");
+			async = true;
 			break;
 
 		  case 'M':
@@ -580,7 +555,7 @@ main(int argc, char **argv)
 			break;
 
 		  case 's':
-			// subscribe to this GCL (see also -m)
+			// subscribe to this log
 			subscribe = true;
 			break;
 
@@ -610,17 +585,19 @@ main(int argc, char **argv)
 	int ntypes = 0;
 	if (async)
 		ntypes++;
-	if (multiread)
-		ntypes++;
 	if (subscribe)
 		ntypes++;
 	if (ntypes > 1)
 	{
-		ep_app_error("Can only specify one of -a, -m, and -s");
+		ep_app_error("Can only specify one of -a and -s");
 		exit(EX_USAGE);
 	}
+	else if (use_callbacks)
+	{
+		ep_app_warn("UseCallbacks (-c) flag does nothing without -a or -s");
+	}
 
-	// we require a GCL name
+	// we require a log name
 	if (show_usage || argc <= 0)
 		usage();
 
@@ -650,7 +627,7 @@ main(int argc, char **argv)
 	estat = gdp_parse_name(argv[0], gobname);
 	if (!EP_STAT_ISOK(estat))
 	{
-		ep_app_message(estat, "illegal GCL name syntax:\n\t%s", argv[0]);
+		ep_app_message(estat, "illegal log name syntax:\n\t%s", argv[0]);
 		exit(EX_USAGE);
 	}
 
@@ -660,14 +637,14 @@ main(int argc, char **argv)
 		gdp_pname_t gobpname;
 
 		gdp_printable_name(gobname, gobpname);
-		fprintf(stderr, "Reading GCL %s\n", gobpname);
+		fprintf(stderr, "Reading log %s\n", gobpname);
 	}
 
-	// open the GCL; arguably this shouldn't be necessary
+	// open the log; arguably this shouldn't be necessary
 	estat = gdp_gin_open(gobname, open_mode, NULL, &gin);
 	if (!EP_STAT_ISOK(estat))
 	{
-		ep_app_message(estat, "Cannot open GCL %s", argv[0]);
+		ep_app_message(estat, "Cannot open log %s", argv[0]);
 		exit(EX_NOINPUT);
 	}
 
@@ -681,9 +658,8 @@ main(int argc, char **argv)
 	// arrange to do the reading via one of the helper routines
 	if (async)
 		estat = do_async_read(gin, firstrec, numrecs, use_callbacks);
-	else if (subscribe || multiread || use_callbacks)
-		estat = do_multiread(gin, firstrec, dtstr, numrecs,
-						subscribe, use_callbacks);
+	else if (subscribe)
+		estat = do_subscribe(gin, firstrec, dtstr, numrecs, use_callbacks);
 	else
 		estat = do_simpleread(gin, firstrec, dtstr, numrecs);
 
@@ -712,7 +688,7 @@ fail0:
 	{
 		EP_STAT close_stat = gdp_gin_close(gin);
 		if (!EP_STAT_ISOK(close_stat))
-			ep_app_message(close_stat, "cannot close GCL");
+			ep_app_message(close_stat, "cannot close log");
 	}
 
 	// this sleep is to watch for any extraneous results coming back
