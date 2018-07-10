@@ -53,9 +53,10 @@
 #include <ep_hash.h>
 #include <ep_string.h>
 
-#include <sys/stat.h>
-#include <fcntl.h>
 #include <ctype.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 
 static EP_HASH	*ParamHash;
@@ -72,7 +73,10 @@ read_param_file(char *path)
 	char lbuf[200];
 
 	if (path == NULL || (fp = fopen(path, "r")) == NULL)
+	{
+		errno = 0;		// avoid misleading error messages
 		return;
+	}
 
 	while (fgets(lbuf, sizeof lbuf, fp) != NULL)
 	{
