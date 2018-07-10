@@ -39,23 +39,15 @@
 #include "logd.h"
 #include "logd_sqlite.h"
 
-//#include <gdp/gdp_buf.h>
+#include <gdp/gdp_buf.h>
 #include <gdp/gdp_md.h>
 
-//#include <ep/ep_hash.h>
 #include <ep/ep_hexdump.h>
-//#include <ep/ep_log.h>
-//#include <ep/ep_mem.h>
 #include <ep/ep_net.h>
 #include <ep/ep_string.h>
-//#include <ep/ep_thr.h>
 
 #include <dirent.h>
 #include <errno.h>
-//#include <fcntl.h>
-//#include <inttypes.h>
-//#include <stdint.h>
-//#include <stdio.h>
 #include <sys/file.h>
 #include <sys/stat.h>
 
@@ -199,15 +191,20 @@ ep_stat_from_sqlite_result_code(int rc)
 }
 
 static EP_STAT
-sqlite_error(int rc, const char *where, const char *phase)
+sqlite_error(int rc, const char *sqerrmsg, const char *where, const char *phase)
 {
 	EP_STAT estat = ep_stat_from_sqlite_result_code(rc);
-	if (rc != SQLITE_OK && ep_dbg_test(Dbg, 1))
+	if (EP_STAT_ISOK(estat))
+		estat = GDP_STAT_SQLITE_ERROR;
+	if ((rc != SQLITE_OK || sqerrmsg != NULL) && ep_dbg_test(Dbg, 1))
 	{
 		char ebuf[100];
-		ep_dbg_cprintf(Dbg, 1, "SQLite status (%s during %s): %s (%d)\n\t%s\n",
-				where, phase, sqlite3_errstr(rc), rc,
-				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		if (sqerrmsg == NULL)
+			sqerrmsg = sqlite3_errstr(rc);
+		ep_dbg_cprintf(Dbg, 1,
+					"SQLite status (%s during %s): %s (%d)\n\t%s\n",
+					where, phase, sqerrmsg, rc,
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 	return estat;
 }
@@ -217,6 +214,71 @@ static void
 sqlite_logger(void *unused, int rc, const char *msg)
 {
 	ep_dbg_printf("SQLite log %d: %s\n", rc, msg);
+}
+
+
+static struct pragma_name
+{
+	const char	*pname;
+	const char	*pdefault;
+}					SqlitePragmaNames[] =
+					{
+						{ "synchronous",			"NORMAL"			},
+						{ "journal_mode",			"TRUNCATE"			},
+						{ "temp_store",				NULL,				},
+						{ "locking_mode",			"EXCLUSIVE",		},
+						{ "cache_size",				NULL,				},
+						{ "page_size",				NULL,				},
+						{ "journal_size_limit",		NULL,				},
+						{ NULL,						NULL				},
+					};
+static char			*SqlitePragmasSQL;		// SQL to set pragmas
+
+static void
+sqlite_init_pragmas(void)
+{
+	gdp_buf_t *sqlbuf = gdp_buf_new();
+	struct pragma_name *pp = SqlitePragmaNames;
+
+	for (; pp->pname != NULL; pp++)
+	{
+		char pnamebuf[100];
+
+		snprintf(pnamebuf, sizeof pnamebuf,
+				"swarm.gdplogd.sqlite.pragma.%s", pp->pname);
+		const char *pv = ep_adm_getstrparam(pnamebuf, pp->pdefault);
+		if (pv != NULL)
+			gdp_buf_printf(sqlbuf, "   PRAGMA %s = %s;\n", pp->pname, pv);
+	}
+	size_t qlen = gdp_buf_getlength(sqlbuf);
+	if (qlen > 0)
+	{
+		SqlitePragmasSQL = ep_mem_malloc(qlen + 1);
+		snprintf(SqlitePragmasSQL, qlen + 1, "%s", gdp_buf_getptr(sqlbuf, qlen));
+		ep_dbg_cprintf(Dbg, 0, "SQLite3 Pragmas:\n%s", SqlitePragmasSQL);
+	}
+}
+
+
+static EP_STAT
+sqlite_set_pragmas(struct sqlite3 *db, const char *logname)
+{
+	EP_STAT estat = EP_STAT_OK;
+	int rc;
+	char *sqerrstr = NULL;
+
+	if (SqlitePragmasSQL == NULL)
+		return estat;
+
+	rc = sqlite3_exec(db, SqlitePragmasSQL, NULL, NULL, &sqerrstr);
+	if (rc != SQLITE_OK || sqerrstr != NULL)
+	{
+		estat = sqlite_error(rc, sqerrstr, logname, "sqlite_set_pragmas");
+		ep_dbg_cprintf(Dbg, 1, "    query = %s", SqlitePragmasSQL);
+		if (sqerrstr != NULL)
+			sqlite3_free(sqerrstr);
+	}
+	return estat;
 }
 
 
@@ -254,6 +316,8 @@ sqlite_init(void)
 
 	sqlite3_config(SQLITE_CONFIG_SERIALIZED);	// fully threadable
 	sqlite3_initialize();
+
+	sqlite_init_pragmas();
 
 	SQLiteInitialized = true;
 	ep_dbg_cprintf(Dbg, 8, "sqlite_init: log dir = %s, mode = 0%o\n",
@@ -438,7 +502,7 @@ physinfo_free(gob_physinfo_t *phys)
 		// we can now close the database
 		rc = sqlite3_close(phys->db);
 		if (rc != 0)		//XXX
-			(void) sqlite_error(rc, "physinfo_free", "cannot close db");
+			(void) sqlite_error(rc, NULL, "physinfo_free", "cannot close db");
 		phys->db = NULL;
 	}
 
@@ -471,6 +535,7 @@ sqlite_create(gdp_gob_t *gob, gdp_md_t *gmd)
 	gob_physinfo_t *phys;
 	const char *phase = "init";
 	int rc;
+	char *sqerrstr = NULL;
 
 	EP_ASSERT_POINTER_VALID(gob);
 
@@ -554,12 +619,18 @@ sqlite_create(gdp_gob_t *gob, gdp_md_t *gmd)
 		phys->ver = GLOG_VERSION;
 	}
 
+	// set performance pragmas
+	phase = "set pragmas";
+	estat = sqlite_set_pragmas(phys->db, gob->pname);
+	if (!EP_STAT_ISOK(estat))
+		goto fail0;
+
 	phase = "create schema";
 	{
 		// create the database schema: primary table and indices
 		// https://www.sqlite.org/c3ref/exec.html
 		// sqlite3_exec(db, cmd, callback, closure, *errmsg)
-		rc = sqlite3_exec(phys->db, LogSchema, NULL, NULL, NULL);
+		rc = sqlite3_exec(phys->db, LogSchema, NULL, NULL, &sqerrstr);
 		CHECK_RC(rc, goto fail1);
 	}
 
@@ -637,7 +708,10 @@ fail3:
 
 fail1:
 	// failure resulted from an SQLite error
-	estat = sqlite_error(rc, "sqlite_create", phase);
+	estat = sqlite_error(rc, sqerrstr, "sqlite_create", phase);
+	if (sqerrstr != NULL)
+		sqlite3_free(sqerrstr);
+	sqerrstr = NULL;
 
 fail0:
 	// turn OK into an errno-based code
@@ -687,7 +761,7 @@ check_pragma(struct sqlite3 *db,
 	rc = sqlite3_prepare_v2(db, qbuf, -1, &stmt, NULL);
 	if (rc != SQLITE_OK)
 	{
-		estat = sqlite_error(rc, "sqlite_open pragma prepare", name);
+		estat = sqlite_error(rc, NULL, "sqlite_open pragma prepare", name);
 		if (EP_STAT_ISOK(estat))
 			estat = GDP_STAT_SQLITE_ERROR;
 		return estat;
@@ -696,7 +770,7 @@ check_pragma(struct sqlite3 *db,
 	rc = sqlite3_step(stmt);
 	if (rc != SQLITE_ROW)
 	{
-		estat = sqlite_error(rc, "sqlite_open pragma check", name);
+		estat = sqlite_error(rc, NULL, "sqlite_open pragma check", name);
 		if (EP_STAT_ISOK(estat))
 			estat = GDP_STAT_SQLITE_ERROR;
 		sqlite3_finalize(stmt);
@@ -774,6 +848,12 @@ sqlite_open(gdp_gob_t *gob)
 		if (!EP_STAT_ISOK(estat))
 			goto fail1;
 	}
+
+	// set performance pragmas
+	phase = "set pragmas";
+	estat = sqlite_set_pragmas(phys->db, gob->pname);
+	if (!EP_STAT_ISOK(estat))
+		goto fail1;
 
 	// read metadata
 	phase = "metadata read";
@@ -1053,7 +1133,7 @@ process_select_results(sqlite3_stmt *stmt,
 	int reset_rc = sqlite3_reset(stmt);
 	if (reset_rc != SQLITE_OK)
 	{
-		estat = sqlite_error(reset_rc, "process_select_results", "reset");
+		estat = sqlite_error(reset_rc, NULL, "process_select_results", "reset");
 	}
 	else if (rc == SQLITE_ROW)
 	{
@@ -1076,7 +1156,7 @@ process_select_results(sqlite3_stmt *stmt,
 		}
 	}
 	else if (!sqlite_rc_success(rc))
-		estat = sqlite_error(rc, "process_select_results", "step");
+		estat = sqlite_error(rc, NULL, "process_select_results", "step");
 	if (EP_STAT_ISOK(estat))
 		estat = EP_STAT_FROM_INT(nresults);
 	return estat;
@@ -1132,7 +1212,7 @@ sqlite_read_by_hash(gdp_gob_t *gob,
 	if (false)
 	{
 fail2:
-		estat = sqlite_error(rc, "sqlite_read_by_hash", phase);
+		estat = sqlite_error(rc, NULL, "sqlite_read_by_hash", phase);
 	}
 	if (phys->read_by_hash_stmt != NULL)
 		sqlite3_clear_bindings(phys->read_by_hash_stmt);
@@ -1219,7 +1299,7 @@ sqlite_read_by_recno(gdp_gob_t *gob,
 	if (false)
 	{
 fail2:
-		estat = sqlite_error(rc, "sqlite_read_by_recno", phase);
+		estat = sqlite_error(rc, NULL, "sqlite_read_by_recno", phase);
 	}
 	if (stmt != NULL)
 		sqlite3_clear_bindings(stmt);
@@ -1293,7 +1373,7 @@ sqlite_read_by_timestamp(gdp_gob_t *gob,
 	if (false)
 	{
 fail2:
-		estat = sqlite_error(rc, "sqlite_read_by_timestamp", phase);
+		estat = sqlite_error(rc, NULL, "sqlite_read_by_timestamp", phase);
 	}
 	if (phys->read_by_timestamp_stmt != NULL)
 		sqlite3_clear_bindings(phys->read_by_timestamp_stmt);
@@ -1342,7 +1422,7 @@ sqlite_recno_exists(gdp_gob_t *gob, gdp_recno_t recno)
 	if (false)
 	{
 fail1:
-		sqlite_error(rc, "sqlite_recno_exists", phase);
+		sqlite_error(rc, NULL, "sqlite_recno_exists", phase);
 	}
 	sqlite3_finalize(stmt);
 
@@ -1428,7 +1508,7 @@ sqlite_append(gdp_gob_t *gob,
 		if (rc != SQLITE_DONE)
 		{
 fail3:
-			estat = sqlite_error(rc, "sqlite_append", phase);
+			estat = sqlite_error(rc, NULL, "sqlite_append", phase);
 			if (hash != NULL)
 				gdp_hash_free(hash);
 		}

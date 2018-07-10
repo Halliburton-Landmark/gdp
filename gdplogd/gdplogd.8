@@ -208,6 +208,56 @@ The old record with the same number will not be accessible.
 Allow gaps in record numbers.
 This will likely confuse readers who try to read the record
 that does not exist.
+.
+.It swarm.gdplogd.sqlite.pragma.cache_size
+Set the SQLite cache size.
+Defaults to the built-in SQLite default.
+.
+.It swarm.gdplogd.sqlite.pragma.journal_mode
+Set the SQLite journalling mode.
+May be
+.Li DELETE ,
+.Li TRUNCATE ,
+.Li PERSIST ,
+.Li MEMORY ,
+.Li WAL ,
+or
+.Li OFF .
+Defaults to
+.Li TRUNCATE .
+.
+.It swarm.gdplogd.sqlite.pragma.journal_size_limit
+Set the maximum size of the SQLite journal.
+Defaults to the built-in SQLite default.
+.
+.It swarm.gdplogd.sqlite.pragma.locking_mode
+Sets the file locking mode.
+May be
+.Li NORMAL
+or
+.Li EXCLUSIVE .
+Defaults to
+.Li EXCLUSIVE .
+.
+.It swarm.gdplogd.sqlite.pragma.synchronous
+Specify the circumstances when SQLite will force pages to disk.
+May be
+.Li OFF ,
+.Li NORMAL ,
+.Li FULL ,
+or
+.Li EXTRA .
+Defaults to
+.Li NORMAL .
+.
+.It swarm.gdplogd.sqlite.pragma.temp_store
+Indicate where temporary tables should be stored.
+May be
+.Li DEFAULT ,
+.Li FILE ,
+or
+.Li MEMORY .
+Defaults to the built-in SQLite default.
 .El
 .
 .Sh SEE ALSO
