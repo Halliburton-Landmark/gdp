@@ -46,6 +46,7 @@
 #include <signal.h>
 #include <sysexits.h>
 #include <arpa/inet.h>
+#include <sys/socket.h>
 
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.main", "GDP Log Daemon");
@@ -406,6 +407,17 @@ main(int argc, char **argv)
 	signal(SIGTERM, sigterm);
 	signal(SIGQUIT, sigabort);
 	signal(SIGABRT, sigabort);
+
+	// Ignore SIGPIPE, since this can happen sometimes on writes to the
+	// router.  This allows us to catch the error and reconnect.
+	if (ep_adm_getboolparam("swarm.gdplogd.ignore.sigpipe",
+#ifdef SO_NOSIGPIPE
+				false
+#else
+				true
+#endif
+				))
+		signal(SIGPIPE, SIG_IGN);
 
 	// dump state on assertion failure
 	EpAssertInfo = assertion_dump;

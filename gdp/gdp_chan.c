@@ -45,6 +45,7 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/queue.h>
+#include <sys/signal.h>
 #include <sys/socket.h>
 
 #include <netinet/tcp.h>
@@ -756,11 +757,20 @@ chan_open_helper(
 								EV_READ, MIN_HEADER_LENGTH, 0);
 				bufferevent_enable(chan->bev, EV_READ | EV_WRITE);
 
-#ifdef SO_NOSIGPIPE
 				// disable SIGPIPE so that we'll get an error instead of death
+#ifdef SO_NOSIGPIPE
 				int sockopt_set = 1;
 				setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE,
 						(void *) &sockopt_set, sizeof sockopt_set);
+#else
+				if (ep_adm_getboolparam("swarm.gdp.ignore.sigpipe", false))
+				{
+					// It isn't clear you want to do this, since this may
+					// cause stdout writes to dead pipes to keep going in
+					// programs that are not fastidious about error checking.
+					// (Most programs do not check e.g., printf for error.)
+					signal(SIGPIPE, SIG_IGN);
+				}
 #endif
 				break;
 			}

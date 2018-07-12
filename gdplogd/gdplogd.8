@@ -140,17 +140,22 @@ are semantically the same.
 This variable is only intended to be used during a transition period;
 it will go away in the future.
 .
-.It swarm.gdplogd.disklog.log-posix-errors
-Send any Posix errors to the system log.
-May be useful for some debugging scenarios.
-Default to
-.Li false .
-.
-.It swarm.gdplogd.disklog.log-sqlite-errors
-Send any SQLite errors to the system log.
-May be useful for some debugging scenarios.
-Default to
-.Li true .
+.It swarm.gdplogd.ignore.sigpipe
+If set, ignore the
+.Li SIGPIPE
+signal.
+This allows
+.Nm
+to reconnect to the router if it gets a write error.
+Defaults to
+.Li false
+on systems that allow the signal to be ignored on individual sockets,
+.Li true
+otherwise.
+See also the
+.Li swarm.gdp.ignore.sigpipe
+parameter described in
+.Xr gdp 7 .
 .
 .It swarm.gdplogd.log.dir
 The directory in which physical logs are written.
@@ -208,6 +213,18 @@ The old record with the same number will not be accessible.
 Allow gaps in record numbers.
 This will likely confuse readers who try to read the record
 that does not exist.
+.
+.It swarm.gdplogd.sqlite.log-posix-errors
+Send any Posix errors to the system log.
+May be useful for some debugging scenarios.
+Default to
+.Li false .
+.
+.It swarm.gdplogd.sqlite.log-sqlite-errors
+Send any SQLite errors to the system log.
+May be useful for some debugging scenarios.
+Default to
+.Li true .
 .
 .It swarm.gdplogd.sqlite.pragma.cache_size
 Set the SQLite cache size.

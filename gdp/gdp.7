@@ -260,6 +260,24 @@ How many seconds to allow an event loop to run before restarting it.
 This is only needed in some versions of the underlying event library.
 Defaults to 30.
 .
+.It swarm.gdp.ignore.sigpipe
+If set, the
+.Li SIGPIPE
+signal is ignored,
+which allows the application to reconnect to the router
+if it goes away during a write.
+Unfortunately this also applies to writes to other files,
+including
+.Va stdout ,
+which allows applications to fail silently
+unless the application checks the result of every write.
+Since almost no programs check to see if
+.Fn printf
+succeeds, this can result in programs seeming to hang
+if the consumer of a pipe goes away.
+Defaults to
+.Li false .
+.
 .It swarm.gdp.invoke.retries
 When a GDP client is trying to invoke a service
 (for example, accessing a log)
