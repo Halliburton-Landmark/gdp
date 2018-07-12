@@ -1637,6 +1637,66 @@ sqlite_getstats(
 }
 
 
+static EP_STAT
+sqlite_xact_begin(gdp_gob_t *gob)
+{
+	EP_STAT estat = EP_STAT_OK;
+	gob_physinfo_t *phys = GETPHYS(gob);
+	char *sqerrstr = NULL;
+
+	int rc = sqlite3_exec(phys->db, "BEGIN TRANSACTION;",
+						NULL, NULL, &sqerrstr);
+	if (!sqlite_rc_success(rc))
+	{
+		// failure resulted from an SQLite error
+		estat = sqlite_error(rc, sqerrstr, "sqlite_xact_begin", "operation");
+	}
+	if (sqerrstr != NULL)
+		sqlite3_free(sqerrstr);
+	return estat;
+}
+
+
+static EP_STAT
+sqlite_xact_end(gdp_gob_t *gob)
+{
+	EP_STAT estat = EP_STAT_OK;
+	gob_physinfo_t *phys = GETPHYS(gob);
+	char *sqerrstr = NULL;
+
+	int rc = sqlite3_exec(phys->db, "END TRANSACTION;",
+						NULL, NULL, &sqerrstr);
+	if (!sqlite_rc_success(rc))
+	{
+		// failure resulted from an SQLite error
+		estat = sqlite_error(rc, sqerrstr, "sqlite_xact_end", "operation");
+	}
+	if (sqerrstr != NULL)
+		sqlite3_free(sqerrstr);
+	return estat;
+}
+
+
+static EP_STAT
+sqlite_xact_abort(gdp_gob_t *gob)
+{
+	EP_STAT estat = EP_STAT_OK;
+	gob_physinfo_t *phys = GETPHYS(gob);
+	char *sqerrstr = NULL;
+
+	int rc = sqlite3_exec(phys->db, "ROLLBACK TRANSACTION;",
+						NULL, NULL, &sqerrstr);
+	if (!sqlite_rc_success(rc))
+	{
+		// failure resulted from an SQLite error
+		estat = sqlite_error(rc, sqerrstr, "sqlite_xact_abort", "operation");
+	}
+	if (sqerrstr != NULL)
+		sqlite3_free(sqerrstr);
+	return estat;
+}
+
+
 __BEGIN_DECLS
 struct gob_phys_impl	GdpSqliteImpl =
 {
@@ -1652,5 +1712,8 @@ struct gob_phys_impl	GdpSqliteImpl =
 	.remove				= sqlite_remove,
 	.foreach			= sqlite_foreach,
 	.getstats			= sqlite_getstats,
+	.xact_begin			= sqlite_xact_begin,
+	.xact_end			= sqlite_xact_end,
+	.xact_abort			= sqlite_xact_abort,
 };
 __END_DECLS

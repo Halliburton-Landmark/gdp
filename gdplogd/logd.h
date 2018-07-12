@@ -222,6 +222,12 @@ struct gob_phys_impl
 	bool		(*recno_exists)(
 						gdp_gob_t *gob,
 						gdp_recno_t recno);
+	EP_STAT		(*xact_begin)(
+						gdp_gob_t *gob);
+	EP_STAT		(*xact_end)(
+						gdp_gob_t *gob);
+	EP_STAT		(*xact_abort)(
+						gdp_gob_t *gob);
 };
 
 // known implementations
