@@ -45,6 +45,7 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/queue.h>
+#include <sys/socket.h>
 
 #include <netinet/tcp.h>
 
@@ -744,7 +745,6 @@ chan_open_helper(
 				ep_dbg_cprintf(Dbg, 39, "successful connect\n");
 				estat = EP_STAT_OK;
 
-				// set up the bufferevent
 				evutil_make_socket_nonblocking(sock);
 				chan->bev = bufferevent_socket_new(EventBase, sock,
 								BEV_OPT_CLOSE_ON_FREE | BEV_OPT_THREADSAFE |
@@ -755,6 +755,13 @@ chan_open_helper(
 				bufferevent_setwatermark(chan->bev,
 								EV_READ, MIN_HEADER_LENGTH, 0);
 				bufferevent_enable(chan->bev, EV_READ | EV_WRITE);
+
+#ifdef SO_NOSIGPIPE
+				// disable SIGPIPE so that we'll get an error instead of death
+				int sockopt_set = 1;
+				setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE,
+						(void *) &sockopt_set, sizeof sockopt_set);
+#endif
 				break;
 			}
 
