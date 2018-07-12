@@ -650,6 +650,8 @@ nopubkey:
 						gob->pname);
 			estat = EP_STAT_OK;
 		}
+
+		// still need to compute the digest for the hash chain
 		gob->digest = ep_crypto_md_new(mdtype);
 	}
 
@@ -686,88 +688,100 @@ cmd_append(gdp_req_t *req)
 							"cmd_append: GOB not open", estat);
 	}
 
+	// get the payload, which may contain multiple records
 	GdpMessage__CmdAppend *payload;
 	GET_PAYLOAD(req, cmd_append, CMD_APPEND);
-	//FIXME: should loop through datums verifying hash chain.
-	//FIXME: only last entry should have signature.
-	EP_ASSERT(payload->dl->n_d == 1);		//FIXME
-	GdpDatum *pbd = payload->dl->d[0];		//FIXME
-
-	CMD_TRACE(req->cpdu->msg->cmd, "%s %" PRIgdp_recno,
-			req->gob->pname, pbd->recno);
-
-	// validate record number
-	if (pbd->recno <= 0)
+	if (payload->dl->n_d <= 0)
 	{
-		estat = _gdp_req_nak_resp(req, GDP_NAK_C_BADOPT,
-						"cmd_append: recno must be > 0",
-						GDP_STAT_NAK_BADOPT);
-		goto fail0;
+		// no data included in APPEND command
+		return _gdp_req_nak_resp(req, GDP_NAK_C_BADREQ,
+							"cmd_append: no data", GDP_STAT_NAK_BADREQ);
 	}
 
-	if (pbd->recno != (gdp_recno_t) (req->gob->nrecs + 1))
+	// verify that the records in this payload link to each other
+	int rx;
+	GdpDatum *pbd;
+	for (rx = 0; rx < payload->dl->n_d; rx++)
 	{
-		bool random_order_ok = EP_UT_BITSET(FORGIVE_LOG_GAPS, GdplogdForgive) &&
-							EP_UT_BITSET(FORGIVE_LOG_DUPS, GdplogdForgive);
+		pbd = payload->dl->d[rx++];
 
-		// replay or missing a record
-		ep_dbg_cprintf(Dbg, random_order_ok ? 29 : 9,
-						"cmd_append: record out of sequence: got %"
-						PRIgdp_recno ", expected %" PRIgdp_recno "\n"
-						"\ton log %s\n",
-						pbd->recno, req->gob->nrecs + 1,
-						req->gob->pname);
+		// FIXME: check hash of previous record matches prevhash in this record
 
-		if (pbd->recno <= (gdp_recno_t) req->gob->nrecs)
+		CMD_TRACE(req->cpdu->msg->cmd, "%s %" PRIgdp_recno,
+				req->gob->pname, pbd->recno);
+
+		// validate record number
+		if (pbd->recno <= 0)
 		{
-			// may be a duplicate append, or just filling in a gap
-			// (should probably see if duplicates are the same data)
+			estat = _gdp_req_nak_resp(req, GDP_NAK_C_BADOPT,
+							"cmd_append: recno must be > 0",
+							GDP_STAT_NAK_BADOPT);
+			goto fail0;
+		}
 
-			if (!EP_UT_BITSET(FORGIVE_LOG_DUPS, GdplogdForgive) &&
-				req->gob->x->physimpl->recno_exists(
-									req->gob, pbd->recno))
+		if (pbd->recno != (gdp_recno_t) (req->gob->nrecs + 1))
+		{
+			bool random_order_ok = EP_UT_BITSET(FORGIVE_LOG_GAPS, GdplogdForgive) &&
+								EP_UT_BITSET(FORGIVE_LOG_DUPS, GdplogdForgive);
+
+			// replay or missing a record
+			ep_dbg_cprintf(Dbg, random_order_ok ? 29 : 9,
+							"cmd_append: record out of sequence: got %"
+							PRIgdp_recno ", expected %" PRIgdp_recno "\n"
+							"\ton log %s\n",
+							pbd->recno, req->gob->nrecs + 1,
+							req->gob->pname);
+
+			if (pbd->recno <= (gdp_recno_t) req->gob->nrecs)
 			{
+				// may be a duplicate append, or just filling in a gap
+				// (should probably see if duplicates are the same data)
+
+				if (!EP_UT_BITSET(FORGIVE_LOG_DUPS, GdplogdForgive) &&
+					req->gob->x->physimpl->recno_exists(
+										req->gob, pbd->recno))
+				{
+					char mbuf[100];
+					snprintf(mbuf, sizeof mbuf,
+							"cmd_append: duplicate record number %" PRIgdp_recno,
+							pbd->recno);
+					estat = _gdp_req_nak_resp(req, GDP_NAK_C_CONFLICT,
+							mbuf, GDP_STAT_RECORD_DUPLICATED);
+					goto fail0;
+				}
+			}
+			else if (pbd->recno > (gdp_recno_t) (req->gob->nrecs + 1) &&
+					!EP_UT_BITSET(FORGIVE_LOG_GAPS, GdplogdForgive))
+			{
+				// gap in record numbers
 				char mbuf[100];
 				snprintf(mbuf, sizeof mbuf,
-						"cmd_append: duplicate record number %" PRIgdp_recno,
+						"cmd_append: record number %" PRIgdp_recno " missing",
 						pbd->recno);
-				estat = _gdp_req_nak_resp(req, GDP_NAK_C_CONFLICT,
-						mbuf, GDP_STAT_RECORD_DUPLICATED);
+				estat = _gdp_req_nak_resp(req, GDP_NAK_C_FORBIDDEN,
+						mbuf, GDP_STAT_RECNO_SEQ_ERROR);
 				goto fail0;
 			}
 		}
-		else if (pbd->recno > (gdp_recno_t) (req->gob->nrecs + 1) &&
-				!EP_UT_BITSET(FORGIVE_LOG_GAPS, GdplogdForgive))
-		{
-			// gap in record numbers
-			char mbuf[100];
-			snprintf(mbuf, sizeof mbuf,
-					"cmd_append: record number %" PRIgdp_recno " missing",
-					pbd->recno);
-			estat = _gdp_req_nak_resp(req, GDP_NAK_C_FORBIDDEN,
-					mbuf, GDP_STAT_RECNO_SEQ_ERROR);
-			goto fail0;
-		}
 	}
 
-	// validate sequence number and signature
-	// only path to datum is via this req, so we don't have to lock it
+	// validate signature of the last datum in PDU
 	if (req->gob->digest == NULL)
 	{
 		estat = init_sig_digest(req->gob);
 		EP_STAT_CHECK(estat, goto fail1);
 	}
 
-	// check the signature in the PDU
+	// only path to datum is via this req, so we don't have to lock it
 	gdp_datum_t *datum = gdp_datum_new();
 	_gdp_datum_from_pb(datum, pbd, pbd->sig);
 
-	if (req->gob->digest == NULL)
+	if (!EP_UT_BITSET(GOBF_SIGNING, req->gob->flags))
 	{
 		// error (maybe): no public key
 		if (EP_UT_BITSET(GDP_SIG_PUBKEYREQ, GdpSignatureStrictness))
 		{
-			ep_dbg_cprintf(Dbg, 1, "cmd_append: no public key (fail)\n");
+			ep_dbg_cprintf(Dbg, 31, "cmd_append: no public key (fail)\n");
 			goto fail1;
 		}
 		ep_dbg_cprintf(Dbg, 51, "cmd_append: no public key (warn)\n");
@@ -777,18 +791,18 @@ cmd_append(gdp_req_t *req)
 		// error (maybe): signature required
 		if (EP_UT_BITSET(GDP_SIG_REQUIRED, GdpSignatureStrictness))
 		{
-			ep_dbg_cprintf(Dbg, 1, "cmd_append: missing signature (fail)\n");
+			ep_dbg_cprintf(Dbg, 31, "cmd_append: missing signature (fail)\n");
 			goto fail1;
 		}
-		ep_dbg_cprintf(Dbg, 1, "cmd_append: missing signature (warn)\n");
+		ep_dbg_cprintf(Dbg, 51, "cmd_append: missing signature (warn)\n");
 	}
-	else if (EP_UT_BITSET(GOBF_SIGNING, req->gob->flags))
+	else
 	{
 		// check the signature
 		size_t len;
 		EP_CRYPTO_MD *md = ep_crypto_md_clone(req->gob->digest);
 
-		_gdp_datum_digest(datum, md);	//FIXME
+		_gdp_datum_digest(datum, md);	//FIXME: what?
 		len = pbd->sig->sig.len;
 		estat = ep_crypto_vrfy_final(md, pbd->sig->sig.data, len);
 		ep_crypto_md_free(md);
@@ -808,22 +822,53 @@ cmd_append(gdp_req_t *req)
 		}
 	}
 
-	// append to disk file and send to subscribers
+	// append records to long term storage
+	if (req->gob->x->physimpl->xact_begin != NULL)
+		req->gob->x->physimpl->xact_begin(req->gob);
+	for (rx = 0; rx < payload->dl->n_d; rx++)
 	{
+		pbd = payload->dl->d[rx++];
+		if (payload->dl->n_d != 1)
+			_gdp_datum_from_pb(datum, pbd, pbd->sig);
+		// else it is already set from above
+
 		// do the physical append to disk
 		estat = req->gob->x->physimpl->append(req->gob, datum);
-		if (EP_STAT_ISOK(estat))
+		if (!EP_STAT_ISOK(estat))
+			break;
+	}
+	if (EP_STAT_ISOK(estat))
+	{
+		if (req->gob->x->physimpl->xact_end != NULL)
+			req->gob->x->physimpl->xact_end(req->gob);
+	}
+	else
+	{
+		if (req->gob->x->physimpl->xact_abort != NULL)
+			req->gob->x->physimpl->xact_abort(req->gob);
+	}
+
+	// if physical appends succeeded, notify subscribers
+	if (EP_STAT_ISOK(estat))
+	{
+		for (rx = 0; rx < payload->dl->n_d; rx++)
 		{
+			pbd = payload->dl->d[rx++];
+			if (payload->dl->n_d != 1)
+				_gdp_datum_from_pb(datum, pbd, pbd->sig);
+			// else it is already set from above
+
 			// send the new datum to any and all subscribers
+			GdpDatum *pbd = ep_mem_malloc(sizeof *pbd);
+			gdp_datum__init(pbd);
 			gdp_msg_t *msg = _gdp_msg_new(GDP_ACK_CONTENT,
 									req->cpdu->msg->rid, req->cpdu->msg->seqno);
 
-			GdpDatum *pbd = ep_mem_malloc(sizeof *pbd);
-			gdp_datum__init(pbd);
 			_gdp_datum_to_pb(datum, msg, pbd);
 
+			//FIXME: does dl ever get used or freed?
 			GdpDatumList *dl = msg->ack_content->dl;
-			dl->d = ep_mem_malloc(sizeof pbd);
+			dl->d = ep_mem_malloc(payload->dl->n_d * sizeof pbd);
 			dl->n_d = 1;
 			dl->d[0] = pbd;
 
@@ -832,8 +877,8 @@ cmd_append(gdp_req_t *req)
 			sub_notify_all_subscribers(req);
 			_gdp_pdu_free(&req->rpdu);
 		}
-		gdp_datum_free(datum);
 	}
+	gdp_datum_free(datum);
 
 	if (EP_STAT_ISOK(estat))
 	{

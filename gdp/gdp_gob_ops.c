@@ -526,7 +526,6 @@ append_common(
 		ep_dbg_cprintf(Dbg, 1, "append_common: need at least one datum\n");
 		return GDP_STAT_DATUM_REQUIRED;
 	}
-	EP_ASSERT(n_datums == 1);	//FIXME: server doesn't handle n_datums > 1 yet
 	EP_ASSERT_POINTER_VALID(datums);
 
 	// set up datums with appropriate back links
