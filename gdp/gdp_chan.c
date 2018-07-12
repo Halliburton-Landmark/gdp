@@ -439,6 +439,7 @@ static EP_PRFLAGS_DESC	EventWhatFlags[] =
 	{ BEV_EVENT_ERROR,		BEV_EVENT_ERROR,		"ERROR"				},
 	{ BEV_EVENT_TIMEOUT,	BEV_EVENT_TIMEOUT,		"TIMEOUT"			},
 	{ BEV_EVENT_CONNECTED,	BEV_EVENT_CONNECTED,	"CONNECTED"			},
+	{ 0xffff,				GDP_IOEVENT_USER_CLOSE,	"USER_CLOSE"		},
 	{ 0, 0, NULL }
 };
 
@@ -528,11 +529,13 @@ chan_event_cb(struct bufferevent *bev, short events, void *ctx)
 static EP_STAT
 chan_do_close(gdp_chan_t *chan, int what)
 {
-	if (chan == NULL)
+	if (ep_dbg_test(Dbg, 7))
 	{
-		ep_dbg_cprintf(Dbg, 7, "chan_do_close: null channel\n");
-		return EP_STAT_ERROR;
+		ep_dbg_printf("chan_do_close(%p)\n    ", chan);
+		ep_prflags(what, EventWhatFlags, NULL);
 	}
+	if (chan == NULL)
+		return EP_STAT_ERROR;
 
 	chan->state = GDP_CHAN_CLOSING;
 	ep_thr_cond_broadcast(&chan->cond);
