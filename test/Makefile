@@ -28,6 +28,7 @@
 
 BINALL= \
 		gdp-stresser \
+		t_async_append \
 		t_ep_uuid \
 		t_fwd_append \
 		t_multimultiread \

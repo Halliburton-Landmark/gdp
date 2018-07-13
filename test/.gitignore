@@ -1,4 +1,5 @@
 gdp-stresser
+t_async_append
 t_fwd_append
 t_multimultiread
 t_sub_and_append
