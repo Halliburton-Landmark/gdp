@@ -106,6 +106,11 @@ gdp_datum_free(gdp_datum_t *datum)
 		if (ndrain > 0)
 			gdp_buf_drain(datum->dbuf, ndrain);
 	}
+	if (datum->dhash != NULL)
+	{
+		gdp_hash_free(datum->dhash);
+		datum->dhash = NULL;
+	}
 	if (datum->sig != NULL)
 	{
 		//XXX retain this buffer?
@@ -365,6 +370,7 @@ _gdp_datum_digest(gdp_datum_t *datum, EP_CRYPTO_MD *md)
 	// if the hash of the data isn't computed, build it now
 	if (datum->dhash == NULL)
 	{
+		ep_dbg_cprintf(Dbg, 51, "_gdp_datum_digest: new dhash\n");
 		int hashalg = ep_crypto_md_type(md);
 		EP_CRYPTO_MD *dmd = ep_crypto_md_new(hashalg);
 		if (datum->dbuf != NULL)
