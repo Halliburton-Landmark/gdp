@@ -456,26 +456,24 @@ gdp_md_dump(const gdp_md_t *gmd, FILE *fp, int detail, int indent)
 				md->md_id, md->md_len);
 		if (detail > 1)
 		{
+			const char *tag = "unknown";
+
 			switch (md->md_id)
 			{
 				case GDP_MD_XID:
-					fprintf(fp, " (external id)\n%s%.*s\n",
-								_gdp_pr_indent(indent + 1), md->md_len, mdd);
+					tag = "external id";
 					break;
 
 				case GDP_MD_UUID:
-					fprintf(fp, " (uuid)\n%s%.*s\n",
-								_gdp_pr_indent(indent + 1), md->md_len, mdd);
+					tag = "uuid";
 					break;
 
 				case GDP_MD_CTIME:
-					fprintf(fp, " (creation time)\n%s%.*s\n",
-								_gdp_pr_indent(indent + 1), md->md_len, mdd);
+					tag = "creation time";
 					break;
 
 				case GDP_MD_CID:
-					fprintf(fp, " (creator)\n%s%.*s\n",
-								_gdp_pr_indent(indent + 1), md->md_len, mdd);
+					tag = "creator";
 					break;
 
 				case GDP_MD_PUBKEY:
@@ -502,13 +500,14 @@ gdp_md_dump(const gdp_md_t *gmd, FILE *fp, int detail, int indent)
 					if (detail >= 4)
 						ep_hexdump(mdd + 4, md->md_len - 4,
 								stdout, EP_HEXDUMP_HEX, 0);
-				default:
-					fprintf(fp, "\n%s%s",
-							_gdp_pr_indent(indent + 1), EpChar->lquote);
-					ep_xlate_out(mdd, md->md_len,
-							fp, "", EP_XLATE_PLUS | EP_XLATE_NPRINT);
-					fprintf(fp, "%s\n", EpChar->rquote);
+					continue;
 			}
+
+			fprintf(fp, " (%s)\n%s%s",
+					tag, _gdp_pr_indent(indent + 1), EpChar->lquote);
+			ep_xlate_out(mdd, md->md_len,
+					fp, "", EP_XLATE_PLUS | EP_XLATE_NPRINT);
+			fprintf(fp, "%s\n", EpChar->rquote);
 		}
 	}
 }
