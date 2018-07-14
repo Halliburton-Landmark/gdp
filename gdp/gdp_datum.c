@@ -106,11 +106,6 @@ gdp_datum_free(gdp_datum_t *datum)
 		if (ndrain > 0)
 			gdp_buf_drain(datum->dbuf, ndrain);
 	}
-	if (datum->dhash != NULL)
-	{
-		gdp_hash_free(datum->dhash);
-		datum->dhash = NULL;
-	}
 	if (datum->sig != NULL)
 	{
 		//XXX retain this buffer?
@@ -154,9 +149,6 @@ gdp_datum_reset(gdp_datum_t *datum)
 		datum->dbuf = gdp_buf_new();
 	else
 		gdp_buf_reset(datum->dbuf);
-	if (datum->dhash != NULL)
-		gdp_hash_free(datum->dhash);
-	datum->dhash = NULL;
 	if (datum->sig != NULL)
 		gdp_sig_reset(datum->sig);
 	datum->recno = GDP_PDU_NO_RECNO;
@@ -370,24 +362,6 @@ _gdp_datum_digest(gdp_datum_t *datum, EP_CRYPTO_MD *md)
 		_gdp_datum_dump(datum, NULL);
 	}
 
-	// if the hash of the data isn't computed, build it now
-	if (datum->dhash == NULL)
-	{
-		ep_dbg_cprintf(Dbg, 51, "_gdp_datum_digest: new dhash\n");
-		int hashalg = ep_crypto_md_type(md);
-		EP_CRYPTO_MD *dmd = ep_crypto_md_new(hashalg);
-		if (datum->dbuf != NULL)
-		{
-			size_t dlen = gdp_buf_getlength(datum->dbuf);
-			ep_crypto_md_update(dmd, gdp_buf_getptr(datum->dbuf, dlen), dlen);
-		}
-		uint8_t mdbuf[EP_CRYPTO_MAX_DIGEST];
-		size_t mdlen = sizeof mdbuf;
-		ep_crypto_md_final(dmd, &mdbuf, &mdlen);
-		ep_crypto_md_free(dmd);
-		datum->dhash = gdp_hash_new(hashalg, mdbuf, mdlen);
-	}
-
 	// now compute H(recno || timestamp || prevHash || proof || H(data))
 	// recno
 	{
@@ -416,9 +390,19 @@ _gdp_datum_digest(gdp_datum_t *datum, EP_CRYPTO_MD *md)
 	//TODO: include proof
 	// data hash
 	{
-		size_t dhashlen;
-		void *hashbytes = gdp_hash_getptr(datum->dhash, &dhashlen);
-		ep_crypto_md_update(md, hashbytes, dhashlen);
+		int hashalg = ep_crypto_md_type(md);
+		EP_CRYPTO_MD *dmd = ep_crypto_md_new(hashalg);
+		if (datum->dbuf != NULL)
+		{
+			size_t dlen = gdp_buf_getlength(datum->dbuf);
+			ep_crypto_md_update(dmd, gdp_buf_getptr(datum->dbuf, dlen), dlen);
+		}
+
+		uint8_t dhash[EP_CRYPTO_MAX_DIGEST];
+		size_t dhlen = sizeof dhash;
+		ep_crypto_md_final(dmd, &dhash, &dhlen);
+		ep_crypto_md_free(dmd);
+		ep_crypto_md_update(md, dhash, dhlen);
 	}
 }
 

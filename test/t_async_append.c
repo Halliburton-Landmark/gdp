@@ -67,25 +67,25 @@ int main(int argc, char **argv)
 	if (!EP_STAT_ISOK(estat))
 		ep_app_fatal("GDP Initialization failed");
 
-	// be sure we're really writing random data
 	random_data = ep_mem_malloc(dlen);
-	ep_crypto_random_buf(random_data, dlen);
 
 	gdp_parse_name(argv[0], name);
 	gdp_gin_open(name, GDP_MODE_RA, NULL, &handle);
 
-
 	datum = gdp_datum_new();
 	buf = gdp_datum_getbuf(datum);
-	gdp_buf_write(buf, random_data, sizeof random_data);
-	for (i=0; i<numrecs; i++)
+	for (i = 0; i < numrecs; i++)
 	{
+		// be sure we're really writing random data
+		ep_crypto_random_buf(random_data, dlen);
+		gdp_buf_reset(buf);
+		gdp_buf_write(buf, random_data, sizeof random_data);
 		gdp_gin_append_async(handle, 1, &datum, NULL, NULL, NULL);
 	}
 
 	printf("Done appending. Now reading\n");
 
-	for (i=0; i<numrecs; i++)
+	for (i = 0; i < numrecs; i++)
 	{
 		e = gdp_event_next(NULL, NULL);
 		if (gdp_event_gettype(e) != GDP_EVENT_SUCCESS)

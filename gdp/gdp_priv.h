@@ -154,7 +154,6 @@ struct gdp_datum
 	gdp_recno_t			recno;			// the record number
 	EP_TIME_SPEC		ts;				// commit timestamp
 	gdp_buf_t			*dbuf;			// data buffer
-	gdp_hash_t			*dhash;			// hash of dbuf
 	gdp_sig_t			*sig;			// signature (may be NULL)
 	gdp_hash_t			*prevhash;		// hash of previous datum
 };
