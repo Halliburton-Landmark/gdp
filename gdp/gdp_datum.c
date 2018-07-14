@@ -154,6 +154,9 @@ gdp_datum_reset(gdp_datum_t *datum)
 		datum->dbuf = gdp_buf_new();
 	else
 		gdp_buf_reset(datum->dbuf);
+	if (datum->dhash != NULL)
+		gdp_hash_free(datum->dhash);
+	datum->dhash = NULL;
 	if (datum->sig != NULL)
 		gdp_sig_reset(datum->sig);
 	datum->recno = GDP_PDU_NO_RECNO;
