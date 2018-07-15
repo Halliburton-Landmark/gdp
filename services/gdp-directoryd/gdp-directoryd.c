@@ -131,9 +131,8 @@ int main(int argc, char **argv)
 	{
 		// await request (blocking)
 		otw_dir_len = recvfrom(fd_listen, (uint8_t *) &otw_dir.ver,
-							   sizeof(otw_dir), 0,
+							   sizeof(otw_dir), MSG_TRUNC,
 							   (struct sockaddr *)&si_rem, &si_rem_len);
-
 		// timeout used to expire rows
 		if (otw_dir_len < 0 && errno == EAGAIN)
 		{
@@ -165,7 +164,8 @@ int main(int argc, char **argv)
 		}
 
 		// continue if timeout or obviously short packets
-		if (otw_dir_len < offsetof(otw_dir_t, dguid))
+		if (otw_dir_len < offsetof(otw_dir_t, dguid) ||
+			otw_dir_len > sizeof(otw_dir_t))
 		{
 			continue;
 		}
