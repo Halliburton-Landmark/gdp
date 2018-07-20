@@ -159,7 +159,7 @@ _gdp_req_new(gdp_cmd_t cmd,
 		ep_thr_mutex_init(&req->mutex, EP_THR_MUTEX_DEFAULT);
 		ep_thr_mutex_setorder(&req->mutex, GDP_MUTEX_LORDER_REQ);
 		ep_thr_cond_init(&req->cond);
-		STAILQ_INIT(&req->events);
+		TAILQ_INIT(&req->events);
 	}
 
 	// initialize request
@@ -310,8 +310,8 @@ _gdp_req_free(gdp_req_t **reqp)
 	// remove any pending events from the request
 	{
 		gdp_event_t *gev;
-		while ((gev = STAILQ_FIRST(&req->events)) != NULL)
-			STAILQ_REMOVE_HEAD(&req->events, queue);
+		while ((gev = TAILQ_FIRST(&req->events)) != NULL)
+			TAILQ_REMOVE(&req->events, gev, queue);
 	}
 
 	// free the associated PDU(s)

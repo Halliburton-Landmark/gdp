@@ -57,7 +57,7 @@ typedef struct gdp_gin		gdp_gin_t;
 typedef GdpMessage			gdp_msg_t;
 typedef GdpMsgCode			gdp_cmd_t;
 typedef struct event_base	event_base_t;
-STAILQ_HEAD(gev_list, gdp_event);
+TAILQ_HEAD(gev_list, gdp_event);
 
 extern EP_THR		_GdpIoEventLoopThread;
 extern event_base_t	*_GdpIoEventBase;	// for all I/O events

@@ -47,17 +47,17 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.event", "GDP event handling");
 
 // free (unused) events
 static EP_THR_MUTEX		FreeListMutex	EP_THR_MUTEX_INITIALIZER2(GDP_MUTEX_LORDER_LEAF);
-static struct gev_list	FreeList		= STAILQ_HEAD_INITIALIZER(FreeList);
+static struct gev_list	FreeList		= TAILQ_HEAD_INITIALIZER(FreeList);
 
 // active events (synchronous, ready for gdp_event_next)
 static EP_THR_MUTEX		ActiveListMutex	EP_THR_MUTEX_INITIALIZER2(GDP_MUTEX_LORDER_LEAF);
 static EP_THR_COND		ActiveListSig	EP_THR_COND_INITIALIZER;
-static struct gev_list	ActiveList		= STAILQ_HEAD_INITIALIZER(ActiveList);
+static struct gev_list	ActiveList		= TAILQ_HEAD_INITIALIZER(ActiveList);
 
 // callback events (asynchronous, ready for delivery in callback thread)
 static EP_THR_MUTEX		CallbackListMutex	EP_THR_MUTEX_INITIALIZER2(GDP_MUTEX_LORDER_LEAF);
 static EP_THR_COND		CallbackListSig		EP_THR_COND_INITIALIZER;
-static struct gev_list	CallbackList		= STAILQ_HEAD_INITIALIZER(CallbackList);
+static struct gev_list	CallbackList		= TAILQ_HEAD_INITIALIZER(CallbackList);
 static EP_THR			CallbackThread;
 static bool				CallbackThreadStarted	= false;
 
@@ -74,8 +74,8 @@ _gdp_event_new(gdp_event_t **gevp)
 	for (;;)
 	{
 		ep_thr_mutex_lock(&FreeListMutex);
-		if ((gev = STAILQ_FIRST(&FreeList)) != NULL)
-			STAILQ_REMOVE_HEAD(&FreeList, queue);
+		if ((gev = TAILQ_FIRST(&FreeList)) != NULL)
+			TAILQ_REMOVE(&FreeList, gev, queue);
 		ep_thr_mutex_unlock(&FreeListMutex);
 		if (gev == NULL || gev->type == _GDP_EVENT_FREE)
 			break;
@@ -122,7 +122,7 @@ gdp_event_free(gdp_event_t *gev)
 	ep_mem_free(gev);
 #else
 	ep_thr_mutex_lock(&FreeListMutex);
-	STAILQ_INSERT_HEAD(&FreeList, gev, queue);
+	TAILQ_INSERT_HEAD(&FreeList, gev, queue);
 	ep_thr_mutex_unlock(&FreeListMutex);
 #endif
 	return EP_STAT_OK;
@@ -156,7 +156,7 @@ restart:
 	{
 		int err;
 
-		while ((gev = STAILQ_FIRST(&ActiveList)) == NULL)
+		while ((gev = TAILQ_FIRST(&ActiveList)) == NULL)
 		{
 			// wait until we have at least one thing to try
 			ep_dbg_cprintf(Dbg, 58, "gdp_event_next: empty ActiveList; waiting\n");
@@ -183,7 +183,7 @@ restart:
 				break;
 
 			// not the event we want
-			gev = STAILQ_NEXT(gev, queue);
+			gev = TAILQ_NEXT(gev, queue);
 		}
 
 		if (gev != NULL)
@@ -195,7 +195,7 @@ restart:
 
 	if (gev != NULL)
 	{
-		STAILQ_REMOVE(&ActiveList, gev, gdp_event, queue);
+		TAILQ_REMOVE(&ActiveList, gev, queue);
 		if (!EP_ASSERT(gev->type != _GDP_EVENT_FREE))
 		{
 			// bad news, this event is on two lists (Active and Free)
@@ -224,13 +224,13 @@ _gdp_event_free_all(gdp_gin_t *gin)
 	GDP_GIN_CHECK_RETURN_STAT(gin);
 
 	ep_thr_mutex_lock(&ActiveListMutex);
-	for (gev = STAILQ_FIRST(&ActiveList); gev != NULL; gev = next_gev)
+	for (gev = TAILQ_FIRST(&ActiveList); gev != NULL; gev = next_gev)
 	{
-		next_gev = STAILQ_NEXT(gev, queue);
+		next_gev = TAILQ_NEXT(gev, queue);
 		if (gev->gin != gin)
 			continue;
 		else if (gev->type == _GDP_EVENT_FREE)
-			STAILQ_REMOVE(&ActiveList, gev, gdp_event, queue);
+			TAILQ_REMOVE(&ActiveList, gev, queue);
 		else
 			gdp_event_free(gev);
 	}
@@ -281,21 +281,22 @@ insert_event(gdp_event_t *gev,
 	if (gev->type == GDP_EVENT_DONE)
 	{
 		// done ("no more results") always goes at end of list
-		STAILQ_INSERT_TAIL(list, gev, queue);
+		gev->sortkey = UINT64_MAX;
+		TAILQ_INSERT_TAIL(list, gev, queue);
 	}
-	else if ((next_ev = STAILQ_FIRST(list)) == NULL ||
-			next_ev->sortkey > gev->sortkey)
+	else if ((next_ev = TAILQ_LAST(list, gev_list)) == NULL ||
+			next_ev->sortkey < gev->sortkey)
 	{
-		STAILQ_INSERT_HEAD(list, gev, queue);
+		TAILQ_INSERT_TAIL(list, gev, queue);
 	}
 	else
 	{
 		// find correct position in list
 		gdp_event_t *this_ev = next_ev;
-		while ((next_ev = STAILQ_NEXT(this_ev, queue)) != NULL &&
-				next_ev->sortkey > gev->sortkey)
+		while ((next_ev = TAILQ_PREV(this_ev, gev_list, queue)) != NULL &&
+				next_ev->sortkey < gev->sortkey)
 			this_ev = next_ev;
-		STAILQ_INSERT_AFTER(list, this_ev, gev, queue);
+		TAILQ_INSERT_BEFORE(this_ev, gev, queue);
 	}
 }
 
@@ -381,15 +382,15 @@ _gdp_event_insert_pending(struct gev_list *glist, gdp_req_t *req)
 	ep_dbg_cprintf(Dbg, 48,
 			"_gdp_event_insert_pending(%p): %s\n",
 			glist,
-			STAILQ_FIRST(glist) == NULL ? "empty" : "events");
-	for (gev = STAILQ_FIRST(glist); gev != NULL; gev = STAILQ_NEXT(gev, queue))
+			TAILQ_FIRST(glist) == NULL ? "empty" : "events");
+	for (gev = TAILQ_FIRST(glist); gev != NULL; gev = TAILQ_NEXT(gev, queue))
 	{
 		// if this is a DONE event but we don't have all the results, leave it
 		//TODO: have to allow for timeout
 		if (gev->type == GDP_EVENT_DONE &&
 				!EP_UT_BITSET(GDP_REQ_COMPLETE, req->flags))
 			continue;
-		STAILQ_REMOVE(glist, gev, gdp_event, queue);
+		TAILQ_REMOVE(glist, gev, queue);
 		_gdp_event_trigger(gev, req);
 	}
 }
@@ -410,11 +411,11 @@ _gdp_event_thread(void *ctx)
 
 		// get the next event off the list
 		ep_thr_mutex_lock(&CallbackListMutex);
-		while ((gev = STAILQ_FIRST(&CallbackList)) == NULL)
+		while ((gev = TAILQ_FIRST(&CallbackList)) == NULL)
 		{
 			ep_thr_cond_wait(&CallbackListSig, &CallbackListMutex, NULL);
 		}
-		STAILQ_REMOVE_HEAD(&CallbackList, queue);
+		TAILQ_REMOVE(&CallbackList, gev, queue);
 		ep_thr_mutex_unlock(&CallbackListMutex);
 
 		// sanity checks...

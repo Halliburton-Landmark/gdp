@@ -40,7 +40,7 @@
 
 struct gdp_event
 {
-	STAILQ_ENTRY(gdp_event)	queue;		// free/active queue link
+	TAILQ_ENTRY(gdp_event)	queue;		// free/active queue link
 	unsigned int			type;		// event type
 	gdp_gin_t				*gin;		// GCL instance for event
 	gdp_datum_t				*datum;		// datum for event
