@@ -78,7 +78,7 @@ _gdp_invoke(gdp_req_t *req)
 	if (req->gob != NULL)
 		GDP_GOB_ASSERT_ISLOCKED(req->gob);
 	cmdname = _gdp_proto_cmd_name(req->cpdu->msg->cmd);
-	if (ep_dbg_test(Dbg, 10))
+	if (ep_dbg_test(Dbg, 11))
 	{
 		ep_dbg_printf("\n>>> _gdp_invoke(req=%p rid=%" PRIgdp_rid "): %s (%d), gob@%p\n",
 				req,
@@ -202,9 +202,9 @@ _gdp_invoke(gdp_req_t *req)
 	} while (--retries > 0);
 
 	// if we had any pending asynchronous events, deliver them
-	_gdp_event_trigger_pending(&req->events);
+	_gdp_event_insert_pending(&req->events, req);
 
-	if (ep_dbg_test(Dbg, 10))
+	if (ep_dbg_test(Dbg, 11))
 	{
 		char ebuf[200];
 
@@ -319,7 +319,8 @@ ack(gdp_req_t *req, const char *where)
 	EP_STAT estat;
 
 	estat = acknak(req, where, true);
-	EP_STAT_CHECK(estat, return estat);
+	if (EP_STAT_ISFAIL(estat))
+		return estat;
 
 	estat = GDP_STAT_FROM_ACK(req->rpdu->msg->cmd);
 	return estat;
@@ -333,7 +334,8 @@ ack_success(gdp_req_t *req)
 	gdp_gob_t *gob;
 
 	estat = ack(req, "ack_success");
-	EP_STAT_CHECK(estat, goto fail0);
+	if (EP_STAT_ISFAIL(estat))
+		goto fail0;
 
 	// mark this request as active (for subscriptions)
 	ep_time_now(&req->act_ts);
@@ -418,6 +420,11 @@ ack_data_content(gdp_req_t *req)
 	if (req->numrecs > 0)
 		req->numrecs--;			//XXX payload->dl->n_d?
 
+	// ... and how many we actually got
+	req->r_results += payload->dl->n_d;
+	if (req->s_results >= 0 && req->r_results >= req->s_results)
+		req->flags |= GDP_REQ_COMPLETE;
+
 #if 0 //TODO: IMPLEMENT ME
 	// do read filtering if requested
 	if (req->gin != NULL && req->gin->readfilter != NULL)
@@ -425,6 +432,35 @@ ack_data_content(gdp_req_t *req)
 #endif //TODO
 
 	return estat;
+}
+
+
+// no more results to come
+static EP_STAT
+ack_end_results(gdp_req_t *req)
+{
+	EP_STAT estat;
+
+	EP_ASSERT_ELSE(req->gob != NULL, return EP_STAT_ASSERT_ABORT);
+	GDP_MSG_CHECK(req->rpdu, return EP_STAT_ASSERT_ABORT);
+
+	estat = ack_success(req);
+	if (EP_STAT_ISFAIL(estat))
+		return estat;
+
+	EP_ASSERT_ELSE(req->rpdu->msg->body_case ==
+						GDP_MESSAGE__BODY_ACK_END_OF_RESULTS,
+				return EP_STAT_ASSERT_ABORT);
+	GdpMessage__AckEndOfResults *payload = req->rpdu->msg->ack_end_of_results;
+
+	// don't need to check has_nresults, since the default is what we want
+	req->s_results = payload->nresults;
+	ep_dbg_cprintf(Dbg, 22, "ack_end_results: read %"PRId64 " sent %"PRId64 "\n",
+			req->r_results, req->s_results);
+	if (req->r_results >= req->s_results)
+		req->flags |= GDP_REQ_COMPLETE;
+
+	return EP_STAT_OK;
 }
 
 
@@ -683,7 +719,7 @@ static dispatch_ent_t	DispatchTable[256] =
 	NOENT,				// 188
 	NOENT,				// 189
 	NOENT,				// 190
-	{ ack_success,		"ACK_END_OF_RESULTS",	GDP_STAT_ACK_END_OF_RESULTS	},	// 191
+	{ ack_end_results,	"ACK_END_OF_RESULTS",	GDP_STAT_ACK_END_OF_RESULTS	},	// 191
 
 	{ nak_client,		"NAK_C_BADREQ",			GDP_STAT_NAK_BADREQ			},	// 192
 	{ nak_client,		"NAK_C_UNAUTH",			GDP_STAT_NAK_UNAUTH			},	// 193

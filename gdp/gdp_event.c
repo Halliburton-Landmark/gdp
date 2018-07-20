@@ -41,6 +41,7 @@
 #include <string.h>
 #include <sys/errno.h>
 
+
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.event", "GDP event handling");
 
 
@@ -240,38 +241,125 @@ _gdp_event_free_all(gdp_gin_t *gin)
 
 
 /*
-**  Trigger an event (i.e., add to event queue)
-**		There are two lists, depending on whether a callback was
-**			specified.
+**  Insert an event into a queue.
+**		This is essentially an insertion sort.
+**		The list (or other enclosing data structure) must be locked
+**			before this is called.
+**		TODO: This should use a TAILQ and start searching from the
+**			tail for a fit so that a merge of two sorted lists is
+**			more efficient.  Even better would be to just concatenate
+**			them.
 */
 
 static void
-_gdp_event_trigger(gdp_event_t *gev)
+insert_event(gdp_event_t *gev,
+		struct gev_list *list)
 {
 	EP_ASSERT_POINTER_VALID(gev);
 
-	ep_dbg_cprintf(Dbg, 48,
-			"_gdp_event_trigger: adding event %p (%d) to %s list\n",
-			gev, gev->type, gev->cb == NULL ? "active" : "callback");
+	if (ep_dbg_test(Dbg, 48))
+	{
+		const char *where;
+
+		if (list == &ActiveList)
+			where = "active";
+		else if (list == &CallbackList)
+			where = "callback";
+		else
+			where = "deferred";
+		ep_dbg_printf("_gdp_event_trigger: adding event %p (%d) to %s list\n",
+				gev, gev->type, where);
+	}
 	if (gev->type == _GDP_EVENT_FREE)
 	{
 		ep_dbg_cprintf(Dbg, 1, "_gdp_event_trigger(%p): event is free\n", gev);
 		return;
 	}
 
-	if (gev->cb == NULL)
+	// sort the event into the correct place in the list
+	gdp_event_t *next_ev;
+	if (gev->type == GDP_EVENT_DONE)
 	{
-		// signal the user thread (synchronous delivery)
+		// done ("no more results") always goes at end of list
+		STAILQ_INSERT_TAIL(list, gev, queue);
+	}
+	else if ((next_ev = STAILQ_FIRST(list)) == NULL ||
+			next_ev->sortkey > gev->sortkey)
+	{
+		STAILQ_INSERT_HEAD(list, gev, queue);
+	}
+	else
+	{
+		// find correct position in list
+		gdp_event_t *this_ev = next_ev;
+		while ((next_ev = STAILQ_NEXT(this_ev, queue)) != NULL &&
+				next_ev->sortkey > gev->sortkey)
+			this_ev = next_ev;
+		STAILQ_INSERT_AFTER(list, this_ev, gev, queue);
+	}
+}
+
+
+/*
+**  Handle timeout for GDP_EVENT_DONE events.
+**		If a DONE PDU comes in before all data has been received,
+**		the event is saved.  But if nothing else happens before this
+**		timeout, assume that nothing else will come.
+*/
+
+static void
+done_timeout(int unused, short what, void *req_)
+{
+	gdp_req_t *req = req_;
+
+	if (req->state == GDP_REQ_WAITING)
+		return;
+	_gdp_event_insert_pending(&req->events, req);
+}
+
+
+/*
+**  Trigger an event (i.e., add to an event queue).
+**		There are two lists, depending on whether a callback was specified.
+**
+**	This is a bit tricky because of asynchronous results, which may
+**	appear out of order.  In particular, we want to avoid returning the
+**	"done" event since it really means "no more results" if there are
+**	actually going to be more results appearing.  When we do get the
+**	"done" event, it should contain the number of results that
+**	preceded it.  If we haven't seen that many results yet we'll need
+**	to tuck it away for a while.
+*/
+
+#define DONE_TIMEOUT	5000		// in microseconds
+
+static void
+_gdp_event_trigger(gdp_event_t *gev, gdp_req_t *req)
+{
+	if (gev->type == GDP_EVENT_DONE &&
+			!EP_UT_BITSET(GDP_REQ_COMPLETE, req->flags))
+	{
+		// more results will come later
+		static int32_t timeout = -1;
+
+		if (timeout < 0)
+			timeout = ep_adm_getlongparam("swarm.gdp.timeout.done",
+											DONE_TIMEOUT);
+		insert_event(gev, &req->events);
+		if (timeout > 0)
+			req->ev_to = _gdp_evloop_timer_set(timeout, &done_timeout, req);
+	}
+	else if (gev->cb == NULL)
+	{
 		ep_thr_mutex_lock(&ActiveListMutex);
-		STAILQ_INSERT_TAIL(&ActiveList, gev, queue);
+		insert_event(gev, &ActiveList);
 		ep_thr_cond_broadcast(&ActiveListSig);
 		ep_thr_mutex_unlock(&ActiveListMutex);
 	}
 	else
 	{
-		// signal the callback thread (asynchronous delivery via callback)
 		ep_thr_mutex_lock(&CallbackListMutex);
-		STAILQ_INSERT_TAIL(&CallbackList, gev, queue);
+		insert_event(gev, &CallbackList);
 		ep_thr_cond_signal(&CallbackListSig);
 		ep_thr_mutex_unlock(&CallbackListMutex);
 	}
@@ -286,18 +374,23 @@ _gdp_event_trigger(gdp_event_t *gev)
 */
 
 void
-_gdp_event_trigger_pending(struct gev_list *events)
+_gdp_event_insert_pending(struct gev_list *glist, gdp_req_t *req)
 {
 	gdp_event_t *gev;
 
 	ep_dbg_cprintf(Dbg, 48,
-			"_gdp_event_trigger_pending(%p): %s\n",
-			events,
-			STAILQ_FIRST(events) == NULL ? "empty" : "events");
-	while ((gev = STAILQ_FIRST(events)) != NULL)
+			"_gdp_event_insert_pending(%p): %s\n",
+			glist,
+			STAILQ_FIRST(glist) == NULL ? "empty" : "events");
+	for (gev = STAILQ_FIRST(glist); gev != NULL; gev = STAILQ_NEXT(gev, queue))
 	{
-		STAILQ_REMOVE_HEAD(events, queue);
-		_gdp_event_trigger(gev);
+		// if this is a DONE event but we don't have all the results, leave it
+		//TODO: have to allow for timeout
+		if (gev->type == GDP_EVENT_DONE &&
+				!EP_UT_BITSET(GDP_REQ_COMPLETE, req->flags))
+			continue;
+		STAILQ_REMOVE(glist, gev, gdp_event, queue);
+		_gdp_event_trigger(gev, req);
 	}
 }
 
@@ -451,6 +544,7 @@ _gdp_event_add_from_req(gdp_req_t *req)
 	{
 		EP_ASSERT(msg->ack_content->dl->n_d == 1);		//FIXME: should handle multiples
 		_gdp_datum_from_pb(gev->datum, msg->ack_content->dl->d[0], msg->sig);
+		gev->sortkey = gev->datum->recno;
 	}
 
 	// schedule the event for delivery
@@ -459,12 +553,12 @@ _gdp_event_add_from_req(gdp_req_t *req)
 		// can't deliver yet: make it pending
 		ep_dbg_cprintf(Dbg, 40,
 				"_gdp_event_add_from_req: event %p pending\n", gev);
-		STAILQ_INSERT_TAIL(&req->events, gev, queue);
+		insert_event(gev, &req->events);
 	}
 	else
 	{
 		// go ahead and deliver
-		_gdp_event_trigger(gev);
+		_gdp_event_trigger(gev, req);
 	}
 
 	return estat;
@@ -491,9 +585,12 @@ _gdp_event_dump(const gdp_event_t *gev, FILE *fp, int detail, int indent)
 		fp = ep_dbg_getfile();
 
 	if (detail >= GDP_PR_BASIC + 1)
-		fprintf(fp, "Event type %d, cbarg %p, stat %s\n",
-				gev->type, gev->udata,
+	{
+		fprintf(fp, "Event type %d, sortkey %"PRIu64 ", cbarg %p, stat %s\n",
+				gev->type, gev->sortkey, gev->udata,
 				ep_stat_tostr(gev->stat, ebuf, sizeof ebuf));
+		indent++;
+	}
 
 	if (gev->datum != NULL)
 		recno = gev->datum->recno;

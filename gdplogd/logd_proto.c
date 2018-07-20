@@ -497,15 +497,20 @@ make_read_acknak_pdu(gdp_req_t *req, EP_STAT estat)
 		_gdp_req_ack_resp(req, GDP_NAK_C_NOTFOUND);
 		GdpMessage__NakGeneric *resp = req->rpdu->msg->nak;
 		resp->ep_stat = EP_STAT_TO_INT(estat);
+		resp->has_ep_stat = true;
 		resp->recno = req->nextrec;
+		resp->has_recno = true;
 	}
-	else if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_LOST_SUBSCR))
+	else if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_LOST_SUBSCR) ||
+			EP_STAT_IS_SAME(estat, GDP_STAT_ACK_END_OF_RESULTS))
 	{
 		// found some results, but no more to come
 		_gdp_req_ack_resp(req, GDP_ACK_END_OF_RESULTS);
-		GdpMessage__NakGeneric *resp = req->rpdu->msg->nak;
+		GdpMessage__AckEndOfResults *resp = req->rpdu->msg->ack_end_of_results;
 		resp->ep_stat = EP_STAT_TO_INT(estat);
-		resp->recno = req->nextrec;
+		resp->has_ep_stat = true;
+		resp->nresults = req->s_results;
+		resp->has_nresults = true;
 	}
 	else
 	{
@@ -513,7 +518,17 @@ make_read_acknak_pdu(gdp_req_t *req, EP_STAT estat)
 		_gdp_req_ack_resp(req, GDP_NAK_S_INTERNAL);
 		GdpMessage__NakGeneric *resp = req->rpdu->msg->nak;
 		resp->ep_stat = EP_STAT_TO_INT(estat);
+		resp->has_ep_stat = true;
 		resp->recno = req->nextrec;
+		resp->has_recno = true;
+	}
+	if (ep_dbg_test(Dbg, 37))
+	{
+		char ebuf[100];
+
+		ep_dbg_printf("make_read_acknak_pdu(%s): %d\n",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf),
+				req->rpdu->msg->body_case);
 	}
 }
 
@@ -526,7 +541,9 @@ send_read_result(EP_STAT estat, gdp_datum_t *datum, gdp_result_ctx_t *cb_ctx)
 	if (EP_STAT_ISOK(estat))
 		_gdp_datum_to_pb(datum, req->rpdu->msg,
 					req->rpdu->msg->ack_content->dl->d[0]);
-	req->stat = _gdp_pdu_out(req->rpdu, req->chan, NULL);
+	req->stat = estat = _gdp_pdu_out(req->rpdu, req->chan, NULL);
+	if (EP_STAT_ISOK(estat))
+		req->s_results++;
 	return estat;
 }
 
@@ -555,6 +572,7 @@ cmd_read_by_recno(gdp_req_t *req)
 		if (req->nextrec <= 0)
 			req->nextrec = 1;
 	}
+	req->s_results = 0;
 
 	estat = req->gob->x->physimpl->read_by_recno(req->gob,
 								req->nextrec, req->numrecs,
@@ -584,6 +602,7 @@ cmd_read_by_ts(gdp_req_t *req)
 	req->numrecs = payload->nrecs;
 	if (req->numrecs < 0)
 		req->numrecs = UINT32_MAX;
+	req->s_results = 0;
 
 	EP_TIME_SPEC ts;
 	_gdp_timestamp_from_pb(&ts, payload->timestamp);

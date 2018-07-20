@@ -735,6 +735,24 @@ _gdp_reclaim_resources_init(void (*f)(int, short, void *))
 
 
 /*
+**  Set libevent timer.
+*/
+
+struct event *
+_gdp_evloop_timer_set(int32_t timeout, libevent_event_t *cbfunc, void *cbarg)
+{
+	struct timeval tv;
+	struct event *ev;
+
+	ev = event_new(_GdpIoEventBase, -1, 0, cbfunc, cbarg);
+	tv.tv_sec = timeout / 1000000;
+	tv.tv_usec = timeout % 1000000;
+	event_add(ev, &tv);
+	return ev;
+}
+
+
+/*
 **	Base loop to be called for event-driven systems.
 **	Their events should have already been added to the event base.
 **
@@ -758,9 +776,11 @@ void *
 _gdp_run_event_loop(void *eli_)
 {
 	long evdelay = ep_adm_getlongparam("swarm.gdp.event.loopdelay", 100000L);
+									// loopdelay in microseconds
 
 	// keep the loop alive if EVLOOP_NO_EXIT_ON_EMPTY isn't available
 	long ev_timeout = ep_adm_getlongparam("swarm.gdp.event.looptimeout", 30L);
+									// looptimeout in seconds
 	struct timeval tv = { ev_timeout, 0 };
 	struct event *evtimer = event_new(_GdpIoEventBase, -1, EV_PERSIST,
 			&event_loop_timeout, NULL);

@@ -177,6 +177,13 @@ _gdp_msg_new(gdp_cmd_t cmd, gdp_rid_t rid, gdp_seqno_t seqno)
 //		gdp_datum__init(msg->ack_content->datum);
 		break;
 
+	case GDP_ACK_END_OF_RESULTS:
+		msg->body_case = GDP_MESSAGE__BODY_ACK_END_OF_RESULTS;
+		msg->ack_end_of_results = (GdpMessage__AckEndOfResults *)
+					ep_mem_zalloc(sizeof *msg->ack_end_of_results);
+		gdp_message__ack_end_of_results__init(msg->ack_end_of_results);
+		break;
+
 	default:
 		if (cmd >= GDP_NAK_C_MIN && cmd <= GDP_NAK_S_MAX)
 		{
@@ -202,7 +209,7 @@ _gdp_msg_new(gdp_cmd_t cmd, gdp_rid_t rid, gdp_seqno_t seqno)
 		break;
 	}
 
-	ep_dbg_cprintf(Dbg, 49, "_gdp_msg_new => %p\n", msg);
+	ep_dbg_cprintf(Dbg, 31, "_gdp_msg_new => %p\n", msg);
 	return msg;
 }
 
@@ -250,12 +257,12 @@ print_pb_datum(const GdpDatum *d, FILE *fp, int indent)
 	}
 	else
 	{
-		fprintf(fp, "\n%sprevhash=(none)\n", _gdp_pr_indent(indent));
+		fprintf(fp, "\n%sprevhash=(none)", _gdp_pr_indent(indent));
 	}
 	if (d->sig == NULL)
-		fprintf(fp, "%ssig=(none)", _gdp_pr_indent(indent));
+		fprintf(fp, "\n%ssig=(none)", _gdp_pr_indent(indent));
 	else
-		fprintf(fp, "%ssig=%p [%zd]", _gdp_pr_indent(indent),
+		fprintf(fp, "\n%ssig=%p [%zd]", _gdp_pr_indent(indent),
 					d->sig, d->sig->sig.len);
 	fprintf(fp, ", data[%zd]=\n", d->data.len);
 	ep_hexdump(d->data.data, d->data.len, fp, EP_HEXDUMP_ASCII, 0);
@@ -343,10 +350,10 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 		break;
 
 	case GDP_MESSAGE__BODY_CMD_READ_BY_RECNO:
-		fprintf(fp, "cmd_read_by_recno:\n%srecno=%" PRIgdp_recno,
+		fprintf(fp, "cmd_read_by_recno:\n%srecno %" PRIgdp_recno,
 				_gdp_pr_indent(indent), msg->cmd_read_by_recno->recno);
 		if (msg->cmd_read_by_recno->has_nrecs)
-			fprintf(fp, ", nrecs=%"PRId32, msg->cmd_read_by_recno->nrecs);
+			fprintf(fp, ", nrecs %"PRId32, msg->cmd_read_by_recno->nrecs);
 		fprintf(fp, "\n");
 		break;
 
@@ -354,7 +361,7 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 		fprintf(fp, "cmd_read_by_ts: ");
 		print_pb_ts(msg->cmd_read_by_ts->timestamp, fp);
 		if (msg->cmd_read_by_ts->has_nrecs)
-			fprintf(fp, ", nrecs=%"PRId32, msg->cmd_read_by_ts->nrecs);
+			fprintf(fp, ", nrecs %"PRId32, msg->cmd_read_by_ts->nrecs);
 		fprintf(fp, "\n");
 		break;
 
@@ -391,7 +398,7 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 		break;
 
 	case GDP_MESSAGE__BODY_ACK_SUCCESS:
-		fprintf(fp, "ack_success:\n%srecno=", _gdp_pr_indent(indent));
+		fprintf(fp, "ack_success:\n%srecno ", _gdp_pr_indent(indent));
 		if (msg->ack_success->has_recno)
 			fprintf(fp, "%" PRIgdp_recno, msg->ack_success->recno);
 		else
@@ -401,12 +408,12 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 		fprintf(fp, "\n");
 		if (msg->ack_success->has_hash)
 		{
-			fprintf(fp, "%shash=", _gdp_pr_indent(indent + 1));
+			fprintf(fp, "%shash ", _gdp_pr_indent(indent + 1));
 			ep_hexdump(msg->ack_success->hash.data,
 						msg->ack_success->hash.len,
 						fp, EP_HEXDUMP_TERSE, 0);
 		}
-		fprintf(fp, "%smetadata=", _gdp_pr_indent(indent + 1));
+		fprintf(fp, "%smetadata ", _gdp_pr_indent(indent + 1));
 		if (msg->ack_success->has_metadata)
 		{
 			fprintf(fp, "\n");
@@ -431,19 +438,32 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 		}
 		break;
 
+	case GDP_MESSAGE__BODY_ACK_END_OF_RESULTS:
+		fprintf(fp, "ack_end_of_results: nresults ");
+		if (msg->ack_end_of_results->has_nresults)
+			fprintf(fp, "%" PRIu64 "\n", msg->ack_end_of_results->nresults);
+		else
+			fprintf(fp, "(unset)\n");
+		if (msg->nak->has_ep_stat)
+			fprintf(fp, "%sep_stat %s\n",
+					_gdp_pr_indent(indent),
+					ep_stat_tostr(EP_STAT_FROM_INT(msg->nak->ep_stat),
+								ebuf, sizeof ebuf));
+		break;
+
 	case GDP_MESSAGE__BODY_NAK:
 		fprintf(fp, "nak:\n");
 		if (msg->nak->has_ep_stat)
-			fprintf(fp, "%sep_stat=%s\n",
+			fprintf(fp, "%sep_stat %s\n",
 					_gdp_pr_indent(indent),
 					ep_stat_tostr(EP_STAT_FROM_INT(msg->nak->ep_stat),
 								ebuf, sizeof ebuf));
 		if (msg->nak->description != NULL)
-			fprintf(fp, "%sdetail=%s\n",
+			fprintf(fp, "%sdetail %s\n",
 					_gdp_pr_indent(indent),
 					msg->nak->description);
 		if (msg->nak->has_recno)
-			fprintf(fp, "%srecno=%" PRIgdp_recno "\n",
+			fprintf(fp, "%srecno %" PRIgdp_recno "\n",
 					_gdp_pr_indent(indent),
 					msg->nak->recno);
 		break;
@@ -451,16 +471,16 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 	case GDP_MESSAGE__BODY_NAK_CONFLICT:
 		fprintf(fp, "nak_conflict\n");
 		if (msg->nak_conflict->has_ep_stat)
-			fprintf(fp, "%sep_stat=%s\n",
+			fprintf(fp, "%sep_stat %s\n",
 					_gdp_pr_indent(indent),
 					ep_stat_tostr(EP_STAT_FROM_INT(msg->nak_conflict->ep_stat),
 								ebuf, sizeof ebuf));
 		if (msg->nak_conflict->description != NULL)
-			fprintf(fp, "%sdetail=%s\n",
+			fprintf(fp, "%sdetail %s\n",
 					_gdp_pr_indent(indent),
 					msg->nak_conflict->description);
 		if (msg->nak_conflict->has_recno)
-			fprintf(fp, "%srecno=%" PRIgdp_recno "\n",
+			fprintf(fp, "%srecno %" PRIgdp_recno "\n",
 					_gdp_pr_indent(indent),
 					msg->nak_conflict->recno);
 		break;

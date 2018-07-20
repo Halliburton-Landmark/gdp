@@ -47,6 +47,7 @@ message GdpMessage
 		AckSuccess			ack_success				= 128;
 		AckChanged			ack_changed				= 132;
 		AckContent			ack_content				= 133;
+		AckEndOfResults		ack_end_of_results		= 191;
 
 		NakGeneric			nak						= 192;
 		NakConflict			nak_conflict			= 201;
@@ -240,6 +241,13 @@ message GdpMessage
 	{
 		required GdpDatumList	dl = 1;				// returned data list
 		optional bool			moredata = 2;		// set if more data possible
+	}
+
+	// End of results
+	message AckEndOfResults
+	{
+		optional uint32			ep_stat = 1;
+		optional uint64			nresults = 3;		// number of results
 	}
 
 	/*

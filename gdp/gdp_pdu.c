@@ -299,7 +299,6 @@ _gdp_pdu_in(
 	pdu->chan = chan;
 
 	// decode Protobuf into gdp_pdu_t
-	pdu->msg = msg;
 	if (!msg->has_rid)
 		msg->rid = GDP_PDU_NO_RID;
 	if (!msg->has_seqno)

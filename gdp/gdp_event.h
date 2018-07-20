@@ -47,6 +47,7 @@ struct gdp_event
 	gdp_event_cbfunc_t		cb;			// callback for event
 	void					*udata;		// user data
 	EP_STAT					stat;		// detailed status code
+	uint64_t				sortkey;	// sort key for delivery order
 };
 
 // set up request to deliver events or callbacks
@@ -60,8 +61,9 @@ extern EP_STAT			_gdp_event_add_from_req(
 								gdp_req_t *req);
 
 // add pending events to appropriate current queue
-extern void				_gdp_event_trigger_pending(
-								struct gev_list *glist);
+extern void				_gdp_event_insert_pending(
+								struct gev_list *glist,
+								gdp_req_t *req);
 
 // free all events for a given GCL instance
 EP_STAT					_gdp_event_free_all(

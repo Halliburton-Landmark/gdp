@@ -494,6 +494,7 @@ _gdp_datum_to_pb(const gdp_datum_t *datum,
 	}
 	else if (pbd->ts != NULL)
 	{
+		ep_dbg_cprintf(Dbg, 3, "_gdp_datum_to_pb: freeing ts\n");
 		gdp_timestamp__free_unpacked(pbd->ts, NULL);
 		pbd->ts = NULL;
 	}
@@ -539,6 +540,7 @@ _gdp_datum_to_pb(const gdp_datum_t *datum,
 	}
 	else if (pbd->sig != NULL)
 	{
+		ep_dbg_cprintf(Dbg, 3, "_gdp_datum_to_pb: freeing sig\n");
 		gdp_signature__free_unpacked(pbd->sig, NULL);
 		pbd->sig = NULL;
 	}

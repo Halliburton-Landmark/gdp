@@ -172,6 +172,8 @@ _gdp_req_new(gdp_cmd_t cmd,
 	req->gob = gob;
 	if (gob != NULL)
 		_gdp_gob_incref(gob);		// request has a new reference
+	req->r_results = 0;				// no results received yet
+	req->s_results = -1;			// unknown number of results sent
 
 	// if we're not passing in a PDU, create and initialize the new one
 	if (pdu == NULL)
@@ -624,6 +626,7 @@ static EP_PRFLAGS_DESC	ReqFlags[] =
 	{ GDP_REQ_ALLOC_RID,	GDP_REQ_ALLOC_RID,		"ALLOC_RID"		},
 	{ GDP_REQ_ON_GOB_LIST,	GDP_REQ_ON_GOB_LIST,	"ON_GOB_LIST"	},
 	{ GDP_REQ_ON_CHAN_LIST,	GDP_REQ_ON_CHAN_LIST,	"ON_CHAN_LIST"	},
+	{ GDP_REQ_COMPLETE,		GDP_REQ_COMPLETE,		"COMPLETE"		},
 	{ GDP_REQ_ROUTEFAIL,	GDP_REQ_ROUTEFAIL,		"ROUTEFAIL"		},
 	{ 0,					0,						NULL			}
 };
@@ -644,10 +647,12 @@ _gdp_req_dump(const gdp_req_t *req, FILE *fp, int detail, int indent)
 	VALGRIND_HG_DISABLE_CHECKING(req, sizeof *req);
 	flockfile(fp);
 	fprintf(fp, "req@%p:\n", req);
-	fprintf(fp, "%snextrec=%" PRIgdp_recno ", numrecs=%" PRIu32 ", chan=%p\n"
+	fprintf(fp, "%snextrec=%" PRIgdp_recno ", numrecs=%" PRIu32
+				", r_results=%" PRId64 ", s_results=%" PRId64 ", chan=%p\n"
 			"%spostproc=%p, sub_cbfunc=%p, sub_cbarg=%p\n"
 			"%sgin=%p, state=%s, stat=%s\n",
-			_gdp_pr_indent(indent), req->nextrec, req->numrecs, req->chan,
+			_gdp_pr_indent(indent), req->nextrec, req->numrecs,
+				req->r_results, req->s_results, req->chan,
 			_gdp_pr_indent(indent), req->postproc, req->sub_cbfunc, req->sub_cbarg,
 			_gdp_pr_indent(indent), req->gin, statestr(req),
 			ep_stat_tostr(req->stat, ebuf, sizeof ebuf));

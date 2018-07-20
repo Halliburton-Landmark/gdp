@@ -659,6 +659,7 @@ struct gdp_req
 	gdp_chan_t			*chan;		// the network channel for this req
 	EP_STAT				stat;		// status code from last operation
 	gdp_recno_t			nextrec;	// next record to return (subscriptions)
+	int64_t				s_results;	// number of results sent
 	int32_t				numrecs;	// remaining number of records to return
 	uint32_t			flags;		// see below
 	EP_TIME_SPEC		act_ts;		// timestamp of last successful activity
@@ -670,7 +671,9 @@ struct gdp_req
 
 	// these are only of interest in clients, never in gdplogd
 	gdp_gin_t			*gin;		// GIN handle (client only, may be NULL)
+	int64_t				r_results;	// number of results received so far
 	struct gev_list		events;		// pending events (see above)
+	struct event		*ev_to;		// event timeout (to scan pending events)
 };
 
 // states
@@ -689,6 +692,7 @@ struct gdp_req
 #define GDP_REQ_ALLOC_RID		0x00000040	// force allocation of new rid
 #define GDP_REQ_ON_GOB_LIST		0x00000080	// this is on a GOB list
 #define GDP_REQ_ON_CHAN_LIST	0x00000100	// this is on a channel list
+#define GDP_REQ_COMPLETE		0x00000200	// all data for this req delivered
 #define GDP_REQ_ROUTEFAIL		0x00000400	// fail immediately on route failure
 
 EP_STAT			_gdp_req_new(				// create new request
@@ -792,6 +796,16 @@ struct event_loop_info
 
 void			*_gdp_run_event_loop(
 						void *eli_);
+
+typedef void	libevent_event_t(
+						evutil_socket_t sock,
+						short what,
+						void *cbarg);
+
+struct event	*_gdp_evloop_timer_set(
+						int32_t timeout,			// in timeout usec
+						libevent_event_t *cbfunc,	// ... call cbfunc
+						void *cbarg);				// ... with this arg
 
 
 /*

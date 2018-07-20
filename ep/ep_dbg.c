@@ -327,9 +327,12 @@ ep_dbg_backtrace(void)
 #if EP_OSCF_HAS_BACKTRACE
 	void *frames[NFRAMES];
 	int nframes;
+	int fd = fileno(EpDebugFileP);
 
+	if (fd < 0)
+		fd = 2;
 	nframes = backtrace(frames, NFRAMES);
-	backtrace_symbols_fd(frames, nframes, fileno(EpDebugFileP));
+	backtrace_symbols_fd(frames, nframes, fd);
 #else
 	ep_dbg_printf("No stack backtrace available\n");
 #endif
