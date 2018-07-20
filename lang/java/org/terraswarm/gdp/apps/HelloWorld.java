@@ -45,7 +45,7 @@ public class HelloWorld {
 	    String logname = "edu.berkeley.eecs.mor.20160131_182143";
 	    GDP_NAME gn = new GDP_NAME(logname);
 	    System.out.println("Creating object");
-	    GDP_GCL g = new GDP_GCL(gn, GDP_GCL.GDP_MODE.RA, new GDP_NAME(""));
+	    GDP_GIN g = new GDP_GIN(gn, GDP_GIN.GDP_MODE.RA, new GDP_NAME(""));
 
 	    /*
 	      g.subscribe(0,3);
@@ -65,7 +65,7 @@ public class HelloWorld {
         
 	    g.append((new Date().toString()).getBytes());
         
-	    HashMap<String, Object> returnDatum = g.read(-1);
+	    HashMap<String, Object> returnDatum = g.read_by_recno(-1);
 	    byte[] data = (byte[]) returnDatum.get("data");
 	    for (int i=0; i<data.length; i++) {
 		System.out.print((char) data[i]);

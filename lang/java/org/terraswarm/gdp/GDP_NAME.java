@@ -44,7 +44,7 @@ import com.sun.jna.ptr.PointerByReference;
 import org.terraswarm.gdp.NativeSize; // Fixed by cxh in makefile.
 
 /**
- * Names inside the GDP. This works for GCL's, log-servers
+ * Names inside the GDP. This works for GIN's, log-servers
  * and any other entities. An entity can have up to three kind of names:
  *
  * <ul>
@@ -62,7 +62,7 @@ public class GDP_NAME {
      * Pass a string that could be either a human readable name, or a
      * printable name.
      * @param name A version of the name
-     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp08Library.EP_STAT_SEV_WARN.
+     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp20Library.EP_STAT_SEV_WARN.
      */
     public GDP_NAME(String name) throws GDPException {
         this.name = this.__parse_name(name);
@@ -107,7 +107,7 @@ public class GDP_NAME {
         // Copy to newly created bytebuffer.
         tmp.put(this.name);
 
-        byte ret = Gdp08Library.INSTANCE.gdp_name_is_valid(tmp);
+        byte ret = Gdp20Library.INSTANCE.gdp_name_is_valid(tmp);
         if (ret == 0x00) {
             return false;
         } else {
@@ -149,12 +149,12 @@ public class GDP_NAME {
      * Parse the (presumably) printable name to return an internal name
      * @param s A potential printable name
      * @return A 32-byte long internal name
-     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp08Library.EP_STAT_SEV_WARN.     
+     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp20Library.EP_STAT_SEV_WARN.     
      */
     private byte[] __parse_name(String s) throws GDPException {
         ByteBuffer dst = ByteBuffer.allocate(32); // FIXME
         
-        EP_STAT estat = Gdp08Library.INSTANCE.gdp_parse_name(s, dst);
+        EP_STAT estat = Gdp20Library.INSTANCE.gdp_parse_name(s, dst);
         GDP.check_EP_STAT(estat, "Failed to parse " + s);
 
         // we don't care if the bytebuffer gets modified. We aren't using
@@ -176,7 +176,7 @@ public class GDP_NAME {
         ByteBuffer printable = ByteBuffer.allocate(this.PNAME_LEN+1);
         
                 
-        Gdp08Library.INSTANCE.gdp_printable_name(internal, printable);
+        Gdp20Library.INSTANCE.gdp_printable_name(internal, printable);
         // no problem, since we don't need bytebuffer interface to this
         // memory anymore.
         

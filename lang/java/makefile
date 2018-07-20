@@ -33,9 +33,9 @@
 #
 # If you change the GDP version, see the instructions in package.html
 #
-GDPLIBMAJVER=0
-GDPLIBMINVER=8
-GDP_PATCH_VERSION=0
+GDPLIBMAJVER=2
+GDPLIBMINVER=0
+GDP_PATCH_VERSION=3
 
 GDP_MAJOR_MINOR_VERSION=$(GDPLIBMAJVER).$(GDPLIBMINVER)
 
@@ -115,27 +115,27 @@ BUILD_JARS=$(JNA_JAR) $(JNAERATOR_JAR) $(JNAERATOR_RUNTIME_JAR)
 ### to be manually updated.
 
 $(JNA_JAR):
-	wget 'https://maven.java.net/content/repositories/releases/net/java/dev/jna/jna/4.2.2x/$@' -O $@; \
+	echo "Fetching $@ from maven repositories. If this fails, you might have to update paths and such."; \
+	wget 'https://repo1.maven.org/maven2/net/java/dev/jna/jna/4.2.2/$@' -O $@; \
 	status=$$?; \
 	if [ $$status -ne 0 ]; then \
-		echo "Failed to get $@ from maven.java.net, getting it from terraswarm.org instead."; \
-		wget 'https://www.terraswarm.org/downloads/$@' -O $@; \
+		echo "Failed to get $@ from maven.java.net."; \
 	fi
 
 $(JNAERATOR_JAR):
-	wget 'https://search.maven.org/remotecontent?filepath=com/nativelibs4java/jnaeratorx/$(JNAERATOR_VERSION)/$@' -O $@; \
+	echo "Fetching $@ from maven repositories. If this fails, you might have to update paths and such."; \
+	wget 'https://repo1.maven.org/maven2/com/nativelibs4java/jnaerator/$(JNAERATOR_VERSION)/$@' -O $@; \
 	status=$$?; \
 	if [ $$status -ne 0 ]; then \
-		echo "Failed to get $@ from search.maven.org, getting it from terraswarm.org instead."; \
-		wget 'https://www.terraswarm.org/downloads/$@' -O $@; \
+		echo "Failed to get $@ from maven.java.net."; \
 	fi
 
 $(JNAERATOR_RUNTIME_JAR):
-	wget 'https://search.maven.org/remotecontent?filepath=com/nativelibs4java/jnaerator-runtimex/$(JNAERATOR_VERSION)/$@' -O $@; \
+	echo "Fetching $@ from maven repositories. If this fails, you might have to update paths and such."; \
+	wget 'https://repo1.maven.org/maven2/com/nativelibs4java/jnaerator-runtime/$(JNAERATOR_VERSION)/$@' -O $@; \
 	status=$$?; \
 	if [ $$status -ne 0 ]; then \
-		echo "Failed to get $@ from search.maven.org, getting it from terraswarm.org instead."; \
-		wget 'https://www.terraswarm.org/downloads/$@' -O $@; \
+		echo "Failed to get $@ from maven.java.net."; \
 	fi
 
 
