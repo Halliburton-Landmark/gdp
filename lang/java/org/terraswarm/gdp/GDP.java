@@ -124,7 +124,9 @@ public class GDP {
     public static String ep_stat_toStr(EP_STAT estat) {
         int length = 200;
         ByteBuffer buffer = ByteBuffer.allocate(length);
-        Pointer statusMessage = Gdp20Library.INSTANCE.ep_stat_tostr((EP_STAT.ByValue)estat, buffer, new NativeSize(length));
+        Pointer statusMessage = Gdp20Library.INSTANCE
+                                    .ep_stat_tostr((EP_STAT.ByValue)estat,
+                                                buffer, new NativeSize(length));
         return new String(buffer.array()).trim();
     }
 
