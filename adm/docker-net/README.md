@@ -76,7 +76,7 @@ works nicely. The name of the log daemon can be overridden by setting
 
     docker run -d --network=gdpnet \
         -e GDP_ROUTER=gdprouter:8009 \
-        -e GDPLOGD_NAME=docker.gdplogd
+        -e GDPLOGD_NAME=docker.gdplogd \
         --name=logserver \
         --mount source=logs,destination=/var/swarm/gdp/glogs \
         gdplogd -D *=10
@@ -95,3 +95,13 @@ Similarly for the router container
     docker stop gdprouter
     docker container rm gdprouter
 
+# Using the infrastructure
+
+Once these docker containers are up and running, you should point your
+client applications to this infrastructure by means of appropriate
+configuration. Typically, this means setting the router and default
+log server parameters in your `~/.ep_adm_params/gdp` (or similar)
+configuration file. For the setup above, you probably want the following:
+
+    swarm.gdp.routers=HOSTNAME_OR_IP_ADDRESS_OF_DOCKER_HOST
+    swarm.gdp.gdp-create.server=docker.gdplogd
