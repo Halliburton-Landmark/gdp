@@ -42,18 +42,24 @@ public class ReaderTestSubscribe {
             GDP.gdp_init();
             GDP.dbg_set("*=10");
 
-            String logname = "logjava";
+            if (args.length<1) {
+                System.out.println("Usage: <logname>");
+                return;
+            }
+
+            String logname = args[0];
             GDP_NAME gn = new GDP_NAME(logname);
-            System.out.println("Creating object");
+
+            System.out.println("Opening object");
             GDP_GIN g = new GDP_GIN(gn, GDP_GIN.GDP_MODE.RA);
 
             g.subscribe_by_recno(0, 0, null);
             for (;;) {
-              HashMap<String, Object> event = GDP_GIN.get_next_event(null, null);
-              if ((int) event.get("type") == 2) { break; }
-          HashMap<String, Object> datum = (HashMap<String, Object>) event.get("datum");
-          System.out.print(new String((byte[]) datum.get("data"), "UTF-8"));
-              System.out.println();
+                HashMap<String, Object> event = GDP_GIN.get_next_event(null, null);
+                if ((int) event.get("type") == 2) { break; }
+                HashMap<String, Object> datum = (HashMap<String, Object>) event.get("datum");
+                System.out.print(new String((byte[]) datum.get("data"), "UTF-8"));
+                System.out.println();
             }
         } catch (Throwable throwable) {
             System.err.println(throwable);
