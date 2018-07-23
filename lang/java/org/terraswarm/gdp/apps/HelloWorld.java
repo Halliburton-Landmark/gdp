@@ -32,7 +32,8 @@ import org.terraswarm.gdp.*;
 import java.util.Date;
 import java.util.HashMap;
 
-/** A simple test.
+/** A simple test program that writes the current date as a
+ * record, and reads it back.
  */
 public class HelloWorld {
 
@@ -49,24 +50,8 @@ public class HelloWorld {
 
             String logname = args[0];
             GDP_NAME gn = new GDP_NAME(logname);
-            System.out.println("Creating object");
+            System.out.println("Opening GIN");
             GDP_GIN g = new GDP_GIN(gn, GDP_GIN.GDP_MODE.RA);
-
-            /*
-              g.subscribe(0,3);
-              for (;;) {
-              String data = g.get_next_data(0);
-              if (data == null) { break; }
-              System.out.println(data);
-              }
-
-            */
-            /*
-              g.append(new Date().toString());
-              System.out.println(g.read(-1));
-              g.append(new Date().toString());
-              System.out.println(g.read(-1));
-            */
         
             g.append((new Date().toString()).getBytes());
         
