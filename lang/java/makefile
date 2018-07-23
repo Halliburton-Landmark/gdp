@@ -209,16 +209,21 @@ jclass: jna $(JNA_JAR) $(JSRCS) $(JCLASS)
 ### apps
 
 JAVA = java
-LOG_NAME = logjava
-ROUTER_NAME = 172.0.0.1:8007
+LOG_NAME = logjava.`date +'%Y%m%d-%H%M%S'`
+LOGD_NAME = docker.gdplogd
+ROUTER_NAME = 127.0.0.1:8009
 
 
 runCreateTest: all
-	DYLD_LIBRARY_PATH=$(GDP_SRC)/libs LD_LIBRARY_PATH=$(GDP_SRC)/libs $(JAVA) -Djna.debug_load=true -Djna.dump_memory=true -classpath $(CLASSPATH) org.terraswarm.gdp.apps.createTest 
+	DYLD_LIBRARY_PATH=$(GDP_SRC)/libs LD_LIBRARY_PATH=$(GDP_SRC)/libs $(JAVA) -Djna.debug_load=true -Djna.dump_memory=true -classpath $(CLASSPATH) org.terraswarm.gdp.apps.createTest $(LOG_NAME) $(LOGD_NAME)
 runNameTest: all
 	DYLD_LIBRARY_PATH=$(GDP_SRC)/libs LD_LIBRARY_PATH=$(GDP_SRC)/libs $(JAVA) -Djna.debug_load=true -Djna.dump_memory=true -classpath $(CLASSPATH) org.terraswarm.gdp.apps.nameTest 
 runHelloWorld: all
 	DYLD_LIBRARY_PATH=$(GDP_SRC)/libs LD_LIBRARY_PATH=$(GDP_SRC)/libs $(JAVA) -Djna.debug_load=true -Djna.dump_memory=true -classpath $(CLASSPATH) org.terraswarm.gdp.apps.HelloWorld 
+
+runReaderTestSubscribe: org/terraswarm/gdp/apps/ReaderTestSubscribe.class
+	DYLD_LIBRARY_PATH=$(GDP_SRC)/libs LD_LIBRARY_PATH=$(GDP_SRC)/libs $(JAVA) -Djna.debug_load=true -Djna.dump_memory=true -classpath $(CLASSPATH) org.terraswarm.gdp.apps.ReaderTestSubscribe -G $(ROUTER_NAME) -D gdp.api=100 $(LOG_NAME)
+
 #
 #runReaderTest: org/terraswarm/gdp/apps/ReaderTest.class
 #	DYLD_LIBRARY_PATH=$(GDP_SRC)/libs LD_LIBRARY_PATH=$(GDP_SRC)/libs $(JAVA) -Djna.debug_load=true -Djna.dump_memory=true -classpath $(CLASSPATH) org.terraswarm.gdp.apps.ReaderTest -G $(ROUTER_NAME) -D gdp.api=100 $(LOG_NAME)
