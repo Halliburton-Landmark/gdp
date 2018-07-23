@@ -1,98 +1,97 @@
-Creates a private test network for testing GDP-routers and log servers
-without disrupting the actual production network.
-Currently, it supports a very simple topology of `N` routers (all connected
-to each other) and `M` log servers connected to each router (total `MxN` log 
-servers).
+**Note: This is for V2. Eventually, the V2 distinction should be dropped.**
 
-Hopefully this will be of use for testing and any future upgrades
-of the GDP protocol.
+# Introduction
 
-Files:
-======
+This directory contains a very basic setup for
 
-- Dockerfile.baseimage : A base image with pre-requisite packages
-- Dockerfile.gdp-router: A recipe for generating gdp-router docker image
-- Dockerfile.gdplogd   : A recipe for generating gdplogd docker image
-- Makefile             : Wrapper script to start up everything
+- Creating gdp-router docker image from scratch
+- Creating log-server docker image from scratch
+- A basic set of docker commands to set up a local test environment.
 
-How to use:
-===========
+Especially note that:
 
-To get started, adjust parameters `NUM_ROUTERS` and `NUM_LOGDS_PER_ROUTER` in
-makefile, run `make`. To shut down the circus, use `make clean`. If you want 
-to get rid of the base docker image (because it's too old with outdated
-packages, or you changed some dependency), use `make clean-all`.
+- There is no guaranteed for the safety of the data. This is experimental
+  software, and more importantly, experimental configuration/setup
+  procedure. You are on your own if you experience data loss.
 
-You can also pass additional commandline arguments by adjusting appropriate
-`*CMDLINE_ARGS` parameter in the Makefile. But before modifying it, first check
-what are the current parameters being passed. The way arguments works is that 
-docker executes the executable specified in Dockerfile under ENTRYPOINT with 
-the specified arguments. Any addition to the actual `docker run ...` command 
-after the image name are passed to the executable on container startup. Treat
-`*CMDLINE_ARGS` as an easy way to specify additional parameters, but make sure
-you don't cause conflicts with what is already being passed.
+- The docker commands are not error prone. In other words, don't just
+  naively execute these commands without knowing what they do.
 
-Some basic docker commands:
+- These images pull from the repository and compile the code from scratch,
+  which is a very inefficient way of creating docker images. It takes too
+  long to build the images and the images are huge. But this is what it is
+  for the moment, and needs to be fixed.
 
-    docker images
->   shows the images available locally. You should be able to see 'gdp-router'
-    and 'gdp-logd' after executing `make images`
+- The router image creates its single, standalone network. Ideally, one
+  should be able to connect to other GDP networks. This needs to be fixed
+  as well.
 
-    docker ps
->   shows currently running docker containers
+- For the moment, the router image is based on the `eric/net4` branch
+  from the `gdp_router_click` repository. The `master` branch is what we
+  would like in the long run, but that requires quite a bit of setup and
+  is a little less mature.
 
-    docker ps -a
->   shows all docker containers
+- The log-server image stores data in a docker volume stored on the host
+  and managed by docker. Make sure you are not naively running multiple
+  containers attached to the same volume.
 
-    docker logs <container-name>
->   Displays the console output of a specified container.
-    Pass argument `-f` for equivalent behavior as `tail -f`
-    container-names are found using `docker ps`, they are of the form 
-    `gdp-router_172.30.0.*` or `gdp-logd_172.30.*.*.` 
+# Image creation.
 
-    docker kill <container-name>
->   Kill a running container (does not remove the container files from disk)
+With the note about large images and slow image creation in mind, you
+can run the following:
 
-    docker rm <container-name>
->   Remove a container, frees up the name too.
+    make
+
+You should now have two images: one called `router` and antoher called
+`gdplogd`. You can check it via `docker image ls`.
+
+# Management via Docker
+
+Here's one way to start your own environment. Make sure you understand what
+you are doing, and don't just naively run things.
+
+First, let's create a bridged network for our images. This enables isolation
+and name resolution by referring to the container name.
+
+    docker network create gdpnet
+
+Let's run a router instance, which we call `gdprouter`. We expose the port
+`8009` to outside.
+
+    docker run -d --network=gdpnet --name gdprouter -p 8009:8009 router
+
+Now, let's create a volume to host persistent data for our log-server. We
+call the volume `logs`, and we will attach this volume to our running
+container next.
+
+    docker volume create logs
+
+The following starts the log-server container. We pass the router that this
+log server should connect to via the environment variable `GDP_ROUTER`,
+which is simply the name of the container `gdprouter` we created earlier.
+Since both contianers join the same network `gdpnet`, hostname resolution
+works nicely. The name of the log daemon can be overridden by setting
+`GDPLOGD_NAME` to appropriate value as well.
 
 
-Notes:
-=====
+    docker run -d --network=gdpnet \
+        -e GDP_ROUTER=gdprouter:8009 \
+        -e GDPLOGD_NAME=docker.gdplogd
+        --name=logserver \
+        --mount source=logs,destination=/var/swarm/gdp/glogs \
+        gdplogd -D *=10
 
-- Make sure you have all the required packages:
-  - 'fakeroot' and 'checkinstall'. These are needed to build a debian
-    package that gets added to the docker containers.
-  - Docker (see https://docs.docker.com/engine/installation/linux/ ). Also
-    recommended is the 'Post-installation steps' to allow running docker
-    by non-root users. See:
-    https://docs.docker.com/engine/installation/linux/linux-postinstall/
-  - 'bridge-utils' and 'iputils-arping'
+To stop the containers, we need two steps: (1) stop the container and
+(2) remove the container so that the name becomes available for future
+and that we accidentally do not end up in a situation where multiple
+containers are all connected to the same volume. Here's how to stop
+the containers we started above:
 
-- As of version 1.7, docker lacks the ability to specify the IP address of a 
-  container by the user. We need to know the IP addresses of all the router
-  instances in advance, thus functionality of pre-determined IP addresses is a 
-  necessity.
-  To get around this, we use `pipework` - a 3rd party shell script that creates
-  it's own bridge. Launching a docker container becomes a two step process: 
-  - Launch a docker container from a given image
-  - Use pipework to attach another virual network interface in the container
-    just launched, which is connected to a separate virual bridge.
+    docker stop logserver
+    docker container rm logserver
 
-- If you are running this docker local network in a virtualized environment, it
-  may or may not work depending on the settings for your virtual network card.
-  In particular, see 'https://github.com/jpetazzo/pipework#virtualbox' for
-  a workaround for virtual-box.
+Similarly for the router container
 
-- The convention used for IP address allocation is: 
-  - Host has IP address 172.30.0.255
-  - GDP routers have IP addresses: 172.30.0.x (x=> 1-254)
-  - GDP log servers attached to 172.30.0.x have IP addresses of the form
-    172.30.y.x (y=> 1-15). This can be increased, if needed.
-
-- GDP routers include a random delay before starting, this is to make sure that
-  we can start multiple instances of GDP routers with the same command line
-  arguments without running into race conditions. GDP log servers are executed
-  using a wrapper script that adds a delay of 10 seconds to accommodate for the
-  delay in GDP router startup. See dockerfile.
+    docker stop gdprouter
+    docker container rm gdprouter
 
