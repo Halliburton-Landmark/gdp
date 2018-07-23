@@ -13,37 +13,28 @@ Especially note that:
 - There is no guaranteed for the safety of the data. This is experimental
   software, and more importantly, experimental configuration/setup
   procedure. You are on your own if you experience data loss.
-
 - The docker commands are not error prone. In other words, don't just
   naively execute these commands without knowing what they do.
-
 - These images pull from the repository and compile the code from scratch,
   which is a very inefficient way of creating docker images. It takes too
   long to build the images and the images are huge. But this is what it is
   for the moment, and needs to be fixed.
-
 - The router image creates its single, standalone network. Ideally, one
   should be able to connect to other GDP networks. This needs to be fixed
   as well.
-
 - For the moment, the router image is based on the `eric/net4` branch
   from the `gdp_router_click` repository. The `master` branch is what we
   would like in the long run, but that requires quite a bit of setup and
   is a little less mature.
-
 - The log-server image stores data in a docker volume stored on the host
   and managed by docker. Make sure you are not naively running multiple
   containers attached to the same volume.
 
-# Image creation.
+# Image creation
 
 With the note about large images and slow image creation in mind, you
-can run the following:
-
-    make
-
-You should now have two images: one called `router` and antoher called
-`gdplogd`. You can check it via `docker image ls`.
+can run `make`. This should result in two images: one called `router`
+and antoher called `gdplogd`. You can check it via `docker image ls`.
 
 # Management via Docker
 
@@ -95,7 +86,7 @@ Similarly for the router container
     docker stop gdprouter
     docker container rm gdprouter
 
-# Using the infrastructure
+# Client-side setup
 
 Once these docker containers are up and running, you should point your
 client applications to this infrastructure by means of appropriate
