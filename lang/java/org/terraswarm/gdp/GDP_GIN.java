@@ -64,6 +64,20 @@ public class GDP_GIN {
      * @param name   Name of the log, which will be created if necessary.
      * @param iomode Should this be opened read only, read-append,
      * append-only.  See {@link #GDP_MODE}.
+     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp20Library.EP_STAT_SEV_WARN.
+     */
+    public GDP_GIN(GDP_NAME name, GDP_MODE iomode) throws GDPException {
+        this(name, iomode, null);
+    }
+
+    /** 
+     * Initialize a new Global Data Plane GIN
+     *
+     * Signatures are not yet supported, but are taken care of by the C library.
+     *
+     * @param name   Name of the log, which will be created if necessary.
+     * @param iomode Should this be opened read only, read-append,
+     * append-only.  See {@link #GDP_MODE}.
      * @param logdName  Name of the log server where this should be 
      *                  placed if it does not yet exist.
      * @exception GDPException If a GDP C function returns a code great than or equal to Gdp20Library.EP_STAT_SEV_WARN.
@@ -86,7 +100,7 @@ public class GDP_GIN {
         estat = Gdp20Library.INSTANCE.gdp_gin_open(ByteBuffer.wrap(this.gclName), 
                             iomode.ordinal(), (PointerByReference) null, 
                             ginhByReference);
-        if (!GDP.check_EP_STAT(estat)) {
+        if (!GDP.check_EP_STAT(estat) && (logdName!=null)) {
             System.out.println("GDP_GIN: gdp_gin_open() failed, trying to create the log and call gdp_gin_open() again.");
             GDP_GIN.create(name, logdName);
             estat = Gdp20Library.INSTANCE.gdp_gin_open(ByteBuffer.wrap(this.gclName), 
