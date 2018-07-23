@@ -70,12 +70,11 @@ public class GDP_GIN {
      */
     public GDP_GIN(GDP_NAME name, GDP_MODE iomode, GDP_NAME logdName) throws GDPException {
         // FIXME: No signatures support.
-
-	System.out.println("GDP_GIN.java: GDP_GIN(" + name +
-			   "(" + new String(name.printable_name()) +
-			   "), " + iomode + ", " + logdName +
-			   "(" + new String(logdName.printable_name()) +
-			   ")");
+        System.out.println("GDP_GIN.java: GDP_GIN(" + name +
+                           "(" + new String(name.printable_name()) +
+                           "), " + iomode + ", " + logdName +
+                           "(" + new String(logdName.printable_name()) +
+                           ")");
         EP_STAT estat;
         
         PointerByReference ginhByReference = new PointerByReference();
@@ -83,21 +82,21 @@ public class GDP_GIN {
         this.gclName = name.internal_name();
         
         // Open the GCL.
-	GDP.dbg_set("*=20");
+        GDP.dbg_set("*=20");
         estat = Gdp20Library.INSTANCE.gdp_gin_open(ByteBuffer.wrap(this.gclName), 
                             iomode.ordinal(), (PointerByReference) null, 
                             ginhByReference);
-	if (!GDP.check_EP_STAT(estat)) {
-	    System.out.println("GDP_GIN: gdp_gin_open() failed, trying to create the log and call gdp_gin_open() again.");
-	    GDP_GIN.create(name, logdName);
-	    estat = Gdp20Library.INSTANCE.gdp_gin_open(ByteBuffer.wrap(this.gclName), 
-						       iomode.ordinal(), (PointerByReference) null, 
-						       ginhByReference);
-	}
+        if (!GDP.check_EP_STAT(estat)) {
+            System.out.println("GDP_GIN: gdp_gin_open() failed, trying to create the log and call gdp_gin_open() again.");
+            GDP_GIN.create(name, logdName);
+            estat = Gdp20Library.INSTANCE.gdp_gin_open(ByteBuffer.wrap(this.gclName), 
+                                                       iomode.ordinal(), (PointerByReference) null, 
+                                                       ginhByReference);
+        }
         GDP.check_EP_STAT(estat, "gdp_gin_open(" +
-			  gclName + "(" + new String(name.printable_name(),0) + "), " +
-			  iomode.ordinal() + ", null, " +
-			  ginhByReference + ") failed.");
+                          gclName + "(" + new String(name.printable_name(),0) + "), " +
+                          iomode.ordinal() + ", null, " +
+                          ginhByReference + ") failed.");
 
         // Associate the C pointer to this object.
         ginh = ginhByReference.getValue();
@@ -249,7 +248,7 @@ public class GDP_GIN {
      */
     public static void create(GDP_NAME logName, GDP_NAME logdName, 
                     Map<Integer, byte[]> metadata) throws GDPException {
-	System.out.println("GDP_GIN.java: create(" + logName + ", " + ", " + logdName + ", " + metadata + ")");
+        System.out.println("GDP_GIN.java: create(" + logName + ", " + ", " + logdName + ", " + metadata + ")");
         EP_STAT estat;
         
         // Get the 256-bit internal names for log and logd
@@ -269,9 +268,9 @@ public class GDP_GIN {
                         m.gdp_md_ptr, new PointerByReference(tmpPtr));
         
         GDP.check_EP_STAT(estat, "gdp_gin_create(" + 
-			  logNameInternal + ", " +
-			  logdNameInternal + ", " +
-			  m.gdp_md_ptr + " new PointerByReference(" + tmpPtr + ")) failed.");
+                          logNameInternal + ", " +
+                          logdNameInternal + ", " +
+                          m.gdp_md_ptr + " new PointerByReference(" + tmpPtr + ")) failed.");
         
         return;
     }
@@ -320,7 +319,7 @@ public class GDP_GIN {
      * @exception GDPException If a GDP C function returns a code great than or equal to Gdp20Library.EP_STAT_SEV_WARN.
      */
     public static GDP_GIN newGCL(GDP_NAME name, int iomode, GDP_NAME logdName) throws GDPException {
-	System.out.println("GDP_GIN.java: newGCL(" + name + ", " + iomode + ", " + logdName + ")");
+        System.out.println("GDP_GIN.java: newGCL(" + name + ", " + iomode + ", " + logdName + ")");
         // The GDP Accessor uses this method
         GDP_MODE gdp_mode = GDP_MODE.ANY;
         switch (iomode) {
@@ -407,17 +406,16 @@ public class GDP_GIN {
      * @param timeout   Timeout for this subscription
      * @exception GDPException If a GDP C function returns a code great than or equal to Gdp20Library.EP_STAT_SEV_WARN.
      */
-    public void subscribe_by_recno(long firstrec, int numrecs, EP_TIME_SPEC timeout) throws GDPException {
+    public void subscribe_by_recno(long firstrec, int numrecs,
+                        EP_TIME_SPEC timeout) throws GDPException {
 
         EP_STAT estat;
         _checkGclh(ginh);
-        /*
         estat = Gdp20Library.INSTANCE
                     .gdp_gin_subscribe_by_recno(ginh, firstrec, numrecs,
-                                        timeout, null, null);
+                                        timeout.getPointer(), null, null);
 
         GDP.check_EP_STAT(estat, "gdp_gin_subscribe_by_recno() failed.");
-        */
         return;
     }
 
