@@ -31,6 +31,7 @@ case "$OS" in
     	rm -f lib$lib.so.$major lib$lib.so
 	ln -s lib$lib.so.$ver lib$lib.so.$major
 	ln -s lib$lib.so.$major lib$lib.so
+	ln -s lib$lib.so.$ver lib$lib.$ver.so
 	;;
 
   "darwin")

@@ -33,9 +33,9 @@
 #
 # If you change the GDP version, see the instructions in package.html
 #
-GDPLIBMAJVER=0
-GDPLIBMINVER=8
-GDP_PATCH_VERSION=0
+GDPLIBMAJVER=2
+GDPLIBMINVER=0
+GDP_PATCH_VERSION=3
 
 GDP_MAJOR_MINOR_VERSION=$(GDPLIBMAJVER).$(GDPLIBMINVER)
 
@@ -115,27 +115,27 @@ BUILD_JARS=$(JNA_JAR) $(JNAERATOR_JAR) $(JNAERATOR_RUNTIME_JAR)
 ### to be manually updated.
 
 $(JNA_JAR):
-	wget 'https://maven.java.net/content/repositories/releases/net/java/dev/jna/jna/4.2.2x/$@' -O $@; \
+	echo "Fetching $@ from maven repositories. If this fails, you might have to update paths and such."; \
+	wget 'https://repo1.maven.org/maven2/net/java/dev/jna/jna/4.2.2/$@' -O $@; \
 	status=$$?; \
 	if [ $$status -ne 0 ]; then \
-		echo "Failed to get $@ from maven.java.net, getting it from terraswarm.org instead."; \
-		wget 'https://www.terraswarm.org/downloads/$@' -O $@; \
+		echo "Failed to get $@ from maven.java.net."; \
 	fi
 
 $(JNAERATOR_JAR):
-	wget 'https://search.maven.org/remotecontent?filepath=com/nativelibs4java/jnaeratorx/$(JNAERATOR_VERSION)/$@' -O $@; \
+	echo "Fetching $@ from maven repositories. If this fails, you might have to update paths and such."; \
+	wget 'https://repo1.maven.org/maven2/com/nativelibs4java/jnaerator/$(JNAERATOR_VERSION)/$@' -O $@; \
 	status=$$?; \
 	if [ $$status -ne 0 ]; then \
-		echo "Failed to get $@ from search.maven.org, getting it from terraswarm.org instead."; \
-		wget 'https://www.terraswarm.org/downloads/$@' -O $@; \
+		echo "Failed to get $@ from maven.java.net."; \
 	fi
 
 $(JNAERATOR_RUNTIME_JAR):
-	wget 'https://search.maven.org/remotecontent?filepath=com/nativelibs4java/jnaerator-runtimex/$(JNAERATOR_VERSION)/$@' -O $@; \
+	echo "Fetching $@ from maven repositories. If this fails, you might have to update paths and such."; \
+	wget 'https://repo1.maven.org/maven2/com/nativelibs4java/jnaerator-runtime/$(JNAERATOR_VERSION)/$@' -O $@; \
 	status=$$?; \
 	if [ $$status -ne 0 ]; then \
-		echo "Failed to get $@ from search.maven.org, getting it from terraswarm.org instead."; \
-		wget 'https://www.terraswarm.org/downloads/$@' -O $@; \
+		echo "Failed to get $@ from maven.java.net."; \
 	fi
 
 
@@ -209,28 +209,30 @@ jclass: jna $(JNA_JAR) $(JSRCS) $(JCLASS)
 ### apps
 
 JAVA = java
-LOG_NAME = logjava
-ROUTER_NAME = 172.0.0.1:8007
-
+LOG_NAME = logjava              # You probably want to override this on command-line.
+LOGD_NAME = docker.gdplogd      # You probably want to override this on command-line.
 
 runCreateTest: all
-	DYLD_LIBRARY_PATH=$(GDP_SRC)/libs LD_LIBRARY_PATH=$(GDP_SRC)/libs $(JAVA) -Djna.debug_load=true -Djna.dump_memory=true -classpath $(CLASSPATH) org.terraswarm.gdp.apps.createTest 
+	DYLD_LIBRARY_PATH=$(GDP_SRC)/libs LD_LIBRARY_PATH=$(GDP_SRC)/libs $(JAVA) -Djna.debug_load=true -Djna.dump_memory=true -classpath $(CLASSPATH) org.terraswarm.gdp.apps.CreateTest $(LOG_NAME) $(LOGD_NAME)
 runNameTest: all
-	DYLD_LIBRARY_PATH=$(GDP_SRC)/libs LD_LIBRARY_PATH=$(GDP_SRC)/libs $(JAVA) -Djna.debug_load=true -Djna.dump_memory=true -classpath $(CLASSPATH) org.terraswarm.gdp.apps.nameTest 
+	DYLD_LIBRARY_PATH=$(GDP_SRC)/libs LD_LIBRARY_PATH=$(GDP_SRC)/libs $(JAVA) -Djna.debug_load=true -Djna.dump_memory=true -classpath $(CLASSPATH) org.terraswarm.gdp.apps.NameTest 
 runHelloWorld: all
-	DYLD_LIBRARY_PATH=$(GDP_SRC)/libs LD_LIBRARY_PATH=$(GDP_SRC)/libs $(JAVA) -Djna.debug_load=true -Djna.dump_memory=true -classpath $(CLASSPATH) org.terraswarm.gdp.apps.HelloWorld 
+	DYLD_LIBRARY_PATH=$(GDP_SRC)/libs LD_LIBRARY_PATH=$(GDP_SRC)/libs $(JAVA) -Djna.debug_load=true -Djna.dump_memory=true -classpath $(CLASSPATH) org.terraswarm.gdp.apps.HelloWorld $(LOG_NAME)
+runReaderTestSubscribe: all
+	DYLD_LIBRARY_PATH=$(GDP_SRC)/libs LD_LIBRARY_PATH=$(GDP_SRC)/libs $(JAVA) -Djna.debug_load=true -Djna.dump_memory=true -classpath $(CLASSPATH) org.terraswarm.gdp.apps.ReaderTestSubscribe $(LOG_NAME)
+
 #
 #runReaderTest: org/terraswarm/gdp/apps/ReaderTest.class
-#	DYLD_LIBRARY_PATH=$(GDP_SRC)/libs LD_LIBRARY_PATH=$(GDP_SRC)/libs $(JAVA) -Djna.debug_load=true -Djna.dump_memory=true -classpath $(CLASSPATH) org.terraswarm.gdp.apps.ReaderTest -G $(ROUTER_NAME) -D gdp.api=100 $(LOG_NAME)
+#	DYLD_LIBRARY_PATH=$(GDP_SRC)/libs LD_LIBRARY_PATH=$(GDP_SRC)/libs $(JAVA) -Djna.debug_load=true -Djna.dump_memory=true -classpath $(CLASSPATH) org.terraswarm.gdp.apps.ReaderTest $(LOG_NAME)
 #
 #runReaderTestPtIILib: org/terraswarm/gdp/apps/ReaderTest.class
-#	DYLD_LIBRARY_PATH=$(GDP_SRC)/libs LD_LIBRARY_PATH=$(GDP_SRC)/libs $(JAVA) -Djna.debug_load=true -Djna.dump_memory=true -classpath $(CLASSPATH) org.terraswarm.gdp.apps.ReaderTest -G $(ROUTER_NAME) -D gdp.api=100 $(LOG_NAME)
+#	DYLD_LIBRARY_PATH=$(GDP_SRC)/libs LD_LIBRARY_PATH=$(GDP_SRC)/libs $(JAVA) -Djna.debug_load=true -Djna.dump_memory=true -classpath $(CLASSPATH) org.terraswarm.gdp.apps.ReaderTest $(LOG_NAME)
 #
 #runReaderTestSubscriber: org/terraswarm/gdp/apps/ReaderTest.class
-#	DYLD_LIBRARY_PATH=$(GDP_SRC)/libs LD_LIBRARY_PATH=$(GDP_SRC)/libs $(JAVA) -Djna.debug_load=true -Djna.dump_memory=true -classpath $(CLASSPATH) org.terraswarm.gdp.apps.ReaderTest -G $(ROUTER_NAME) -s -D gdp.api=100 $(LOG_NAME)
+#	DYLD_LIBRARY_PATH=$(GDP_SRC)/libs LD_LIBRARY_PATH=$(GDP_SRC)/libs $(JAVA) -Djna.debug_load=true -Djna.dump_memory=true -classpath $(CLASSPATH) org.terraswarm.gdp.apps.ReaderTest -s $(LOG_NAME)
 #
 #runWriterTest: org/terraswarm/gdp/apps/WriterTest.class
-#	DYLD_LIBRARY_PATH=$(GDP_SRC)/libs LD_LIBRARY_PATH=$(GDP_SRC)/libs $(JAVA) -Djna.debug_load=true -Djna.dump_memory=true -classpath $(CLASSPATH) org.terraswarm.gdp.apps.WriterTest -G $(ROUTER_NAME) -D gdp.api=100 $(LOG_NAME)
+#	DYLD_LIBRARY_PATH=$(GDP_SRC)/libs LD_LIBRARY_PATH=$(GDP_SRC)/libs $(JAVA) -Djna.debug_load=true -Djna.dump_memory=true -classpath $(CLASSPATH) org.terraswarm.gdp.apps.WriterTest $(LOG_NAME)
 #
 
 ### 

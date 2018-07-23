@@ -9,5 +9,9 @@ linux-x86-64
 !GDP*.java
 !EP_CRYPTO.java
 !ReaderTest.java
+!ReaderTestSubscribe.java
+!CreateTest.java
+!NameTest.java
+!HelloWorld.java
 !WriterTest.java
 !GdpUtilities.java

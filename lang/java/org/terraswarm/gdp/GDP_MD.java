@@ -49,42 +49,42 @@ import org.terraswarm.gdp.NativeSize; // Fixed by cxh in makefile.
  * @author Nitesh Mor
  */
 
-class GDP_GCLMD {
+class GDP_MD {
     
     /**
-     * Pass a pointer to an already allocated gdp_gclmd_t C structure.
-     * @param d A pointer to an existing gdp_gclmd_t
+     * Pass a pointer to an already allocated gdp_md_t C structure.
+     * @param d A pointer to an existing gdp_md_t
      */
-    public GDP_GCLMD(PointerByReference d) {
-        this.gdp_gclmd_ptr = d;
+    public GDP_MD(PointerByReference d) {
+        this.gdp_md_ptr = d;
         this.did_i_create_it = false;
         return;
     }
     
     /**
      * If called without an existing pointer, we allocated a new 
-     * C gdp_gclmd_t structure.
+     * C gdp_md_t structure.
      */
-    public GDP_GCLMD() {
-        this.gdp_gclmd_ptr = Gdp08Library.INSTANCE.gdp_gclmd_new(0);
+    public GDP_MD() {
+        this.gdp_md_ptr = Gdp20Library.INSTANCE.gdp_md_new(0);
         this.did_i_create_it = true;
     }
     
     /**
-     * In case we allocated memory for the C gdp_gclmd_t ourselves, free it.
+     * In case we allocated memory for the C gdp_md_t ourselves, free it.
      */
     public void finalize() {        
         if (this.did_i_create_it) {
-            Gdp08Library.INSTANCE.gdp_gclmd_free(this.gdp_gclmd_ptr);
+            Gdp20Library.INSTANCE.gdp_md_free(this.gdp_md_ptr);
         }
     }
     
     /**
      * Add a new entry to the metadata
-     * @param gclmd_id  ID for the metadata. Internally a 32-bit unsigned integer
+     * @param md_id  ID for the metadata. Internally a 32-bit unsigned integer
      * @param data  The corresponding data.
      */
-    public void add(int gclmd_id, byte[] data) {
+    public void add(int md_id, byte[] data) {
         
         // FIXME: figure out if we need to have a +1 for len
         NativeSize len = new NativeSize(data.length);
@@ -101,13 +101,13 @@ class GDP_GCLMD {
             pointer.setByte(i,data[i]);
         }
                 
-        Gdp08Library.INSTANCE.gdp_gclmd_add(this.gdp_gclmd_ptr, gclmd_id,
+        Gdp20Library.INSTANCE.gdp_md_add(this.gdp_md_ptr, md_id,
                 len, pointer);
     }
 
     
     /**
-     * Get a metadata entry by index. This is not searching by a gclmd_id. For
+     * Get a metadata entry by index. This is not searching by a md_id. For
      * that, look at find.
      * @param index The particular metadata entry we are looking for
      * @return  Returns a Key-Value pair containing the requested index. 
@@ -116,8 +116,8 @@ class GDP_GCLMD {
      */ 
     public HashMap<Integer, byte[]> get(int index){
 
-        // Pointer to hold the gclmd_id
-        IntBuffer gclmd_id_ptr = IntBuffer.allocate(1);
+        // Pointer to hold the md_id
+        IntBuffer md_id_ptr = IntBuffer.allocate(1);
         
         // to hold the length of the buffer
         NativeSize len = new NativeSize();
@@ -125,36 +125,36 @@ class GDP_GCLMD {
         // Pointer to the buffer to hold the value
         PointerByReference p = new PointerByReference();
         
-        Gdp08Library.INSTANCE.gdp_gclmd_get(this.gdp_gclmd_ptr, 
-                index, gclmd_id_ptr, new NativeSizeByReference(len), p);
+        Gdp20Library.INSTANCE.gdp_md_get(this.gdp_md_ptr, 
+                index, md_id_ptr, new NativeSizeByReference(len), p);
         
-        // get the gclmd_id
-        int gclmd_id = gclmd_id_ptr.get(0);
+        // get the md_id
+        int md_id = md_id_ptr.get(0);
         
         Pointer pointer = p.getValue();
         byte[] val = pointer.getByteArray(0, len.intValue());
         
         HashMap<Integer, byte[]> ret = new HashMap<Integer, byte[]>();
         
-        ret.put(gclmd_id, val);
+        ret.put(md_id, val);
         
         return ret;
     }
     
     /**
-     * Find a particular metadata entry by looking up gclmd_id
-     * @param gclmd_id ID we are searching for
-     * @return the value associated with <code>gclmd_id</code> 
+     * Find a particular metadata entry by looking up md_id
+     * @param md_id ID we are searching for
+     * @return the value associated with <code>md_id</code> 
      */
-    public byte[] find(int gclmd_id) {
+    public byte[] find(int md_id) {
 
         // to hold the length of the buffer
         NativeSize len = new NativeSize();
         // Pointer to the buffer to hold the value
         PointerByReference p = new PointerByReference();
         
-        Gdp08Library.INSTANCE.gdp_gclmd_find(this.gdp_gclmd_ptr, 
-                gclmd_id, new NativeSizeByReference(len), p);
+        Gdp20Library.INSTANCE.gdp_md_find(this.gdp_md_ptr, 
+                md_id, new NativeSizeByReference(len), p);
         
         Pointer pointer = p.getValue();
         byte[] bytes = pointer.getByteArray(0, len.intValue());
@@ -163,7 +163,7 @@ class GDP_GCLMD {
     }
 
     // Pointer to the C structure
-    public PointerByReference gdp_gclmd_ptr = null;
+    public PointerByReference gdp_md_ptr = null;
     
     // To keep track of whether we need to call free in destructor
     private boolean did_i_create_it = false;

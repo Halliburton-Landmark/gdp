@@ -32,10 +32,9 @@ import org.terraswarm.gdp.*;
 import java.util.Date;
 import java.util.HashMap;
 
-/** A simple test program that writes the current date as a
- * record, and reads it back.
+/** A simple test.
  */
-public class HelloWorld {
+public class ReaderTestSubscribe {
 
     public static void main(String[] args) {
 
@@ -43,22 +42,24 @@ public class HelloWorld {
             GDP.gdp_init();
             GDP.dbg_set("*=10");
 
-            if (args.length < 1) {
+            if (args.length<1) {
                 System.out.println("Usage: <logname>");
                 return;
             }
 
             String logname = args[0];
             GDP_NAME gn = new GDP_NAME(logname);
-            System.out.println("Opening GIN");
+
+            System.out.println("Opening object");
             GDP_GIN g = new GDP_GIN(gn, GDP_GIN.GDP_MODE.RA);
-        
-            g.append((new Date().toString()).getBytes());
-        
-            HashMap<String, Object> returnDatum = g.read_by_recno(-1);
-            byte[] data = (byte[]) returnDatum.get("data");
-            for (int i=0; i<data.length; i++) {
-                System.out.print((char) data[i]);
+
+            g.subscribe_by_recno(0, 0, null);
+            for (;;) {
+                HashMap<String, Object> event = GDP_GIN.get_next_event(null, null);
+                if ((int) event.get("type") == 2) { break; }
+                HashMap<String, Object> datum = (HashMap<String, Object>) event.get("datum");
+                System.out.print(new String((byte[]) datum.get("data"), "UTF-8"));
+                System.out.println();
             }
         } catch (Throwable throwable) {
             System.err.println(throwable);
