@@ -433,9 +433,12 @@ public class GDP_GIN {
 
         EP_STAT estat;
         _checkGclh(ginh);
+        Pointer p = null;
+        if (timeout != null)
+            p = timeout.getPointer();
         estat = Gdp20Library.INSTANCE
                     .gdp_gin_subscribe_by_recno(ginh, firstrec, numrecs,
-                                        timeout.getPointer(), null, null);
+                                        p, null, null);
 
         GDP.check_EP_STAT(estat, "gdp_gin_subscribe_by_recno() failed.");
         return;
