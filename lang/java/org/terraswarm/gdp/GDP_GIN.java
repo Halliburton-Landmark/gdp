@@ -64,31 +64,13 @@ public class GDP_GIN {
      * @param name   Name of the log, which will be created if necessary.
      * @param iomode Should this be opened read only, read-append,
      * append-only.  See {@link #GDP_MODE}.
-     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp20Library.EP_STAT_SEV_WARN.
+     * @exception GDPException If a GDP C function returns a code great than or
+     *              equal to Gdp20Library.EP_STAT_SEV_WARN.
      */
     public GDP_GIN(GDP_NAME name, GDP_MODE iomode) throws GDPException {
-        this(name, iomode, null);
-    }
-
-    /** 
-     * Initialize a new Global Data Plane GIN
-     *
-     * Signatures are not yet supported, but are taken care of by the C library.
-     *
-     * @param name   Name of the log, which will be created if necessary.
-     * @param iomode Should this be opened read only, read-append,
-     * append-only.  See {@link #GDP_MODE}.
-     * @param logdName  Name of the log server where this should be 
-     *                  placed if it does not yet exist.
-     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp20Library.EP_STAT_SEV_WARN.
-     */
-    public GDP_GIN(GDP_NAME name, GDP_MODE iomode, GDP_NAME logdName) throws GDPException {
-        // FIXME: No signatures support.
         System.out.println("GDP_GIN.java: GDP_GIN(" + name +
                            "(" + new String(name.printable_name()) +
-                           "), " + iomode + ", " + logdName +
-                           "(" + new String(logdName.printable_name()) +
-                           ")");
+                           "), " + iomode);
         EP_STAT estat;
         
         PointerByReference ginhByReference = new PointerByReference();
@@ -97,19 +79,15 @@ public class GDP_GIN {
         
         // Open the GCL.
         GDP.dbg_set("*=20");
-        estat = Gdp20Library.INSTANCE.gdp_gin_open(ByteBuffer.wrap(this.gclName), 
+        estat = Gdp20Library.INSTANCE.gdp_gin_open(
+                            ByteBuffer.wrap(this.gclName), 
                             iomode.ordinal(), (PointerByReference) null, 
                             ginhByReference);
-        if (!GDP.check_EP_STAT(estat) && (logdName!=null)) {
-            System.out.println("GDP_GIN: gdp_gin_open() failed, trying to create the log and call gdp_gin_open() again.");
-            GDP_GIN.create(name, logdName);
-            estat = Gdp20Library.INSTANCE.gdp_gin_open(ByteBuffer.wrap(this.gclName), 
-                                                       iomode.ordinal(), (PointerByReference) null, 
-                                                       ginhByReference);
-        }
+
+        // check return status; throw exception if need be.
         GDP.check_EP_STAT(estat, "gdp_gin_open(" +
-                          gclName + "(" + new String(name.printable_name(),0) + "), " +
-                          iomode.ordinal() + ", null, " +
+                          gclName + "(" + new String(name.printable_name(),0)
+                          + "), " + iomode.ordinal() + ", null, " +
                           ginhByReference + ") failed.");
 
         // Associate the C pointer to this object.
@@ -160,8 +138,10 @@ public class GDP_GIN {
      * 
      * @param datum_dict    A dictionary containing the key "data". The value
      *                      associated should be a byte[] containing the data
-     *                      to be appended.
-     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp20Library.EP_STAT_SEV_WARN.
+     *                      to be appended. Note that there are size limitations
+     *                      on how much data can be appended in a single call.
+     * @exception GDPException If a GDP C function returns a code great than or
+     *            equal to Gdp20Library.EP_STAT_SEV_WARN.
      */
     public void append(Map<String, Object>datum_dict) throws GDPException {
 
@@ -172,18 +152,20 @@ public class GDP_GIN {
         datum.setbuf((byte[]) data);
         
         _checkGclh(ginh);
+        // Let the C lib calculate prevHash
         estat = Gdp20Library.INSTANCE.gdp_gin_append(ginh,
-                                datum.gdp_datum_ptr, null); // Let the C lib calculate prevHash
-        GDP.check_EP_STAT(estat, "gdp_gin_append(" + ginh + ", " + datum.gdp_datum_ptr + ") failed.");
-
+                                datum.gdp_datum_ptr, null);
+        GDP.check_EP_STAT(estat, "gdp_gin_append(" + ginh +
+                         ", " + datum.gdp_datum_ptr + ") failed.");
         return;
     }
 
     /**
      * Append data to a log. This will create a new record in the log.
      * 
-     * @param data  Data that should be appended
-     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp20Library.EP_STAT_SEV_WARN.
+     * @param data  Data that should be appended. Note length restrictions.
+     * @exception GDPException If a GDP C function returns a code great than or
+     *            equal to Gdp20Library.EP_STAT_SEV_WARN.
      */
     public void append(byte[] data)  throws GDPException {
         
@@ -194,14 +176,17 @@ public class GDP_GIN {
     }
 
     /**
-     * Append data to a log, asynchronously. This will create a new record in the log.
+     * Append data to a log, asynchronously. This will create a new record
+     * in the log.
      * 
      * @param datum_dict    A dictionary containing the key "data". The value
      *                      associated should be a byte[] containing the data
      *                      to be appended.
-     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp20Library.EP_STAT_SEV_WARN.
+     * @exception GDPException If a GDP C function returns a code great than or
+     *            equal to Gdp20Library.EP_STAT_SEV_WARN.
      */
-    public void append_async(Map<String, Object>datum_dict) throws GDPException {
+    public void append_async(Map<String, Object>datum_dict)
+                                            throws GDPException {
 
         EP_STAT estat;
         GDP_DATUM datum = new GDP_DATUM();
@@ -210,19 +195,23 @@ public class GDP_GIN {
         datum.setbuf((byte[]) data);
         
         _checkGclh(ginh);
-        PointerByReference datums = new PointerByReference(datum.gdp_datum_ptr.getValue());
+        PointerByReference datums = new PointerByReference(
+                                            datum.gdp_datum_ptr.getValue());
         estat = Gdp20Library.INSTANCE.gdp_gin_append_async(ginh,
                                 1, datums, null, null, null);
-        GDP.check_EP_STAT(estat, "gdp_gin_append_async(" + ginh + ", " + datum.gdp_datum_ptr + "null, null) failed.");
+        GDP.check_EP_STAT(estat, "gdp_gin_append_async(" + ginh +
+                            ", " + datum.gdp_datum_ptr + "null, null) failed.");
 
         return;
     }
 
     /**
-     * Append data to a log, asynchronously. This will create a new record in the log.
+     * Append data to a log, asynchronously. This will create a new record
+     * in the log.
      * 
      * @param data  Data that should be appended
-     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp20Library.EP_STAT_SEV_WARN.
+     * @exception GDPException If a GDP C function returns a code great than or
+      *           equal to Gdp20Library.EP_STAT_SEV_WARN.
      */
     public void append_async(byte[] data) throws GDPException {
         
@@ -258,11 +247,13 @@ public class GDP_GIN {
      * @param logdName  Name of the log server where this should be 
      *                  placed.
      * @param metadata  Metadata to be added to the log. 
-     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp20Library.EP_STAT_SEV_WARN.
+     * @exception GDPException If a GDP C function returns a code great than or
+     *            equal to Gdp20Library.EP_STAT_SEV_WARN.
      */
     public static void create(GDP_NAME logName, GDP_NAME logdName, 
                     Map<Integer, byte[]> metadata) throws GDPException {
-        System.out.println("GDP_GIN.java: create(" + logName + ", " + ", " + logdName + ", " + metadata + ")");
+        System.out.println("GDP_GIN.java: create(" + logName +
+                            ", " + ", " + logdName + ", " + metadata + ")");
         EP_STAT estat;
         
         // Get the 256-bit internal names for log and logd
@@ -278,7 +269,8 @@ public class GDP_GIN {
             m.add(k, metadata.get(k));
         }
         
-        estat = Gdp20Library.INSTANCE.gdp_gin_create(logNameInternal, logdNameInternal,
+        estat = Gdp20Library.INSTANCE.gdp_gin_create(
+                        logNameInternal, logdNameInternal,
                         m.gdp_md_ptr, new PointerByReference(tmpPtr));
         
         GDP.check_EP_STAT(estat, "gdp_gin_create(" + 
@@ -293,18 +285,22 @@ public class GDP_GIN {
      * Create a GCL (with empty metadata).
      * @param logName   Name of the log
      * @param logdName  Name of the logserver that should host this log
-     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp20Library.EP_STAT_SEV_WARN.
+     * @exception GDPException If a GDP C function returns a code great than or
+     *            equal to Gdp20Library.EP_STAT_SEV_WARN.
      */
-    public static void create(String logName, String logdName) throws GDPException {
+    public static void create(String logName, String logdName)
+                                            throws GDPException {
         GDP_GIN.create(new GDP_NAME(logName), new GDP_NAME(logdName));
     }
     /**
      * Create a GCL (with empty metadata).
      * @param logName   Name of the log
      * @param logdName  Name of the logserver that should host this log
-     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp20Library.EP_STAT_SEV_WARN.
+     * @exception GDPException If a GDP C function returns a code great than or
+     *            equal to Gdp20Library.EP_STAT_SEV_WARN.
      */
-    public static void create(GDP_NAME logName, GDP_NAME logdName) throws GDPException {
+    public static void create(GDP_NAME logName, GDP_NAME logdName)
+                                            throws GDPException {
         GDP_GIN.create(logName, logdName, new HashMap<Integer, byte[]>());
     }
 
@@ -327,13 +323,17 @@ public class GDP_GIN {
      * creating a GCL from JavaScript.
      *
      * @param name   Name of the log.
-     * @param iomode Opening mode (0: for internal use only, 1: read-only, 2: read-append, 3: append-only)
+     * @param iomode Opening mode (0: for internal use only,
+     *        1: read-only, 2: read-append, 3: append-only)
      * @param logdName  Name of the log server where this should be 
      *                  placed if it does not yet exist.
-     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp20Library.EP_STAT_SEV_WARN.
+     * @exception GDPException If a GDP C function returns a code great than or
+     *            equal to Gdp20Library.EP_STAT_SEV_WARN.
      */
-    public static GDP_GIN newGCL(GDP_NAME name, int iomode, GDP_NAME logdName) throws GDPException {
-        System.out.println("GDP_GIN.java: newGCL(" + name + ", " + iomode + ", " + logdName + ")");
+    public static GDP_GIN newGCL(GDP_NAME name, int iomode, GDP_NAME logdName)
+                                                          throws GDPException {
+        System.out.println("GDP_GIN.java: newGCL(" + name + 
+                                ", " + iomode + ", " + logdName + ")");
         // The GDP Accessor uses this method
         GDP_MODE gdp_mode = GDP_MODE.ANY;
         switch (iomode) {
@@ -350,9 +350,12 @@ public class GDP_GIN {
             gdp_mode = GDP_MODE.RA;
             break;
         default:
-            throw new IllegalArgumentException("Mode must be 0-3, instead it was: " + iomode);
+            throw new IllegalArgumentException(
+                            "Mode must be 0-3, instead it was: " + iomode);
         }
-        return new GDP_GIN(name, gdp_mode, logdName);
+
+        GDP_GIN.create(name, logdName);
+        return new GDP_GIN(name, gdp_mode);
     }
 
     /**
@@ -360,9 +363,11 @@ public class GDP_GIN {
      * 
      * @param recno Record number to be read
      * @return A hashmap containing the data just read
-     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp20Library.EP_STAT_SEV_WARN.
+     * @exception GDPException If a GDP C function returns a code great than or
+     *            equal to Gdp20Library.EP_STAT_SEV_WARN.
      */
-    public HashMap<String, Object> read_by_recno(long recno) throws GDPException {
+    public HashMap<String, Object> read_by_recno(long recno)
+                                            throws GDPException {
         EP_STAT estat;
         GDP_DATUM datum = new GDP_DATUM();
                 
@@ -396,9 +401,11 @@ public class GDP_GIN {
      * 
      * @param firstrec  The record num to start reading from
      * @param numrecs   Max number of records to be returned. 
-     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp20Library.EP_STAT_SEV_WARN.
+     * @exception GDPException If a GDP C function returns a code great than or
+     *            equal to Gdp20Library.EP_STAT_SEV_WARN.
      */
-    public void read_by_recno_async(long firstrec, int numrecs) throws GDPException {
+    public void read_by_recno_async(long firstrec, int numrecs)
+                                                throws GDPException {
 
         EP_STAT estat;
         _checkGclh(ginh);
@@ -418,7 +425,8 @@ public class GDP_GIN {
      * @param firstrec  The record num to start the subscription from
      * @param numrecs   Max number of records to be returned. 0 => infinite
      * @param timeout   Timeout for this subscription
-     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp20Library.EP_STAT_SEV_WARN.
+     * @exception GDPException If a GDP C function returns a code great than or
+     *            equal to Gdp20Library.EP_STAT_SEV_WARN.
      */
     public void subscribe_by_recno(long firstrec, int numrecs,
                         EP_TIME_SPEC timeout) throws GDPException {

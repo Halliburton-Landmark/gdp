@@ -42,10 +42,15 @@ public class HelloWorld {
             GDP.gdp_init();
             GDP.dbg_set("*=10");
 
-            String logname = "edu.berkeley.eecs.mor.20160131_182143";
+            if (args.length < 1) {
+                System.out.println("Usage: <logname>");
+                return;
+            }
+
+            String logname = args[0];
             GDP_NAME gn = new GDP_NAME(logname);
             System.out.println("Creating object");
-            GDP_GIN g = new GDP_GIN(gn, GDP_GIN.GDP_MODE.RA, new GDP_NAME("gdplogd.mor"));
+            GDP_GIN g = new GDP_GIN(gn, GDP_GIN.GDP_MODE.RA);
 
             /*
               g.subscribe(0,3);
