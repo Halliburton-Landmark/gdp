@@ -98,7 +98,7 @@ public class GDP {
         int EP_STAT_SEVERITY = (code >>> Gdp20Library._EP_STAT_SEVSHIFT)
                 & ((1 << Gdp20Library._EP_STAT_SEVBITS) - 1);
 
-	//System.out.println("check_EP_STAT(" + estat.code + ") " + ep_stat_toStr(estat));
+        //System.out.println("check_EP_STAT(" + estat.code + ") " + ep_stat_toStr(estat));
 
         return (EP_STAT_SEVERITY < Gdp20Library.EP_STAT_SEV_WARN);
     }
@@ -112,9 +112,9 @@ public class GDP {
      */
     public static void check_EP_STAT(EP_STAT estat, String message)
             throws GDPException {
-	if (!check_EP_STAT(estat)) {
-	    throw new GDPException(message, estat);
-	}
+        if (!check_EP_STAT(estat)) {
+            throw new GDPException(message, estat);
+        }
     }
 
     /** Given a EP_STAT, return the description of the status.
@@ -122,10 +122,10 @@ public class GDP {
      *  @return The status
      */
     public static String ep_stat_toStr(EP_STAT estat) {
-	int length = 200;
-	ByteBuffer buffer = ByteBuffer.allocate(length);
-	Pointer statusMessage = Gdp20Library.INSTANCE.ep_stat_tostr((EP_STAT.ByValue)estat, buffer, new NativeSize(length));
-	return new String(buffer.array()).trim();
+        int length = 200;
+        ByteBuffer buffer = ByteBuffer.allocate(length);
+        Pointer statusMessage = Gdp20Library.INSTANCE.ep_stat_tostr((EP_STAT.ByValue)estat, buffer, new NativeSize(length));
+        return new String(buffer.array()).trim();
     }
 
     public static final int GDP_MD_XID     = 0x00584944; 
