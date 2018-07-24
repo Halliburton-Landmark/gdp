@@ -28,7 +28,7 @@ cd $dir
 ver=$major.$minor
 case "$OS" in
   "ubuntu" | "debian" | "freebsd" | "centos")
-    	rm -f lib$lib.so.$major lib$lib.so
+    	rm -f lib$lib.so.$major lib$lib.so lib$lib.$ver.so
 	ln -s lib$lib.so.$ver lib$lib.so.$major
 	ln -s lib$lib.so.$major lib$lib.so
 	ln -s lib$lib.so.$ver lib$lib.$ver.so
