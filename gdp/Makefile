@@ -141,6 +141,7 @@ LIBEVENT2=	-levent -levent_pthreads
 LIBCRYPTO=	-lcrypto
 LIBPROTO_C=	-lprotobuf-c
 LIBAVAHI=	-lavahi-client -lavahi-common
+LIBUUID=    -luuid
 INCEP=		-I${INCROOT}
 LIBEP=		-lep
 INCS=		${INCSEARCH} ${INCEP} ${INCEVENT2} ${INCAVAHI}
@@ -154,7 +155,8 @@ LDLIBS=		${LIBEP} \
 		${LIBEVENT2} \
 		${LIBCRYPTO} \
 		${LIBPROTO_C} \
-		${LIBAVAHI}
+		${LIBAVAHI} \
+		${LIBUUID}
 CC=		cc
 PG=
 WALL=		-Wall
