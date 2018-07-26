@@ -196,14 +196,20 @@ typedef void			(*gdp_event_cbfunc_t)(	// the callback function
 
 //extern struct event_base		*GdpIoEventBase;	// the base for GDP I/O events
 
-// initialize the library
+// initialize the GDP library, inc running event loop, system connect, etc.
 extern EP_STAT	gdp_init(
 					const char *gdpd_addr);	// address of gdpd
 
 // pre-initialize the library (gdp_init does this -- rarely needed)
+// includes event loop setup (not run), cache setup, signal handling
 EP_STAT			gdp_lib_init(
 					const char *progname,
 					const char *my_routing_name);
+
+// pre-pre-initialize basic libraries (gdp_lib_init does this -- only
+// used by programs that don't actually talk to the GDP itself)
+EP_STAT			gdp_init_phase_0(
+					const char *progname);
 
 // run event loop (normally run from gdp_init; never returns)
 extern void		*gdp_run_accept_event_loop(
@@ -381,8 +387,22 @@ EP_STAT			gdp_internal_name(
 
 // parse a (possibly human-friendly) GDP object name
 EP_STAT			gdp_parse_name(
-					const char *ext,
-					gdp_name_t internal);
+					const char *xname,
+					gdp_name_t gname);
+
+EP_STAT			gdp_name_resolve(
+					const char *xname,
+					gdp_name_t gname);
+
+EP_STAT			gdp_name_update(
+					const char *xname,
+					const gdp_name_t gname);
+
+EP_STAT			gdp_name_root_set(
+					const char *root);
+
+const char		*gdp_name_root_get(
+					void);
 
 // get the number of records in the log
 extern gdp_recno_t	gdp_gin_getnrecs(

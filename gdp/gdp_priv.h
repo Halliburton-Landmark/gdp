@@ -135,6 +135,13 @@ gdp_buf_t		*_gdp_sig_getbuf(gdp_sig_t *sig);
 
 
 /*
+**  Names
+*/
+
+void			_gdp_name_init(void);	// initialize name resolution
+
+
+/*
 **	 Datums
 **		These are the underlying data unit that is passed through a GOB.
 **

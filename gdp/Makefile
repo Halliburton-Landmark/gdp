@@ -133,6 +133,7 @@ ALL=		${CLEANALL} ${PUBALL}
 INCROOT=	..
 INCSEARCH=	${INCLOCAL} \
 		-I${INCROOT} \
+		`mysql_config --include` \
 		-I${LOCAL1}/include \
 		-I${LOCAL2}/include \
 		-I${LOCAL3}/include
@@ -141,11 +142,14 @@ LIBEVENT2=	-levent -levent_pthreads
 LIBCRYPTO=	-lcrypto
 LIBPROTO_C=	-lprotobuf-c
 LIBAVAHI=	-lavahi-client -lavahi-common
+LIBSQLITE=	-lsqlite3
+LIBADD=
 INCEP=		-I${INCROOT}
 LIBEP=		-lep
 INCS=		${INCSEARCH} ${INCEP} ${INCEVENT2} ${INCAVAHI}
 LIBSEARCH=	${LIBLOCAL} \
 		-L${LIBROOT}/ep \
+		`mysql_config --libs` \
 		-L${LOCAL1}/lib \
 		-L${LOCAL2}/lib \
 		-L${LOCAL3}/lib
@@ -154,7 +158,9 @@ LDLIBS=		${LIBEP} \
 		${LIBEVENT2} \
 		${LIBCRYPTO} \
 		${LIBPROTO_C} \
-		${LIBAVAHI}
+		${LIBAVAHI} \
+		${LIBSQLITE} \
+		${LIBADD}
 CC=		cc
 PG=
 WALL=		-Wall

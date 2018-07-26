@@ -129,7 +129,11 @@ main(int argc, char **argv)
 	if (show_usage || argc != 1)
 		usage();
 
-	// don't really need to initialize the GDP library for this
+	// don't really need to initialize the GDP library for this, but
+	// we do need the name lookup part of this --- cheat and use
+	// an internal interface.
+	gdp_init_phase_0(NULL);
+
 	if (parse_hex(argv[0], gdpiname) != 0)
 		gdp_parse_name(argv[0], gdpiname);
 	gdp_printable_name(gdpiname, gdppname);

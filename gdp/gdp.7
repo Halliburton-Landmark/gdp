@@ -296,6 +296,31 @@ If it does not get a response in this many milliseconds
 it will retry.
 Defaults to 10000 (ten seconds).
 .
+.It swarm.gdp.namedb.database
+The name of the database holding the mapping.
+Defaults to
+.Li gdp_names .
+.
+.It swarm.gdp.namedb.host
+The DNS name of the host on which the database resides.
+Currently no default; this must be set.
+.
+.It swarm.gdp.namedb.passwd
+The password for the database user.
+Defaults to the empty string,
+as appropriate for anonymous users.
+.
+.It swarm.gdp.namedb.table
+The name of the table with the mappings.
+Defaults to
+.Li gdp_names .
+.
+.It swarm.gdp.namedb.user
+The name of the database user to do the update.
+This user must have INSERT permission on the database.
+Defaults to
+.Li anonymous .
+.
 .It swarm.gdp.reconnect.delay
 If a GDP application (either client or server) loses contact with
 the routing layer, it will sleep this number of milliseconds
@@ -323,7 +348,7 @@ If that user id is unknown, switch to
 .Li 1:1
 (generally
 .Li daemon
-on most systems.
+on most systems).
 If the parameter is not specified at all no special processing takes place.
 Can be overridden on a per-program basis.
 .
@@ -422,10 +447,10 @@ change to this user id.
 Overrides
 .Va swarm.gdp.runasuser .
 .El
-
+.
 .Sh SEE ALSO
 .Xr gdplogd 8
-
+.
 .Sh BUGS
 Routers should be discovered rather than configured in.
 .Pp

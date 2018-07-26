@@ -94,6 +94,7 @@ LIBCRYPTO=	-lcrypto
 LIBPROTO_C=	-lprotobuf-c
 LIBAVAHI=	-lavahi-client -lavahi-common
 LIBSQLITE=	-lsqlite3
+LIBMYSQL=	`mysql_config --libs`
 LIBADD=		`sh ../adm/add-libs.sh gdplogd`
 INCS=		${INCSEARCH} ${INCGDP} ${INCEP}
 LDFLAGS+=	${LIBSEARCH}
@@ -104,6 +105,7 @@ LDLIBS=		${LIBGDP} \
 		${LIBPROTO_C} \
 		${LIBAVAHI} \
 		${LIBSQLITE} \
+		${LIBMYSQL} \
 		${LIBADD}
 CC=		cc
 PG=

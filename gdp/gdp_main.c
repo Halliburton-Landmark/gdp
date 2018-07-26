@@ -941,6 +941,43 @@ siginfo(int sig, short what, void *arg)
 
 
 /*
+**  Initialization, Part 0:
+**		Initialize external libraries.
+**
+**		Used by a few of the utility routines, but unusual in that
+**		it doesn't actually start up GDP communications.
+*/
+
+EP_STAT
+gdp_init_phase_0(const char *progname)
+{
+	ep_dbg_cprintf(Dbg, 4, "gdp_init_phase_0: %s\n", GdpVersion);
+
+	// initialize the EP library
+	ep_lib_init(EP_LIB_USEPTHREADS);
+
+	// initialize runtime parameters
+	ep_adm_readparams("gdp");
+	if (progname == NULL)
+		progname = ep_app_getprogname();
+	if (progname != NULL)
+		ep_adm_readparams(progname);
+	ep_crypto_init(0);
+
+	// clear out spurious errors
+	errno = 0;
+
+	// we can now re-adjust debugging
+	ep_dbg_setfile(NULL);
+
+	// register status strings
+	_gdp_stat_init();
+
+	return EP_STAT_OK;
+}
+
+
+/*
 **  Initialization, Part 1:
 **		Initialize the various external libraries.
 **		Set up the I/O event loop base.
@@ -956,16 +993,17 @@ gdp_lib_init(const char *progname, const char *myname)
 {
 	EP_STAT estat = EP_STAT_OK;
 
-	ep_dbg_cprintf(Dbg, 4, "_gdp_lib_init(%s)\n\t%s\n",
-			myname == NULL ? "NULL" : myname,
-			GdpVersion);
-
-	// initialize the EP library
-	ep_lib_init(EP_LIB_USEPTHREADS);
+	ep_dbg_cprintf(Dbg, 4, "_gdp_lib_init(%s)\n",
+			myname == NULL ? "NULL" : myname);
 
 	ep_thr_mutex_lock(&GdpInitMutex);
 	if (_GdpLibInitialized)
 		goto done;
+
+	gdp_init_phase_0(progname);
+
+	// initialize external -> internal name mapping
+	_gdp_name_init();
 
 	if (ep_dbg_test(EvlibDbg, 80))
 	{
@@ -974,19 +1012,6 @@ gdp_lib_init(const char *progname, const char *myname)
 		// according to the code...
 		event_enable_debug_mode();
 	}
-
-	ep_adm_readparams("gdp");
-	if (progname == NULL)
-		progname = ep_app_getprogname();
-	if (progname != NULL)
-		ep_adm_readparams(progname);
-	ep_crypto_init(0);
-
-	// clear out spurious errors
-	errno = 0;
-
-	// we can now re-adjust debugging
-	ep_dbg_setfile(NULL);
 
 	// arrange to call atexit(3) functions on SIGTERM
 	if (ep_adm_getboolparam("swarm.gdp.catch.sigint", true))
@@ -1004,9 +1029,6 @@ gdp_lib_init(const char *progname, const char *myname)
 									true);
 	_GdpRunRespInThread = ep_adm_getboolparam("swarm.gdp.response.runinthread",
 									false);
-
-	// register status strings
-	_gdp_stat_init();
 
 	// figure out or generate our name (for routing)
 	if (myname == NULL && progname != NULL)

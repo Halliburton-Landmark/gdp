@@ -58,6 +58,10 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
+// allow environment to override admin parameters
+#ifndef EP_CONF_ADM_ENV_OVERRIDE
+# define EP_CONF_ADM_ENV_OVERRIDE	1
+#endif
 
 static EP_HASH	*ParamHash;
 
@@ -230,6 +234,16 @@ getparamval(
 {
 	static bool recurse = false;
 	extern bool _EpLibInitialized;
+
+#if EP_CONF_ADM_ENV_OVERRIDE
+	// allow environment to override admin parameters
+	if (getuid() == geteuid() && getuid() != 0)
+	{
+		const char *val = getenv(pname);
+		if (val != NULL)
+			return val;
+	}
+#endif
 
 	// don't allow recursive calls or use before initialization
 	if (recurse | !_EpLibInitialized)

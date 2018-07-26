@@ -89,6 +89,8 @@ static struct ep_stat_to_string Stats[] =
 	{ GDP_STAT_METADATA_REQUIRED,		"logs must have metadata",			},
 	{ GDP_STAT_RESPONSE_SENT,			"response already sent",			},
 	{ GDP_STAT_NO_METADATA,				"GDP log has no metadata",			},
+	{ GDP_STAT_NAME_UNKNOWN,			"cannot resolve GDP name",			},
+	{ GDP_STAT_MYSQL_ERROR,				"other mysql error",				},
 
 	// codes corresponding to command responses
 	{ GDP_STAT_ACK_END_OF_RESULTS,		"263 end of results",				},

@@ -3,6 +3,7 @@ gdp-create
 gdp-delete
 gdp-find-xname
 gdp-log-check
+gdp-name-add
 gdp-name-xlate
 gdp-newsegment
 gdp-rest

@@ -39,6 +39,7 @@ BINALL=		\
 SBINALL_ZC= 	gdp-zcpublish
 SBINALL=	\
 		gdp-find-xname \
+		gdp-name-add \
 		gdp-name-xlate \
 		gdp-delete \
 		$(SBINALL_ZC) \
@@ -111,6 +112,7 @@ LIBJANSSON=	-ljansson
 LIBEVENT2=	-levent -levent_pthreads -pthread
 LIBCRYPTO=	-lcrypto
 LIBPROTO_C=	-lprotobuf-c
+LIBMYSQL=	`mysql_config --libs`
 LIBADD=		`sh ../adm/add-libs.sh`
 INCS=		${INCSEARCH} ${INCGDP} ${INCEP}
 LDFLAGS+=	${LIBSEARCH}
@@ -120,6 +122,7 @@ LDLIBS=		${LIBGDP} \
 		${LIBCRYPTO} \
 		${LIBPROTO_C} \
 		${LIBJANSSON} \
+		${LIBMYSQL} \
 		${LIBADD}
 PG=
 WALL=		-Wall
@@ -138,6 +141,9 @@ all_noavahi:
 	${MAKE}	STD=-DGDP_OSCF_USE_ZEROCONF=0 LIBAVAHI= BINALL_ZC= SBINALL_ZC= all
 
 gdp-log-check.o: ../gdplogd/logd_disklog.c ../gdplogd/logd_gcl.c
+
+gdp-name-add.o: gdp-name-add.c
+	${CC} -c -o $@ ${CFLAGS} `mysql_config --cflags` gdp-name-add.c
 
 gdp-rest:	gdp-rest.c ../scgilib/scgilib.o
 	${CC} ${INCS} -o $@ ${LDFLAGS} gdp-rest.c ${LDLIBS} ../scgilib/scgilib.o

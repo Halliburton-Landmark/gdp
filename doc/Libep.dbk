@@ -2278,6 +2278,15 @@ ep_logv(
       arguments or X Resource names, e.g.,
       "<varname>libep.stream.hfile.bsize</varname>". You must read one or more
       parameter files before getting parameters.</para>
+
+      <para>If the <constant>EP_CONF_ADM_ENV_OVERRIDE</constant> defined
+      constant is set to <constant>1</constant> during compilation, parameters
+      can be overridden in the environment. For example,</para>
+
+      <programlisting>env swarm.gdp.routers=foo.example.com gdplogd</programlisting>
+
+      <para>This only works if the program is running as a non-root user
+      without setuid.</para>
     </section>
 
     <section>
