@@ -40,19 +40,21 @@ package_directory = os.path.dirname(os.path.abspath(__file__))
 try:
     gdp = CDLL(os.path.join(package_directory,
            "..", "..", "..", "libs",  "libgdp.so"))
-except OSError:
+except OSError as e:
+    print e
     try:
         gdp = CDLL(os.path.join(package_directory,
-                            "..", "..", "..", "gdp",  "libgdp.so.0.9"))
+                            "..", "..", "..", "gdp",  "libgdp.so.2.0"))
     except OSError:
         gdp = CDLL(os.path.join(package_directory,
-                            "..", "..", "..", "gdp",  "libgdp.0.9.dylib"))
+                            "..", "..", "..", "gdp",  "libgdp.2.0.dylib"))
 
 #ep = CDLL(os.path.join(package_directory,
 #          "..", "..", "..", "libs", "libep.so"))
 try:
     evb = CDLL("libevent.so")       # On linux
-except OSError:
+except OSError as e:
+    print e
     try:
         # On Mac
         evb = CDLL("libevent.dylib")
