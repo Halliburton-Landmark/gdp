@@ -182,11 +182,11 @@ void			_gdp_datum_dump(		// dump data record (for debugging)
 
 gdp_hash_t		*_gdp_datum_hash(		// compute hash of datum
 						gdp_datum_t *datum,
-						const gdp_gob_t *gob);		// enclosing GOB
+						gdp_gob_t *gob);			// enclosing GOB
 
 bool			_gdp_datum_hash_equal(	// check that a hash matches the datum
 						gdp_datum_t *datum,			// the datum to check
-						const gdp_gob_t *gob,		// enclosing GOB
+						gdp_gob_t *gob,				// enclosing GOB
 						const gdp_hash_t *hash);	// the hash to check against
 
 void			_gdp_datum_digest(		// add datum to existing digest
@@ -206,6 +206,10 @@ void			_gdp_datum_from_pb(		// convert protobuf form to datum
 EP_STAT			_gdp_datum_sign(		// sign a datum
 						gdp_datum_t *datum,			// the datum to sign
 						gdp_gob_t *gob);			// the object storing it
+
+EP_STAT			_gdp_datum_vrfy_gob(	// verify a datum signature
+						gdp_datum_t *datum,
+						gdp_gob_t *gob);
 
 void			_gdp_timestamp_from_pb(	// convert protobuf form to EP_TIME_SPEC
 						EP_TIME_SPEC *ts,
@@ -257,6 +261,9 @@ struct gdp_gin
 	void				*readfpriv;		// private data for readfilter
 };
 
+#define GINF_INUSE			0x0001		// GIN is allocated
+#define GINF_ISLOCKED		0x0002		// GIN is locked
+
 // internal GDP object, shared between open instances, used in gdplogd
 struct gdp_gob
 {
@@ -273,19 +280,22 @@ struct gdp_gob
 										// called when this is freed
 	gdp_recno_t			nrecs;			// # of records (actually last recno)
 	gdp_md_t			*gob_md;		// metadata
-	EP_CRYPTO_MD		*digest;		// base crypto digest
+	EP_CRYPTO_MD		*sign_ctx;		// base digest for signature
+	EP_CRYPTO_MD		*vrfy_ctx;		// base digest for verification
 	struct gdp_gob_xtra	*x;				// for use by gdplogd, gdp-rest
 };
 
-// flags for GDP objects (* means shared with gdp_gob_inst)
-#define GOBF_DROPPING		0x0001		// handle is being deallocated
-#define GOBF_INCACHE		0x0002		// handle is in cache
-#define GOBF_ISLOCKED		0x0004		// GOB is locked *
-#define GOBF_INUSE			0x0008		// handle is allocated *
+// flags for GDP objects
+#define GOBF_INUSE			0x0001		// handle is allocated *
+#define GOBF_ISLOCKED		0x0002		// GOB is locked *
+#define GOBF_DROPPING		0x0004		// handle is being deallocated
+#define GOBF_INCACHE		0x0008		// handle is in cache
 #define GOBF_DEFER_FREE		0x0010		// defer actual free until reclaim
 #define GOBF_KEEPLOCKED		0x0020		// don't unlock in _gdp_gob_decref
 #define GOBF_PENDING		0x0040		// not yet fully open
 #define GOBF_SIGNING		0x0080		// we are signing records
+#define GOBF_VERIFYING		0x0100		// we are verifying records
+#define GOBF_VRFY_WARN		0x0200		// verification fail is a warning only
 
 
 /*
@@ -549,6 +559,9 @@ void			_gdp_gob_pr_stats(			// print (debug) GOB statistics
 
 /*
 **  GOB Open Information
+**
+**		Passed from application into library to allow for all the
+**		parameters we didn't think of when we first defined the API.
 */
 
 struct gdp_open_info
@@ -558,9 +571,13 @@ struct gdp_open_info
 							gdp_name_t	name,
 							void *signkey_udata,
 							EP_CRYPTO_KEY **);
-	void				*signkey_udata;
-	bool				keep_in_cache:1;	// defer GOB free
+	void				*signkey_udata;		// passed to signkey_cb
+	uint32_t			flags;				// see below
 };
+
+// flags values
+#define GOIF_KEEP_IN_CACHE		0x00000001	// defer GOB free
+#define GOIF_VERIFY_PROOF		0x00000002	// when reading, verify datum
 
 
 /*

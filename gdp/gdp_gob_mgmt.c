@@ -188,9 +188,11 @@ _gdp_gob_free(gdp_gob_t **pgob)
 	if (gob->gob_md != NULL)
 		gdp_md_free(gob->gob_md);
 	gob->gob_md = NULL;
-	if (gob->digest != NULL)
-		ep_crypto_md_free(gob->digest);
-	gob->digest = NULL;
+	if (gob->sign_ctx != NULL)
+		ep_crypto_md_free(gob->sign_ctx);
+	if (gob->vrfy_ctx != NULL)
+		ep_crypto_md_free(gob->vrfy_ctx);
+	gob->sign_ctx = gob->vrfy_ctx = NULL;
 
 	// if there is any "extra" data, drop that
 	//		(redundant; should be done by the freefunc)
@@ -223,14 +225,16 @@ _gdp_gob_free(gdp_gob_t **pgob)
 
 EP_PRFLAGS_DESC	_GdpGobFlags[] =
 {
+	{ GOBF_INUSE,			GOBF_INUSE,				"INUSE"				},
+	{ GOBF_ISLOCKED,		GOBF_ISLOCKED,			"ISLOCKED"			},
 	{ GOBF_DROPPING,		GOBF_DROPPING,			"DROPPING"			},
 	{ GOBF_INCACHE,			GOBF_INCACHE,			"INCACHE"			},
-	{ GOBF_ISLOCKED,		GOBF_ISLOCKED,			"ISLOCKED"			},
-	{ GOBF_INUSE,			GOBF_INUSE,				"INUSE"				},
 	{ GOBF_DEFER_FREE,		GOBF_DEFER_FREE,		"DEFER_FREE"		},
 	{ GOBF_KEEPLOCKED,		GOBF_KEEPLOCKED,		"KEEPLOCKED"		},
 	{ GOBF_PENDING,			GOBF_PENDING,			"PENDING"			},
 	{ GOBF_SIGNING,			GOBF_SIGNING,			"SIGNING"			},
+	{ GOBF_VERIFYING,		GOBF_VERIFYING,			"VERIFYING"			},
+	{ GOBF_VRFY_WARN,		GOBF_VRFY_WARN,			"VRFY_WARN"			},
 	{ 0, 0, NULL }
 };
 
@@ -276,9 +280,9 @@ _gdp_gob_dump(
 				char tbuf[40];
 				struct tm tm;
 
-				fprintf(fp, "%sfreefunc = %p, gob_md = %p, digest = %p\n",
+				fprintf(fp, "%sfreefunc = %p, gob_md = %p, sign_ctx = %p, vrfy_ctx = %p\n",
 						_gdp_pr_indent(indent),
-						gob->freefunc, gob->gob_md, gob->digest);
+						gob->freefunc, gob->gob_md, gob->sign_ctx, gob->vrfy_ctx);
 				gmtime_r(&gob->utime, &tm);
 				strftime(tbuf, sizeof tbuf, "%Y-%m-%d %H:%M:%S", &tm);
 				fprintf(fp, "%sutime = %s, x = %p\n",

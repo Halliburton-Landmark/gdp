@@ -617,79 +617,6 @@ cmd_read_by_ts(gdp_req_t *req)
 
 
 /*
-**  Initialize the digest field
-**
-**		This needs to be done during the append rather than the open
-**		so if gdplogd is restarted, existing connections will heal.
-*/
-
-static EP_STAT
-init_sig_digest(gdp_gob_t *gob)
-{
-	EP_STAT estat;
-	size_t pklen;
-	uint8_t *pkbuf;
-	int pktype;
-	int mdtype = gob->hashalg;
-	EP_CRYPTO_KEY *key;
-
-	if (gob->digest != NULL)
-		return EP_STAT_OK;
-
-	// assuming we have a public key, set up the message digest context
-	EP_ASSERT_ELSE(gob->gob_md != NULL, return GDP_STAT_NO_METADATA);
-	estat = gdp_md_find(gob->gob_md, GDP_MD_PUBKEY, &pklen,
-					(const void **) &pkbuf);
-	if (!EP_STAT_ISOK(estat) || pklen < 5)
-		goto nopubkey;
-
-	mdtype = pkbuf[0];
-	pktype = pkbuf[1];
-	ep_dbg_cprintf(Dbg, 40, "init_sig_data: mdtype=%d, pktype=%d, pklen=%zd\n",
-			mdtype, pktype, pklen);
-	key = ep_crypto_key_read_mem(pkbuf + 4, pklen - 4,
-			EP_CRYPTO_KEYFORM_DER, EP_CRYPTO_F_PUBLIC);
-	if (key != NULL)
-	{
-		gob->digest = ep_crypto_vrfy_new(key, mdtype);
-		gob->flags |= GOBF_SIGNING;
-	}
-	else
-	{
-nopubkey:
-		if (EP_UT_BITSET(GDP_SIG_PUBKEYREQ, GdpSignatureStrictness))
-		{
-			ep_dbg_cprintf(Dbg, 1, "ERROR: no public key for %s\n",
-						gob->pname);
-			estat = GDP_STAT_CRYPTO_SIGFAIL;
-		}
-		else
-		{
-			ep_dbg_cprintf(Dbg, 52, "WARNING: no public key for %s\n",
-						gob->pname);
-			estat = EP_STAT_OK;
-		}
-
-		// still need to compute the digest for the hash chain
-		gob->digest = ep_crypto_md_new(mdtype);
-	}
-
-	// include the GOB name
-	ep_crypto_md_update(gob->digest, gob->name, sizeof gob->name);
-
-	// and the metadata (re-serialized)
-	{
-		uint8_t *mdbuf;
-		size_t mdlen = _gdp_md_serialize(gob->gob_md, &mdbuf);
-		ep_crypto_md_update(gob->digest, mdbuf, mdlen);
-		ep_mem_free(mdbuf);
-	}
-
-	return estat;
-}
-
-
-/*
 **  CMD_APPEND --- append a datum to a GOB
 **
 **		This will have side effects if there are subscriptions pending.
@@ -784,13 +711,6 @@ cmd_append(gdp_req_t *req)
 		}
 	}
 
-	// validate signature of the last datum in PDU
-	if (req->gob->digest == NULL)
-	{
-		estat = init_sig_digest(req->gob);
-		EP_STAT_CHECK(estat, goto fail1);
-	}
-
 	// only path to datum is via this req, so we don't have to lock it
 	gdp_datum_t *datum = gdp_datum_new();
 	_gdp_datum_from_pb(datum, pbd, pbd->sig);
@@ -817,28 +737,9 @@ cmd_append(gdp_req_t *req)
 	}
 	else
 	{
-		// check the signature
-		size_t len;
-		EP_CRYPTO_MD *md = ep_crypto_md_clone(req->gob->digest);
-
-		_gdp_datum_digest(datum, md);	//FIXME: what?
-		len = pbd->sig->sig.len;
-		estat = ep_crypto_vrfy_final(md, pbd->sig->sig.data, len);
-		ep_crypto_md_free(md);
-		if (!EP_STAT_ISOK(estat))
-		{
-			// error: signature failure
-			if (EP_UT_BITSET(GDP_SIG_MUSTVERIFY, GdpSignatureStrictness))
-			{
-				ep_dbg_cprintf(Dbg, 1, "cmd_append: signature failure (fail)\n");
-				goto fail1;
-			}
-			ep_dbg_cprintf(Dbg, 31, "cmd_append: signature failure (warn)\n");
-		}
-		else
-		{
-			ep_dbg_cprintf(Dbg, 51, "cmd_append: good signature\n");
-		}
+		// validate signature of the last datum in PDU
+		estat = _gdp_datum_vrfy_gob(datum, req->gob);
+		EP_STAT_CHECK(estat, goto fail1);
 	}
 
 	// append records to long term storage

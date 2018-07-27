@@ -438,6 +438,11 @@ EP_STAT				gdp_open_info_set_caching(
 						gdp_open_info_t *info,
 						bool keep_in_cache);
 
+// set data verification behavior
+EP_STAT				gdp_open_info_set_vrfy(
+						gdp_open_info_t *info,
+						bool verify_proof);
+
 /*
 **  Metadata handling
 */
@@ -506,6 +511,11 @@ bool			gdp_datum_hash_equal(
 						gdp_datum_t *datum,
 						const gdp_gin_t *gin,
 						const gdp_hash_t *hash);
+
+// check the signature on a datum
+EP_STAT			gdp_datum_vrfy(
+						gdp_datum_t *datum,
+						gdp_gin_t *gin);
 
 // print out data record
 extern void		gdp_datum_print(

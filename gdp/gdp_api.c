@@ -128,7 +128,7 @@ _gdp_gin_lock_trace(gdp_gin_t *gin,
 					const char *id)
 {
 	_ep_thr_mutex_lock(&gin->mutex, file, line, id);
-	gin->flags |= GOBF_ISLOCKED;
+	gin->flags |= GINF_ISLOCKED;
 }
 
 void
@@ -137,9 +137,17 @@ _gdp_gin_unlock_trace(gdp_gin_t *gin,
 					int line,
 					const char *id)
 {
-	gin->flags &= ~GOBF_ISLOCKED;
+	gin->flags &= ~GINF_ISLOCKED;
 	_ep_thr_mutex_unlock(&gin->mutex, file, line, id);
 }
+
+
+EP_PRFLAGS_DESC	_GdpGinFlags[] =
+{
+	{ GINF_INUSE,				GINF_INUSE,			"INUSE"				},
+	{ GINF_ISLOCKED,			GINF_ISLOCKED,		"ISLOCKED"			},
+	{ 0, 0, NULL }
+};
 
 void
 _gdp_gin_dump(
@@ -147,7 +155,6 @@ _gdp_gin_dump(
 		FILE *fp,
 		int detail)
 {
-	extern EP_PRFLAGS_DESC _GdpGobFlags[];	// defined in gdp_gob_mgmt.c
 	int indent = 1;
 
 	if (fp == NULL)
@@ -175,7 +182,7 @@ _gdp_gin_dump(
 			VALGRIND_HG_ENABLE_CHECKING(gob, sizeof *gob);
 		}
 		fprintf(fp, "%sflags = ", _gdp_pr_indent(indent));
-		ep_prflags(gin->flags, _GdpGobFlags, fp);
+		ep_prflags(gin->flags, _GdpGinFlags, fp);		//XXX FIXME
 
 		if (detail >= GDP_PR_BASIC)
 		{
@@ -210,7 +217,7 @@ check_and_lock_gin(gdp_gin_t *gin, const char *where)
 	if (gin == NULL)
 		return bad_gin(gin, where, "null gin");
 	_gdp_gin_lock(gin);
-	if (!EP_UT_BITSET(GOBF_INUSE, gin->flags))
+	if (!EP_UT_BITSET(GINF_INUSE, gin->flags))
 	{
 		_gdp_gin_unlock(gin);
 		return bad_gin(gin, where, "gin not inuse");
@@ -262,7 +269,7 @@ _gdp_gin_new(gdp_gob_t *gob)
 		if ((gin = SLIST_FIRST(&GinFreeList)) != NULL)
 			SLIST_REMOVE_HEAD(&GinFreeList, next);
 		ep_thr_mutex_unlock(&GinFreeListMutex);
-		if (gin == NULL || !EP_UT_BITSET(GOBF_INUSE, gin->flags))
+		if (gin == NULL || !EP_UT_BITSET(GINF_INUSE, gin->flags))
 			break;
 
 		// gin from freelist is allocated --- abandon it
@@ -276,7 +283,7 @@ _gdp_gin_new(gdp_gob_t *gob)
 		ep_thr_mutex_setorder(&gin->mutex, GDP_MUTEX_LORDER_GIN);
 	}
 
-	gin->flags = GOBF_INUSE;
+	gin->flags = GINF_INUSE;
 	gin->gob = gob;
 
 	VALGRIND_HG_CLEAN_MEMORY(gin, sizeof gin);
@@ -290,7 +297,7 @@ _gdp_gin_free(gdp_gin_t *gin)
 	ep_dbg_cprintf(Dbg, 28, "_gdp_gin_free(%p)\n", gin);
 	if (gin == NULL)
 		return;
-	if (!EP_ASSERT(EP_UT_BITSET(GOBF_INUSE, gin->flags)))
+	if (!EP_ASSERT(EP_UT_BITSET(GINF_INUSE, gin->flags)))
 		return;
 	GDP_GIN_ASSERT_ISLOCKED(gin);
 
@@ -507,6 +514,7 @@ gdp_gin_open(gdp_name_t name,
 {
 	EP_STAT estat;
 	gdp_gob_t *gob = NULL;
+	gdp_gin_t *gin = NULL;
 	gdp_cmd_t cmd;
 
 	if (ep_dbg_test(Dbg, 19))
@@ -554,23 +562,33 @@ gdp_gin_open(gdp_name_t name,
 		EP_STAT_CHECK(estat, goto fail0);
 	}
 
-	if (open_info != NULL && open_info->keep_in_cache)
+	if (open_info != NULL && EP_UT_BITSET(GOIF_KEEP_IN_CACHE, open_info->flags))
 	{
 		gob->flags |= GOBF_DEFER_FREE;
 		_gdp_reclaim_resources_init(NULL);
 	}
 	gob->flags &= ~GOBF_PENDING;
-	*pgin = _gdp_gin_new(gob);
+	gin = _gdp_gin_new(gob);
 	_gdp_gob_unlock(gob);
 
 fail0:
+	if (EP_STAT_ISOK(estat))
+	{
+		*pgin = gin;
+	}
+	else
+	{
+		if (gob != NULL)
+			_gdp_gob_free(&gob);
+	}
+
 	if (gob != NULL && !EP_STAT_ISOK(estat))
 		_gdp_gob_free(&gob);
 	ep_thr_mutex_unlock(&OpenMutex);
-	prstat(estat, *pgin, "gdp_open");
+	prstat(estat, gin, "gdp_open");
 	if (ep_dbg_test(Dbg, 10))
 	{
-		_gdp_gin_dump(*pgin, NULL, GDP_PR_DETAILED);
+		_gdp_gin_dump(gin, NULL, GDP_PR_DETAILED);
 		if (ep_dbg_test(Dbg, 14))
 			_gdp_gob_dump(gob, NULL, GDP_PR_BASIC, 0);
 	}
@@ -1060,6 +1078,24 @@ gdp_open_info_set_caching(
 		bool keep_in_cache)
 {
 	//XXX should check for info == NULL here
-	info->keep_in_cache = keep_in_cache;
+	if (keep_in_cache)
+		info->flags |= GOIF_KEEP_IN_CACHE;
+	else
+		info->flags &= ~GOIF_KEEP_IN_CACHE;
+	return EP_STAT_OK;
+}
+
+EP_STAT
+gdp_open_info_set_vrfy(
+		gdp_open_info_t *info,
+		bool verify_proof)
+{
+	//XXX should check for info == NULL here
+	//XXX ideally this would check to make sure we have a public key,
+	//XXX	but that isn't possible yet.
+	if (verify_proof)
+		info->flags |= GOIF_VERIFY_PROOF;
+	else
+		info->flags &= ~GOIF_VERIFY_PROOF;
 	return EP_STAT_OK;
 }

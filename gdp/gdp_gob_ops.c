@@ -281,24 +281,24 @@ find_secret_key(gdp_gob_t *gob,
 	}
 
 	// set up the signing context (doubles as a message digest)
-	gob->digest = ep_crypto_sign_new(secretkey, md_alg_id);
+	gob->sign_ctx = ep_crypto_sign_new(secretkey, md_alg_id);
 
 	// we can release the key now
 	if (my_secretkey)
 		ep_crypto_key_free(secretkey);
 
-	if (gob->digest == NULL)
+	if (gob->sign_ctx == NULL)
 		return EP_STAT_CRYPTO_DIGEST;
 
 	// add the GOB name to the hashed message digest
-	ep_crypto_sign_update(gob->digest, gob->name, sizeof gob->name);
+	ep_crypto_sign_update(gob->sign_ctx, gob->name, sizeof gob->name);
 
 	// re-serialize the metadata and include it
 	{
 		uint8_t *mdbuf;
 		size_t mdlen;
 		mdlen = _gdp_md_serialize(gob->gob_md, &mdbuf);
-		ep_crypto_sign_update(gob->digest, mdbuf, mdlen);
+		ep_crypto_sign_update(gob->sign_ctx, mdbuf, mdlen);
 		ep_mem_free(mdbuf);
 	}
 
@@ -343,14 +343,13 @@ _gdp_gob_open(gdp_gob_t *gob,
 	EP_STAT_CHECK(estat, goto fail0);
 	msg = req->rpdu->msg;
 	EP_ASSERT(msg != NULL);
-	if (msg->body_case !=
-			GDP_MESSAGE__BODY_ACK_SUCCESS)
+	if (msg->body_case != GDP_MESSAGE__BODY_ACK_SUCCESS)
 	{
 		ep_dbg_cprintf(Dbg, 1,
 				"_gdp_gob_open: unexpected response type %d (expected %d)\n",
 				msg->body_case,
 				GDP_MESSAGE__BODY_ACK_SUCCESS);
-		//estat = ???;
+		//XXX: estat = ???;
 	}
 	else
 	{
@@ -369,25 +368,25 @@ _gdp_gob_open(gdp_gob_t *gob,
 	if (cmd == GDP_CMD_OPEN_AO || cmd == GDP_CMD_OPEN_RA)
 		estat = find_secret_key(gob, open_info);
 
-	if (gob->digest == NULL)
+	if (gob->vrfy_ctx == NULL)
 	{
 		// not signing, but we still need to set up the message digest
-		gob->digest = ep_crypto_md_new(gob->hashalg);
-		if (gob->digest == NULL)
+		gob->vrfy_ctx = ep_crypto_md_new(gob->hashalg);
+		if (gob->vrfy_ctx == NULL)
 		{
 			estat = EP_STAT_CRYPTO_DIGEST;
 			goto fail0;
 		}
 
 		// add the GOB name to the hashed message digest
-		ep_crypto_md_update(gob->digest, gob->name, sizeof gob->name);
+		ep_crypto_md_update(gob->vrfy_ctx, gob->name, sizeof gob->name);
 
 		// re-serialize the metadata and include it
 		{
 			uint8_t *mdbuf;
 			size_t mdlen;
 			mdlen = _gdp_md_serialize(gob->gob_md, &mdbuf);
-			ep_crypto_md_update(gob->digest, mdbuf, mdlen);
+			ep_crypto_md_update(gob->vrfy_ctx, mdbuf, mdlen);
 			ep_mem_free(mdbuf);
 		}
 	}
