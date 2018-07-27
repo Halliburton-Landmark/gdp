@@ -143,13 +143,13 @@ LIBCRYPTO=	-lcrypto
 LIBPROTO_C=	-lprotobuf-c
 LIBAVAHI=	-lavahi-client -lavahi-common
 LIBSQLITE=	-lsqlite3
-LIBADD=
+LIBMYSQL=	`mysql_config --libs`
+LIBADD=		`sh ../adm/add-libs.sh libgdp`
 INCEP=		-I${INCROOT}
 LIBEP=		-lep
 INCS=		${INCSEARCH} ${INCEP} ${INCEVENT2} ${INCAVAHI}
 LIBSEARCH=	${LIBLOCAL} \
 		-L${LIBROOT}/ep \
-		`mysql_config --libs` \
 		-L${LOCAL1}/lib \
 		-L${LOCAL2}/lib \
 		-L${LOCAL3}/lib
@@ -160,6 +160,7 @@ LDLIBS=		${LIBEP} \
 		${LIBPROTO_C} \
 		${LIBAVAHI} \
 		${LIBSQLITE} \
+		${LIBMYSQL} \
 		${LIBADD}
 CC=		cc
 PG=
