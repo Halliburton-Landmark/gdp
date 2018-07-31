@@ -693,7 +693,6 @@ struct gdp_req
 									// do post processing after ack sent
 	gdp_event_cbfunc_t	sub_cbfunc;	// callback function (subscribe & async I/O)
 	void				*sub_cbarg;	// user-supplied opaque data to cb
-	EP_CRYPTO_MD		*digest;	// message digest context
 
 	// these are only of interest in clients, never in gdplogd
 	gdp_gin_t			*gin;		// GIN handle (client only, may be NULL)

@@ -92,12 +92,10 @@ done:
 */
 
 EP_STAT
-_gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
+_gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan)
 {
 	EP_STAT estat = EP_STAT_OK;
 	gdp_buf_t *obuf = NULL;
-//	uint8_t sigbuf[EP_CRYPTO_MAX_SIG];
-//	bool use_sigbuf = false;
 	int cmd = 0;
 
 	EP_ASSERT_ELSE(pdu != NULL, return EP_STAT_ASSERT_ABORT);
@@ -121,54 +119,14 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 	obuf = gdp_buf_new();
 
 	/*
-	** Copy PDU information into Protobuf.
-	*/
-
-
-#if 0	//XXX should compute signature before calling _gdp_pdu_out
-	if (basemd != NULL && pdu->msg != NULL)
-	{
-		// compute the signature
-		EP_CRYPTO_MD *md = ep_crypto_md_clone(basemd);
-
-		if (md != NULL)
-		{
-			gdp_datum_t *datum = pdu->datum;
-			size_t siglen = sizeof sigbuf;
-			uint8_t recnobuf[8];		// 64 bits
-			uint8_t *pbp = recnobuf;
-			size_t reclen;
-
-			PUT64(datum->recno);
-			ep_crypto_sign_update(md, &recnobuf, sizeof recnobuf);
-			reclen = gdp_buf_getlength(datum->dbuf);
-			ep_crypto_sign_update(md, gdp_buf_getptr(datum->dbuf, reclen),
-					reclen);
-			ep_crypto_sign_final(md, &sigbuf, &siglen);
-			pb_sig.sig_type = datum->sigmdalg = ep_crypto_md_type(md);
-			pb_sig.sig_len = datum->siglen = siglen;
-			pb_sig.signature.len = siglen;
-			pb_sig.signature.data = sigbuf;
-			if (datum->sig != NULL)
-				gdp_buf_drain(datum->sig, gdp_buf_getlength(datum->sig));
-			use_sigbuf = true;
-			ep_crypto_sign_free(md);
-		}
-		else
-		{
-			ep_dbg_cprintf(DbgOut, 1, "_gdp_pdu_out: cannot clone message digest");
-		}
-	}
-#endif	//XXX
-	if (ep_dbg_test(DbgOut, 1))
-		flockfile(ep_dbg_getfile());
-
-	/*
 	**  Protobuf should be ready to go now --- serialize it.
 	**
 	**		Currently uses evbuffer_reserve_space to avoid another
 	**		copy.  Alternative: use evbuffer_add_reference.
 	*/
+
+	if (ep_dbg_test(DbgOut, 1))
+		flockfile(ep_dbg_getfile());
 
 	{
 		size_t pb_len;
@@ -217,8 +175,7 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan, EP_CRYPTO_MD *basemd)
 
 	if (ep_dbg_test(DbgOut, 18))
 	{
-		ep_dbg_printf("_gdp_pdu_out, chan = %p, basemd = %p:",
-				chan, basemd);
+		ep_dbg_printf("_gdp_pdu_out, chan = %p:", chan);
 		if (ep_dbg_test(DbgOut, 22))
 		{
 			ep_dbg_printf("\n");

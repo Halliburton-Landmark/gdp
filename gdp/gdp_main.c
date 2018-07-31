@@ -225,7 +225,7 @@ process_cmd(void *cpdu_)
 
 		// send response PDU if appropriate
 		req->rpdu->msg->cmd = (GdpMsgCode) resp;
-		req->stat = _gdp_pdu_out(req->rpdu, req->chan, NULL);
+		req->stat = _gdp_pdu_out(req->rpdu, req->chan);
 		//XXX anything to do with estat here?
 	}
 

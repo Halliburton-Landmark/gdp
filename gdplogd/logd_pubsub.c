@@ -71,7 +71,7 @@ sub_send_message_notification(gdp_req_t *req)
 	memcpy(req->rpdu->dst, req->cpdu->src, sizeof req->rpdu->dst);
 	req->rpdu->msg->rid = req->cpdu->msg->rid;
 	req->rpdu->msg->seqno = req->cpdu->msg->seqno;
-	estat = _gdp_pdu_out(req->rpdu, req->chan, NULL);
+	estat = _gdp_pdu_out(req->rpdu, req->chan);
 
 	if (!EP_STAT_ISOK(estat))
 	{
@@ -249,7 +249,7 @@ sub_end_subscription(gdp_req_t *req)
 		_gdp_req_dump(req, ep_dbg_getfile(), GDP_PR_BASIC, 0);
 	}
 
-	(void) _gdp_pdu_out(req->rpdu, req->chan, NULL);
+	(void) _gdp_pdu_out(req->rpdu, req->chan);
 }
 
 

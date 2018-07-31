@@ -541,7 +541,7 @@ send_read_result(EP_STAT estat, gdp_datum_t *datum, gdp_result_ctx_t *cb_ctx)
 	if (EP_STAT_ISOK(estat))
 		_gdp_datum_to_pb(datum, req->rpdu->msg,
 					req->rpdu->msg->ack_content->dl->d[0]);
-	req->stat = estat = _gdp_pdu_out(req->rpdu, req->chan, NULL);
+	req->stat = estat = _gdp_pdu_out(req->rpdu, req->chan);
 	if (EP_STAT_ISOK(estat))
 		req->s_results++;
 	return estat;

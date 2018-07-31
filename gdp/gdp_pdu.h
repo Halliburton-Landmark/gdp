@@ -242,8 +242,7 @@ void		_gdp_pdu_free(			// free a PDU
 
 EP_STAT		_gdp_pdu_out(			// send a PDU to a network buffer
 				gdp_pdu_t *,			// the PDU information
-				gdp_chan_t *,			// the network channel
-				EP_CRYPTO_MD *);		// the crypto context for signing
+				gdp_chan_t *);			// the network channel
 
 EP_STAT		_gdp_pdu_in(			// read a PDU from a network buffer
 				gdp_pdu_t *,			// the buffer to store the result
