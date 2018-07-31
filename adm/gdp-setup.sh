@@ -48,6 +48,7 @@ case "$OS" in
 	package libevent-dev
 	package libevent-pthreads
 	package libsqlite3-dev
+	package libmysqlclient-dev
 	package libssl-dev
 	package uuid-dev
 	package lighttpd
@@ -77,6 +78,8 @@ case "$OS" in
 	package lighttpd
 	package jansson
 	package protobuf-c
+	package sqlite3
+	package mysql57
 	if [ "$PKGMGR" = "brew" ]
 	then
 		package mosquitto
@@ -106,15 +109,20 @@ case "$OS" in
 	package protobuf-c
 	package avahi
 	package mosquitto
+	package sqlite3
+	package mysql57-client
 	package hs-pandoc
 	;;
 
     "gentoo" | "redhat")
+	# untested
 	package libevent-devel
 	package openssl-devel
 	package lighttpd
 	package jansson-devel
 	package avahi-devel
+	package sqlite3-devel
+	package mysql57-devel
 	package mosquitto
 	if [ -e /etc/systemd/system ]
 	then
@@ -132,6 +140,8 @@ case "$OS" in
 	package lighttpd
 	package jansson-devel
 	package avahi-devel
+	package sqlite3-devel
+	package mysql57-devel
 	package mosquitto
 	if [ -e /etc/systemd/system ]
 	then
