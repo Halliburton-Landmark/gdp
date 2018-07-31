@@ -49,6 +49,9 @@
 #include <sys/errno.h>
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.gob.ops", "GOB operations for GDP");
+#if GDP_DEBUG_EXTENDED_TESTS
+static EP_DBG	TestDbg = EP_DBG_INIT("test.gdp.gob.ops", "extended testing");
+#endif
 
 
 /*
@@ -561,6 +564,14 @@ append_common(
 			ep_dbg_printf("append_common: _gdp_datum_sign => %s\n",
 					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		}
+#if GDP_DEBUG_EXTENDED_TESTS
+		if (ep_dbg_test(TestDbg, 101))
+		{
+			// Change the datum after computing signature.
+			// Should cause the append to be rejected.
+			gdp_buf_getptr(datum->dbuf, 1)[0]++;	//TEST
+		}
+#endif
 	}
 
 	// create a new request structure
