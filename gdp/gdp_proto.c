@@ -377,7 +377,7 @@ ack_data_changed(gdp_req_t *req)
 	return estat;
 }
 
-// response to read command
+// response to read or subscribe command
 static EP_STAT
 ack_data_content(gdp_req_t *req)
 {
@@ -890,7 +890,7 @@ _gdp_req_dispatch(gdp_req_t *req, int cmd)
 				ep_dbg_printf(" [gob->refcnt %d]", req->gob->refcnt);
 		ep_dbg_printf("\n");
 		if (ep_dbg_test(Dbg, 51))
-			_gdp_req_dump(req, NULL, GDP_PR_BASIC, 0);
+			_gdp_req_dump(req, NULL, GDP_PR_DETAILED, 0);
 		funlockfile(ep_dbg_getfile());
 	}
 
@@ -902,7 +902,7 @@ _gdp_req_dispatch(gdp_req_t *req, int cmd)
 
 	// command function should not change lock state of GOB
 	if (req->gob != NULL && !GDP_GOB_ASSERT_ISLOCKED(req->gob))
-		_gdp_gob_dump(req->gob, NULL, GDP_PR_BASIC, 0);
+		_gdp_gob_dump(req->gob, NULL, GDP_PR_DETAILED, 0);
 
 	if (ep_dbg_test(Dbg, 18) || ep_dbg_test(DbgCmdTrace, 18))
 	{
