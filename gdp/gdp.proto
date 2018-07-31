@@ -252,6 +252,9 @@ message GdpMessage
 
 	/*
 	**  Negative acknowledgements.
+	**		Note that _gdp_req_nak_resp assumes that all NAKs are
+	**		NakGeneric.  If that changes, that routine will need to be
+	**		changed (and made more complex, alas).
 	*/
 
 	// Generic failure (shared).
