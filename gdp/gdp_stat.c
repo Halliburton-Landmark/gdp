@@ -74,7 +74,7 @@ static struct ep_stat_to_string Stats[] =
 	{ GDP_STAT_SKEY_REQUIRED,			"secret key required",				},
 	{ GDP_STAT_LOG_READ_ERROR,			"log read error",					},
 	{ GDP_STAT_RECNO_SEQ_ERROR,			"record out of sequence",			},
-	{ GDP_STAT_CRYPTO_SIGFAIL,			"signature failure",				},
+	{ GDP_STAT_CRYPTO_VRFY_FAIL,		"signature verification failure",	},
 	{ GDP_STAT_PHYSIO_ERROR,            "physical I/O error on log",        },
 	{ GDP_STAT_RECORD_EXPIRED,			"record expired",					},
 	{ GDP_STAT_USING_FREE_REQ,			"trying to use free req",			},
@@ -91,6 +91,9 @@ static struct ep_stat_to_string Stats[] =
 	{ GDP_STAT_NO_METADATA,				"GDP log has no metadata",			},
 	{ GDP_STAT_NAME_UNKNOWN,			"cannot resolve GDP name",			},
 	{ GDP_STAT_MYSQL_ERROR,				"other mysql error",				},
+	{ GDP_STAT_CRYPTO_SIG_MISSING,		"signature missing",				},
+	{ GDP_STAT_CRYPTO_NO_PUB_KEY,		"missing public key",				},
+	{ GDP_STAT_CRYPTO_NO_SIG,			"datum missing required signature",	},
 
 	// codes corresponding to command responses
 	{ GDP_STAT_ACK_END_OF_RESULTS,		"263 end of results",				},

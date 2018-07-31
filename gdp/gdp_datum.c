@@ -333,12 +333,18 @@ _gdp_datum_dump(const gdp_datum_t *datum,
 
 
 /*
-**  Initialize verification context.
-**		This is also used for computing the datum hash even if no
-**		signature verification is being done.
+**  Initialize signature verification context.
+**
+**		Returns GDP_STAT_CRYPTO_NO_PUB_KEY if there is no public key
+**		associated with this log.  However, even if no public key is
+**		found, the message digest is set up since it is used in
+**		other places such as the hash chain.
+**
+**		If there is a public key, it also sets the GOBF_VERIFYING flag
+**		for use down the line.
 */
 
-static void
+static EP_STAT
 init_vrfy_ctx(gdp_datum_t *datum, gdp_gob_t *gob)
 {
 	EP_STAT estat;
@@ -374,7 +380,7 @@ nopubkey:
 		ep_dbg_cprintf(Dbg, 30,
 					"init_vrfy_ctx: no public key for %s\n",
 					gob->pname);
-		estat = GDP_STAT_CRYPTO_SIGFAIL;
+		estat = GDP_STAT_CRYPTO_NO_PUB_KEY;
 
 		// still need to compute the digest for the hash chain
 		gob->vrfy_ctx = ep_crypto_md_new(mdtype);
@@ -384,10 +390,18 @@ nopubkey:
 	ep_crypto_md_update(gob->vrfy_ctx, gob->name, sizeof gob->name);
 
 	// and the metadata (re-serialized)
+	// NOTE:  this will not be needed once the GOB name becomes the
+	// NOTE:  hash of the metadata.
 	uint8_t *mdbuf;
 	size_t mdlen = _gdp_md_serialize(gob->gob_md, &mdbuf);
 	ep_crypto_md_update(gob->vrfy_ctx, mdbuf, mdlen);
 	ep_mem_free(mdbuf);
+
+	char ebuf[100];
+	ep_dbg_cprintf(Dbg, 40,
+				"init_vrfy_ctx: %s\n",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	return estat;
 }
 
 /*
@@ -484,7 +498,7 @@ gdp_hash_t *
 _gdp_datum_hash(gdp_datum_t *datum, gdp_gob_t *gob)
 {
 	if (gob->vrfy_ctx == NULL)
-		init_vrfy_ctx(datum, gob);
+		(void) init_vrfy_ctx(datum, gob);
 
 	EP_CRYPTO_MD *md = ep_crypto_md_clone(gob->vrfy_ctx);
 	_gdp_datum_digest(datum, md);
@@ -721,7 +735,8 @@ _gdp_datum_vrfy_gob(gdp_datum_t *datum, gdp_gob_t *gob)
 	EP_STAT estat = EP_STAT_OK;
 
 	if (gob->vrfy_ctx == NULL)
-		init_vrfy_ctx(datum, gob);
+		estat = init_vrfy_ctx(datum, gob);
+	EP_STAT_CHECK(estat, goto nopubkey);
 
 	// if we aren't verifying we can quit now
 	if (!EP_UT_BITSET(GOBF_VERIFYING, gob->flags))
@@ -740,6 +755,10 @@ _gdp_datum_vrfy_gob(gdp_datum_t *datum, gdp_gob_t *gob)
 	ep_crypto_md_free(md);
 	if (!EP_STAT_ISOK(estat))
 	{
+		char ebuf[100];
+nopubkey:
+		ep_dbg_cprintf(Dbg, 31, "gdp_datum_vrfy: %s\n",
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 		// error: signature failure
 		if (EP_UT_BITSET(GOBF_VRFY_WARN, gob->flags))
 		{
@@ -751,11 +770,15 @@ _gdp_datum_vrfy_gob(gdp_datum_t *datum, gdp_gob_t *gob)
 		{
 			ep_dbg_cprintf(Dbg, 1,
 						"gdp_datum_vrfy: signature failure (fail)\n");
+			// estat is already set
 		}
 	}
 	else
 	{
-		ep_dbg_cprintf(Dbg, 51, "gdp_datum_vrfy: good signature\n");
+		int lev = EP_STAT_ISOK(estat) ? 51 : 31;
+		char ebuf[100];
+		ep_dbg_cprintf(Dbg, lev, "gdp_datum_vrfy: %s\n",
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 	return estat;
 }

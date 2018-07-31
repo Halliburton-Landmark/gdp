@@ -561,14 +561,21 @@ gdp_gin_open(gdp_name_t name,
 		estat = _gdp_gob_open(gob, cmd, open_info, _GdpChannel, 0);
 		EP_STAT_CHECK(estat, goto fail0);
 	}
-
-	if (open_info != NULL && EP_UT_BITSET(GOIF_KEEP_IN_CACHE, open_info->flags))
-	{
-		gob->flags |= GOBF_DEFER_FREE;
-		_gdp_reclaim_resources_init(NULL);
-	}
 	gob->flags &= ~GOBF_PENDING;
 	gin = _gdp_gin_new(gob);
+
+	if (open_info != NULL)
+	{
+		if ( EP_UT_BITSET(GOIF_KEEP_IN_CACHE, open_info->flags))
+		{
+			gob->flags |= GOBF_DEFER_FREE;
+			_gdp_reclaim_resources_init(NULL);
+		}
+		if (EP_UT_BITSET(GOIF_VERIFY_PROOF, open_info->flags))
+		{
+			gin->flags |= GINF_SIG_VRFY_REQ;
+		}
+	}
 	_gdp_gob_unlock(gob);
 
 fail0:

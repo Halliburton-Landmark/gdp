@@ -280,9 +280,10 @@ _gdp_gob_dump(
 				char tbuf[40];
 				struct tm tm;
 
-				fprintf(fp, "%sfreefunc = %p, gob_md = %p, sign_ctx = %p, vrfy_ctx = %p\n",
-						_gdp_pr_indent(indent),
-						gob->freefunc, gob->gob_md, gob->sign_ctx, gob->vrfy_ctx);
+				fprintf(fp, "%sfreefunc = %p, gob_md = %p\n"
+						"%ssign_ctx = %p, vrfy_ctx = %p\n",
+						_gdp_pr_indent(indent), gob->freefunc, gob->gob_md,
+						_gdp_pr_indent(indent), gob->sign_ctx, gob->vrfy_ctx);
 				gmtime_r(&gob->utime, &tm);
 				strftime(tbuf, sizeof tbuf, "%Y-%m-%d %H:%M:%S", &tm);
 				fprintf(fp, "%sutime = %s, x = %p\n",

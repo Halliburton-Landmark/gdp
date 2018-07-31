@@ -715,7 +715,30 @@ cmd_append(gdp_req_t *req)
 	gdp_datum_t *datum = gdp_datum_new();
 	_gdp_datum_from_pb(datum, pbd, pbd->sig);
 
-	if (!EP_UT_BITSET(GOBF_SIGNING, req->gob->flags))
+	estat = _gdp_datum_vrfy_gob(datum, req->gob);
+	if (EP_STAT_IS_SAME(estat, GDP_STAT_CRYPTO_NO_PUB_KEY))
+	{
+		// log has no public key associated
+		if (EP_UT_BITSET(GDP_SIG_PUBKEYREQ, GdpSignatureStrictness))
+			goto fail1;
+	}
+	else if (EP_STAT_IS_SAME(estat, GDP_STAT_CRYPTO_NO_SIG))
+	{
+		// datum has no signature
+		if (EP_UT_BITSET(GDP_SIG_REQUIRED, GdpSignatureStrictness))
+			goto fail1;
+	}
+	else if (EP_STAT_IS_SAME(estat, GDP_STAT_CRYPTO_VRFY_FAIL))
+	{
+		// signature exists but does not match
+		if (EP_UT_BITSET(GDP_SIG_MUSTVERIFY, GdpSignatureStrictness))
+			goto fail1;
+	}
+	else
+	{
+		// signature exists and is good
+	}
+	if (!EP_UT_BITSET(GOBF_VERIFYING, req->gob->flags))
 	{
 		// error (maybe): no public key
 		if (EP_UT_BITSET(GDP_SIG_PUBKEYREQ, GdpSignatureStrictness))
@@ -823,7 +846,7 @@ cmd_append(gdp_req_t *req)
 fail1:
 		estat = _gdp_req_nak_resp(req, GDP_NAK_C_FORBIDDEN,
 						"cmd_append",
-						GDP_STAT_NAK_FORBIDDEN);
+						estat);
 		req->rpdu->msg->nak->recno = req->gob->nrecs;
 	}
 

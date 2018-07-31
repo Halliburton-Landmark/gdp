@@ -263,6 +263,8 @@ struct gdp_gin
 
 #define GINF_INUSE			0x0001		// GIN is allocated
 #define GINF_ISLOCKED		0x0002		// GIN is locked
+#define GINF_SIG_VRFY		0x0004		// verify returned data if possible
+#define GINF_SIG_VRFY_REQ	0x0008		// signature verification required
 
 // internal GDP object, shared between open instances, used in gdplogd
 struct gdp_gob
@@ -286,8 +288,8 @@ struct gdp_gob
 };
 
 // flags for GDP objects
-#define GOBF_INUSE			0x0001		// handle is allocated *
-#define GOBF_ISLOCKED		0x0002		// GOB is locked *
+#define GOBF_INUSE			0x0001		// handle is allocated
+#define GOBF_ISLOCKED		0x0002		// GOB is locked
 #define GOBF_DROPPING		0x0004		// handle is being deallocated
 #define GOBF_INCACHE		0x0008		// handle is in cache
 #define GOBF_DEFER_FREE		0x0010		// defer actual free until reclaim
