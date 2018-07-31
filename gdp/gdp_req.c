@@ -735,7 +735,7 @@ _gdp_req_nak_resp(gdp_req_t *req,
 	gdp_printable_name(req->cpdu->dst, pname);
 	snprintf(text_message, sizeof text_message, "%s: %s: %s",
 			detail, pname, ep_stat_tostr(estat, ebuf, sizeof ebuf));
-	if (GDP_CMD_IS_S_NAK(nak_type))
+	if (nak_type == GDP_NAK_S_INTERNAL)
 	{
 		// server error (rather than client error)
 		ep_log(estat, "%s: %s", detail, pname);
