@@ -223,7 +223,7 @@ static struct pragma_name
 	const char	*pdefault;
 }					SqlitePragmaNames[] =
 					{
-						{ "synchronous",			"NORMAL"			},
+						{ "synchronous",			"OFF",				},
 						{ "journal_mode",			"TRUNCATE"			},
 						{ "temp_store",				NULL,				},
 						{ "locking_mode",			"EXCLUSIVE",		},
