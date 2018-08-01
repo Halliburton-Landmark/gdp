@@ -211,9 +211,12 @@ jclass: jna $(JNA_JAR) $(JSRCS) $(JCLASS)
 JAVA = java
 LOG_NAME = logjava              # You probably want to override this on command-line.
 LOGD_NAME = docker.gdplogd      # You probably want to override this on command-line.
+KEYFILE = non-existent.pem      # You probably want to override this on command-line.
 
 runCreateTest: all
 	DYLD_LIBRARY_PATH=$(GDP_SRC)/libs LD_LIBRARY_PATH=$(GDP_SRC)/libs $(JAVA) -Djna.debug_load=true -Djna.dump_memory=true -classpath $(CLASSPATH) org.terraswarm.gdp.apps.CreateTest $(LOG_NAME) $(LOGD_NAME)
+runCreateTestWithKey: all
+	DYLD_LIBRARY_PATH=$(GDP_SRC)/libs LD_LIBRARY_PATH=$(GDP_SRC)/libs $(JAVA) -Djna.debug_load=true -Djna.dump_memory=true -classpath $(CLASSPATH) org.terraswarm.gdp.apps.CreateTestWithKey $(LOG_NAME) $(KEYFILE) $(LOGD_NAME)
 runNameTest: all
 	DYLD_LIBRARY_PATH=$(GDP_SRC)/libs LD_LIBRARY_PATH=$(GDP_SRC)/libs $(JAVA) -Djna.debug_load=true -Djna.dump_memory=true -classpath $(CLASSPATH) org.terraswarm.gdp.apps.NameTest 
 runHelloWorld: all

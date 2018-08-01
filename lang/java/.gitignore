@@ -11,6 +11,7 @@ linux-x86-64
 !ReaderTest.java
 !ReaderTestSubscribe.java
 !CreateTest.java
+!CreateTestWithKey.java
 !NameTest.java
 !HelloWorld.java
 !WriterTest.java
