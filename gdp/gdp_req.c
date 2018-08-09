@@ -702,8 +702,9 @@ _gdp_req_ack_resp(
 
 	if (req->rpdu != NULL)
 	{
-		ep_dbg_cprintf(Dbg, 1, "_gdp_req_ack_resp: flushing old rpdu %p\n",
-				req->rpdu);
+		ep_dbg_cprintf(Dbg, 61,
+				"_gdp_req_ack_resp: flushing old rpdu %p for %s\n",
+				req->rpdu, _gdp_proto_cmd_name(ack_type));
 		_gdp_pdu_free(&req->rpdu);
 	}
 	msg = _gdp_msg_new(ack_type, req->cpdu->msg->rid, req->cpdu->msg->seqno);
@@ -745,7 +746,7 @@ _gdp_req_nak_resp(gdp_req_t *req,
 	}
 	if (req->rpdu != NULL)
 	{
-		ep_dbg_cprintf(Dbg, 1, "gdpd_nak_resp: flushing old rpdu %p\n",
+		ep_dbg_cprintf(Dbg, 61, "gdpd_nak_resp: flushing old rpdu %p\n",
 				req->rpdu);
 		_gdp_pdu_free(&req->rpdu);
 	}
