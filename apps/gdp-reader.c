@@ -623,6 +623,9 @@ main(int argc, char **argv)
 			setlinebuf(LogFile);
 	}
 
+	if (OutFile == NULL)
+		OutFile = stdout;
+
 	// initialize the GDP library
 	estat = gdp_init(gdpd_addr);
 	if (!EP_STAT_ISOK(estat))
