@@ -16,6 +16,7 @@
 .Op Fl m
 .Op Fl M
 .Op Fl n Ar n-recs
+.Op Fl o Ar output-file
 .Op Fl q
 .Op Fl s
 .Op Fl t
@@ -119,6 +120,9 @@ worth of data and then terminate.
 The default is to show all existing data
 except when using subscriptions,
 where the default is to run until the process is manually killed.
+.
+.It Fl o Ar output-file
+Send data output to the indicated file.
 .
 .It Fl q
 Don't print metadata, such as the record number and timestamp.

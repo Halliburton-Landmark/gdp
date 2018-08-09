@@ -74,6 +74,7 @@ bool	TextData = false;		// set if data should be displayed as text
 bool	PrintSig = false;		// set if signature should be printed
 bool	Quiet = false;			// don't print metadata
 int		NRead = 0;				// number of datums read
+FILE	*OutFile;				// data output file
 
 void
 do_log(const char *tag)
@@ -166,7 +167,7 @@ do_simpleread(gdp_gin_t *gin,
 		gdp_recno_t recno;
 
 		// print the previous value
-		printdatum(datum, stdout);
+		printdatum(datum, OutFile);
 
 		// flush any left over data
 		if (gdp_buf_reset(gdp_datum_getbuf(datum)) < 0)
@@ -185,7 +186,7 @@ do_simpleread(gdp_gin_t *gin,
 
 	// print the final value
 	if (EP_STAT_ISOK(estat))
-		printdatum(datum, stdout);
+		printdatum(datum, OutFile);
 
 	// end of data is returned as a "not found" error: turn it into a warning
 	//    to avoid scaring the unsuspecting user
@@ -217,7 +218,7 @@ print_event(gdp_event_t *gev)
 	  case GDP_EVENT_DATA:
 		// this event contains a data return
 		LOG("S");
-		printdatum(gdp_event_getdatum(gev), stdout);
+		printdatum(gdp_event_getdatum(gev), OutFile);
 		break;
 
 	  case GDP_EVENT_DONE:
@@ -447,7 +448,7 @@ usage(void)
 {
 	fprintf(stderr,
 			"Usage: %s [-a] [-c] [-d datetime] [-D dbgspec] [-f firstrec]\n"
-			"  [-G router_addr] [-L logfile] [-M] [-n nrecs]\n"
+			"  [-G router_addr] [-L logfile] [-M] [-n nrecs] [-o outfile]\n"
 			"  [-s] [-t] [-v] log_name\n"
 			"    -a  read asynchronously\n"
 			"    -c  use callbacks\n"
@@ -458,6 +459,7 @@ usage(void)
 			"    -L  set logging file name (for debugging)\n"
 			"    -M  show log metadata\n"
 			"    -n  set number of records to read (default all)\n"
+			"    -o  set output file name\n"
 			"    -q  be quiet (don't print any metadata)\n"
 			"    -s  subscribe to this log\n"
 			"    -t  print data as text (instead of hexdump)\n"
@@ -492,7 +494,7 @@ main(int argc, char **argv)
 	ep_lib_init(EP_LIB_USEPTHREADS);	// initialize app errors, etc.
 
 	// parse command-line options
-	while ((opt = getopt(argc, argv, "aAcd:D:f:G:L:mMn:qstv")) > 0)
+	while ((opt = getopt(argc, argv, "aAcd:D:f:G:L:mMn:o:qstv")) > 0)
 	{
 		errno = 0;						// avoid misleading messages
 		switch (opt)
@@ -547,6 +549,15 @@ main(int argc, char **argv)
 		  case 'n':
 			// select the number of records to be returned
 			numrecs = atol(optarg);
+			break;
+
+		  case 'o':
+			OutFile = fopen(optarg, "w");
+			if (OutFile == NULL)
+			{
+				ep_app_error("Cannot open output file %s", optarg);
+				exit(EX_CANTCREAT);
+			}
 			break;
 
 		  case 'q':
