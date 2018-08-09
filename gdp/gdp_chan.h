@@ -311,4 +311,8 @@ void			_gdp_chan_unlock(			// unlock the channel
 void			_gdp_chan_drain_input(		// drain all input from channel
 						gdp_chan_t *chan);
 
+void			_gdp_chan_dump_reqs(		// print all outstanding requests
+						gdp_chan_t *chan,
+						FILE *fp);
+
 #endif // _GDP_CHAN_H_

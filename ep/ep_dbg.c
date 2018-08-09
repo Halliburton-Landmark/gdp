@@ -319,21 +319,23 @@ ep_cvt_txt_to_debug(
 #include <execinfo.h>
 #endif
 
-#define NFRAMES		128
+#define NFRAMES		128		// maximum stack depth
 
 void
-ep_dbg_backtrace(void)
+ep_dbg_backtrace(FILE *fp)
 {
+	if (fp == NULL)
+		fp = EpDebugFileP;
 #if EP_OSCF_HAS_BACKTRACE
 	void *frames[NFRAMES];
 	int nframes;
-	int fd = fileno(EpDebugFileP);
+	int fd = fileno(fp);
 
 	if (fd < 0)
 		fd = 2;
 	nframes = backtrace(frames, NFRAMES);
 	backtrace_symbols_fd(frames, nframes, fd);
 #else
-	ep_dbg_printf("No stack backtrace available\n");
+	fprintf(fp, "No stack backtrace available\n");
 #endif
 }

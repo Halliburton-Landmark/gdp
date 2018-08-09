@@ -903,6 +903,29 @@ _gdp_run_as(const char *runasuser)
 
 
 /*
+**  Print all outstanding requests on a channel
+*/
+
+void
+_gdp_chan_dumpreqs(gdp_chan_t *chan, FILE *fp)
+{
+	gdp_req_t *req;
+	gdp_chan_x_t *chanx = _gdp_chan_get_cdata(chan);
+
+	if (chanx == NULL)
+	{
+		fprintf(fp, "\n<<< No Requests >>>\n");
+		return;
+	}
+	fprintf(fp, "\n<<< Active requests >>>\n");
+	LIST_FOREACH(req, &chanx->reqs, chanlist)
+	{
+		_gdp_req_dump(req, fp, GDP_PR_PRETTY, 0);
+	}
+}
+
+
+/*
 **  SIGINFO --- called to print out internal state (for debugging)
 **
 **		On BSD and MacOS this is implemented as a SIGINFO (^T from
@@ -915,17 +938,19 @@ extern const char GdpVersion[];
 void
 _gdp_dump_state(int plev)
 {
-	flockfile(stderr);
-	fprintf(stderr, "\n<<< GDP STATE >>>\nVersion: %s\n", GdpVersion);
-	_gdp_gob_cache_dump(plev, stderr);
-	fprintf(stderr, "\n<<< Open file descriptors >>>\n");
-	ep_app_dumpfds(stderr);
-	fprintf(stderr, "\n<<< Stack backtrace >>>\n");
-	ep_dbg_backtrace();
-	fprintf(stderr, "\n<<< Statistics >>>\n");
-	_gdp_req_pr_stats(stderr);
-	_gdp_gob_pr_stats(stderr);
-	funlockfile(stderr);
+	FILE *fp = stderr;			// should this be the debug file?
+	flockfile(fp);
+	fprintf(fp, "\n<<< GDP STATE >>>\nVersion: %s\n", GdpVersion);
+	_gdp_gob_cache_dump(plev, fp);
+	_gdp_chan_dumpreqs(_GdpChannel, fp);
+	fprintf(fp, "\n<<< Open file descriptors >>>\n");
+	ep_app_dumpfds(fp);
+	fprintf(fp, "\n<<< Stack backtrace >>>\n");
+	ep_dbg_backtrace(fp);
+	fprintf(fp, "\n<<< Statistics >>>\n");
+	_gdp_req_pr_stats(fp);
+	_gdp_gob_pr_stats(fp);
+	funlockfile(fp);
 }
 
 

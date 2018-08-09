@@ -133,7 +133,7 @@ diagnose_thr_err(int err,
 			name = "???";
 		ep_dbg_printf("ep_thr_%-13s: %s:%d %s (%p): %s\n",
 				where, file, line, name, p, nbuf);
-		ep_dbg_backtrace();
+		ep_dbg_backtrace(NULL);
 	}
 	if (ep_dbg_test(Dbg, 101))
 		ep_assert_failure(file, line,

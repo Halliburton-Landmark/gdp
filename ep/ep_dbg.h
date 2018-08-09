@@ -90,7 +90,7 @@ extern void	ep_dbg_vprintf(const char *fmt, va_list av);
 						ep_dbg_printf(__VA_ARGS__);}
 
 // stack backtrace to debug output
-extern void	ep_dbg_backtrace(void);
+extern void	ep_dbg_backtrace(FILE *fp);
 
 // crackarg parsing
 extern EP_STAT	epCavDebug(const char *vp, void *rp);

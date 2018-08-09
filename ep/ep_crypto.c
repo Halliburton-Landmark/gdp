@@ -115,7 +115,7 @@ _ep_crypto_error(EP_STAT def_stat, const char *msg, ...)
 	ep_dbg_printf("\n");
 	ERR_print_errors_fp(fp);
 	if (ep_dbg_test(Dbg, 31))
-		ep_dbg_backtrace();
+		ep_dbg_backtrace(NULL);
 
 	return estat;
 }
