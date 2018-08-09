@@ -455,7 +455,7 @@ ack_end_results(gdp_req_t *req)
 
 	// don't need to check has_nresults, since the default is what we want
 	req->s_results = payload->nresults;
-	ep_dbg_cprintf(Dbg, 22, "ack_end_results: read %"PRId64 " sent %"PRId64 "\n",
+	ep_dbg_cprintf(Dbg, 13, "ack_end_results: read %"PRId64 " sent %"PRId64 "\n",
 			req->r_results, req->s_results);
 	if (req->r_results >= req->s_results)
 		req->flags |= GDP_REQ_COMPLETE;
