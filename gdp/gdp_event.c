@@ -338,7 +338,7 @@ static void
 _gdp_event_trigger(gdp_event_t *gev, gdp_req_t *req)
 {
 	if (gev->type == GDP_EVENT_DONE &&
-			!EP_UT_BITSET(GDP_REQ_COMPLETE, req->flags))
+			EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
 	{
 		// more results will come later
 		static int32_t timeout = -1;
@@ -388,7 +388,7 @@ _gdp_event_insert_pending(struct gev_list *glist, gdp_req_t *req)
 		// if this is a DONE event but we don't have all the results, leave it
 		//TODO: have to allow for timeout
 		if (gev->type == GDP_EVENT_DONE &&
-				!EP_UT_BITSET(GDP_REQ_COMPLETE, req->flags))
+				EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
 			continue;
 		TAILQ_REMOVE(glist, gev, queue);
 		_gdp_event_trigger(gev, req);
@@ -492,7 +492,6 @@ _gdp_event_add_from_req(gdp_req_t *req)
 	  case GDP_ACK_END_OF_RESULTS:
 		// end of subscription
 		evtype = GDP_EVENT_DONE;
-		req->flags &= ~GDP_REQ_PERSIST;
 		break;
 
 	  case GDP_ACK_CREATED:

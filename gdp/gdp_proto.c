@@ -423,7 +423,7 @@ ack_data_content(gdp_req_t *req)
 	// ... and how many we actually got
 	req->r_results += payload->dl->n_d;
 	if (req->s_results >= 0 && req->r_results >= req->s_results)
-		req->flags |= GDP_REQ_COMPLETE;
+		req->flags &= ~GDP_REQ_PERSIST;
 
 #if 0 //TODO: IMPLEMENT ME
 	// do read filtering if requested
@@ -459,7 +459,7 @@ ack_end_results(gdp_req_t *req)
 			"ack_end_results: read %"PRId64 " sent %"PRId64 "\n",
 			req->r_results, req->s_results);
 	if (req->r_results >= req->s_results)
-		req->flags |= GDP_REQ_COMPLETE;
+		req->flags &= ~GDP_REQ_PERSIST;
 
 	return EP_STAT_OK;
 }
