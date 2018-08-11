@@ -533,7 +533,7 @@ process_resp(void *rpdu_)
 		if (ep_dbg_test(DbgProcResp, 41))
 		{
 			ep_dbg_printf("process_resp: req->rpdu already set\n    ");
-			_gdp_pdu_dump(req->rpdu, ep_dbg_getfile(), 0);
+			_gdp_pdu_dump(req->rpdu, ep_dbg_getfile(), 1);
 		}
 		_gdp_pdu_free(&req->rpdu);
 	}

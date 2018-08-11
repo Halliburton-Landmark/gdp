@@ -291,7 +291,7 @@ fail0:
 					where,
 					emsg != NULL ? emsg : "unknown severe failure");
 		}
-		else if (ep_dbg_test(Dbg, 1))
+		else if (ep_dbg_test(Dbg, EP_STAT_ISWARN(estat) ? 10 : 1))
 		{
 			char ebuf[100];
 			if (emsg != NULL)
@@ -455,7 +455,8 @@ ack_end_results(gdp_req_t *req)
 
 	// don't need to check has_nresults, since the default is what we want
 	req->s_results = payload->nresults;
-	ep_dbg_cprintf(Dbg, 13, "ack_end_results: read %"PRId64 " sent %"PRId64 "\n",
+	ep_dbg_cprintf(Dbg, req->r_results == req->s_results ? 15 : 10,
+			"ack_end_results: read %"PRId64 " sent %"PRId64 "\n",
 			req->r_results, req->s_results);
 	if (req->r_results >= req->s_results)
 		req->flags |= GDP_REQ_COMPLETE;
