@@ -44,14 +44,23 @@
 #include <ep_assert.h>
 
 
+/*
+**  Function lists
+**
+**	Functions take two arguments.  The first is set when the
+**	call is entered into the list.  It acts as a closure.
+**	The second is specified when the list is actually invoked.
+*/
+
+
 /**************************  BEGIN PRIVATE  **************************/
 
 // per-entry structure
 struct fseg
 {
-	struct fseg	*next;			// next in list
-	void		(*func)(void *);	// the function to call
-	void		*arg;			// the argument to that func
+	struct fseg		*next;		// next in list
+	EP_FUNCLIST_FUNC	*func;		// the function to call
+	void			*closure;	// first argument to that func
 };
 
 // per-list structure
@@ -105,8 +114,8 @@ ep_funclist_free(EP_FUNCLIST *flp)
 
 void
 ep_funclist_push(EP_FUNCLIST *flp,
-	void (*func)(void *),
-	void *arg)
+	EP_FUNCLIST_FUNC *func,
+	void *closure)
 {
 	struct fseg *fsp;
 
@@ -116,7 +125,7 @@ ep_funclist_push(EP_FUNCLIST *flp,
 	// allocate a new function block and fill it
 	fsp = (struct fseg *) ep_rpool_malloc(flp->rpool, sizeof *fsp);
 	fsp->func = func;
-	fsp->arg = arg;
+	fsp->closure = closure;
 
 	// link it onto the list
 	fsp->next = flp->list;
@@ -127,7 +136,8 @@ ep_funclist_push(EP_FUNCLIST *flp,
 
 
 void
-ep_funclist_invoke(EP_FUNCLIST *flp)
+ep_funclist_invoke(EP_FUNCLIST *flp,
+	void *arg)
 {
 	struct fseg *fsp;
 
@@ -137,7 +147,7 @@ ep_funclist_invoke(EP_FUNCLIST *flp)
 	ep_thr_mutex_lock(&flp->mutex);
 	for (fsp = flp->list; fsp != NULL; fsp = fsp->next)
 	{
-		(*fsp->func)(fsp->arg);
+		(*fsp->func)(fsp->closure, arg);
 	}
 	ep_thr_mutex_unlock(&flp->mutex);
 }

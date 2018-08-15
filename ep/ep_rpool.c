@@ -215,7 +215,7 @@ ep_rpool_free(EP_RPOOL *rp)
 	// free any related resources
 	if (rp->ffuncs != NULL)
 	{
-		ep_funclist_invoke(rp->ffuncs);
+		ep_funclist_invoke(rp->ffuncs, rp);
 		ep_funclist_free(rp->ffuncs);
 	}
 

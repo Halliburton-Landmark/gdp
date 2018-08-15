@@ -43,7 +43,7 @@ __BEGIN_DECLS
 
 typedef struct EP_RPOOL		EP_RPOOL;
 
-typedef void			(EP_RPOOL_FREEFUNC)(void *);
+typedef void			(EP_RPOOL_FREEFUNC)(void *, void *);
 
 extern EP_RPOOL *ep_rpool_new(			// create new pool
 			const char *name,		// name (debugging)

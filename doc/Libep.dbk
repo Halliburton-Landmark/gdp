@@ -12,10 +12,10 @@
     </author>
 
     <copyright>
-      <year>2008, 2014&ndash;2017 Eric P. Allman. All rights reserved.</year>
+      <year>2008, 2014&ndash;2018 Eric P. Allman. All rights reserved.</year>
     </copyright>
 
-    <date>2017-06-28</date>
+    <date>2018-08-15</date>
   </articleinfo>
 
   <section>
@@ -363,9 +363,9 @@ EP_STAT  EP_STAT_FROM_INT(unsigned int istat)  // convert unsigned integer to st
       <constant>EP_STAT_MOD_GENERIC</constant>:</para>
 
       <informaltable border="1">
-        <col width="4*" />
+        <col width="4*"/>
 
-        <col width="6*" />
+        <col width="6*"/>
 
         <tr>
           <td>EP_STAT_OK</td>
@@ -478,9 +478,9 @@ void            ep_stat_abort(
           follows:</para>
 
           <informaltable border="1">
-            <col width="4*" />
+            <col width="4*"/>
 
-            <col width="6*" />
+            <col width="6*"/>
 
             <tr>
               <td>0x000 (<constant>EP_REGISTRY_GENERIC</constant>)</td>
@@ -1066,8 +1066,10 @@ EP_TIME_INVALIDATE(                  // invalidate a timestamp
 
     void
     ep_funclist_push(EP_FUNCLIST *fp,   // list to push to
-                void (*func)(void *),   // the function to invoke
-                void *arg)              // an argument to pass to it
+                void (*func)(           // the function to invoke
+                        void *closure,  // from the ep_funclist_push call
+                        void *arg),     // from the ep_funclist_invoke call
+                void *closure)          // the closure arg to pass to it
 
     void
     ep_funclist_pop(EP_FUNCLIST *fp)    // list to pop from, value discarded
@@ -1076,7 +1078,8 @@ EP_TIME_INVALIDATE(                  // invalidate a timestamp
     ep_funclist_clear(EP_FUNCLIST *fp)  // list to clear
 
     void
-    ep_funclist_invoke(EP_FUNCLIST *fp) // invoke all functions in list</programlisting>
+    ep_funclist_invoke(EP_FUNCLIST *fp, // invoke all functions in list
+                void *arg)              // second func arg</programlisting>
     </section>
   </section>
 
@@ -1096,9 +1099,9 @@ EP_TIME_INVALIDATE(                  // invalidate a timestamp
     memory allocation:</para>
 
     <informaltable border="1">
-      <col width="4*" />
+      <col width="4*"/>
 
-      <col width="6*" />
+      <col width="6*"/>
 
       <tr>
         <td><constant>EP_CRYPTO_MAX_PUB_KEY</constant></td>
@@ -1334,9 +1337,9 @@ EP_STAT                 ep_crypto_vrfy_final(
       and the actual cipher itself. The chaining modes are:</para>
 
       <informaltable border="1">
-        <col width="4*" />
+        <col width="4*"/>
 
-        <col width="6*" />
+        <col width="6*"/>
 
         <tr>
           <td width=""><constant>EP_CRYPTO_MODE_CBC</constant></td>
@@ -1361,9 +1364,9 @@ EP_STAT                 ep_crypto_vrfy_final(
       type) are:</para>
 
       <informaltable border="1">
-        <col width="4*" />
+        <col width="4*"/>
 
-        <col width="6*" />
+        <col width="6*"/>
 
         <tr>
           <td><constant>EP_CRYPTO_SYMKEY_NONE</constant></td>
@@ -1474,9 +1477,9 @@ EP_STAT                 ep_crypto_cipher_final(
       EP_STAT_MOD_CRYPTO.</para>
 
       <informaltable border="1">
-        <col width="4*" />
+        <col width="4*"/>
 
-        <col width="6*" />
+        <col width="6*"/>
 
         <tr>
           <td><errorcode>EP_STAT_CRYPTO_DIGEST</errorcode></td>
@@ -2583,9 +2586,9 @@ ep_sd_notifyf(
       <title>EP_XLATE "how" Bits</title>
 
       <tgroup cols="2">
-        <colspec />
+        <colspec/>
 
-        <colspec colwidth="3*" />
+        <colspec colwidth="3*"/>
 
         <tbody>
           <row>

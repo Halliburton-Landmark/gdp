@@ -44,7 +44,7 @@ __BEGIN_DECLS
 typedef struct EP_FUNCLIST	EP_FUNCLIST;
 
 // the type of a function passed to the funclist
-typedef void		(EP_FUNCLIST_FUNC)(void *arg);
+typedef void		(EP_FUNCLIST_FUNC)(void *closure, void *arg);
 
 // the funclist primitives
 extern EP_FUNCLIST	*ep_funclist_new(
@@ -54,9 +54,10 @@ extern void		ep_funclist_free(
 extern void		ep_funclist_push(
 				EP_FUNCLIST *flp,
 				EP_FUNCLIST_FUNC *func,
-				void *arg);
+				void *closure);
 extern void		ep_funclist_invoke(
-				EP_FUNCLIST *flp);
+				EP_FUNCLIST *flp,
+				void *arg);
 
 __END_DECLS
 #endif //_EP_FUNCLIST_H_
