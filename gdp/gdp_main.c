@@ -39,6 +39,7 @@
 #include <ep/ep.h>
 #include <ep/ep_app.h>
 #include <ep/ep_dbg.h>
+#include <ep/ep_funclist.h>
 #include <ep/ep_log.h>
 #include <ep/ep_syslog.h>
 
@@ -933,7 +934,8 @@ _gdp_chan_dumpreqs(gdp_chan_t *chan, FILE *fp)
 **		SIGUSR1 instead.
 */
 
-extern const char GdpVersion[];
+extern const char	GdpVersion[];
+EP_FUNCLIST			*_GdpDumpFuncs;
 
 void
 _gdp_dump_state(int plev)
@@ -941,8 +943,13 @@ _gdp_dump_state(int plev)
 	FILE *fp = stderr;			// should this be the debug file?
 	flockfile(fp);
 	fprintf(fp, "\n<<< GDP STATE >>>\nVersion: %s\n", GdpVersion);
-	_gdp_gob_cache_dump(plev, fp);
-	_gdp_chan_dumpreqs(_GdpChannel, fp);
+
+	_gdp_gob_cache_dump(plev, fp);			// GOB cache contents
+	_gdp_chan_dumpreqs(_GdpChannel, fp);	// outstanding requests
+
+	if (_GdpDumpFuncs != NULL)
+		ep_funclist_invoke(_GdpDumpFuncs, (void *) fp);
+
 	fprintf(fp, "\n<<< Open file descriptors >>>\n");
 	ep_app_dumpfds(fp);
 	fprintf(fp, "\n<<< Stack backtrace >>>\n");
@@ -980,6 +987,7 @@ gdp_init_phase_0(const char *progname)
 
 	// initialize the EP library
 	ep_lib_init(EP_LIB_USEPTHREADS);
+	_GdpDumpFuncs = ep_funclist_new("GDP debug dump functions");
 
 	// initialize runtime parameters
 	ep_adm_readparams("gdp");

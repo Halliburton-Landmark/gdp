@@ -76,4 +76,8 @@ void					_gdp_event_dump(
 								int detail,
 								int indent);
 
+void					_gdp_event_dump_all(
+								void *unused_,
+								void *fp_);
+
 #endif // _GDP_EVENT_H_

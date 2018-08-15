@@ -394,6 +394,18 @@ ack_data_content(gdp_req_t *req)
 				return EP_STAT_ASSERT_ABORT);
 	GdpMessage__AckContent *payload = req->rpdu->msg->ack_content;
 
+	if (ep_dbg_test(Dbg, 25))
+	{
+		ep_dbg_printf("ack_data_content(%zd): ", payload->dl->n_d);
+		if (payload->dl->n_d == 1)
+			ep_dbg_printf(" recno %"PRIgdp_recno "\n",
+					payload->dl->d[0]->recno);
+		else if (payload->dl->n_d > 1)
+			ep_dbg_printf(" recno %"PRIgdp_recno " - %"PRIgdp_recno "\n",
+					payload->dl->d[0]->recno,
+					payload->dl->d[payload->dl->n_d - 1]->recno);
+	}
+
 	// if we returned zero content, handle specially
 	//TODO: should put all datums into event queue here rather than
 	//TODO: up the call stack.

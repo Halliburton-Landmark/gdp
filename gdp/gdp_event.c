@@ -32,6 +32,7 @@
 
 #include <ep/ep_thr.h>
 #include <ep/ep_dbg.h>
+#include <ep/ep_funclist.h>
 #include <ep/ep_log.h>
 
 #include "gdp.h"
@@ -633,6 +634,36 @@ _gdp_event_dump(const gdp_event_t *gev, FILE *fp, int detail, int indent)
 		fprintf(fp, "Unknown event type %d: %s\n",
 					gev->type, ep_stat_tostr(gev->stat, ebuf, sizeof ebuf));
 		break;
+	}
+}
+
+
+/*
+**  Dump all events (debugging)
+**
+**		Intentionally doesn't lock the queues.
+*/
+
+void
+_gdp_event_dump_all(void *unused_, void *fp_)
+{
+	gdp_event_t *gev;
+	FILE *fp = fp_;
+	int detail = GDP_PR_DETAILED;
+
+	if (fp == NULL)
+		fp = ep_dbg_getfile();
+
+	fprintf(fp, "\n<<< Active Events >>>\n");
+	TAILQ_FOREACH(gev, &ActiveList, queue)
+	{
+		_gdp_event_dump(gev, fp, detail, 0);
+	}
+
+	fprintf(fp, "\n<<< Callback Events >>>\n");
+	TAILQ_FOREACH(gev, &CallbackList, queue)
+	{
+		_gdp_event_dump(gev, fp, detail, 0);
 	}
 }
 

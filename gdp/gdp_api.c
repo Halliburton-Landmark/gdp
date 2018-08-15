@@ -48,6 +48,7 @@
 #include <ep/ep_app.h>
 #include <ep/ep_b64.h>
 #include <ep/ep_dbg.h>
+#include <ep/ep_funclist.h>
 #include <ep/ep_prflags.h>
 #include <ep/ep_string.h>
 
@@ -396,6 +397,7 @@ gdp_init(const char *router_addr)
 {
 	gdp_chan_x_t *chanx = NULL;
 	EP_STAT estat = EP_STAT_OK;
+	extern EP_FUNCLIST *_GdpDumpFuncs;
 
 	ep_dbg_cprintf(Dbg, 9, "gdp_init, initialized = %d\n", _GdpLibInitialized);
 	if (_GdpLibInitialized)				// set in gdp_lib_init
@@ -404,6 +406,8 @@ gdp_init(const char *router_addr)
 	// set up global state, event loop, etc. (shared with gdplogd)
 	estat = gdp_lib_init(NULL, NULL);
 	EP_STAT_CHECK(estat, goto fail0);
+
+	ep_funclist_push(_GdpDumpFuncs, _gdp_event_dump_all, NULL);
 
 	chanx = (gdp_chan_x_t *) ep_mem_zalloc(sizeof *chanx);
 	LIST_INIT(&chanx->reqs);
