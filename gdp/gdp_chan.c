@@ -54,11 +54,7 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.chan", "GDP channel processing");
 
 
 // protocol version number in layer 4 (transport) PDU
-#if PROTOCOL_L4_V3
-#define GDP_CHAN_PROTO_VERSION	3
-#else
 #define GDP_CHAN_PROTO_VERSION	4
-#endif
 
 static struct event_base	*EventBase;
 static EP_STAT				chan_reopen(gdp_chan_t *);
@@ -93,24 +89,9 @@ struct gdp_chan
 #define GDP_CHAN_CLOSING		4		// channel is closing
 
 
-#if PROTOCOL_L4_V3
-// Running over a Version 3 Transport Layer
-// PDU layout shown in gdp_pdu.h
-#define MIN_HEADER_LENGTH	(1+1+1+1+32+32+4+1+1+1+1+4)
-
-//XXX obsolete
-static uint8_t	RoutingLayerAddr[32] =
-	{
-		0xff, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff, 0x00,
-		0xff, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff, 0x00,
-		0xff, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff, 0x00,
-		0xff, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff, 0x00,
-	};
-#else
 //XXX following needs to be changed if ADDR_FMT != 0
 // magic, hdrlen, type, ttl, seq_mf_foff, fraglen, paylen, dst, src
 #define MIN_HEADER_LENGTH	(1 + 1 + 1 + 1 + 4 + 2 + 2 + 32 + 32)
-#endif	// PROTOCOL_L4_V3
 #define MAX_HEADER_LENGTH	(255 * 4)
 
 
@@ -186,7 +167,6 @@ read_header(gdp_chan_t *chan,
 		size_t *plenp)
 {
 	uint8_t *pbp = gdp_buf_getptr(ibuf, MIN_HEADER_LENGTH);
-	int b;
 	size_t hdr_len = 0;
 	size_t payload_len = 0;
 	EP_STAT estat = EP_STAT_OK;
@@ -205,37 +185,18 @@ read_header(gdp_chan_t *chan,
 		ep_hexdump(pbp, MIN_HEADER_LENGTH, ep_dbg_getfile(), EP_HEXDUMP_HEX, 0);
 	}
 
-	GET8(b);				// PDU version number (offset 0)
-#if PROTOCOL_L4_V3
-	if (b != 2 && b != 3)
-#else
-	if (b != GDP_CHAN_PROTO_VERSION)
-#endif
+	int ver;
+	GET8(ver);				// PDU version number (offset 0)
+	if (ver != GDP_CHAN_PROTO_VERSION)
 	{
 		ep_dbg_cprintf(Dbg, 1, "wrong protocol version %d (%d expected)\n",
-				b, GDP_CHAN_PROTO_VERSION);
+				ver, GDP_CHAN_PROTO_VERSION);
 		estat = GDP_STAT_PDU_VERSION_MISMATCH;
 
 		// for lack of anything better, flush the entire input buffer
 		gdp_buf_drain(ibuf, gdp_buf_getlength(ibuf));
 		goto fail0;
 	}
-#if PROTOCOL_L4_V3
-	GET8(b);				// time to live (ignored by non-routing layer)
-	int rnak;
-	GET8(b);					// reserved (ignored)
-	GET8(rnak);					// command (ignored except for router naks)
-	memcpy(dst, pbp, sizeof (gdp_name_t));	// destination
-	pbp += sizeof (gdp_name_t);
-	memcpy(src, pbp, sizeof (gdp_name_t));	// source
-	pbp += sizeof (gdp_name_t);
-	GET32(b);					// rid (ignored)
-	GET16(b);					// signature size and type (ignored)
-	GET8(b);					// option length / 4
-	hdr_len = MIN_HEADER_LENGTH + (b * 4);
-	GET8(b);					// flags (ignored)
-	GET32(payload_len);			// data length
-#else
 	GET8(hdr_len);			// header length / 4
 	hdr_len &= 0x3F;		// top two bits reserved
 	hdr_len *= 4;
@@ -259,8 +220,8 @@ read_header(gdp_chan_t *chan,
 	ttl &= 0x3f;
 	uint32_t seq_mf_foff;
 	GET32(seq_mf_foff);		// seqno, more frags bit, and frag offset
-//	uint16_t seqno = (seq_mf_foff >> GDP_PKT_SEQNO_SHIFT) & GDP_PKT_SEQNO_MASK;
-//	uint16_t frag_off = seq_mf_foff & GDP_PKT_SEQNO_FOFF_MASK;
+	uint16_t seqno = (seq_mf_foff >> GDP_PKT_SEQNO_SHIFT) & GDP_PKT_SEQNO_MASK;
+	uint16_t frag_off = seq_mf_foff & GDP_PKT_SEQNO_FOFF_MASK;
 	uint16_t frag_len;
 	GET16(frag_len);		// fragment length
 	GET16(payload_len);		// length of opaque payload (reassembled)
@@ -283,11 +244,11 @@ read_header(gdp_chan_t *chan,
 	if (ep_dbg_test(Dbg, 55))
 	{
 		gdp_pname_t src_p, dst_p;
-		ep_dbg_printf("read_header(%zd): paylen %zd\n"
+		ep_dbg_printf("read_header(%zd): ver %d ttl %d seqno %d off %d paylen %zd\n"
 					"    src %s\n"
 					"    dst %s\n"
 					"    flags ",
-				hdr_len, payload_len,
+				hdr_len, ver, ttl, seqno, frag_off, payload_len,
 				gdp_printable_name(*src, src_p),
 				gdp_printable_name(*dst, dst_p));
 			ep_prflags(flags, L4Flags, NULL);
@@ -311,7 +272,6 @@ read_header(gdp_chan_t *chan,
 		estat = GDP_STAT_PDU_CORRUPT;
 		goto done;
 	}
-#endif	// PROTOCOL_L4_V3
 
 	// XXX check for rational payload_len here? XXX
 
@@ -321,10 +281,6 @@ read_header(gdp_chan_t *chan,
 
 	// consume the header, but leave the payload
 	gdp_buf_drain(ibuf, hdr_len);
-#if PROTOCOL_L4_V3
-	if (rnak == GDP_NAK_R_NOROUTE)
-		estat = GDP_STAT_NAK_NOROUTE;
-#endif
 
 done:
 	if (EP_STAT_ISOK(estat))
@@ -942,21 +898,6 @@ send_helper(gdp_chan_t *chan,
 	char pb[MAX_HEADER_LENGTH];
 	char *pbp = pb;
 
-#if PROTOCOL_L4_V3
-	PUT8(GDP_CHAN_PROTO_VERSION);		// version number (3)
-	PUT8(GDP_TTL_DEFAULT);				// time to live
-	PUT8(0);							// reserved
-	PUT8(tos);							// command (overloaded)
-	memcpy(pbp, dst, sizeof (gdp_name_t));	// dst
-	pbp += sizeof (gdp_name_t);
-	memcpy(pbp, src, sizeof (gdp_name_t));	// src
-	pbp += sizeof (gdp_name_t);
-	PUT32(0);							// request ID (unused)
-	PUT16(0);							// signature length and MD algorithm
-	PUT8(0);							// optionals length
-	PUT8(0);							// flags
-	PUT32(payload_len);					// SDU payload length
-#else
 	PUT8(GDP_CHAN_PROTO_VERSION);		// version number
 	PUT8(MIN_HEADER_LENGTH / 4);		// header length (= 72 / 4)
 	PUT8(tos);							// flags / type of service
@@ -970,7 +911,6 @@ send_helper(gdp_chan_t *chan,
 	pbp += sizeof (gdp_name_t);
 	memcpy(pbp, src, sizeof (gdp_name_t));	// source address
 	pbp += sizeof (gdp_name_t);
-#endif
 
 	// now write header to the socket
 	bufferevent_lock(chan->bev);
@@ -1053,21 +993,12 @@ _gdp_chan_advertise(
 	ep_dbg_cprintf(Dbg, 39, "_gdp_chan_advertise(%s):\n",
 			gdp_printable_name(gname, pname));
 
-	gdp_buf_t *payload = gdp_buf_new();
+//	gdp_buf_t *payload = gdp_buf_new();
 
 	// might batch several adverts into one PDU
-	gdp_buf_write(payload, gname, sizeof (gdp_name_t));
-
-#if PROTOCOL_L4_V3
-	estat = send_helper(chan, NULL, _GdpMyRoutingName, RoutingLayerAddr,
-						payload, GDP_CMD_ADVERTISE);
-#else
-//	gdp_name_t null_name = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-//							 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-
+//	gdp_buf_write(payload, gname, sizeof (gdp_name_t));
 	estat = send_helper(chan, NULL, _GdpMyRoutingName, gname,
 						NULL, GDP_PKT_TYPE_ADVERTISE);
-#endif
 
 	if (ep_dbg_test(Dbg, 21))
 	{
@@ -1092,8 +1023,8 @@ _gdp_chan_withdraw(
 
 	ep_dbg_cprintf(Dbg, 39, "_gdp_chan_withdraw(%s)\n",
 			gdp_printable_name(gname, pname));
-	gdp_buf_t *payload = gdp_buf_new();
-	gdp_buf_write(payload, gname, sizeof (gdp_name_t));
+//	gdp_buf_t *payload = gdp_buf_new();
+//	gdp_buf_write(payload, gname, sizeof (gdp_name_t));
 	estat = send_helper(chan, NULL, _GdpMyRoutingName, gname,
 						NULL, GDP_PKT_TYPE_WITHDRAW);
 
