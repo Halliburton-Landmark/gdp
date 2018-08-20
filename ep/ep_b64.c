@@ -121,7 +121,7 @@ ep_b64_encode(const void *bbin, size_t bsize,
 
 	if (tsize < neededlength)
 	{
-		ep_dbg_printf("B64_OVERFLOW: tsize = %ld, neededlength = %zd\n",
+		ep_dbg_printf("B64_OVERFLOW: tsize = %zd, neededlength = %zd\n",
 				tsize, neededlength);
 		return EP_STAT_B64_OVERFLOW;
 	}
