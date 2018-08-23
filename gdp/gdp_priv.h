@@ -797,6 +797,7 @@ EP_STAT			_gdp_io_recv(
 						gdp_chan_t *chan,
 						gdp_name_t src,
 						gdp_name_t dst,
+						gdp_seqno_t seqno,
 						gdp_buf_t *payload_buf,
 						size_t payload_len);
 

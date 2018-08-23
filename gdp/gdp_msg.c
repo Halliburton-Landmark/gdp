@@ -297,7 +297,7 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 	if (msg->seqno == GDP_PDU_NO_SEQNO)
 		fprintf(fp, "(none)");
 	else
-		fprintf(fp, "%" PRIgdp_seqno, msg->seqno);
+		fprintf(fp, "%d", msg->seqno);
 
 	fprintf(fp, "\n%ssig@%p", _gdp_pr_indent(indent), msg->sig);
 	if (msg->sig == NULL)

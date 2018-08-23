@@ -77,7 +77,7 @@ _gdp_pdu_dump(const gdp_pdu_t *pdu, FILE *fp, int indent)
 	gdp_print_name(pdu->dst, fp);
 	fprintf(fp, "\n%ssrc=", _gdp_pr_indent(indent));
 	gdp_print_name(pdu->src, fp);
-	fprintf(fp, "\n%s", _gdp_pr_indent(indent));
+	fprintf(fp, "\n%sseqno %d, ", _gdp_pr_indent(indent), pdu->seqno);
 	_gdp_msg_dump(pdu->msg, fp, indent);
 
 done:
@@ -302,7 +302,7 @@ static TAILQ_HEAD(pkt_head, gdp_pdu)
 						PduFreeList = TAILQ_HEAD_INITIALIZER (PduFreeList);
 
 gdp_pdu_t *
-_gdp_pdu_new(GdpMessage *msg, gdp_name_t src, gdp_name_t dst)
+_gdp_pdu_new(GdpMessage *msg, gdp_name_t src, gdp_name_t dst, gdp_seqno_t seqno)
 {
 	gdp_pdu_t *pdu;
 
@@ -310,7 +310,8 @@ _gdp_pdu_new(GdpMessage *msg, gdp_name_t src, gdp_name_t dst)
 	{
 		gdp_pname_t src_pname;
 		gdp_pname_t dst_pname;
-		ep_dbg_printf("_gdp_pdu_new(%s => %s)\n",
+		ep_dbg_printf("_gdp_pdu_new(%d; %s => %s)\n",
+					seqno,
 					gdp_printable_name(src, src_pname),
 					gdp_printable_name(dst, dst_pname));
 	}
@@ -335,6 +336,7 @@ _gdp_pdu_new(GdpMessage *msg, gdp_name_t src, gdp_name_t dst)
 	pdu->msg = msg;
 	memcpy(pdu->src, src, sizeof pdu->src);
 	memcpy(pdu->dst, dst, sizeof pdu->dst);
+	pdu->seqno = seqno;
 
 	ep_dbg_cprintf(Dbg, 48, "_gdp_pdu_new => %p\n", pdu);
 	return pdu;

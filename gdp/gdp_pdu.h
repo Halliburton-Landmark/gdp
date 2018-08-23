@@ -93,8 +93,10 @@
 **		be explicitly freed.
 */
 
-typedef uint32_t		gdp_seqno_t;	// protocol sequence number
-#define	PRIgdp_seqno	PRId32
+typedef uint16_t		gdp_seqno_t;	// protocol sequence number
+#define	PRIgdp_seqno	PRIu16
+#define GDP_SEQNO_BASE	(2 ^ 15)		// modulus base
+#define GDP_SEQNO_NONE	GDP_SEQNO_BASE	// "no sequence number"
 
 typedef uint32_t		gdp_rid_t;		// request id (uniquifies request)
 #define PRIgdp_rid		PRIu32
@@ -110,6 +112,7 @@ typedef struct gdp_pdu
 	// copied from L4 (lower layer)
 	gdp_name_t				dst;		// destination address
 	gdp_name_t				src;		// source address
+	gdp_seqno_t				seqno;		// sequence number
 
 	// Layer 5 info
 	GdpMessage				*msg;		// on-the-wire message (not NULL)
@@ -235,7 +238,8 @@ typedef struct gdp_pdu
 gdp_pdu_t	*_gdp_pdu_new(			// allocate a new PDU
 				GdpMessage *msg,		// the initial message (may be NULL)
 				gdp_name_t src,			// source address
-				gdp_name_t dst);		// destination address
+				gdp_name_t dst,			// destination address
+				gdp_seqno_t seqno);		// L4 sequence number
 
 void		_gdp_pdu_free(			// free a PDU
 				gdp_pdu_t **);

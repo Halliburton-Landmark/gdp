@@ -816,7 +816,8 @@ cmd_append(gdp_req_t *req)
 			dl->d[0] = pbd;
 
 			EP_ASSERT(req->rpdu == NULL);
-			req->rpdu = _gdp_pdu_new(msg, req->cpdu->dst, req->cpdu->src);
+			req->rpdu = _gdp_pdu_new(msg, req->cpdu->dst, req->cpdu->src,
+									GDP_SEQNO_NONE);
 			sub_notify_all_subscribers(req);
 			_gdp_pdu_free(&req->rpdu);
 		}

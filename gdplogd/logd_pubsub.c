@@ -235,7 +235,8 @@ sub_end_subscription(gdp_req_t *req)
 		GdpMessage *msg = ep_mem_malloc(sizeof *msg);
 		gdp_message__init(msg);
 		if (req->rpdu == NULL)
-			req->rpdu = _gdp_pdu_new(msg, req->cpdu->dst, req->cpdu->src);
+			req->rpdu = _gdp_pdu_new(msg, req->cpdu->dst, req->cpdu->src,
+									GDP_SEQNO_NONE);
 		req->rpdu->msg = msg;
 	}
 

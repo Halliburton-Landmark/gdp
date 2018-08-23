@@ -164,6 +164,7 @@ read_header(gdp_chan_t *chan,
 		gdp_buf_t *ibuf,
 		gdp_name_t *src,
 		gdp_name_t *dst,
+		gdp_seqno_t *seqnop,
 		size_t *plenp)
 {
 	uint8_t *pbp = gdp_buf_getptr(ibuf, MIN_HEADER_LENGTH);
@@ -286,6 +287,7 @@ done:
 	if (EP_STAT_ISOK(estat))
 	{
 		estat = EP_STAT_FROM_INT(payload_len);
+		*seqnop = seqno;
 	}
 	else
 	{
@@ -328,6 +330,7 @@ chan_read_cb(struct bufferevent *bev, void *ctx)
 	gdp_buf_t *ibuf = GDP_BUF_FROM_EVBUFFER(bufferevent_get_input(bev));
 	gdp_chan_t *chan = (gdp_chan_t *) ctx;
 	gdp_name_t src, dst;
+	gdp_seqno_t seqno;
 
 	ep_dbg_cprintf(Dbg, 50, "chan_read_cb: fd %d, %zd bytes\n",
 			bufferevent_getfd(bev), gdp_buf_getlength(ibuf));
@@ -338,7 +341,7 @@ chan_read_cb(struct bufferevent *bev, void *ctx)
 	{
 		// get the transport layer header
 		size_t payload_len;
-		estat = read_header(chan, ibuf, &src, &dst, &payload_len);
+		estat = read_header(chan, ibuf, &src, &dst, &seqno, &payload_len);
 
 		// if we don't have enough input, wait for more (we'll be called again)
 		if (EP_STAT_IS_SAME(estat, GDP_STAT_KEEP_READING))
@@ -368,7 +371,8 @@ chan_read_cb(struct bufferevent *bev, void *ctx)
 			if (chan->recv_cb != NULL)
 			{
 				// call upper level processing
-				estat = (*chan->recv_cb)(chan, src, dst, ibuf, payload_len);
+				estat = (*chan->recv_cb)(chan, src, dst, seqno,
+									ibuf, payload_len);
 			}
 			else
 			{

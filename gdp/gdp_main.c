@@ -1208,12 +1208,13 @@ _gdp_io_recv(
 		gdp_chan_t *chan,
 		gdp_name_t src,
 		gdp_name_t dst,
+		gdp_seqno_t seqno,
 		gdp_buf_t *payload_buf,
 		size_t payload_len)
 {
 	EP_STAT estat;
 
-	gdp_pdu_t *pdu = _gdp_pdu_new(NULL, src, dst);
+	gdp_pdu_t *pdu = _gdp_pdu_new(NULL, src, dst, seqno);
 	estat = _gdp_pdu_in(pdu, payload_buf, payload_len, chan);
 	EP_STAT_CHECK(estat, goto fail0);
 
@@ -1256,7 +1257,7 @@ _gdp_router_event(
 	{
 		//XXX wildcard seqno?
 		GdpMessage *msg = _gdp_msg_new(cmd, GDP_PDU_ANY_RID, GDP_PDU_NO_SEQNO);
-		gdp_pdu_t *pdu = _gdp_pdu_new(msg, src, dst);
+		gdp_pdu_t *pdu = _gdp_pdu_new(msg, src, dst, GDP_SEQNO_NONE);
 
 		if (msg->cmd != 0)
 			_gdp_pdu_process(pdu, chan);

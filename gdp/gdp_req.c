@@ -211,7 +211,7 @@ _gdp_req_new(gdp_cmd_t cmd,
 		seqno = GDP_PDU_NO_SEQNO;		// for now...
 
 		gdp_msg_t *msg = _gdp_msg_new(cmd, rid, seqno);
-		pdu = _gdp_pdu_new(msg, _GdpMyRoutingName, dst);
+		pdu = _gdp_pdu_new(msg, _GdpMyRoutingName, dst, GDP_SEQNO_NONE);
 
 		ep_dbg_cprintf(Dbg, 11, "_gdp_req_new: allocated new pdu @ %p\n",
 					pdu);
@@ -707,7 +707,7 @@ _gdp_req_ack_resp(
 		_gdp_pdu_free(&req->rpdu);
 	}
 	msg = _gdp_msg_new(ack_type, req->cpdu->msg->rid, req->cpdu->msg->seqno);
-	req->rpdu = _gdp_pdu_new(msg, req->cpdu->dst, req->cpdu->src);
+	req->rpdu = _gdp_pdu_new(msg, req->cpdu->dst, req->cpdu->src, GDP_SEQNO_NONE);
 	return EP_STAT_OK;
 }
 
@@ -755,7 +755,8 @@ _gdp_req_nak_resp(gdp_req_t *req,
 				_gdp_proto_cmd_name(nak_type),
 				text_message);
 	msg = _gdp_msg_new(nak_type, req->cpdu->msg->rid, req->cpdu->msg->seqno);
-	req->rpdu = _gdp_pdu_new(msg, req->cpdu->dst, req->cpdu->src);
+	req->rpdu = _gdp_pdu_new(msg, req->cpdu->dst, req->cpdu->src,
+							GDP_SEQNO_NONE);
 	GdpMessage__NakGeneric *nak = msg->nak;
 	nak->ep_stat = EP_STAT_TO_INT(estat);
 	nak->description = ep_mem_strdup(text_message);
