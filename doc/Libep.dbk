@@ -863,6 +863,9 @@ typedef struct
         float       tv_accuracy;     // clock accuracy in seconds
 } EP_TIME_SPEC;
 
+#define EP_TIME_NOTIME      (-INT64_MAX)
+#define EP_TIME_MAXTIME     (INT64_MAX)
+
 EP_STAT
 ep_time_now(                         // return current time
         EP_TIME_SPEC *tv);
@@ -884,7 +887,12 @@ ep_time_before(                      // determine if A occurred before B
 
 void
 ep_time_from_nsec(                   // create a time from a scalar number of nanoseconds
-        int64_t delta,
+        int64_t nsec,
+        EP_TIME_SPEC *tv);
+
+void
+ep_time_from_sec(                    // create a time from a scalar number of seconds
+        int64_t sec,
         EP_TIME_SPEC *tv);
 
 float

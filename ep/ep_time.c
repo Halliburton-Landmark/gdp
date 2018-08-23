@@ -122,6 +122,19 @@ ep_time_now(EP_TIME_SPEC *tv)
 
 
 /*
+**  EP_TIME_ZERO --- zero out a time structure
+*/
+
+void
+ep_time_zero(EP_TIME_SPEC *tv)
+{
+	tv->tv_sec = 0;
+	tv->tv_nsec = 0;
+	tv->tv_accuracy = 0.0;
+}
+
+
+/*
 **  EP_TIME_DELTANOW --- return current time of day plus a delta
 **
 **	This assumes that a negative delta is represented as both
@@ -205,6 +218,19 @@ ep_time_from_nsec(int64_t nsec, EP_TIME_SPEC *tv)
 	tv->tv_sec = nsec / ONESECOND;
 	tv->tv_nsec = nsec % ONESECOND;
 	//tv->tv_accuracy = 0;		TODO: is this right?
+}
+
+
+/*
+**  EP_TIME_FROM_SEC --- create an EP_TIME_SPEC from seconds
+*/
+
+void
+ep_time_from_sec(int64_t sec, EP_TIME_SPEC *tv)
+{
+	tv->tv_sec = sec;
+	tv->tv_nsec = 0;
+	tv->tv_accuracy = 0.0;
 }
 
 

@@ -48,10 +48,14 @@ typedef struct
 
 // doesn't use INT64_MIN because protobuf chokes on that as default
 // this is INT64_MIN + 1
-#define EP_TIME_NOTIME		(-9223372036854775807LL)
+#define EP_TIME_NOTIME		(-INT64_MAX)
+#define EP_TIME_MAXTIME		INT64_MAX
 
 // return current time
 extern EP_STAT	ep_time_now(EP_TIME_SPEC *tv);
+
+// zero out a time
+extern void	ep_time_zero(EP_TIME_SPEC *tv);
 
 // return current time plus an offset
 extern EP_STAT	ep_time_deltanow(
@@ -74,7 +78,11 @@ extern int64_t	ep_time_to_nsec(
 
 // create a time from a scalar number of nanoseconds
 extern void	ep_time_from_nsec(
-				int64_t delta,
+				int64_t nsec,
+				EP_TIME_SPEC *tv);
+
+extern void	ep_time_from_sec(
+				int64_t sec,
 				EP_TIME_SPEC *tv);
 
 // return putative clock accuracy
