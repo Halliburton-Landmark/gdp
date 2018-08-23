@@ -50,16 +50,7 @@
 #include "gdp.h"
 #include "gdp_priv.h"
 
-#ifndef PROTOCOL_L4_V3
-// send v4 session traffic over v3 transport layer
-# define PROTOCOL_L4_V3			0		// L4 over V4
-#endif
-
-#if PROTOCOL_L4_V3
-# define GDP_PORT_DEFAULT		8007	// default IP port
-#else
-# define GDP_PORT_DEFAULT		8009	// default IP port
-#endif
+#define GDP_PORT_DEFAULT		8009	// default IP port
 #define GDP_TTL_DEFAULT			15		// hops left
 
 
@@ -229,6 +220,7 @@ typedef EP_STAT		gdp_chan_recv_cb_t(
 							gdp_chan_t *chan,
 							gdp_name_t src,
 							gdp_name_t dst,
+							gdp_seqno_t seqno,
 							gdp_buf_t *payload,
 							size_t payload_len);
 
