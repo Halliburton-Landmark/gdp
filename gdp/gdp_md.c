@@ -494,12 +494,12 @@ gdp_md_dump(const gdp_md_t *gmd, FILE *fp, int detail, int indent)
 								md->md_len - 4,
 								EP_CRYPTO_KEYFORM_DER,
 								EP_CRYPTO_F_PUBLIC);
-						ep_crypto_key_print(key, stdout, EP_CRYPTO_F_PUBLIC);
+						ep_crypto_key_print(key, fp, EP_CRYPTO_F_PUBLIC);
 						ep_crypto_key_free(key);
 					}
 					if (detail >= 4)
 						ep_hexdump(mdd + 4, md->md_len - 4,
-								stdout, EP_HEXDUMP_HEX, 0);
+								fp, EP_HEXDUMP_HEX, 0);
 					continue;
 			}
 
