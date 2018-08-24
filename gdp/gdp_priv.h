@@ -361,6 +361,9 @@ void			_gdp_gob_dump(				// dump for debugging
 						int detail,				// how much to print
 						int indent);			// unused at this time
 
+EP_STAT			_gdp_gob_init_vrfy_ctx(		// initialize for proof verification
+						gdp_gob_t *gob);
+
 EP_STAT			_gdp_gob_create(			// create a new GDP object
 						gdp_name_t gobname,
 						gdp_name_t logdname,
@@ -717,6 +720,7 @@ struct gdp_req
 #define GDP_REQ_ALLOC_RID		0x00000040	// force allocation of new rid
 #define GDP_REQ_ON_GOB_LIST		0x00000080	// this is on a GOB list
 #define GDP_REQ_ON_CHAN_LIST	0x00000100	// this is on a channel list
+#define GDP_REQ_VRFY_CONTENT	0x00000200	// verify content proof
 #define GDP_REQ_ROUTEFAIL		0x00000400	// fail immediately on route failure
 
 EP_STAT			_gdp_req_new(				// create new request

@@ -21,6 +21,7 @@
 .Op Fl s
 .Op Fl t
 .Op Fl v
+.Op Fl V
 .Ar log-name
 .
 .Sh DESCRIPTION
@@ -172,6 +173,12 @@ but with the character version also shown.
 .It Fl v
 Print verbose output.
 This shows signature information as well as the data.
+.
+.It Fl V
+Verify data correctness.
+This gives an error if the data does not validate,
+either by the hash chain or the digital signature.
+.
 .El
 .
 .Pp

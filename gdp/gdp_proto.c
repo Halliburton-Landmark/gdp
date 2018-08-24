@@ -419,9 +419,23 @@ ack_data_content(gdp_req_t *req)
 		}
 		if (payload->dl->n_d < 1)
 			return GDP_STAT_RECORD_MISSING;		//XXX better choice?
-		//XXX should we return an error here?
+		//XXX should we return an error here?  Not fully implemented yet
 	}
-	GdpDatum *datum = payload->dl->d[payload->dl->n_d - 1];
+
+	// check the signature on the last datum in the PDU
+	GdpDatum *pbdatum = payload->dl->d[payload->dl->n_d - 1];
+	gdp_datum_t *datum = gdp_datum_new();		// inefficient
+	_gdp_datum_from_pb(datum, pbdatum, pbdatum->sig);
+
+	if (EP_UT_BITSET(GDP_REQ_VRFY_CONTENT, req->flags))
+	{
+		char ebuf[100];
+
+		estat = _gdp_datum_vrfy_gob(datum, req->gob);
+		ep_dbg_cprintf(Dbg, EP_STAT_ISOK(estat) ? 44 : 24,
+				"ack_data_content: vrfy %s\n",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
 
 	// hack to try to "self heal" in case we get out of sync
 	if (datum->recno > 0 &&
@@ -430,7 +444,7 @@ ack_data_content(gdp_req_t *req)
 
 	// keep track of how many more records we expect
 	if (req->numrecs > 0)
-		req->numrecs--;			//XXX payload->dl->n_d?
+		req->numrecs -= payload->dl->n_d;
 
 	// ... and how many we actually got
 	req->r_results += payload->dl->n_d;
@@ -443,6 +457,7 @@ ack_data_content(gdp_req_t *req)
 		estat = req->gin->readfilter(req->rpdu->datum, req->gin->readfpriv);
 #endif //TODO
 
+	gdp_datum_free(datum);
 	return estat;
 }
 

@@ -449,7 +449,7 @@ usage(void)
 	fprintf(stderr,
 			"Usage: %s [-a] [-c] [-d datetime] [-D dbgspec] [-f firstrec]\n"
 			"  [-G router_addr] [-L logfile] [-M] [-n nrecs] [-o outfile]\n"
-			"  [-s] [-t] [-v] log_name\n"
+			"  [-s] [-t] [-v] [-V] log_name\n"
 			"    -a  read asynchronously\n"
 			"    -c  use callbacks\n"
 			"    -d  first date/time to read from\n"
@@ -463,7 +463,8 @@ usage(void)
 			"    -q  be quiet (don't print any metadata)\n"
 			"    -s  subscribe to this log\n"
 			"    -t  print data as text (instead of hexdump)\n"
-			"    -v  print verbose output (include signature)\n",
+			"    -v  print verbose output (include signature)\n"
+			"    -V  verify proof on returned data\n",
 			ep_app_getprogname());
 	exit(EX_USAGE);
 }
@@ -484,6 +485,7 @@ main(int argc, char **argv)
 	bool async = false;
 	bool use_callbacks = false;
 	bool showmetadata = false;
+	bool vrfy_proof = false;
 	int32_t numrecs = 0;
 	gdp_recno_t firstrec = 0;
 	bool show_usage = false;
@@ -494,7 +496,7 @@ main(int argc, char **argv)
 	ep_lib_init(EP_LIB_USEPTHREADS);	// initialize app errors, etc.
 
 	// parse command-line options
-	while ((opt = getopt(argc, argv, "aAcd:D:f:G:L:mMn:o:qstv")) > 0)
+	while ((opt = getopt(argc, argv, "aAcd:D:f:G:L:mMn:o:qstvV")) > 0)
 	{
 		errno = 0;						// avoid misleading messages
 		switch (opt)
@@ -577,6 +579,9 @@ main(int argc, char **argv)
 
 		  case 'v':
 			PrintSig = true;
+
+		  case 'V':
+			vrfy_proof = true;
 			break;
 
 		  default:
@@ -654,8 +659,14 @@ main(int argc, char **argv)
 		fprintf(stderr, "Reading log %s\n", gobpname);
 	}
 
+	// set up any special open parameters
+	gdp_open_info_t *open_info = gdp_open_info_new();
+	if (vrfy_proof)
+		gdp_open_info_set_vrfy(open_info, true);
+
 	// open the log; arguably this shouldn't be necessary
-	estat = gdp_gin_open(gobname, open_mode, NULL, &gin);
+	estat = gdp_gin_open(gobname, open_mode, open_info, &gin);
+	gdp_open_info_free(open_info);
 	if (!EP_STAT_ISOK(estat))
 	{
 		ep_app_message(estat, "Cannot open log %s", argv[0]);

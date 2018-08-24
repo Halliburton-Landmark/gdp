@@ -373,24 +373,12 @@ _gdp_gob_open(gdp_gob_t *gob,
 
 	if (gob->vrfy_ctx == NULL)
 	{
-		// not signing, but we still need to set up the message digest
-		gob->vrfy_ctx = ep_crypto_md_new(gob->hashalg);
-		if (gob->vrfy_ctx == NULL)
+		// set up the verification context (or at least the hash digest)
+		estat = _gdp_gob_init_vrfy_ctx(gob);
+		if (!EP_UT_BITSET(GDP_REQ_VRFY_CONTENT, reqflags))
 		{
-			estat = EP_STAT_CRYPTO_DIGEST;
-			goto fail0;
-		}
-
-		// add the GOB name to the hashed message digest
-		ep_crypto_md_update(gob->vrfy_ctx, gob->name, sizeof gob->name);
-
-		// re-serialize the metadata and include it
-		{
-			uint8_t *mdbuf;
-			size_t mdlen;
-			mdlen = _gdp_md_serialize(gob->gob_md, &mdbuf);
-			ep_crypto_md_update(gob->vrfy_ctx, mdbuf, mdlen);
-			ep_mem_free(mdbuf);
+			// since we aren't verifying, just ignore setup errors
+			estat = EP_STAT_OK;
 		}
 	}
 
@@ -834,6 +822,8 @@ _gdp_gob_read_by_recno_async(
 		return GDP_STAT_LOG_NOT_OPEN;
 
 	// create a new READ request (don't need a special command)
+	if (EP_UT_BITSET(GINF_SIG_VRFY, gin->flags))
+		reqflags |= GDP_REQ_VRFY_CONTENT;
 	estat = _gdp_req_new(GDP_CMD_READ_BY_RECNO, gob, chan,
 						NULL, reqflags, &req);
 	EP_STAT_CHECK(estat, return estat);
@@ -921,6 +911,79 @@ fail1:
 	_gdp_req_free(&req);
 
 fail0:
+	return estat;
+}
+
+
+/*
+**  Initialize signature verification context.
+**
+**		Returns GDP_STAT_CRYPTO_NO_PUB_KEY if there is no public key
+**		associated with this log.  However, even if no public key is
+**		found, the message digest is set up since it is used in
+**		other places such as the hash chain.
+**
+**		If there is a public key, it also sets the GOBF_VERIFYING flag
+**		for use down the line.
+*/
+
+EP_STAT
+_gdp_gob_init_vrfy_ctx(gdp_gob_t *gob)
+{
+	EP_STAT estat;
+	size_t pklen;
+	uint8_t *pkbuf;
+	int pktype;
+	int mdtype = gob->hashalg;
+	EP_CRYPTO_KEY *key;
+
+	// assuming we have a public key, set up the message digest context
+	if (gob->gob_md == NULL)
+		goto nopubkey;
+	estat = gdp_md_find(gob->gob_md, GDP_MD_PUBKEY, &pklen,
+					(const void **) &pkbuf);
+	if (!EP_STAT_ISOK(estat) || pklen < 5)
+		goto nopubkey;
+
+	mdtype = pkbuf[0];
+	pktype = pkbuf[1];
+	ep_dbg_cprintf(Dbg, 40,
+				"init_vrfy_ctx: mdtype=%d, pktype=%d, pklen=%zd\n",
+				mdtype, pktype, pklen);
+	key = ep_crypto_key_read_mem(pkbuf + 4, pklen - 4,
+			EP_CRYPTO_KEYFORM_DER, EP_CRYPTO_F_PUBLIC);
+	if (key != NULL)
+	{
+		gob->vrfy_ctx = ep_crypto_vrfy_new(key, mdtype);
+		gob->flags |= GOBF_VERIFYING;
+	}
+	else
+	{
+nopubkey:
+		ep_dbg_cprintf(Dbg, 30,
+					"init_vrfy_ctx: no public key for %s\n",
+					gob->pname);
+		estat = GDP_STAT_CRYPTO_NO_PUB_KEY;
+
+		// still need to compute the digest for the hash chain
+		gob->vrfy_ctx = ep_crypto_md_new(mdtype);
+	}
+
+	// include the GOB name
+	ep_crypto_md_update(gob->vrfy_ctx, gob->name, sizeof gob->name);
+
+	// and the metadata (re-serialized)
+	// NOTE:  this will not be needed once the GOB name becomes the
+	// NOTE:  hash of the metadata.
+	uint8_t *mdbuf;
+	size_t mdlen = _gdp_md_serialize(gob->gob_md, &mdbuf);
+	ep_crypto_md_update(gob->vrfy_ctx, mdbuf, mdlen);
+	ep_mem_free(mdbuf);
+
+	char ebuf[100];
+	ep_dbg_cprintf(Dbg, 40,
+				"init_vrfy_ctx: %s\n",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	return estat;
 }
 

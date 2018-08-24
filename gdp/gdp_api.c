@@ -147,6 +147,8 @@ EP_PRFLAGS_DESC	_GdpGinFlags[] =
 {
 	{ GINF_INUSE,				GINF_INUSE,			"INUSE"				},
 	{ GINF_ISLOCKED,			GINF_ISLOCKED,		"ISLOCKED"			},
+	{ GINF_SIG_VRFY,			GINF_SIG_VRFY,		"SIG_VRFY"			},
+	{ GINF_SIG_VRFY_REQ,		GINF_SIG_VRFY_REQ,	"SIG_VRFY_REQ"		},
 	{ 0, 0, NULL }
 };
 
@@ -577,7 +579,7 @@ gdp_gin_open(gdp_name_t name,
 		}
 		if (EP_UT_BITSET(GOIF_VERIFY_PROOF, open_info->flags))
 		{
-			gin->flags |= GINF_SIG_VRFY_REQ;
+			gin->flags |= GINF_SIG_VRFY;
 		}
 	}
 	_gdp_gob_unlock(gob);
@@ -716,6 +718,7 @@ gdp_gin_read_by_recno(gdp_gin_t *gin,
 			gdp_datum_t *datum)
 {
 	EP_STAT estat;
+	uint32_t reqflags = 0;
 
 	ep_dbg_cprintf(Dbg, 39, "\n>>> gdp_gin_read_by_recno (%"PRIgdp_recno ")\n",
 			recno);
@@ -724,10 +727,14 @@ gdp_gin_read_by_recno(gdp_gin_t *gin,
 
 	estat = check_and_lock_gin_and_gob(gin, "gdp_gin_read_by_recno");
 	EP_STAT_CHECK(estat, return estat);
+
+	if (EP_UT_BITSET(GINF_SIG_VRFY, gin->flags))
+		reqflags |= GDP_REQ_VRFY_CONTENT;
 	//XXX somehow have to convey gin->readfilter to _gdp_gob_read
 	//XXX is there any reason not to just do it here?
 	//XXX Answer: read_async and subscriptions
-	estat = _gdp_gob_read_by_recno(gin->gob, recno, _GdpChannel, 0, datum);
+	estat = _gdp_gob_read_by_recno(gin->gob, recno, _GdpChannel,
+							reqflags, datum);
 	unlock_gin_and_gob(gin, "gdp_gin_read_by_recno");
 	prstat(estat, gin, "gdp_gin_read_by_recno");
 	return estat;

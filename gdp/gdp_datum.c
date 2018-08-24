@@ -331,79 +331,6 @@ _gdp_datum_dump(const gdp_datum_t *datum,
 	gdp_datum_print(datum, fp, GDP_DATUM_PRDEBUG);
 }
 
-
-/*
-**  Initialize signature verification context.
-**
-**		Returns GDP_STAT_CRYPTO_NO_PUB_KEY if there is no public key
-**		associated with this log.  However, even if no public key is
-**		found, the message digest is set up since it is used in
-**		other places such as the hash chain.
-**
-**		If there is a public key, it also sets the GOBF_VERIFYING flag
-**		for use down the line.
-*/
-
-static EP_STAT
-init_vrfy_ctx(gdp_datum_t *datum, gdp_gob_t *gob)
-{
-	EP_STAT estat;
-	size_t pklen;
-	uint8_t *pkbuf;
-	int pktype;
-	int mdtype = gob->hashalg;
-	EP_CRYPTO_KEY *key;
-
-	// assuming we have a public key, set up the message digest context
-	if (gob->gob_md == NULL)
-		goto nopubkey;
-	estat = gdp_md_find(gob->gob_md, GDP_MD_PUBKEY, &pklen,
-					(const void **) &pkbuf);
-	if (!EP_STAT_ISOK(estat) || pklen < 5)
-		goto nopubkey;
-
-	mdtype = pkbuf[0];
-	pktype = pkbuf[1];
-	ep_dbg_cprintf(Dbg, 40,
-				"init_vrfy_ctx: mdtype=%d, pktype=%d, pklen=%zd\n",
-				mdtype, pktype, pklen);
-	key = ep_crypto_key_read_mem(pkbuf + 4, pklen - 4,
-			EP_CRYPTO_KEYFORM_DER, EP_CRYPTO_F_PUBLIC);
-	if (key != NULL)
-	{
-		gob->vrfy_ctx = ep_crypto_vrfy_new(key, mdtype);
-		gob->flags |= GOBF_VERIFYING;
-	}
-	else
-	{
-nopubkey:
-		ep_dbg_cprintf(Dbg, 30,
-					"init_vrfy_ctx: no public key for %s\n",
-					gob->pname);
-		estat = GDP_STAT_CRYPTO_NO_PUB_KEY;
-
-		// still need to compute the digest for the hash chain
-		gob->vrfy_ctx = ep_crypto_md_new(mdtype);
-	}
-
-	// include the GOB name
-	ep_crypto_md_update(gob->vrfy_ctx, gob->name, sizeof gob->name);
-
-	// and the metadata (re-serialized)
-	// NOTE:  this will not be needed once the GOB name becomes the
-	// NOTE:  hash of the metadata.
-	uint8_t *mdbuf;
-	size_t mdlen = _gdp_md_serialize(gob->gob_md, &mdbuf);
-	ep_crypto_md_update(gob->vrfy_ctx, mdbuf, mdlen);
-	ep_mem_free(mdbuf);
-
-	char ebuf[100];
-	ep_dbg_cprintf(Dbg, 40,
-				"init_vrfy_ctx: %s\n",
-				ep_stat_tostr(estat, ebuf, sizeof ebuf));
-	return estat;
-}
-
 /*
 **  Incorporate a datum into a pre-existing message digest.
 **  This can also be used when signing and verifying.
@@ -498,7 +425,7 @@ gdp_hash_t *
 _gdp_datum_hash(gdp_datum_t *datum, gdp_gob_t *gob)
 {
 	if (gob->vrfy_ctx == NULL)
-		(void) init_vrfy_ctx(datum, gob);
+		(void) _gdp_gob_init_vrfy_ctx(gob);
 
 	EP_CRYPTO_MD *md = ep_crypto_md_clone(gob->vrfy_ctx);
 	_gdp_datum_digest(datum, md);
@@ -735,7 +662,7 @@ _gdp_datum_vrfy_gob(gdp_datum_t *datum, gdp_gob_t *gob)
 	EP_STAT estat = EP_STAT_OK;
 
 	if (gob->vrfy_ctx == NULL)
-		estat = init_vrfy_ctx(datum, gob);
+		estat = _gdp_gob_init_vrfy_ctx(gob);
 	EP_STAT_CHECK(estat, goto nopubkey);
 
 	// if we aren't verifying we can quit now
@@ -743,7 +670,7 @@ _gdp_datum_vrfy_gob(gdp_datum_t *datum, gdp_gob_t *gob)
 	{
 		// not verifying: assume this succeeded
 		//FIXME: this should depend on GdpSignatureStrictness
-		ep_dbg_cprintf(Dbg, 2, "_gdp_datum_vrfy: not verifying\n");
+		ep_dbg_cprintf(Dbg, 2, "_gdp_datum_vrfy_gob: not verifying\n");
 		return EP_STAT_OK;
 	}
 
