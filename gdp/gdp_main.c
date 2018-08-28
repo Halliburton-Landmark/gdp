@@ -90,6 +90,11 @@ _gdp_acknak_from_estat(EP_STAT estat, gdp_cmd_t def)
 		if (def < GDP_ACK_MIN || def > GDP_ACK_MAX)
 			resp = GDP_ACK_SUCCESS;
 	}
+	else if (EP_STAT_REGISTRY(estat) == EP_REGISTRY_EPLIB &&
+			EP_STAT_MODULE(estat) == EP_STAT_MOD_CRYPTO)
+	{
+		resp = GDP_NAK_C_UNAUTH;
+	}
 	else
 	{
 		if (def < GDP_NAK_C_MIN || def > GDP_NAK_R_MAX)
