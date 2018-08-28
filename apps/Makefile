@@ -94,6 +94,7 @@ LOCAL3=		/usr/local/opt/openssl
 INCROOT=	..
 INCSEARCH=	${INCLOCAL} \
 		-I${INCROOT} \
+		`mysql_config --include` \
 		-I${LOCAL1}/include \
 		-I${LOCAL2}/include \
 		-I${LOCAL3}/include
