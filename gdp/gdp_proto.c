@@ -68,6 +68,7 @@ _gdp_invoke(gdp_req_t *req)
 	EP_STAT estat = EP_STAT_OK;
 	EP_TIME_SPEC abs_to;
 	long delta_to;				// how long to wait for a response
+	bool retry;					// retry the command
 	int retries;				// how many times to retry
 	long retry_delay;			// how long to delay between retries
 	EP_TIME_SPEC delta_ts;
@@ -114,6 +115,7 @@ _gdp_invoke(gdp_req_t *req)
 				"_gdp_invoke: sending %d, retries=%d\n",
 				req->cpdu->msg->cmd, retries);
 
+		retry = false;
 		estat = _gdp_req_send(req);
 		EP_STAT_CHECK(estat, continue);
 
@@ -156,8 +158,8 @@ _gdp_invoke(gdp_req_t *req)
 			if (e != 0)
 			{
 				estat = ep_stat_from_errno(e);
-				if (e != ETIMEDOUT)			// retry on timeouts
-					retries = 0;
+				if (e == ETIMEDOUT)			// retry on timeouts
+					retry = true;
 				break;
 			}
 		}
@@ -175,31 +177,26 @@ _gdp_invoke(gdp_req_t *req)
 		{
 			estat = req->stat;
 
-			// if we succeeded or it's our fault, don't try again
-			if (EP_STAT_ISOK(req->stat) || GDP_STAT_IS_C_NAK(req->stat) ||
-					GDP_STAT_IS_S_NAK(req->stat))
-			{
-				break;				// we're done, don't retry
-			}
-			else if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOROUTE) &&
-					EP_UT_BITSET(GDP_REQ_ROUTEFAIL, req->flags))
-			{
-				// route failure on open: don't retry
-				break;
-			}
+			// determine if this is something we can recover from
+			if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOROUTE) &&
+					!EP_UT_BITSET(GDP_REQ_ROUTEFAIL, req->flags))
+				retry = true;
 		}
 
-		// do a retry, after re-locking the GOB
-		estat = _gdp_req_unsend(req);
-		EP_STAT_CHECK(estat, break);
-		estat = GDP_STAT_INVOKE_TIMEOUT;	//XXX why?
-		if (retries > 1)
+		// (maybe) do a retry, after re-locking the GOB
+		if (retry)
 		{
-			// if ETIMEDOUT, maybe the router had a glitch:
-			//   wait and try again
-			ep_time_nanosleep(retry_delay MILLISECONDS);
+			estat = _gdp_req_unsend(req);
+			EP_STAT_CHECK(estat, break);
+//			estat = GDP_STAT_INVOKE_TIMEOUT;	//XXX why?
+			if (retries > 1)
+			{
+				// if ETIMEDOUT, maybe the router had a glitch:
+				//   wait and try again
+				ep_time_nanosleep(retry_delay MILLISECONDS);
+			}
 		}
-	} while (--retries > 0);
+	} while (retry && --retries > 0);
 
 	// if we had any pending asynchronous events, deliver them
 	_gdp_event_insert_pending(&req->events, req);
