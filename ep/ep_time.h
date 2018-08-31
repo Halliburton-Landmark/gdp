@@ -72,15 +72,27 @@ extern bool	ep_time_before(
 				EP_TIME_SPEC *a,
 				EP_TIME_SPEC *b);
 
-// create a scalar number of nanoseconds from a time
+// return the difference between two times in microseconds
+extern int64_t	ep_time_diff_usec(
+				EP_TIME_SPEC *a,
+				EP_TIME_SPEC *b);
+
+// create a scalar number of nanoseconds and microseconds from a time
+// These should only be used for time intervals because of overflow problems.
 extern int64_t	ep_time_to_nsec(
 				EP_TIME_SPEC *tv);
+extern int64_t	ep_time_to_usec(
+				EP_TIME_SPEC *tv);
 
-// create a time from a scalar number of nanoseconds
+// create a time from a scalar number of nanoseconds, microseconds, seconds
+// The nsec and usec versions should only be used for time intervals
+// because of integer overflow problems.
 extern void	ep_time_from_nsec(
 				int64_t nsec,
 				EP_TIME_SPEC *tv);
-
+extern void	ep_time_from_usec(
+				int64_t usec,
+				EP_TIME_SPEC *tv);
 extern void	ep_time_from_sec(
 				int64_t sec,
 				EP_TIME_SPEC *tv);

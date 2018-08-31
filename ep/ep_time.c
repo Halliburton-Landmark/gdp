@@ -179,6 +179,18 @@ ep_time_add_delta(EP_TIME_SPEC *delta, EP_TIME_SPEC *tv)
 
 
 /*
+**  EP_TIME_DIFF_USEC --- return delta between two times
+*/
+
+int64_t
+ep_time_diff_usec(EP_TIME_SPEC *a, EP_TIME_SPEC *b)
+{
+	return (b->tv_sec * 1000000L + (b->tv_nsec / 1000)) -
+		(a->tv_sec * 1000000L + (a->tv_nsec / 1000));
+}
+
+
+/*
 **  EP_TIME_BEFORE --- true if A occurred before B
 **
 **	This doesn't allow for clock precision; it should really have
@@ -209,7 +221,7 @@ ep_time_to_nsec(EP_TIME_SPEC *tv)
 
 
 /*
-**  EP_TIME_FROM_NSEC --- convert nanoseconds to a EP_TIME_SPEC
+**  EP_TIME_FROM_[NU]SEC --- convert nanoseconds/microseconds to a EP_TIME_SPEC
 */
 
 void
@@ -217,6 +229,14 @@ ep_time_from_nsec(int64_t nsec, EP_TIME_SPEC *tv)
 {
 	tv->tv_sec = nsec / ONESECOND;
 	tv->tv_nsec = nsec % ONESECOND;
+	//tv->tv_accuracy = 0;		TODO: is this right?
+}
+
+void
+ep_time_from_usec(int64_t usec, EP_TIME_SPEC *tv)
+{
+	tv->tv_sec = usec / 1000000L;
+	tv->tv_nsec = (usec % 1000000L) * 1000L;
 	//tv->tv_accuracy = 0;		TODO: is this right?
 }
 
