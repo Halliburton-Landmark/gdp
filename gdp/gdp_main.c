@@ -742,19 +742,40 @@ _gdp_reclaim_resources_init(void (*f)(int, short, void *))
 
 /*
 **  Set libevent timer.
+**
+**		Timeout is in units of microseconds.
+**		Not general purpose (assumes *pev never changes type).
 */
 
-struct event *
-_gdp_evloop_timer_set(int32_t timeout, libevent_event_t *cbfunc, void *cbarg)
+void
+_gdp_evloop_timer_set(uint32_t timeout,
+					libevent_event_t *cbfunc,
+					void *cbarg,
+					struct event **pev)
 {
 	struct timeval tv;
-	struct event *ev;
+	struct event *ev = *pev;
 
-	ev = event_new(_GdpIoEventBase, -1, 0, cbfunc, cbarg);
+	if (ev == NULL)
+		*pev = ev = event_new(_GdpIoEventBase, -1, 0, cbfunc, cbarg);
+	else
+		event_assign(ev, _GdpIoEventBase, -1, 0, cbfunc, cbarg);
 	tv.tv_sec = timeout / 1000000;
 	tv.tv_usec = timeout % 1000000;
 	event_add(ev, &tv);
-	return ev;
+}
+
+
+/*
+**  Clear libevent timer.
+*/
+
+void
+_gdp_evloop_timer_clr(struct event **pev)
+{
+	if (*pev != NULL)
+		event_free(*pev);
+	*pev = NULL;
 }
 
 
@@ -1261,7 +1282,7 @@ _gdp_router_event(
 
 	{
 		//XXX wildcard seqno?
-		GdpMessage *msg = _gdp_msg_new(cmd, GDP_PDU_ANY_RID, GDP_PDU_NO_SEQNO);
+		GdpMessage *msg = _gdp_msg_new(cmd, GDP_PDU_ANY_RID, GDP_PDU_NO_L5SEQNO);
 		gdp_pdu_t *pdu = _gdp_pdu_new(msg, src, dst, GDP_SEQNO_NONE);
 
 		if (msg->cmd != 0)

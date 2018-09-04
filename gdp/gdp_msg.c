@@ -55,14 +55,14 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.msg", "GDP message manipulation");
 */
 
 gdp_msg_t *
-_gdp_msg_new(gdp_cmd_t cmd, gdp_rid_t rid, gdp_seqno_t seqno)
+_gdp_msg_new(gdp_cmd_t cmd, gdp_rid_t rid, gdp_l5seqno_t l5seqno)
 {
 	gdp_msg_t *msg;
 
 	ep_dbg_cprintf(Dbg, 24,
 				"_gdp_msg_new: cmd %s (%d), rid %" PRIgdp_rid
-							" seqno %" PRIgdp_seqno "\n",
-				_gdp_proto_cmd_name(cmd), cmd, rid, seqno);
+							" l5seqno %" PRIgdp_l5seqno "\n",
+				_gdp_proto_cmd_name(cmd), cmd, rid, l5seqno);
 
 	EP_ASSERT(cmd >= 0 && cmd <= 255);
 	msg = (gdp_msg_t *) ep_mem_zalloc(sizeof *msg);
@@ -73,10 +73,10 @@ _gdp_msg_new(gdp_cmd_t cmd, gdp_rid_t rid, gdp_seqno_t seqno)
 		msg->has_rid = true;
 		msg->rid = rid;
 	}
-	if (seqno != GDP_PDU_NO_SEQNO)
+	if (l5seqno != GDP_PDU_NO_L5SEQNO)
 	{
-		msg->has_seqno = true;
-		msg->seqno = seqno;
+		msg->has_l5seqno = true;
+		msg->l5seqno = l5seqno;
 	}
 
 	// initialize command body based on command type
@@ -293,11 +293,11 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 		fprintf(fp, "(any)");
 	else
 		fprintf(fp, "%" PRIgdp_rid, msg->rid);
-	fprintf(fp, ", seqno=");
-	if (msg->seqno == GDP_PDU_NO_SEQNO)
+	fprintf(fp, ", l5seqno=");
+	if (msg->l5seqno == GDP_PDU_NO_L5SEQNO)
 		fprintf(fp, "(none)");
 	else
-		fprintf(fp, "%d", msg->seqno);
+		fprintf(fp, "%" PRIgdp_l5seqno, msg->l5seqno);
 
 	fprintf(fp, "\n%ssig@%p", _gdp_pr_indent(indent), msg->sig);
 	if (msg->sig == NULL)

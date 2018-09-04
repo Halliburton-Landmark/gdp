@@ -134,7 +134,7 @@ shutdown_req(gdp_req_t *req)
 	{
 		gdp_msg_t *msg = _gdp_msg_new(GDP_NAK_S_LOST_SUBSCR,
 									req->cpdu->msg->rid,
-									req->cpdu->msg->seqno);
+									req->cpdu->msg->l5seqno);
 		gdp_pdu_t *pdu = _gdp_pdu_new(msg, req->gob->name, req->cpdu->src,
 									GDP_SEQNO_NONE);
 		gdp_pdu_t *save_pdu = req->rpdu;

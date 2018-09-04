@@ -93,10 +93,15 @@
 **		be explicitly freed.
 */
 
-typedef uint16_t		gdp_seqno_t;	// protocol sequence number
-#define	PRIgdp_seqno	PRIu16
+// Layer 4 definitions
+typedef uint16_t		gdp_seqno_t;	// L4 protocol sequence number
+#define PRIgdp_seqno	PRIu16
 #define GDP_SEQNO_BASE	(2 ^ 15)		// modulus base
 #define GDP_SEQNO_NONE	GDP_SEQNO_BASE	// "no sequence number"
+
+// Layer 5 definitions
+typedef uint32_t		gdp_l5seqno_t;	// protocol sequence number
+#define	PRIgdp_l5seqno	PRIu32
 
 typedef uint32_t		gdp_rid_t;		// request id (uniquifies request)
 #define PRIgdp_rid		PRIu32
@@ -125,7 +130,7 @@ typedef struct gdp_pdu
 /***** dummy values for other fields *****/
 #define GDP_PDU_NO_RID		UINT32_C(0)		// no request id
 #define GDP_PDU_NO_RECNO	INT64_C(0)		// no record number
-#define GDP_PDU_NO_SEQNO	UINT64_C(0)		// no sequence number
+#define GDP_PDU_NO_L5SEQNO	UINT32_C(0)		// no L5 sequence number
 #define GDP_PDU_ANY_RID		UINT32_MAX		// any request id
 
 /***** manifest constants *****/

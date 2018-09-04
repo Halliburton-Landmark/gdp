@@ -805,7 +805,8 @@ cmd_append(gdp_req_t *req)
 			GdpDatum *pbd = ep_mem_malloc(sizeof *pbd);
 			gdp_datum__init(pbd);
 			gdp_msg_t *msg = _gdp_msg_new(GDP_ACK_CONTENT,
-									req->cpdu->msg->rid, req->cpdu->msg->seqno);
+										req->cpdu->msg->rid,
+										req->cpdu->msg->l5seqno);
 
 			_gdp_datum_to_pb(datum, msg, pbd);
 

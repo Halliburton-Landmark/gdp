@@ -21,13 +21,16 @@
 **  > body contains the semantic payload.
 **  > sig is a signature over cmd, rid, and body.  This signs the
 **    command, not the data.
+**
+**  Note that there are sequence numbers at both Layer 4 and Layer 5.
+**  At the moment only the L4 seqno is in use.
 */
 
 message GdpMessage
 {
 	required GdpMsgCode		cmd = 1;		// command or ack/nak
 	optional uint32			rid = 2;		// request distinguisher
-	optional uint32			seqno = 3;		// sequence number
+	optional uint32			l5seqno = 3;	// sequence number
 	oneof body
 	{
 		CmdCreate			cmd_create				= 66;

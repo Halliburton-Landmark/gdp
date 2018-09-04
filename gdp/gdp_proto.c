@@ -199,7 +199,7 @@ _gdp_invoke(gdp_req_t *req)
 	} while (retry && --retries > 0);
 
 	// if we had any pending asynchronous events, deliver them
-	_gdp_event_insert_pending(&req->events, req);
+	_gdp_event_trigger_pending(req, false);
 
 	if (ep_dbg_test(Dbg, 11))
 	{

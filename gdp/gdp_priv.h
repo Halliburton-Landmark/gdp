@@ -670,7 +670,10 @@ struct gdp_open_info
 **		the first data return appears before the ack for the
 **		initial command has finished processing.  To avoid confusing
 **		applications you have to defer these events until the app
-**		knows that the command succeeded.
+**		knows that the command succeeded.  This list is sorted by
+**		seqno (that is, the sequence number of the PDU as issued
+**		by the sender).  The next expected seqno is stored in
+**		seqnext.
 **
 **		Implemented in gdp_req.c.
 */
@@ -701,6 +704,7 @@ struct gdp_req
 	gdp_gin_t			*gin;		// GIN handle (client only, may be NULL)
 	int64_t				r_results;	// number of results received so far
 	struct gev_list		events;		// pending events (see above)
+	gdp_seqno_t			seqnext;	// next expected seqno
 	struct event		*ev_to;		// event timeout (to scan pending events)
 };
 
@@ -831,10 +835,14 @@ typedef void	libevent_event_t(
 						short what,
 						void *cbarg);
 
-struct event	*_gdp_evloop_timer_set(
-						int32_t timeout,			// in timeout usec
+void			_gdp_evloop_timer_set(
+						uint32_t timeout,			// in timeout usec
 						libevent_event_t *cbfunc,	// ... call cbfunc
-						void *cbarg);				// ... with this arg
+						void *cbarg,				// ... with this arg
+						struct event **pev);		// ... stored here
+
+void			_gdp_evloop_timer_clr(
+						struct event **pev);
 
 
 /*
@@ -846,7 +854,7 @@ struct event	*_gdp_evloop_timer_set(
 gdp_msg_t		*_gdp_msg_new(				// create new message
 					gdp_cmd_t cmd,
 					gdp_rid_t rid,
-					gdp_seqno_t seqno);
+					gdp_l5seqno_t l5seqno);
 
 void			_gdp_msg_free(				// free a message
 					gdp_msg_t **pmsg);

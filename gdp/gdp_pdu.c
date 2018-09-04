@@ -134,7 +134,7 @@ _gdp_pdu_out(gdp_pdu_t *pdu, gdp_chan_t *chan)
 		struct evbuffer_iovec v[1];
 
 		pdu->msg->has_rid = (pdu->msg->rid != GDP_PDU_NO_RID);
-		pdu->msg->has_seqno = (pdu->msg->seqno != GDP_PDU_NO_SEQNO);
+		pdu->msg->has_l5seqno = (pdu->msg->l5seqno != GDP_PDU_NO_L5SEQNO);
 
 		// *__get_packed_size has no error returns
 		pb_len = gdp_message__get_packed_size(pdu->msg);
@@ -258,8 +258,8 @@ _gdp_pdu_in(
 	// decode Protobuf into gdp_pdu_t
 	if (!msg->has_rid)
 		msg->rid = GDP_PDU_NO_RID;
-	if (!msg->has_seqno)
-		msg->seqno = GDP_PDU_NO_SEQNO;
+	if (!msg->has_l5seqno)
+		msg->l5seqno = GDP_PDU_NO_L5SEQNO;
 
 fail1:
 	if (ep_dbg_test(DbgIn, 18))

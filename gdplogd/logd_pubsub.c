@@ -70,7 +70,7 @@ sub_send_message_notification(gdp_req_t *req)
 
 	memcpy(req->rpdu->dst, req->cpdu->src, sizeof req->rpdu->dst);
 	req->rpdu->msg->rid = req->cpdu->msg->rid;
-	req->rpdu->msg->seqno = req->cpdu->msg->seqno;
+	req->rpdu->msg->l5seqno = req->cpdu->msg->l5seqno;
 	estat = _gdp_pdu_out(req->rpdu, req->chan);
 
 	if (!EP_STAT_ISOK(estat))
