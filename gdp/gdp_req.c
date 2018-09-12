@@ -284,10 +284,17 @@ _gdp_req_free(gdp_req_t **reqp)
 	if (req->state == GDP_REQ_FREE)
 	{
 		// req was freed after a reference was taken
+		ep_dbg_cprintf(Dbg, 1, "_gdp_req_free(%p): already free\n", req);
 		return;
 	}
 	if (req->gob != NULL)
 		EP_ASSERT(req->gob->refcnt > 0);
+
+	// remove any timeout associated with this req
+	_gdp_evloop_timer_clr(&req->ev_to);
+
+	// flush any saved events for this req
+	_gdp_event_trigger_pending(req, true);
 
 	// remove the request from the channel subscription list
 	if (EP_UT_BITSET(GDP_REQ_ON_CHAN_LIST, req->flags))

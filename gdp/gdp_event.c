@@ -36,14 +36,18 @@
 #include <ep/ep_log.h>
 
 #include "gdp.h"
-#include "gdp_priv.h"
 #include "gdp_event.h"
+#include "gdp_chan.h"
+#include "gdp_priv.h"
 
 #include <string.h>
 #include <sys/errno.h>
 
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.event", "GDP event handling");
+
+#define DATA_TO_DEFAULT	10000		// "content" timeout (in usec)
+#define DONE_TO_DEFAULT	50000		// "no more results" timeout (in usec)
 
 
 // free (unused) events
@@ -334,26 +338,52 @@ insert_pending_event(gdp_event_t *gev,
 	// sort the event into the correct place in the list
 	if (gev->type == GDP_EVENT_DONE)
 	{
+		static EP_TIME_SPEC done_to = { EP_TIME_NOTIME };
+		if (!EP_TIME_IS_VALID(&done_to))
+		{
+			uint64_t to = ep_adm_getintmaxparam("swarm.gdp.event.timeout.done",
+									DONE_TO_DEFAULT);
+			ep_time_from_usec(to, &done_to);
+			EP_ASSERT(EP_TIME_IS_VALID(&done_to));
+		}
+
 		// done ("no more results") always goes at end of list
-		ep_time_from_sec(EP_TIME_MAXTIME, &gev->timeout);
+		ep_time_deltanow(&done_to, &gev->timeout);
 		TAILQ_INSERT_TAIL(&req->events, gev, queue);
 	}
 	else
 	{
+		static EP_TIME_SPEC data_to = { EP_TIME_NOTIME };
+		if (!EP_TIME_IS_VALID(&data_to))
+		{
+			uint64_t to = ep_adm_getintmaxparam("swarm.gdp.event.timeout.data",
+									DATA_TO_DEFAULT);
+			ep_time_from_usec(to, &data_to);
+			EP_ASSERT(EP_TIME_IS_VALID(&data_to));
+		}
+		ep_time_deltanow(&data_to, &gev->timeout);
+
 		gdp_event_t *next_ev = TAILQ_LAST(&req->events, gev_list);
 		if (next_ev == NULL || modulo_gt(gev->seqno, next_ev->seqno))
 		{
-			ep_dbg_cprintf(Dbg, 46,
-					"insert_pending_event: seqno %" PRIgdp_seqno " in order\n",
-					gev->seqno);
+			if (ep_dbg_test(Dbg, 46))
+			{
+				gdp_seqno_t next_seq = GDP_SEQNO_NONE;
+				if (next_ev != NULL)
+					next_seq = next_ev->seqno;
+				ep_dbg_printf("insert_pending_event: seqno %" PRIgdp_seqno
+							" in order (next %" PRIgdp_seqno
+							" %" PRIgdp_seqno ")\n",
+						gev->seqno, req->seqnext, next_seq);
+			}
 			TAILQ_INSERT_TAIL(&req->events, gev, queue);
 		}
 		else
 		{
 			ep_dbg_cprintf(Dbg, 42,
 					"insert_pending_event: seqno %" PRIgdp_seqno
-					", next seqno %" PRIgdp_seqno "\n",
-					gev->seqno, next_ev->seqno);
+					", next seqno %" PRIgdp_seqno " %" PRIgdp_seqno"\n",
+					gev->seqno, next_ev->seqno, req->seqnext);
 
 			// find correct position in list
 			gdp_event_t *this_ev = next_ev;
@@ -388,6 +418,8 @@ pending_timeout(int unused, short what, void *req_)
 	gdp_req_t *req = req_;
 
 	// activate any pending items that should be delivered now
+	ep_dbg_cprintf(Dbg, 51, "pending_timeout\n");
+	EP_ASSERT(req->state != GDP_REQ_FREE);
 	_gdp_event_trigger_pending(req, false);
 }
 
@@ -407,6 +439,8 @@ done_timeout(int unused, short what, void *req_)
 	gdp_req_t *req = req_;
 
 	// activate any pending items that should be delivered now
+	ep_dbg_cprintf(Dbg, 51, "done_timeout\n");
+	EP_ASSERT(req->state != GDP_REQ_FREE);
 	_gdp_event_trigger_pending(req, true);
 }
 
@@ -424,26 +458,26 @@ done_timeout(int unused, short what, void *req_)
 **	to tuck it away for a while.
 */
 
-#define DONE_TIMEOUT	10000		// in microseconds (10 msec)
-
 static void
 _gdp_event_trigger(gdp_event_t *gev, gdp_req_t *req)
 {
-	ep_dbg_cprintf(Dbg, 48,
-			"_gdp_event_trigger: gev %p req %p\n",
-			gev, req);
+	if (ep_dbg_test(Dbg, 48))
+	{
+		ep_dbg_printf("_gdp_event_trigger: gev %p req %p seqno %" PRIgdp_seqno
+					" %" PRIgdp_seqno "\n",
+					gev, req, gev->seqno, req->seqnext);
+		char tbuf[60];
+		ep_time_format(&gev->timeout, tbuf, sizeof tbuf,
+					EP_TIME_FMT_HUMAN | EP_TIME_FMT_SIGFIG6);
+		ep_dbg_printf("    timeout %s\n", tbuf);
+	}
+	req->seqnext = (gev->seqno + 1) % GDP_SEQNO_BASE;
 	if (gev->type == GDP_EVENT_DONE &&
 			EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
 	{
 		// more results will come later
-		static int32_t timeout = -1;
-
-		if (timeout < 0)
-			timeout = ep_adm_getlongparam("swarm.gdp.timeout.done",
-											DONE_TIMEOUT);
+		ep_dbg_cprintf(Dbg, 49, "  ... deferring done pdu\n");
 		insert_active_event(gev, &req->events);
-		if (timeout > 0)
-			_gdp_evloop_timer_set(timeout, &done_timeout, req, &req->ev_to);
 	}
 	else if (gev->cb == NULL)
 	{
@@ -480,29 +514,44 @@ _gdp_event_trigger_pending(gdp_req_t *req, bool flush)
 	gdp_event_t *gev;
 	EP_TIME_SPEC now;
 
-	ep_dbg_cprintf(Dbg, 48,
-			"_gdp_event_trigger_pending: req %p flush %d first %p\n",
-			req, flush, TAILQ_FIRST(&req->events));
-
 	ep_time_now(&now);
+	if (ep_dbg_test(Dbg, 48))
+	{
+		char tbuf[60];
+
+		ep_time_format(&now, tbuf, sizeof tbuf,
+					EP_TIME_FMT_HUMAN | EP_TIME_FMT_SIGFIG6);
+		ep_dbg_printf("_gdp_event_trigger_pending: "
+					"req %p seqnext %d flush %d\n"
+				"    now %s first %p\n",
+				req, req->seqnext, flush,
+				tbuf, TAILQ_FIRST(&req->events));
+	}
+
 	while ((gev = TAILQ_FIRST(&req->events)) != NULL)
 	{
 		if (!flush &&
-				modulo_gt(gev->seqno, req->seqnext) &&
+				gev->seqno != req->seqnext &&
 				ep_time_before(&now, &gev->timeout))
 			break;
 
 		// we need to trigger this event
 		TAILQ_REMOVE(&req->events, gev, queue);
-		if (gev->seqno == req->seqnext)
-			req->seqnext = (req->seqnext + 1) % GDP_SEQNO_BASE;
 		_gdp_event_trigger(gev, req);
 	}
 
 	// if anything left in the list, set the next timeout
 	if (gev != NULL)
-		_gdp_evloop_timer_set(ep_time_diff_usec(&now, &gev->timeout),
-							&pending_timeout, req, &req->ev_to);
+	{
+		long to = ep_time_diff_usec(&now, &gev->timeout);
+		ep_dbg_cprintf(Dbg, 49, "  ... setting %ld usec event timeout\n", to);
+		if (gev->type == GDP_EVENT_DONE)
+			_gdp_evloop_timer_set(to, &done_timeout, req, &req->ev_to);
+		else
+			_gdp_evloop_timer_set(to, &pending_timeout, req, &req->ev_to);
+	}
+	else
+		ep_dbg_cprintf(Dbg, 49, "   ... no pending events\n");
 }
 
 
@@ -650,6 +699,7 @@ _gdp_event_add_from_req(gdp_req_t *req)
 	gev->udata = req->sub_cbarg;
 	gev->cb = req->sub_cbfunc;
 	gev->datum = gdp_datum_new();
+	EP_TIME_INVALIDATE(&gev->timeout);
 	if (msg->cmd == GDP_ACK_CONTENT)
 	{
 		EP_ASSERT(msg->ack_content->dl->n_d == 1);		//FIXME: should handle multiples
@@ -688,7 +738,7 @@ _gdp_event_dump(const gdp_event_t *gev, FILE *fp, int detail, int indent)
 	{
 		char tbuf[100];
 		ep_time_format(&gev->timeout, tbuf, sizeof tbuf,
-						EP_TIME_FMT_HUMAN | EP_TIME_FMT_NOFUZZ);
+					EP_TIME_FMT_HUMAN | EP_TIME_FMT_SIGFIG6 | EP_TIME_FMT_NOFUZZ);
 		fprintf(fp, "Event type %d, seqno %d, cbarg %p, timeout %s\n"
 				"    stat %s\n",
 				gev->type, gev->seqno, gev->udata, tbuf,

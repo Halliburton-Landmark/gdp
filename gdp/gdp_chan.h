@@ -196,6 +196,12 @@ typedef struct gdp_adcert		gdp_adcert_t;		// advertising cert
 #define GDP_PKT_SEQNO_MF			0x80000000	// more fragments bit
 #define GDP_PKT_SEQNO_FOFF_MASK		0xffff	// fragment offset mask
 
+// L4 sequence number
+//typedef uint16_t					gdp_seqno_t;	// defined in gdp_priv.h
+#define PRIgdp_seqno				PRIu16
+#define GDP_SEQNO_BASE				(1 << 15)		// modulus base
+#define GDP_SEQNO_NONE				((uint16_t) GDP_SEQNO_BASE)
+
 
 /*
 **  Callback function declarations to simplify later declarations.

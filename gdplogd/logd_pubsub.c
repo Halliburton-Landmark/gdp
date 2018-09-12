@@ -34,6 +34,7 @@
 #include "logd_pubsub.h"
 
 #include <gdp/gdp_priv.h>
+#include <gdp/gdp_chan.h>
 #include <ep/ep.h>
 #include <ep/ep_dbg.h>
 #include <ep/ep_hash.h>

@@ -93,13 +93,7 @@
 **		be explicitly freed.
 */
 
-// Layer 4 definitions
-typedef uint16_t		gdp_seqno_t;	// L4 protocol sequence number
-#define PRIgdp_seqno	PRIu16
-#define GDP_SEQNO_BASE	(2 ^ 15)		// modulus base
-#define GDP_SEQNO_NONE	GDP_SEQNO_BASE	// "no sequence number"
-
-// Layer 5 definitions
+// Layer 5 definitions; L4 are in gdp_chan.h
 typedef uint32_t		gdp_l5seqno_t;	// protocol sequence number
 #define	PRIgdp_l5seqno	PRIu32
 
@@ -107,7 +101,7 @@ typedef uint32_t		gdp_rid_t;		// request id (uniquifies request)
 #define PRIgdp_rid		PRIu32
 
 
-typedef struct gdp_pdu
+struct gdp_pdu
 {
 	// metadata
 	TAILQ_ENTRY(gdp_pdu)	list;		// free list
@@ -121,7 +115,7 @@ typedef struct gdp_pdu
 
 	// Layer 5 info
 	GdpMessage				*msg;		// on-the-wire message (not NULL)
-} gdp_pdu_t;
+};
 
 // flag bits
 #define GDP_PDU_INUSE		0x00000001	// PDU is allocated and in use

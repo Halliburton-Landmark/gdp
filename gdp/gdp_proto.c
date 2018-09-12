@@ -310,6 +310,7 @@ fail0:
 **  ACKs (success)
 */
 
+// 2xx --- all successful acks
 static EP_STAT
 ack(gdp_req_t *req, const char *where)
 {
@@ -319,11 +320,15 @@ ack(gdp_req_t *req, const char *where)
 	if (EP_STAT_ISFAIL(estat))
 		return estat;
 
+	// mark this request as active (for subscriptions)
+	ep_time_now(&req->act_ts);
+
 	estat = GDP_STAT_FROM_ACK(req->rpdu->msg->cmd);
 	return estat;
 }
 
 
+// 200 --- generic success
 static EP_STAT
 ack_success(gdp_req_t *req)
 {
@@ -334,9 +339,6 @@ ack_success(gdp_req_t *req)
 	if (EP_STAT_ISFAIL(estat))
 		goto fail0;
 
-	// mark this request as active (for subscriptions)
-	ep_time_now(&req->act_ts);
-
 	//	If we started with no gob id, adopt from incoming PDU.
 	//	This can happen when creating a GOB.
 	gob = req->gob;
@@ -346,6 +348,9 @@ ack_success(gdp_req_t *req)
 		gdp_printable_name(gob->name, gob->pname);
 	}
 
+	// keep track of next sequence number in case async data following
+	req->seqnext = (req->rpdu->seqno + 1) % GDP_SEQNO_BASE;
+
 	// if this is an open response, the GOB is now fully open
 	if (gob != NULL)
 		gob->flags &= ~GOBF_PENDING;
@@ -354,13 +359,13 @@ fail0:
 	return estat;
 }
 
-// response to append command
+// 204 --- response to append command
 static EP_STAT
 ack_data_changed(gdp_req_t *req)
 {
 	EP_STAT estat;
 
-	estat = ack_success(req);
+	estat = ack(req, "ack_data_changed");
 	EP_STAT_CHECK(estat, return estat);
 
 	EP_ASSERT_ELSE(req->rpdu->msg->body_case ==
@@ -374,7 +379,7 @@ ack_data_changed(gdp_req_t *req)
 	return estat;
 }
 
-// response to read or subscribe command
+// 205 --- response to read or subscribe command
 static EP_STAT
 ack_data_content(gdp_req_t *req)
 {
@@ -383,7 +388,7 @@ ack_data_content(gdp_req_t *req)
 	EP_ASSERT_ELSE(req->gob != NULL, return EP_STAT_ASSERT_ABORT);
 	GDP_MSG_CHECK(req->rpdu, return EP_STAT_ASSERT_ABORT);
 
-	estat = ack_success(req);
+	estat = ack(req, "ack_data_content");
 	EP_STAT_CHECK(estat, return estat);
 
 	EP_ASSERT_ELSE(req->rpdu->msg->body_case ==
@@ -459,7 +464,7 @@ ack_data_content(gdp_req_t *req)
 }
 
 
-// no more results to come
+// 263 --- no more results to come
 static EP_STAT
 ack_end_results(gdp_req_t *req)
 {
@@ -468,7 +473,7 @@ ack_end_results(gdp_req_t *req)
 	EP_ASSERT_ELSE(req->gob != NULL, return EP_STAT_ASSERT_ABORT);
 	GDP_MSG_CHECK(req->rpdu, return EP_STAT_ASSERT_ABORT);
 
-	estat = ack_success(req);
+	estat = ack(req, "ack_end_results");
 	if (EP_STAT_ISFAIL(estat))
 		return estat;
 
@@ -483,7 +488,10 @@ ack_end_results(gdp_req_t *req)
 			"ack_end_results: read %"PRId64 " sent %"PRId64 "\n",
 			req->r_results, req->s_results);
 	if (req->r_results >= req->s_results)
+	{
+		_gdp_event_trigger_pending(req, true);
 		req->flags &= ~GDP_REQ_PERSIST;
+	}
 
 	return EP_STAT_OK;
 }

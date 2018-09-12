@@ -51,7 +51,9 @@
 #include <netinet/tcp.h>
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.chan", "GDP channel processing");
-
+#if GDP_EXTREME_TESTS
+static EP_DBG	DbgTest1 = EP_DBG_INIT("test.gdp.chan.seqno", "GDP channel seqno randomization test");
+#endif
 
 // protocol version number in layer 4 (transport) PDU
 #define GDP_CHAN_PROTO_VERSION	4
@@ -241,6 +243,15 @@ read_header(gdp_chan_t *chan,
 		estat = GDP_STAT_PDU_CORRUPT;
 		goto done;
 	}
+
+#if GDP_EXTREME_TESTS
+	if (ep_dbg_test(DbgTest1, 102))
+	{
+		// randomize sequence number to test recovery
+		// (no need to be cryptographically secure, hence trivial algorithm)
+		seqno = random() % GDP_SEQNO_BASE;
+	}
+#endif
 
 	if (ep_dbg_test(Dbg, 55))
 	{

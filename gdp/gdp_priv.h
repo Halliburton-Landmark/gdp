@@ -50,14 +50,18 @@
 # define VALGRIND_HG_CLEAN_MEMORY(a, b)
 #endif
 
-typedef struct gdp_chan		gdp_chan_t;
+typedef struct gdp_chan		gdp_chan_t;		// should be in gdp_chan.h?
+typedef uint16_t			gdp_seqno_t;	// should be in gdp_chan.h?
 typedef struct gdp_req		gdp_req_t;
 typedef struct gdp_gob		gdp_gob_t;
 typedef struct gdp_gin		gdp_gin_t;
+typedef struct gdp_pdu		gdp_pdu_t;		// should be in gdp_pdu.h?
 typedef GdpMessage			gdp_msg_t;
 typedef GdpMsgCode			gdp_cmd_t;
 typedef struct event_base	event_base_t;
 TAILQ_HEAD(gev_list, gdp_event);
+
+#include "gdp_pdu.h"
 
 extern EP_THR		_GdpIoEventLoopThread;
 extern event_base_t	*_GdpIoEventBase;	// for all I/O events
@@ -94,8 +98,6 @@ extern bool			_GdpLibInitialized;	// are we initialized?
 #define GDP_MSG_CHECK(pdu, recovery)										\
 			EP_ASSERT_ELSE(pdu != NULL, recovery);							\
 			EP_ASSERT_ELSE(pdu->msg != NULL, recovery);
-
-#include "gdp_pdu.h"
 
 // declare the type of the gdp_req linked list (used multiple places)
 LIST_HEAD(req_head, gdp_req);

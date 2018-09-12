@@ -54,6 +54,7 @@
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.main", "GDP initialization and main loop");
 static EP_DBG	DbgEvLock = EP_DBG_INIT("gdp.libevent.locks", "GDP libevent lock debugging");
 static EP_DBG	DbgProcResp = EP_DBG_INIT("gdp.response", "GDP response processing");
+static EP_DBG	DbgTimers = EP_DBG_INIT("gdp.libevent.timers", "GDP timer events");
 
 struct event_base	*_GdpIoEventBase;	// the base for GDP I/O events
 gdp_name_t			_GdpMyRoutingName;	// source name for PDUs
@@ -756,10 +757,11 @@ _gdp_evloop_timer_set(uint32_t timeout,
 	struct timeval tv;
 	struct event *ev = *pev;
 
-	if (ev == NULL)
-		*pev = ev = event_new(_GdpIoEventBase, -1, 0, cbfunc, cbarg);
-	else
-		event_assign(ev, _GdpIoEventBase, -1, 0, cbfunc, cbarg);
+	if (ev != NULL)
+		event_free(ev);
+	*pev = ev = event_new(_GdpIoEventBase, -1, 0, cbfunc, cbarg);
+	ep_dbg_cprintf(DbgTimers, 52,
+			"_gdp_evloop_timer_set(%" PRIu32 ") => %p\n", timeout,  ev);
 	tv.tv_sec = timeout / 1000000;
 	tv.tv_usec = timeout % 1000000;
 	event_add(ev, &tv);
@@ -773,6 +775,7 @@ _gdp_evloop_timer_set(uint32_t timeout,
 void
 _gdp_evloop_timer_clr(struct event **pev)
 {
+	ep_dbg_cprintf(DbgTimers, 52, "_gdp_evloop_timer_clr(%p)\n", *pev);
 	if (*pev != NULL)
 		event_free(*pev);
 	*pev = NULL;
