@@ -143,7 +143,7 @@ _gdp_gin_unlock_trace(gdp_gin_t *gin,
 }
 
 
-EP_PRFLAGS_DESC	_GdpGinFlags[] =
+static EP_PRFLAGS_DESC	_GdpGinFlags[] =
 {
 	{ GINF_INUSE,				GINF_INUSE,			"INUSE"				},
 	{ GINF_ISLOCKED,			GINF_ISLOCKED,		"ISLOCKED"			},
@@ -185,7 +185,7 @@ _gdp_gin_dump(
 			VALGRIND_HG_ENABLE_CHECKING(gob, sizeof *gob);
 		}
 		fprintf(fp, "%sflags = ", _gdp_pr_indent(indent));
-		ep_prflags(gin->flags, _GdpGinFlags, fp);		//XXX FIXME
+		ep_prflags(gin->flags, _GdpGinFlags, fp);
 
 		if (detail >= GDP_PR_BASIC)
 		{
