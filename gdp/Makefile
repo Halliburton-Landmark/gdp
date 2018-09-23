@@ -130,6 +130,12 @@ PUBALL=		${SCRIPTS} ${MANALL} ${INCALL} ${LIBALL}
 # "make all" targets (may be overlap)
 ALL=		${CLEANALL} ${PUBALL}
 
+SANITIZE=
+#SANITIZE+=	-fsanitize=address
+#SANITIZE+=	-fsanitize=thread
+#SANITIZE+=	-fsanitize=memory
+#SANITIZE+=	-fsanitize=undefined
+
 INCROOT=	..
 INCSEARCH=	${INCLOCAL} \
 		-I${INCROOT} \
@@ -153,7 +159,7 @@ LIBSEARCH=	${LIBLOCAL} \
 		-L${LOCAL1}/lib \
 		-L${LOCAL2}/lib \
 		-L${LOCAL3}/lib
-LDFLAGS+= 	${LIBSEARCH}
+LDFLAGS+= 	${LIBSEARCH} ${SANITIZE}
 LDLIBS=		${LIBEP} \
 		${LIBEVENT2} \
 		${LIBCRYPTO} \
@@ -168,7 +174,7 @@ WALL=		-Wall
 G=		-g
 O=		-O
 STD=
-COPTS=		${PG} ${WALL} $G $O ${STD}
+COPTS=		${PG} ${WALL} $G $O ${STD} ${SANITIZE}
 CFLAGS+=	${COPTS} ${INCS} -fPIC
 
 LN=		ln

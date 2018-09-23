@@ -73,6 +73,12 @@ INSTALL=	install ${INSTALLFLAGS}
 LOCAL1=		/usr/local
 LOCAL2=		/opt/local
 LOCAL3=		/usr/local/opt/openssl
+SANITIZE=
+#SANITIZE+=	-fsanitize=address
+#SANITIZE+=	-fsanitize=thread
+#SANITIZE+=	-fsanitize=memory
+#SANITIZE+=	-fsanitize=undefined
+
 INCROOT=	..
 INCSEARCH=	${INCLOCAL} \
 		-I${INCROOT} \
@@ -109,14 +115,15 @@ LDLIBS=		${LIBGDP} \
 		${LIBADD}
 LDFLAGS+=	t_common_support.o \
 		${LIBSEARCH} \
-		${LDLIBS}
+		${LDLIBS} \
+		${SANITIZE}
 CC=		cc
 PG=
 WALL=		-Wall
 G=		-g
 O=		-O
 STD=
-COPTS=		${PG} ${WALL} $G $O ${STD}
+COPTS=		${PG} ${WALL} $G $O ${STD} ${SANITIZE}
 CFLAGS+=	${COPTS} ${INCS}
 MKDIR=		mkdir -p
 

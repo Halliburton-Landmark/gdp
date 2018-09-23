@@ -72,6 +72,12 @@ INSTALL=	install ${INSTALLFLAGS}
 LOCAL1=		/usr/local
 LOCAL2=		/opt/local
 LOCAL3=		/usr/local/opt/openssl
+SANITIZE=
+#SANITIZE+=	-fsanitize=address
+#SANITIZE+=	-fsanitize=thread
+#SANITIZE+=	-fsanitize=memory
+#SANITIZE+=	-fsanitize=undefined
+
 INCROOT=	..
 INCSEARCH=	${INCLOCAL} \
 		-I${INCROOT} \
@@ -97,7 +103,7 @@ LIBSQLITE=	-lsqlite3
 LIBMYSQL=	`mysql_config --libs`
 LIBADD=		`sh ../adm/add-libs.sh gdplogd`
 INCS=		${INCSEARCH} ${INCGDP} ${INCEP}
-LDFLAGS+=	${LIBSEARCH}
+LDFLAGS+=	${LIBSEARCH} ${SANITIZE}
 LDLIBS=		${LIBGDP} \
 		${LIBEP} \
 		${LIBEVENT2} \
@@ -113,7 +119,7 @@ WALL=		-Wall
 G=		-g
 O=		-O
 STD=
-COPTS=		${PG} ${WALL} $G $O ${STD}
+COPTS=		${PG} ${WALL} $G $O ${STD} ${SANITIZE}
 CFLAGS+=	${COPTS} ${INCS}
 MKDIR=		mkdir -p
 

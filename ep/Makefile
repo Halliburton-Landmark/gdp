@@ -193,7 +193,12 @@ WALL=		-Wall
 G=		-g
 O=		-O
 STD=
-COPTS=		${PG} ${WALL} $G $O ${STD}
+SANITIZE=
+#SANITIZE+=	-fsanitize=address
+#SANITIZE+=	-fsanitize=thread
+#SANITIZE+=	-fsanitize=memory
+#SANITIZE+=	-fsanitize=undefined
+COPTS=		${PG} ${WALL} $G $O ${STD} ${SANITIZE}
 INCROOT=	..
 INCSEARCH=	${INCLOCAL} \
 		-I${INCROOT} \
@@ -209,7 +214,7 @@ CFLAGS+=	${COPTS} ${INCS} -I${CURDIR} -I.. -fPIC
 RM=		rm
 LD=		ld
 LIBCRYPTO=	-lcrypto
-LDFLAGS+=	-L. ${LIBSEARCH}
+LDFLAGS+=	-L. ${LIBSEARCH} ${SANITIZE}
 LIBEXTRA=
 LDLIBS=		-lep ${LIBCRYPTO} ${LIBEXTRA} -pthread
 LN=		ln
