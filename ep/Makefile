@@ -67,6 +67,7 @@ OBJS_MOST=	\
 	ep_crypto_vrfy.o \
 	ep_dbg.o \
 	ep_dumpfds.o \
+	ep_file_search.o \
 	ep_fopen_smem.o \
 	ep_fopen_styled.o \
 	ep_fopen_syslog.o \
