@@ -703,6 +703,9 @@ ep_crypto_key_write_mem(EP_CRYPTO_KEY *key,
 int
 ep_crypto_keytype_fromkey(EP_CRYPTO_KEY *key)
 {
+	if (key == NULL)
+		return EP_CRYPTO_KEYTYPE_NULL;
+
 	int i = EVP_PKEY_type(key->type);
 
 	switch (i)
@@ -718,10 +721,8 @@ ep_crypto_keytype_fromkey(EP_CRYPTO_KEY *key)
 
 	  case EVP_PKEY_EC:
 		return EP_CRYPTO_KEYTYPE_EC;
-
-	  default:
-		return EP_CRYPTO_KEYTYPE_UNKNOWN;
 	}
+	return EP_CRYPTO_KEYTYPE_UNKNOWN;
 }
 
 
@@ -731,6 +732,8 @@ ep_crypto_keytype_fromkey(EP_CRYPTO_KEY *key)
 
 static struct name_to_format	KeyTypeStrings[] =
 {
+	{ "null",		EP_CRYPTO_KEYTYPE_NULL,		},
+	{ "none",		EP_CRYPTO_KEYTYPE_NULL,		},
 	{ "rsa",		EP_CRYPTO_KEYTYPE_RSA,		},
 	{ "dsa",		EP_CRYPTO_KEYTYPE_DSA,		},
 	{ "ec",			EP_CRYPTO_KEYTYPE_EC,		},
@@ -786,6 +789,7 @@ ep_crypto_key_compat(const EP_CRYPTO_KEY *pubkey, const EP_CRYPTO_KEY *seckey)
 
 static struct name_to_format	KeyEncStrings[] =
 {
+	{ "null",		EP_CRYPTO_SYMKEY_NONE,		},
 	{ "none",		EP_CRYPTO_SYMKEY_NONE,		},
 	{ "aes128",		EP_CRYPTO_SYMKEY_AES128,	},
 	{ "aes192",		EP_CRYPTO_SYMKEY_AES192,	},

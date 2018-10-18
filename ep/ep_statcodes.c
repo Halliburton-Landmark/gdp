@@ -56,6 +56,7 @@ static struct ep_stat_to_string	Stats[] =
     { EP_STAT_UUID_VERSION,	"illegal UUID version",			},
     { EP_STAT_SOFTWARE_ERROR,	"internal software error",		},
     { EP_STAT_NOT_IMPLEMENTED,	"not implemented",			},
+    { EP_STAT_NOT_FOUND,	"item not found",			},
 
     // cryptographic status codes
     { _EP_STAT_INTERNAL(OK, EP_STAT_MOD_CRYPTO, 0), "crypto"		},
@@ -73,6 +74,7 @@ static struct ep_stat_to_string	Stats[] =
     { EP_STAT_CRYPTO_TOOSMALL,	"key or password too short",		},
     { EP_STAT_CRYPTO_TOOLARGE,	"key or password too long",		},
     { EP_STAT_CRYPTO_FAIL,	"unknown cryptographic failure",	},
+    { EP_STAT_CRYPTO_HASHALG,	"unknown message digest algorithm",	},
 
     { EP_STAT_OK,		NULL,					}
 };

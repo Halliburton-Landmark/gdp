@@ -96,7 +96,8 @@ void			ep_crypto_random_buf(	// return random data
 # define EP_CRYPTO_KEYFORM_DER		2	// DER (binary ASN.1)
 
 // asymmetric key types
-# define EP_CRYPTO_KEYTYPE_UNKNOWN	0	// error
+# define EP_CRYPTO_KEYTYPE_UNKNOWN	-1	// error
+# define EP_CRYPTO_KEYTYPE_NULL		0	// NULL (no encryption)
 # define EP_CRYPTO_KEYTYPE_RSA		1	// RSA
 # define EP_CRYPTO_KEYTYPE_DSA		2	// DSA
 # define EP_CRYPTO_KEYTYPE_EC		3	// Elliptic curve
