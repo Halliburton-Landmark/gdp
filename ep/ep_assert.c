@@ -31,6 +31,7 @@
 #include <ep.h>
 #include <ep_app.h>
 #include <ep_assert.h>
+#include <ep/ep_dbg.h>
 #include <ep_stat.h>
 #include <ep_string.h>
 #include <ep_time.h>
@@ -101,6 +102,9 @@ ep_assert_printv(
 			ep_app_getprogname(), file, line);
 	vfprintf(stderr, msg, av);
 	fprintf(stderr, "%s\n", EpVid->vidnorm);
+
+	// includee a stack backtrace for good measure
+	ep_dbg_backtrace(NULL);
 
 	// give the application a chance to print state
 	if (EpAssertInfo != NULL)
