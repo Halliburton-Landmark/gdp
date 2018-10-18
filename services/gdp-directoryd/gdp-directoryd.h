@@ -68,6 +68,10 @@ int debug_knob = VERB;
 #define GDP_CMD_DIR_FIND	9
 #define GDP_CMD_DIR_FOUND  10
 #define GDP_CMD_DIR_FLUSH  11
+#define GDP_CMD_DIR_MFIND  12
+#define GDP_CMD_DIR_MFOUND 13
+
+#define GDP_CMD_DIR_EGUID_MAX 45
 
 // FIXME eventually maintain this in gdp_chan.h or other appropriate shared .h
 typedef struct __attribute__((packed)) otw_dir_s
@@ -75,7 +79,6 @@ typedef struct __attribute__((packed)) otw_dir_s
 	uint8_t ver;
 	uint8_t cmd;
 	uint16_t id;
-	uint8_t eguid[sizeof(gdp_name_t)];
 	uint8_t dguid[sizeof(gdp_name_t)];
+	uint8_t eguid[GDP_CMD_DIR_EGUID_MAX][sizeof(gdp_name_t)];
 } otw_dir_t;
-

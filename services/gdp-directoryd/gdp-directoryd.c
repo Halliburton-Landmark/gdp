@@ -68,6 +68,10 @@ char call_find_nhop_pre[] = "call blackbox.find_nhop (x'";
 char call_find_nhop_sep[] = "', x'";
 char call_find_nhop_end[] = "');";
 
+char call_mfind_nhop_pre[] = "call blackbox.mfind_nhop (x'";
+char call_mfind_nhop_sep[] = "', x'";
+char call_mfind_nhop_end[] = "');";
+
 char call_flush_nhop_pre[] = "call blackbox.flush_nhops (x'";
 char call_flush_nhop_end[] = "');";
 
@@ -98,6 +102,7 @@ int main(int argc, char **argv)
 	MYSQL_RES *mysql_result;
 	unsigned int mysql_fields;
 	MYSQL_ROW mysql_row;
+	unsigned int rows;
 	gdp_pname_t _tmp_pname_1;
 	gdp_pname_t _tmp_pname_2;					
 
@@ -163,10 +168,13 @@ int main(int argc, char **argv)
 			continue;
 		}
 
-		// continue if timeout or obviously short packets
-		if (otw_dir_len < offsetof(otw_dir_t, dguid) ||
-			otw_dir_len > sizeof(otw_dir_t))
+		// continue if timeout or too short/long or partial field
+		if (otw_dir_len < offsetof(otw_dir_t, eguid[0]) ||
+			otw_dir_len > sizeof(otw_dir_t) ||
+			((otw_dir_len - offsetof(otw_dir_t, eguid[0])) %
+			 sizeof(gdp_name_t) != 0))
 		{
+			debug(INFO, "invalid length %d", otw_dir_len);
 			continue;
 		}
 
@@ -194,7 +202,7 @@ int main(int argc, char **argv)
 				  "\teguid[%s]\n"
 				  "\tdguid[%s]\n",
 				  ntohs(otw_dir.id),
-				  gdp_printable_name(otw_dir.eguid, _tmp_pname_1),
+				  gdp_printable_name(otw_dir.eguid[0], _tmp_pname_1),
 				  gdp_printable_name(otw_dir.dguid, _tmp_pname_2));
 
 			// build the query
@@ -205,8 +213,8 @@ int main(int argc, char **argv)
 			debug(INFO, "-> eguid[");
 			for (int i = 0; i < sizeof(gdp_name_t); i++)
 			{
-				debug(INFO, "%.2x", otw_dir.eguid[i]);
-				sprintf(q + (i * 2), "%.2x", otw_dir.eguid[i]);
+				debug(INFO, "%.2x", otw_dir.eguid[0][i]);
+				sprintf(q + (i * 2), "%.2x", otw_dir.eguid[0][i]);
 			}
 			debug(INFO, "]\n");
 			q += (2 * sizeof(gdp_name_t));
@@ -237,7 +245,7 @@ int main(int argc, char **argv)
 				  "\teguid[%s]\n"
 				  "\tdguid[%s]\n",
 				  ntohs(otw_dir.id),
-				  gdp_printable_name(otw_dir.eguid, _tmp_pname_1),
+				  gdp_printable_name(otw_dir.eguid[0], _tmp_pname_1),
 				  gdp_printable_name(otw_dir.dguid, _tmp_pname_2));
 
 			// build the query
@@ -248,8 +256,8 @@ int main(int argc, char **argv)
 			debug(INFO, "-> eguid[");
 			for (int i = 0; i < sizeof(gdp_name_t); i++)
 			{
-				debug(INFO, "%.2x", otw_dir.eguid[i]);
-				sprintf(q + (i * 2), "%.2x", otw_dir.eguid[i]);
+				debug(INFO, "%.2x", otw_dir.eguid[0][i]);
+				sprintf(q + (i * 2), "%.2x", otw_dir.eguid[0][i]);
 			}
 			debug(INFO, "]\n");
 			q += (2 * sizeof(gdp_name_t));
@@ -280,7 +288,7 @@ int main(int argc, char **argv)
 				  "\teguid[%s]\n"
 				  "\tdguid[%s]\n",
 				  ntohs(otw_dir.id),
-				  gdp_printable_name(otw_dir.eguid, _tmp_pname_1),
+				  gdp_printable_name(otw_dir.eguid[0], _tmp_pname_1),
 				  gdp_printable_name(otw_dir.dguid, _tmp_pname_2));
 
 			// build the query
@@ -291,8 +299,8 @@ int main(int argc, char **argv)
 			debug(INFO, "-> eguid[");
 			for (int i = 0; i < sizeof(gdp_name_t); i++)
 			{
-				debug(INFO, "%.2x", otw_dir.eguid[i]);
-				sprintf(q + (i * 2), "%.2x", otw_dir.eguid[i]);
+				debug(INFO, "%.2x", otw_dir.eguid[0][i]);
+				sprintf(q + (i * 2), "%.2x", otw_dir.eguid[0][i]);
 			}
 			debug(INFO, "]\n");
 			q += (2 * sizeof(gdp_name_t));
@@ -314,6 +322,48 @@ int main(int argc, char **argv)
 		}
 		break;
 
+		case GDP_CMD_DIR_MFIND:
+		{
+			char *q;
+			
+			debug(INFO, "id(0x%x) cmd -> mfind nhop\n"
+				  "\teguid[%s]\n"
+				  "\tdguid[%s]\n",
+				  ntohs(otw_dir.id),
+				  gdp_printable_name(otw_dir.eguid[0], _tmp_pname_1),
+				  gdp_printable_name(otw_dir.dguid, _tmp_pname_2));
+
+			// build the query
+
+			strcpy(query, call_mfind_nhop_pre);
+			q = query + sizeof(call_mfind_nhop_pre) - 1;
+
+			debug(INFO, "-> eguid[");
+			for (int i = 0; i < sizeof(gdp_name_t); i++)
+			{
+				debug(INFO, "%.2x", otw_dir.eguid[0][i]);
+				sprintf(q + (i * 2), "%.2x", otw_dir.eguid[0][i]);
+			}
+			debug(INFO, "]\n");
+			q += (2 * sizeof(gdp_name_t));
+			
+			strcat(q, call_mfind_nhop_sep);
+			q += sizeof(call_mfind_nhop_sep) - 1;
+
+			debug(INFO, "-> dguid[");
+			for (int i = 0; i < sizeof(gdp_name_t); i++)
+			{
+				debug(INFO, "%.2x", otw_dir.dguid[i]);
+				sprintf(q + (i * 2), "%.2x", otw_dir.dguid[i]);
+			}
+			debug(INFO, "]\n");
+			q += (2 * sizeof(gdp_name_t));
+			
+			strcat(q, call_mfind_nhop_end);
+			q += sizeof(call_mfind_nhop_end) - 1;
+		}
+		break;
+
 		case GDP_CMD_DIR_FLUSH:
 		{
 			char *q;
@@ -321,7 +371,7 @@ int main(int argc, char **argv)
 			debug(INFO, "id(0x%x) cmd -> flush nhops\n"
 				  "\teguid[%s]\n",
 				  ntohs(otw_dir.id),
-				  gdp_printable_name(otw_dir.eguid, _tmp_pname_1));
+				  gdp_printable_name(otw_dir.eguid[0], _tmp_pname_1));
 
 			// build the query
 
@@ -331,8 +381,8 @@ int main(int argc, char **argv)
 			debug(INFO, "-> eguid[");
 			for (int i = 0; i < sizeof(gdp_name_t); i++)
 			{
-				debug(INFO, "%.2x", otw_dir.eguid[i]);
-				sprintf(q + (i * 2), "%.2x", otw_dir.eguid[i]);
+				debug(INFO, "%.2x", otw_dir.eguid[0][i]);
+				sprintf(q + (i * 2), "%.2x", otw_dir.eguid[0][i]);
 			}
 			debug(INFO, "]\n");
 			q += (2 * sizeof(gdp_name_t));
@@ -359,7 +409,7 @@ int main(int argc, char **argv)
 			
 		mysql_result = mysql_store_result(mysql_con);
 
-		if (otw_dir.cmd != GDP_CMD_DIR_FIND)
+		if (otw_dir.cmd != GDP_CMD_DIR_FIND && otw_dir.cmd != GDP_CMD_DIR_MFIND)
 		{
 			debug(INFO, "done (ack disabled)\n");
 			/* otw_dir_len = sendto(fd_listen, (uint8_t *) &otw_dir.ver, */
@@ -368,6 +418,7 @@ int main(int argc, char **argv)
 		}
 		else
 		{
+			rows = 0;
 			if (mysql_result == NULL)
 			{
 				fprintf(stderr, "Error: result %s\n", mysql_error(mysql_con));
@@ -379,33 +430,69 @@ int main(int argc, char **argv)
 				mysql_row = mysql_fetch_row(mysql_result);
 				if (!mysql_row || mysql_fields != 1 || mysql_row[0] == NULL)
 				{
-					debug(INFO, "not found\n");
-					memset(&otw_dir.eguid[0], 0, sizeof(gdp_name_t));
+					debug(INFO, "no nhop\n");
+					++rows;
+					memset(&otw_dir.eguid[rows - 1][0], 0, sizeof(gdp_name_t));
 				}
 				else
 				{
-					memcpy(&otw_dir.eguid[0], (uint8_t *) mysql_row[0],
-						   sizeof(gdp_name_t));
-
-					otw_dir.cmd = GDP_CMD_DIR_FOUND;
-					
-					debug(INFO, "\teguid[%s]\n",
-						  gdp_printable_name(otw_dir.eguid, _tmp_pname_1));
-
-					debug(INFO, "<- eguid[");
-					for (int i = 0; i < sizeof(gdp_name_t); i++)
+					switch (otw_dir.cmd)
 					{
-						debug(INFO, "%.2x", (uint8_t) otw_dir.eguid[i]);
+					case GDP_CMD_DIR_FIND:
+						otw_dir.cmd = GDP_CMD_DIR_FOUND;
+						break;
+					case GDP_CMD_DIR_MFIND:
+						otw_dir.cmd = GDP_CMD_DIR_MFOUND;
+						break;
+					default:
+						debug(ERR, "rx unsupported cmd %d", otw_dir.cmd);
+						otw_dir_len = -1;
+						goto mysql_result_cleanup;
 					}
-					debug(INFO, "]\n");
+
+					while (mysql_row && rows < GDP_CMD_DIR_EGUID_MAX) {
+						++rows;
+						memcpy(&otw_dir.eguid[rows - 1][0],
+							   (uint8_t *) mysql_row[0], sizeof(gdp_name_t));
+					
+						debug(INFO, "\teguid[%s]\n",
+							  gdp_printable_name(otw_dir.eguid[rows - 1],
+												 _tmp_pname_1));
+					
+						debug(INFO, "<- eguid[");
+						for (int i = 0; i < sizeof(gdp_name_t); i++)
+						{
+							debug(INFO, "%.2x",
+								  (uint8_t) otw_dir.eguid[rows - 1][i]);
+						}
+						debug(INFO, "]\n");
+						
+						mysql_row = mysql_fetch_row(mysql_result);
+					}
+					if (otw_dir.cmd == GDP_CMD_DIR_FOUND && rows != 1)
+					{
+						debug(ERR, "find row count invalid %d", rows);
+						otw_dir_len = -1;
+						goto mysql_result_cleanup;
+					}
+					if (otw_dir.cmd == GDP_CMD_DIR_MFOUND && rows == 0)
+					{
+						debug(ERR, "mfind row count invalid %d", rows);
+						otw_dir_len = -1;
+						goto mysql_result_cleanup;
+					}
 				}
 			}
 
+			otw_dir_len = offsetof(otw_dir_t, eguid[0]) + (rows *
+														   sizeof(gdp_name_t));
 			otw_dir_len = sendto(fd_listen, (uint8_t *) &otw_dir.ver,
 								 otw_dir_len, 0,
 								 (struct sockaddr *)&si_rem, sizeof(si_rem));
 		}
 
+	mysql_result_cleanup:
+		
 		// ensure "commands out of sync" error does not occur on next query
 		if (mysql_result != NULL)
 		{

@@ -122,7 +122,7 @@ begin
 delimiter ;
 
 #
-# blackbox.find_nhop returns best nexthop eguid from eguid towards dguid, if any
+# blackbox.find_nhop returns nexthop from eguid toward closest dguid instance
 #
 drop procedure if exists blackbox.find_nhop;
 delimiter //
@@ -134,11 +134,32 @@ create procedure blackbox.find_nhop
 begin
 	set @oid = NULL;
 	set @did = NULL;
-	set @eid = NULL;
 	select id into @oid from blackbox.guids where guid = eguid;
 	select id into @did from blackbox.guids where guid = dguid;
-	select linkid into @eid from blackbox.graph where latch='dijkstras' and origid = @oid and destid = @did and seq = 1 limit 1;
-	select guid from blackbox.guids where id = @eid;
+	#
+	select guid from graph inner join guids where latch='dijkstras' and origid = @oid and destid = @did and weight = 1 and seq = 1 and id = linkid limit 1;
+	#
+end //
+delimiter ;
+
+#
+# blackbox.mfind_nhop returns nexthop(s) from eguid toward many dguid instances
+#
+drop procedure if exists blackbox.mfind_nhop;
+delimiter //
+create procedure blackbox.mfind_nhop
+(
+	IN eguid BINARY(32),
+	IN dguid BINARY(32)
+)
+begin
+	set @oid = NULL;
+	set @did = NULL;
+	select id into @oid from blackbox.guids where guid = eguid;
+	select id into @did from blackbox.guids where guid = dguid;
+	#
+	select guid from blackbox.graph lasthop inner join blackbox.graph nexthop inner join guids where lasthop.latch='dijkstras' and lasthop.destid = @did and lasthop.weight = 1 and nexthop.latch='dijkstras' and nexthop.origid = @oid and nexthop.destid = lasthop.linkid and nexthop.weight = 1 and nexthop.seq = 1 and @oid != @did and guids.id = nexthop.linkid;
+	#
 end //
 delimiter ;
 
@@ -178,7 +199,7 @@ begin
 delimiter ;
 
 # ==============================================================================
-# installation sanity test
+# installation sanity test (see ./test/README.md for additional tests)
 # ==============================================================================
 
 delete from guids;
