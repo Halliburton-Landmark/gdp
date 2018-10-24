@@ -204,6 +204,20 @@ main(int argc, char **argv)
 		goto fail0;
 	}
 
+	// figure out ultimate human name (perhaps using $GDP_NAME_ROOT)
+	const char *root = getenv("GDP_NAME_ROOT");
+	ep_dbg_cprintf(Dbg, 10, "GDP_NAME_ROOT=%s\n", root);
+	if (root != NULL && root[0] != '\0' && strchr(hname, '.') == NULL)
+	{
+		int plen = strlen(root) + strlen(hname) + 2;
+		char *p = ep_mem_malloc(plen);
+		snprintf(p, plen, "%s.%s", root, hname);
+		hname = p;
+	}
+
+	if (!quiet)
+		ep_app_info("adding %s => %s", hname, pname);
+
 	// open database connection
 	phase = "database open";
 	if (db_user == NULL)
