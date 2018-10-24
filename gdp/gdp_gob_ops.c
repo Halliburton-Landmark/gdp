@@ -70,6 +70,19 @@ _gdp_gob_newname(gdp_gob_t *gob)
 
 
 /*
+**  Get the name of the default creation service.
+**		Right now this is compiled in, but in the future it should
+**		probably try zeroconf first.
+*/
+
+static const char *
+get_default_creation_service_name(void)
+{
+	return GDP_DEFAULT_CREATION_SERVICE;
+}
+
+
+/*
 **	_GDP_GOB_CREATE --- create a new GOB
 **
 **		Creation is a bit tricky, since we don't start with an existing
@@ -78,68 +91,66 @@ _gdp_gob_newname(gdp_gob_t *gob)
 */
 
 EP_STAT
-_gdp_gob_create(gdp_name_t gobname,
-				gdp_name_t logdname,
+_gdp_gob_create(
 				gdp_md_t *gmd,
-				gdp_chan_t *chan,
-				uint32_t reqflags,
+				gdp_name_t service_name,
 				gdp_gob_t **pgob)
 {
 	EP_STAT estat = EP_STAT_OK;
+	gdp_name_t gobname;
+	uint8_t *serialized_md;
+	size_t serialized_len;
+	uint32_t reqflags = 0;
 	gdp_req_t *req = NULL;
 	gdp_gob_t *gob = NULL;
 	gdp_msg_t *msg;
+	gdp_chan_t *chan = _GdpChannel;
 
 	errno = 0;				// avoid spurious messages
 
+	if (!gdp_name_is_valid(service_name))
+	{
+		const char *p;
+		p = ep_adm_getstrparam("swarm.gdp.create.service", NULL);
+		if (p == NULL)
+			p = get_default_creation_service_name();
+		if (p == NULL)
+		{
+			ep_dbg_cprintf(Dbg, 1, "_gdp_gob_create: no service name\n");
+			return GDP_STAT_SVC_NAME_REQ;
+		}
+		estat = gdp_name_parse(p, service_name, NULL);
+		if (!EP_STAT_ISOK(estat))
+		{
+			ep_dbg_cprintf(Dbg, 1,
+					"_gdp_gob_create: cannot parse service name %s\n",
+					p);
+			return GDP_STAT_SVC_NAME_REQ;
+		}
+	}
+
+	// compute the name
+	estat = _gdp_md_to_gdpname(gmd, &gobname, &serialized_md);
+	if (!EP_STAT_ISOK(estat))
+	{
+		char ebuf[100];
+		ep_dbg_cprintf(Dbg, 1, "_gdp_gob_create: _gdp_md_to_gdpname => %s\n",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		return estat;
+	}
+	serialized_len = EP_STAT_TO_INT(estat);
+
+	if (ep_dbg_test(Dbg, 17))
 	{
 		gdp_pname_t gxname, dxname;
 
-		ep_dbg_cprintf(Dbg, 17,
-				"_gdp_gob_create: gob=%s\n\tlogd=%s\n",
-				gobname == NULL ? "none" : gdp_printable_name(gobname, gxname),
-				gdp_printable_name(logdname, dxname));
-	}
-
-	// add UUID to guarantee that the name will be unique
-	size_t mlen;
-	const void *mdata;
-	if (!EP_STAT_ISOK(gdp_md_find(gmd, GDP_MD_UUID, &mlen, &mdata)))
-	{
-		EP_UUID uuid;
-		EP_UUID_STR uustr;
-
-		estat = ep_uuid_generate(&uuid);
-		if (!EP_STAT_ISOK(estat))
-		{
-			char ebuf[100];
-			ep_dbg_cprintf(Dbg, 1,
-						"_gdp_gob_create: ep_uuid_generate: %s\n",
-						ep_stat_tostr(estat, ebuf, sizeof ebuf));
-			return estat;
-		}
-
-		estat = ep_uuid_tostr(&uuid, uustr);
-		if (!EP_STAT_ISOK(estat))
-		{
-			char ebuf[100];
-			ep_dbg_cprintf(Dbg, 1, "_gdp_gob_create: ep_uuid_tostr: %s\n",
-						ep_stat_tostr(estat, ebuf, sizeof ebuf));
-			return estat;
-		}
-		ep_dbg_cprintf(Dbg, 17, "_gdp_gob_create: added UUID %s\n", uustr);
-		estat = gdp_md_add(gmd, GDP_MD_UUID, strlen(uustr), uustr);
-		if (!EP_STAT_ISOK(estat))
-		{
-			char ebuf[100];
-			ep_dbg_cprintf(Dbg, 1, "_gdp_gob_create: gdp_md_add(UUID): %s\n",
-						ep_stat_tostr(estat, ebuf, sizeof ebuf));
-			return estat;
-		}
+		ep_dbg_printf("_gdp_gob_create: gob=%s\n\tservice=%s\n",
+				gdp_printable_name(gobname, gxname),
+				gdp_printable_name(service_name, dxname));
 	}
 
 	// create a new pseudo-GOB for the daemon so we can correlate the results
-	estat = _gdp_gob_new(logdname, &gob);
+	estat = _gdp_gob_new(service_name, &gob);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// create the request
@@ -161,13 +172,8 @@ _gdp_gob_create(gdp_name_t gobname,
 		memcpy(payload->logname.data, gobname, sizeof (gdp_name_t));
 
 		// add the metadata to the output stream
-		{
-			uint8_t *mdbuf;
-			size_t mdlen;
-			mdlen = _gdp_md_serialize(gmd, &mdbuf);
-			payload->metadata->data.len = mdlen;
-			payload->metadata->data.data = mdbuf;
-		}
+		payload->metadata->data.len = serialized_len;
+		payload->metadata->data.data = serialized_md;
 
 		// send command and wait for results
 		estat = _gdp_invoke(req);
@@ -225,8 +231,20 @@ find_secret_key(gdp_gob_t *gob,
 	EP_STAT estat;
 
 	// see if we have a public key; if not we're done
-	estat = gdp_md_find(gob->gob_md, GDP_MD_PUBKEY,
+	estat = gdp_md_find(gob->gob_md, GDP_MD_WRITERPUBKEY,
 				&pkbuflen, (const void **) &pkbuf);
+	if (!EP_STAT_ISOK(estat))
+	{
+		estat = gdp_md_find(gob->gob_md, GDP_MD_OWNERPUBKEY,
+					&pkbuflen, (const void **) &pkbuf);
+	}
+#if GDP_COMPAT_OLD_PUBKEYS
+	if (!EP_STAT_ISOK(estat))
+	{
+		estat = gdp_md_find(gob->gob_md, GDP_MD_PUBKEY,
+					&pkbuflen, (const void **) &pkbuf);
+	}
+#endif
 	if (!EP_STAT_ISOK(estat))
 	{
 		ep_dbg_cprintf(Dbg, 30, "_gdp_gob_open: no public key\n");

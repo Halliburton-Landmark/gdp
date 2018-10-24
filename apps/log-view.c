@@ -154,7 +154,7 @@ show_metadata(int nmds, FILE *dfp, size_t *foffp, int plev)
 					printf(" (creation time)\n    %s\n", mdata);
 					break;
 
-				case GDP_MD_CID:
+				case GDP_MD_CREATOR:
 					printf(" (creator)\n    %s\n", mdata);
 					break;
 
@@ -199,7 +199,7 @@ show_metadata(int nmds, FILE *dfp, size_t *foffp, int plev)
 		{
 			fprintf(stdout, "\tExternal name: %s\n", mdata);
 		}
-		else if (mdhdrs[i].md_id == GDP_MD_CID)
+		else if (mdhdrs[i].md_id == GDP_MD_CREATOR)
 		{
 			fprintf(stdout, "\tCreator:       %s\n", mdata);
 		}

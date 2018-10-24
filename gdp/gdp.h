@@ -66,7 +66,8 @@ typedef uint32_t			gdp_md_id_t;
 typedef struct gdp_buf		gdp_hash_t;		//XXX is this right?
 typedef struct gdp_buf		gdp_sig_t;		//XXX is this right?
 
-// additional information when opening logs (e.g., keys, qos, hints)
+// additional information when creating/opening logs (e.g., keys, qos, hints)
+typedef struct gdp_create_info	gdp_create_info_t;
 typedef struct gdp_open_info	gdp_open_info_t;
 
 // quality of service information for subscriptions
@@ -119,13 +120,15 @@ typedef enum
 */
 
 #define GDP_MD_XID			0x00584944	// XID (external id)
-#define GDP_MD_PUBKEY		0x00505542	// PUB (public key)
+#define GDP_MD_PUBKEY		0x00505542	// PUB (public key, deprecated)
+#define GDP_MD_OWNERPUBKEY	0x004F504B	// OPK (owner public key)
+#define GDP_MD_WRITERPUBKEY	0x0057504B	// WPK (writer public key)
 #define GDP_MD_CTIME		0x0043544D	// CTM (creation time)
 #define GDP_MD_EXPIRE		0x0058544D	// XTM (expiration date/time)
-#define GDP_MD_CID			0x00434944	// CID (creator id)
+#define GDP_MD_CREATOR		0x00434944	// CID (creator id)
 #define GDP_MD_SYNTAX		0x0053594E	// SYN (data syntax: json, xml, etc.)
 #define GDP_MD_LOCATION		0x004C4F43	// LOC (location: lat/long)
-#define GDP_MD_UUID			0x00554944	// UID (unique ID)
+#define GDP_MD_NONCE		0x004E4F4E	// NON (unique nonce)
 
 
 /*
@@ -217,9 +220,8 @@ extern void		*gdp_run_accept_event_loop(
 
 // create a new GOB
 extern EP_STAT	gdp_gin_create(
-					gdp_name_t gobname,
-					gdp_name_t logdname,
-					gdp_md_t *,				// pointer to metadata object
+					gdp_create_info_t *gci,
+					const char *external_name,
 					gdp_gin_t **pgin);
 
 // open an existing GOB
@@ -382,20 +384,24 @@ void			gdp_print_name(
 
 // make a binary GDP object name from a printable version
 EP_STAT			gdp_internal_name(
-					const gdp_pname_t external,
+					const gdp_pname_t printable,
 					gdp_name_t internal);
 
 // parse a (possibly human-friendly) GDP object name
-EP_STAT			gdp_parse_name(
-					const char *xname,
+EP_STAT			gdp_name_parse(
+					const char *hname,		// human text version of name
+					gdp_name_t gname,		// output: internal name
+					char **xnamep);			// output: extended version of hname
+EP_STAT			gdp_parse_name(			// obsolete: back compat
+					const char *hname,
 					gdp_name_t gname);
 
 EP_STAT			gdp_name_resolve(
-					const char *xname,
+					const char *hname,
 					gdp_name_t gname);
 
 EP_STAT			gdp_name_update(
-					const char *xname,
+					const char *hname,
 					const gdp_name_t gname);
 
 EP_STAT			gdp_name_root_set(
@@ -407,6 +413,100 @@ const char		*gdp_name_root_get(
 // get the number of records in the log
 extern gdp_recno_t	gdp_gin_getnrecs(
 					const gdp_gin_t *gin);	// open GIN handle
+
+/*
+**  GOB Creation Information
+**
+**		Once the create_info is set it can be passed to the actual
+**		creation routine, which will fill in any unspecified but
+**		required fields and use that for the final object creation.
+**
+**		The only non-obvious part of this should be key management.
+**		There are multiple keys possible, notably an "admin" (owner)
+**		keypair and a "writer" keypair.  If only admin is specified
+**		then it is also used as the writer key.
+**
+**		The "symbolic" creates take a string that encodes the other
+**		parameters, e.g., "RSA2048-SHA256" might represent a SHA256
+**		hash (digest) algorithm with a 2048-bit RSA signature.  A
+**		null parameter would take defaults.
+**
+**		None of the "create" routines saves the secret key to disk;
+**		that's only done when the "save_keys" routine is called.
+**		That routine has to specify the on-disk symmetric crypto
+**		cipher and associated password, if any.  If unspecified the
+**		algorithm uses a site-specific default but the password
+**		has to be explicit; if it is missing an interactive input
+**		will be solicited.
+**
+**		An expected calling sequence might be:
+**			info = new()
+**			set_xxx(info, ...);
+**			create_key(info, ...);
+**			save_keys(info, ...);
+**			create(info, ...);
+**			free(info);
+**		with (hopefully) obvious status checks.
+*/
+
+// get a new creation information structure
+gdp_create_info_t	*gdp_create_info_new(void);
+
+// free that structure
+void				gdp_create_info_free(
+						gdp_create_info_t **pinfo);
+
+// set various parameters (names should hopefully be obvious)
+EP_STAT				gdp_create_info_set_creator(	// creator (email)
+						gdp_create_info_t *info,
+						const char *user,
+						const char *domain);
+EP_STAT				gdp_create_info_set_expiration(	// expiration date
+						gdp_create_info_t *info,
+						uint64_t expiration);			// in seconds from now
+EP_STAT				gdp_create_info_set_creation_service(
+						gdp_create_info_t *info,
+						const char *x_service_name);
+
+// create new keypair (in memory, not on disk)
+EP_STAT				gdp_create_info_new_owner_key(
+						gdp_create_info_t *info,
+						const char *dig_alg_name,		// digest algorithm
+						const char *key_alg_name,		// signing algorithm
+						int bits,
+						const char *curve_name,
+						const char *key_enc_alg_name);	// on-disk crypto alg
+EP_STAT				gdp_create_info_new_writer_key(
+						gdp_create_info_t *info,
+						const char *dig_alg_name,		// digest algorithm
+						const char *key_alg_name,		// signing algorithm
+						int bits,
+						const char *curve_name,
+						const char *key_enc_alg_name);	// on-disk crypto alg
+
+// set already existing keypair
+EP_STAT				gdp_create_info_set_owner_key(
+						gdp_create_info_t *info,
+						EP_CRYPTO_KEY *key,
+						const char *dig_alg_name);		// digest algorithm
+EP_STAT				gdp_create_info_set_writer_key(
+						gdp_create_info_t *info,
+						EP_CRYPTO_KEY *key,
+						const char *dig_alg_name);		// digest algorithm
+
+// save stored keypairs (both admin and writer) to disk
+EP_STAT				gdp_create_info_save_keys(
+						gdp_create_info_t *info,
+						uint32_t key_ctx,
+						const char *key_enc_alg_name,
+						const char *key_enc_password);
+
+// add arbitrary user metadata (escape hatch for extensions)
+EP_STAT				gdp_create_info_add_metadata(
+						gdp_create_info_t *info,
+						uint32_t md_name,
+						size_t md_len,
+						const void *md_val);
 
 /*
 **  GOB Open Information

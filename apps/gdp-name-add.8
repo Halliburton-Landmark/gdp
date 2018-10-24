@@ -3,22 +3,25 @@
 .Os Swarm-GDP
 .Sh NAME
 .Nm gdp-name-add
-.Nd add entry to external to internal name database
+.Nd add entry to human-oriented to GDP-oriented name directory
 .Sh SYNOPSIS
 .Nm gdp-name-add
 .Op Fl D Ar debug-spec
 .Op Fl H Ar database-host-name
 .Op Fl u Ar database-user-name
-.Ar external-name
-.Ar internal-name
+.Ar human-name
+.Ar gdp-name
 .Sh DESCRIPTION
 .Nm
 adds an entry to the mapping database for
-.Ar external-name
+.Ar human-name
 to
-.Ar internal-name.
-Internal names are represented as base64-encoded 256-bit tokens;
-external names are arbitrary user-supplied text.
+.Ar gdp-name.
+GDPnames are represented as base64-encoded 256-bit tokens;
+human names are arbitrary user-supplied text,
+typically formatted as a reversed DNS-style name,
+e.g.,
+.Dq edu.berkeley.eecs.eric.test.01 .
 .Pp
 The password for the
 .Ar database-user-name

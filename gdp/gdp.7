@@ -194,25 +194,49 @@ gdplogd .
 Defaults to
 .Li true .
 .
+.It swarm.gdp.create.service
+The name of the creation service to use
+for creating a new GDP Object.
+Defaults to
+.Dq edu.berkeley.eecs.creation.service
+unless overridden by setting the
+.Dv GDP_DEFAULT_CREATION_SERVICE
+compile-time macro to a local value when compiling the code.
+.
 .It swarm.gdp.crypto.dsa.keylen
 When creating a new key of type DSA,
 the default number of bits to use.
 Defaults to 2048.
+.
 .It swarm.gdp.crypto.ec.curve
 When creating a new key of type EC (Elliptic Curve),
 the name of the curve to use.
 Defaults to
 .Qq sect283r1 .
+.
 .It swarm.gdp.crypto.hash.alg
 When creating a new log,
 use this as the hash (message digest) algorithm.
 Defaults to
 .Qq sha256 .
+.
 .It swarm.gdp.crypto.key.dir
 When creating a new secret key,
 write it to this directory.
 Defaults to
 .Qq KEYS .
+.
+.It swarm.gdp.crypto.key.exclusive
+If set, create secret key files using exclusive mode,
+i.e., refuse to overwrite existing files.
+Defaults to
+.Li true .
+.
+.It swarm.gdp.crypto.key.mode
+The file mode to use when creating a secret key file.
+Defaults to
+.Li 0400 .
+.
 .It swarm.gdp.crypto.key.path
 When reading an existing secret key,
 This is the path used to search for it.
@@ -224,19 +248,23 @@ KEYS
 /usr/local/etc/swarm/gdp/keys
 /etc/swarm/gdp/keys
 .Ed
+.
 .It swarm.gdp.crypto.keyenc.alg
 When creating a secret key,
 encrypt it using this (symmetric) algorithm before writing it to a disk file.
 Defaults to
 .Qq aes192 .
+.
 .It swarm.gdp.crypto.rsa.keyexp
 When creating an RSA key,
 use this as the key exponent.
 Defaults to 3.
+.
 .It swarm.gdp.crypto.rsa.keylen
 When creating an RSA key,
 make it this many bits long.
 Defaults to 2048.
+.
 .It swarm.gdp.crypto.sign.alg
 When creating a new log,
 use this as the signing algorithm.
@@ -297,9 +325,11 @@ it will retry.
 Defaults to 10000 (ten seconds).
 .
 .It swarm.gdp.namedb.database
-The name of the database holding the mapping.
+The name of the database holding the mappings
+from a human-oriented name to an internal GDPname.
 Defaults to
-.Li gdp_names .
+.Li gdp_hongd
+(human-oriented to GDPname directory).
 .
 .It swarm.gdp.namedb.host
 The DNS name of the host on which the database resides.
@@ -313,11 +343,14 @@ as appropriate for anonymous users.
 .It swarm.gdp.namedb.table
 The name of the table with the mappings.
 Defaults to
-.Li gdp_names .
+.Li human_to_gdp .
 .
 .It swarm.gdp.namedb.user
 The name of the database user to do the update.
-This user must have INSERT permission on the database.
+This user must have SELECT permission on the database
+to do a name lookup
+or INSERT permission
+to add a new name.
 Defaults to
 .Li anonymous .
 .
@@ -446,6 +479,22 @@ If the GDP program is invoked as root,
 change to this user id.
 Overrides
 .Va swarm.gdp.runasuser .
+.El
+.
+.Sh ENVIRONMENT VARIABLES
+.Bl -tag
+.
+.It GDP_NAME_ROOT
+If sent, the value of this environment variable
+is prepended to names that do not have any dots in them.
+For example if
+.Ev GDP_NAME_ROOT =
+com.example, a lookup of
+.Li foo
+would actually look up
+.Li com.example.foo .
+This can be used to provide simplistic name spaces.
+.
 .El
 .
 .Sh SEE ALSO

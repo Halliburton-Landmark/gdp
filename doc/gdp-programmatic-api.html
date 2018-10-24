@@ -40,7 +40,7 @@
   <body>
     <h1>Global Data Plane Programmatic API </h1>
     <h4>Editor: Eric Allman, U.C. Berkeley Swarm Lab, eric@cs.berkeley.edu<br>
-      Version 2.0.0, 2018-06-10</h4>
+      Version 2.1.0, 2018-10-20</h4>
     <p>This document describes the procedural programmatic interface to the
       Global Data Plane.&nbsp; The native code is written in C for maximum
       flexibility and performance, but it is expected that most applications
@@ -62,9 +62,15 @@
       programs: <code>gdp-writer.c</code> and <code>gdp-reader.c</code>, that
       show simple cases of how to append to a GOB and read from a GOB (including
       subscriptions). </p>
-    <p>This document corresponds to version 2.0 of the GDP library and
+    <p>This document corresponds to version 2.1 of the GDP library and
       associated applications.&nbsp; Note that this interface is massively
       incompatible with version 0.9.</p>
+    <h2 class="meta">0&nbsp; To Be Done</h2>
+    <ul>
+      <li>Document metadata interfaces, e.g., <code>gdp_gin_getmetadata</code>,
+        <code>gdp_md_get</code>.</li>
+      <li>Convert this documentation into man pages.</li>
+    </ul>
     <h2>1&nbsp; Terminology</h2>
     <dl>
       <dt>Datum</dt>
@@ -90,8 +96,13 @@
       <dt>GDP Name</dt>
       <dd>The name of a Global Data Plane Object.&nbsp; This is a 256-bit,
         opaque, globally unique number created as the SHA-256 hash of the
-        metadata of the object.&nbsp; <span class="meta">Someday, but not until
-          we have a human &rarr; internal name service.</span></dd>
+        metadata of the object.&nbsp; The usual representation for printing is a
+        43 character base64 encoded string.</dd>
+      <dt>Human-Oriented Name</dt>
+      <dd>A name that human beings like to use, such as a conventional file
+        name.&nbsp; These are unrelated to the internal name.&nbsp; A
+        Human-Oriented Name to GDPname Directory Service (HONGDS) maintains a
+        database mapping from one to the other.</dd>
     </dl>
     <p> In earlier versions of the GDP, both GINs and GOBs were referred to as
       GCLs (GDP Channel-Logs). These names are now broken apart for clarity. For
@@ -176,7 +187,8 @@
         a system default is used. </li>
       <li>If the status is not <code>EP_STAT_OK</code> then the library failed
         to initialize (for example, by being unable to acquire resources.&nbsp;
-        Failure to check this status may result in mysterious failures later.</li>
+        Failure to check this status (generally using the <code class="function">EP_STAT_ISOK</code>
+        predicate) may result in mysterious failures later.</li>
       <li>All source files using the GDP must include <code>&lt;gdp/gdp.h&gt;</code>.
       </li>
     </ul>
@@ -200,18 +212,22 @@
     <br>
     <hr width="100%" size="2">
     <h4> Name</h4>
-    gdp_gin_create &mdash; Create an append-only GOB on a specified log daemon
-    node, returning a GIN &nbsp; <span class="warning">[TEMPORARY INTERFACE]</span>
+    gdp_gin_create &mdash; Create an append-only GOB, returning a GIN<span class="warning"></span>
     <h4> Synopsis</h4>
-    <pre>EP_STAT gdp_gin_create(gdp_name_t gob_name,
-		gdp_name_t logdname,<br>                gdp_md_t *gmd,<br>                gdp_gin_t **ginp)
+    <pre>EP_STAT gdp_gin_create(gdp_create_info_t *gci,<br>                const char *human_name,<br>                gdp_gin_t **ginp)
 </pre>
     <h4> Notes</h4>
     <ul>
-      <li> Creates a GOB with the given name on the indicated log server, both
-        of which must be 256-bit values.&nbsp; Arguably should be called <code>gdp_gob_create</code>
-        since it creates a GOB, but it returns a GIN.</li>
-      <li>Metadata can be passed in that will be stored with the GOB.</li>
+      <li> Creates a GOB with the given human-oriented name.&nbsp; The
+        human-oriented name is a text string which is stored in the metadata and
+        inserted into the Human-Oriented Name to GDPname Directory by the
+        creation service.</li>
+      <li>Metadata and other details are provided by the indicated creation
+        information, which may be <code>NULL</code>.</li>
+      <li>Arguably should be called <code>gdp_gob_create</code> since it
+        creates a GOB, but it returns a GIN.</li>
+      <li>Unless otherwise arranged via the <code>gci</code> parameter, a
+        keypair will be created to be associated with this log.</li>
       <li> Returns a GOB instance (indirectly through <code>*ginp</code>).</li>
       <li> The returned GIN handle is an append-only object.&nbsp; <i>(Actually,
 
@@ -222,23 +238,151 @@
 
 
           this is not enforced at this time).</i></li>
-      <li><span class="warning">This interface <strong><em>will</em></strong>
-          be replaced or updated in the future&nbsp; In particular, the <code>gob_name</code>
-          parameter will go away when the name becomes a hash of the
-          metadata.&nbsp; Similarly, logdname will be replaced by requirements
-          for this GOB (e.g., locality), and a log creation service will
-          determine the actual log server(s) to host the GOB.</span> </li>
-      <li> We probably need payment information, some way of specifying resource
-        requirements, and so forth.</li>
-      <li> Palmer did not describe anything that explicitly creates a GOB. I
-        think explicit creation is important (because of Quality of Service),
-        but the semantics could be automatic creation on first reference with
-        default QoS.</li>
-      <li><span class="warning">Ultimately this will be a call to a service that
-          will acquire the resources, determine physical location, etc., and
-          then tell the appropriate log daemon(s) to do the physical creation.</span></li>
     </ul>
     <br>
+    <hr>
+    <h4>Name</h4>
+    <p>gdp_create_info_new &mdash; allocate a new creation information data
+      structure</p>
+    <h4>Synopsis</h4>
+    <pre>gdp_create_info_t *gdp_create_info_new(void)</pre>
+    <h4>Notes</h4>
+    <ul>
+      <li>Returns a new creation information data structure to be used in the
+        following routines.</li>
+    </ul>
+    <hr>
+    <h4>Name</h4>
+    gdp_create_info_free &mdash; Free the creation information structure<br>
+    <h4>Synopsis</h4>
+    <pre>void gdp_create_info_free(gdp_create_info_t *info)</pre>
+    <h4>Notes</h4>
+    <ul>
+      <li>Frees the data structure pointed to by <code>info</code>.</li>
+      <li>This can be freed as soon as it has been used in <code>gdp_create</code>
+        or re-used to create multiple logs.</li>
+    </ul>
+    <hr>
+    <h4>Name</h4>
+    gdp_create_info_set_owner_key, gdp_create_info_set_writer_key &mdash; Set
+    owner/writer key for a new GOB<br>
+    <h4>Synopsis</h4>
+    <pre>EP_STAT gdp_create_info_set_owner_key(<br>                gdp_create_info_t *info,
+                EP_CRYPTO_KEY *skey,
+                const char *dig_alg_name)
+
+
+EP_STAT gdp_create_info_set_writer_key(
+                gdp_create_info_t *info,
+                EP_CRYPTO_KEY *skey,
+                const char *dig_alg_name)</pre>
+    <h4>Notes</h4>
+    <ul>
+      <li>Sets the owner or writer key to be used for a new GOB.</li>
+      <li>The <code>dig_alg_name</code> parameter specifies the message digest
+        algorithm to be used when signing.</li>
+    </ul>
+    <hr>
+    <p></p>
+    <ul>
+    </ul>
+    <h4>Name</h4>
+    gdp_create_info_new_owner_key, gdp_create_info_new_writer_key &mdash; Create
+    new owner/writer key for a new GOB<br>
+    <h4>Synopsis</h4>
+    <pre>EP_STAT gdp_create_info_new_owner_key(<br>&nbsp;&nbsp;&nbsp;             gdp_create_info_t *info,<br>&nbsp;&nbsp;&nbsp;             const char *dig_alg_name,<br>                const char *key_alg_name,<br>                int key_bits,<br>                const char *curve_name,<br>                const char *key_enc_alg_name)
+
+
+EP_STAT gdp_create_info_new_writer_key(
+&nbsp;&nbsp;&nbsp;             gdp_create_info_t *info,<br>&nbsp;&nbsp;&nbsp;             const char *dig_alg_name,<br>                const char *key_alg_name,<br>                int key_bits,<br>                const char *curve_name,<br>                const char *key_enc_alg_name)
+</pre>
+    <h4>Notes</h4>
+    <ul>
+      <li>Creates a new owner or writer key to be used for a new GOB.</li>
+      <li>The <code>dig_alg_name</code> parameter specifies the message digest
+        algorithm to be used when signing.</li>
+      <li>The <code>key_alg_name</code>, <code>key_bits</code>, and <code>curve_name</code>
+        parameters specify the signing algorithm.</li>
+      <li>The <code>key_enc_alg_name</code> parameter specifies the symmetric
+        encryption algorithm to be used when the key is written to disk.</li>
+      <li>If any of the parameters are <code>NULL</code> (or zero, in the case
+        of <code>key_bits</code>), a default is used; these defaults can be set
+        using administrative parameters.</li>
+    </ul>
+    <hr>
+    <h4>Name</h4>
+    <p>gdp_create_info_set_creator &mdash; set name and domain of entity
+      creating this GOB</p>
+    <h4>Synopsis</h4>
+    <pre>EP_STAT gdp_create_info_set_creator(
+&nbsp;&nbsp;&nbsp;             gdp_create_info_t *info,<br>&nbsp;&nbsp;&nbsp;             const char *user,<br>                const char *domain)</pre>
+    <p></p>
+    <h4>Notes</h4>
+    <ul>
+      <li>Sets the name and/or domain of the creator of this GOB.</li>
+      <li>The full creator name is set to <code>user</code>@<code>domain</code>.</li>
+      <li>If only the <code>user</code> is specified, the <code>domain</code>
+        is set to the DNS domain name of the current host.</li>
+      <li>If only the <code>domain</code> is specified, the <code>user</code>
+        is set to the currently logged in user.</li>
+      <li>If user contains an "<code>@</code>" sign and no <code>domain</code>
+        is specified, the <code>user</code> is used directly as the creator.</li>
+      <li>The creator name is included in the log metadata for informational
+        purposes; it has no direct impact on the semantics of the GOB.</li>
+    </ul>
+    <hr>
+    <h4>Name</h4>
+    <p>gdp_create_info_set_creation_service &mdash; set the name of the GDP
+      creation service</p>
+    <h4>Synopsis</h4>
+    <pre>EP_STAT gdp_create_info_set_creation_service(
+&nbsp;&nbsp;&nbsp;             gdp_create_info_t *info,<br>&nbsp;&nbsp;&nbsp;             const char *creation_service_name)</pre>
+    <p></p>
+    <h4>Notes</h4>
+    <ul>
+      <li>Sets the name of the creation service.&nbsp; Use of this should be
+        rare.</li>
+      <li>Currently defaults to a system-wide default.</li>
+      <li>In the future it will probably try with Zeroconf.</li>
+    </ul>
+    <p></p>
+    <ul>
+    </ul>
+    <hr>
+    <h4>Name</h4>
+    <p>gdp_create_info_set_expiration &mdash; set GOB expiration parameters</p>
+    <h4>Synopsis</h4>
+    <pre>EP_STAT gdp_create_info_add_expiration(<br>&nbsp;&nbsp;&nbsp;             gdp_create_info_t *info,<br>                &lt;to be determined&gt;)</pre>
+    <p></p>
+    <h4>Notes</h4>
+    <ul>
+      <li class="warning">It still isn't clear how this is going to work.&nbsp;
+        For the time being it should not be used.&nbsp; The parameters will
+        probably change.</li>
+    </ul>
+    <ul>
+    </ul>
+    <hr>
+    <h4>Name</h4>
+    <p>gdp_create_info_add_metadata &mdash; add user-defined metadata to the GOB
+      metadata</p>
+    <h4>Synopsis</h4>
+    <pre>EP_STAT gdp_create_info_add_metadata(
+&nbsp;&nbsp;&nbsp;             gdp_create_info_t *info,<br>&nbsp;&nbsp;&nbsp;             uint32_t md_name,<br>                size_t md_len,<br>                const char *md_val)</pre>
+    <p></p>
+    <h4>Notes</h4>
+    <ul>
+      <li>Adds the indicated value to the log metadata.</li>
+      <li>Metadata names are 32-bit unsigned numbers.&nbsp; Values where the
+        high-order byte is zero are reserved for system-defined use.</li>
+      <li>Conventionally metadata names are actually ASCII characters encoded
+        into a four-byte integer.&nbsp; For example, the name <code>0x44454d4f</code>
+        could also be read as "<code>DEMO</code>".</li>
+      <li>Metadata values are arbitrary binary strings up to 255 bytes in
+        length.</li>
+    </ul>
+    <ul>
+    </ul>
     <hr width="100%" size="2">
     <h4> Name</h4>
     gdp_gin_open &mdash; Open an existing GOB, returning a GIN<br>
@@ -272,7 +416,7 @@
     <ul>
       <li>Creates a new data structure to be used in the following routines.</li>
     </ul>
-    <hr><br>
+    <hr>
     <h4>Name</h4>
     gdp_open_info_free &mdash; Free the open information structure<br>
     <h4>Synopsis</h4>
@@ -325,6 +469,22 @@
         time of the GOB.</li>
       <li>Use of this call with <code>keep_in_cache</code> set to <code>TRUE</code>
         may cause a cleanup thread to be spawned.</li>
+    </ul>
+    <hr>
+    <h4>Name</h4>
+    <p>gdp_open_info_set_vrfy &mdash; set log verification behavior</p>
+    <h4>Synopsis</h4>
+    <pre>EP_STAT gdp_open_info_set_vrfy(<br>&nbsp;&nbsp;            &nbsp; gdp_open_info_t *info,<br>&nbsp;&nbsp;            &nbsp; bool do_verification)</pre>
+    <p></p>
+    <h4>Notes</h4>
+    <ul>
+      <li>Sets whether data retrieved from a log server should be verified.</li>
+      <li>The computational cost of verifying additional signatures may
+        negatively affect performance, but it gives you important security
+        protection.</li>
+      <li>Defaults to <code>false</code>.</li>
+    </ul>
+    <ul>
     </ul>
     <hr width="100%" size="2">
     <h4> Name</h4>
@@ -504,7 +664,7 @@
       <li>Example for <code>gdp_gin_read_by_recno_async</code>:&nbsp; suppose
         there are 20 records already in a GOB.&nbsp; Then:</li>
     </ul>
-    <table width="80%" cellspacing="2" cellpadding="2" border="1" align="center">
+    <table cellspacing="2" cellpadding="2" border="1" align="center" width="80%">
       <tbody>
         <tr>
           <td valign="top">start </td>
@@ -629,7 +789,7 @@
       <li>Example:&nbsp; suppose there are 20 records already in a GOB.&nbsp;
         Then:</li>
     </ul>
-    <table width="80%" cellspacing="2" cellpadding="2" border="1" align="center">
+    <table cellspacing="2" cellpadding="2" border="1" align="center" width="80%">
       <tbody>
         <tr>
           <td valign="top">start </td>
@@ -696,12 +856,20 @@
     <pre>gdp_sub_qos_t *gdp_sub_qos_new(void)</pre>
     <pre>void *gdp_sub_qos_free(<br>		gdp_sub_qos_t *qos)</pre>
     <h4>Notes</h4>
+    <ul>
+      <li class="warning">Tentative &mdash; do not use.</li>
+    </ul>
     <hr>
     <h4>Name</h4>
     <p>gdp_sub_qos_set_<i>xyzzy</i> &mdash; set <i>xyzzy</i> qos</p>
     <h4>Synopsis</h4>
     <pre>gdp_sub_qos_set_<code>xyzzy</code>(<br>		gdp_sub_qos_t *qos,<br>		xxx yyy)</pre>
     <h4>Notes</h4>
+    <ul>
+      <li class="warning">Tentative &mdash; do not use.<br>
+      </li>
+    </ul>
+    <p></p>
     <hr>Name gdp_gin_unsubscribe &mdash; Unsubscribe GIN from an associated GOB<span
       class="warning"></span>
     <h4> Synopsis</h4>
@@ -748,7 +916,7 @@
     <ul>
       <li>The event types are as follows:</li>
     </ul>
-    <table width="80%" cellspacing="2" cellpadding="2" border="1" align="center">
+    <table cellspacing="2" cellpadding="2" border="1" align="center" width="80%">
       <tbody>
         <tr>
           <td style="width: 162.2px;" valign="top">Event Name </td>
@@ -846,23 +1014,50 @@
     <h3> 3.6&nbsp; Utilities </h3>
     <hr width="100%" size="2">
     <h4>Name</h4>
-    gdp_parse_name, gdp_printable_name &mdash; parse an external representation
+    gdp_name_parse, gdp_printable_name &mdash; parse an external representation
     to internal, create printable version of name<br>
     <h4>Synopsis</h4>
-    <pre>EP_STAT gdp_parse_name(const char *ext, gdp_name_t gob_name)<br><br>char *gdp_printable_name(const gdp_name_t gob_name,<br>		gdp_pname_t printable)</pre>
+    <pre>EP_STAT gdp_name_parse(<br>                const char *external_name,<br>               &nbsp;gdp_name_t gob_name,<br>                char **extended_name)<br><br>char *gdp_printable_name(const gdp_name_t gob_name,<br>		gdp_pname_t printable)</pre>
     <h4>Notes</h4>
     <ul>
       <li>The <code>gdp_parse_name</code> function converts an external string
         representation of a GOB name to an internal 256-bit encoding.</li>
-      <li>If ext is a URI-base64-encoded string of the correct length, it is
-        converted directly to 256 bits.</li>
-      <li>Otherwise, it is hashed using sha256 to create the internal name.</li>
-      <li><span class="warning">[This functionality will disappear in the
-          future, after a Directory Service is defined and implemented.&nbsp; In
-          particular, it will not be possible for users to select the name of a
-          GOB.]</span></li>
+      <li>If <code>external_name</code> is a URI-base64-encoded string of the
+        correct length, it is converted directly to 256 bits.</li>
+      <li>Otherwise, it is looked up in the Human-Oriented Name to GDPname
+        Directory.</li>
+      <li>If the <code>GDP_NAME_ROOT</code> environment variable is set, it can
+        be used when looking up the name.&nbsp; If the input name has no dots
+        then the root name will be prepended to the name before lookup.&nbsp;
+        For example, if <code>GDP_NAME_ROOT=edu.berkeley.eecs.eric</code> and
+        the <code>external_name</code> is "<code>test</code>" then <code>gdp_name_parse</code>
+        will search for "<code>edu.berkeley.eecs.eric.test</code>" in the
+        directory.</li>
+      <li>If <code>extended_name</code> is non-<code>NULL</code>, <code>*extended_name</code>
+        will be used to store a pointer to the name actually used.&nbsp; This
+        will be the same as <code>external_name</code> unless name extension is
+        performed.&nbsp; If the status is not <code>EP_STAT_OK</code>, <code>*extended_name</code>
+        will be set to <code>NULL</code>.&nbsp; This memory is dynamically
+        allocated; the application is responsible for freeing the memory when it
+        is done with it.</li>
       <li>The <code>gdp_printable_name</code> function converts an internal
-        name to a URI-base64-encoded string.</li>
+        name to a URI-base64-encoded string &mdash; note, not the original
+        human-oriented name.</li>
+    </ul>
+    <hr>
+    <h4>Name</h4>
+    <p>gdp_name_root_set, gdp_name_root_get &mdash; set/get the root name used
+      by gdp_name_parse</p>
+    <h4>Synopsis</h4>
+    <pre>EP_STAT gdp_name_root_set(<br>                const char *root_name)<br>const char *gdp_name_root_get(void)</pre>
+    <h4>Notes</h4>
+    <ul>
+      <li>The root name used by <code>gdp_name_parse</code> can be set or
+        queried using these routines.</li>
+      <li class="warning">It's possible that the name root may be converted to a
+        colon-separated path in the future.&nbsp; Caution is advised.</li>
+    </ul>
+    <ul>
     </ul>
     <hr>
     <h4>Name</h4>
@@ -949,8 +1144,7 @@
       <li>The <span class="variable">filterdata</span> parameter is passed as
         the second argument to <span class="variable">filter</span>.</li>
     </ul>
-    <hr><br>
-    <br>
+    <hr>
     <h4>Name</h4>
     <p>gdp_gin_set_read_filter &mdash; filter read data</p>
     <h4>Synopsis</h4>
@@ -978,7 +1172,7 @@
       <li>The output will contain internal information; it is not intended to
         display information to end users.</li>
     </ul>
-    <hr><br>
+    <hr>
     <h2>4&nbsp; Datums (Records)</h2>
     <p>GOBs are represented as a series of records of type <code>gdp_datum_t</code>.&nbsp;
       Each record has a record number, a commit timestamp, associated data, and
@@ -1297,7 +1491,7 @@ typedef struct
       real-time version of the stream &mdash; for example, over a slow network
       link.</p>
     <h2> Appendix D: References</h2>
-    <table width="100%" cellspacing="2" cellpadding="2" border="1">
+    <table cellspacing="2" cellpadding="2" border="1" width="100%">
       <tbody>
         <tr>
           <td valign="top">[Dab13a] </td>

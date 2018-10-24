@@ -73,6 +73,25 @@ gdp_md_new(int nentries)
 
 
 /*
+**  GDP_MD_CLONE --- create an in-memory copy of metadata
+**
+**		This is not a particularly efficient approach.
+*/
+
+gdp_md_t *
+_gdp_md_clone(gdp_md_t *gmd)
+{
+	uint8_t *serialized_md;
+	size_t serialized_len;
+
+	serialized_len = _gdp_md_serialize(gmd, &serialized_md);
+	gmd = _gdp_md_deserialize(serialized_md, serialized_len);
+	ep_mem_free(serialized_md);
+	return gmd;
+}
+
+
+/*
 **  GDP_MD_FREE --- deallocate space for in-client metadata
 */
 
@@ -127,25 +146,43 @@ gdp_md_add(gdp_md_t *gmd,
 	if (id == GDP_MD_EOLIST)
 		return EP_STAT_OK;
 
-	// see if we have room for another entry
-	if (gmd->nused >= gmd->nalloc)
+	// see if we are replacing an existing name
+	int i;
+	for (i = 0; i < gmd->nused; i++)
 	{
-		// no room; get some more (allocate 50% more than we have)
-		gmd->nalloc = (gmd->nalloc / 2) * 3;
-		gmd->mds = (struct metadatum *)
-				ep_mem_realloc(gmd->mds, gmd->nalloc * sizeof *gmd->mds);
+		if (gmd->mds[i].md_id == id)
+			break;
 	}
 
-	gmd->mds[gmd->nused].md_id = id;
-	gmd->mds[gmd->nused].md_len = len;
+	if (i < gmd->nused)
+	{
+		// free up old data
+		if (EP_UT_BITSET(MDF_OWNDATA, gmd->mds[i].md_flags))
+			ep_mem_free(gmd->mds[i].md_data);
+		gmd->mds[i].md_data = NULL;
+	}
+	else
+	{
+		// add new entry to list
+		if (gmd->nused >= gmd->nalloc)
+		{
+			// no room; get some more (allocate 50% more than we have)
+			gmd->nalloc = (gmd->nalloc / 2) * 3;
+			gmd->mds = (struct metadatum *)
+					ep_mem_realloc(gmd->mds, gmd->nalloc * sizeof *gmd->mds);
+		}
+		gmd->nused++;
+	}
+
+	gmd->mds[i].md_id = id;
+	gmd->mds[i].md_len = len;
 	if (data != NULL)
 	{
-		gmd->mds[gmd->nused].md_data = ep_mem_malloc(len);
-		gmd->mds[gmd->nused].md_flags = MDF_OWNDATA;
-		memcpy(gmd->mds[gmd->nused].md_data, data, len);
+		gmd->mds[i].md_data = ep_mem_malloc(len);
+		gmd->mds[i].md_flags = MDF_OWNDATA;
+		memcpy(gmd->mds[i].md_data, data, len);
 	}
 
-	gmd->nused++;
 
 	return EP_STAT_OK;
 }
@@ -259,7 +296,7 @@ fail0:
 */
 
 size_t
-_gdp_md_serialize(gdp_md_t *gmd, uint8_t **obufp)
+_gdp_md_serialize(const gdp_md_t *gmd, uint8_t **obufp)
 {
 	int i;
 	size_t slen = 0;
@@ -389,6 +426,22 @@ _gdp_md_deserialize(const uint8_t *smd, size_t smd_len)
 	return gmd;
 }
 
+EP_STAT
+_gdp_md_to_gdpname(const gdp_md_t *gmd,
+				gdp_name_t *gname_p,
+				uint8_t **serialized_md_p)
+{
+	uint8_t *serialized_md;
+	size_t serialized_len;
+	serialized_len = _gdp_md_serialize(gmd, &serialized_md);
+	ep_crypto_md_sha256(serialized_md, serialized_len, *gname_p);
+	if (serialized_md_p == NULL)
+		ep_mem_free(serialized_md);
+	else
+		*serialized_md_p = serialized_md;
+	return EP_STAT_FROM_INT(serialized_len);
+}
+
 
 static EP_PRFLAGS_DESC	GdpMdFlags[] =
 {
@@ -401,6 +454,31 @@ static EP_PRFLAGS_DESC	MdatumFlags[] =
 	{ MDF_OWNDATA,		MDF_OWNDATA,		"OWNDATA"		},
 	{ 0,				0,					NULL			},
 };
+
+static void
+print_public_key(uint8_t *mdd, size_t mdlen, FILE *fp, int detail)
+{
+	{
+		int keylen = mdd[2] << 8 | mdd[3];
+		fprintf(fp, "md_alg %s (%d), keytype %s (%d), keylen %d\n",
+				ep_crypto_md_alg_name(mdd[0]), mdd[0],
+				ep_crypto_keytype_name(mdd[1]), mdd[1],
+				keylen);
+	}
+	if (detail >= GDP_PR_PRETTY + 2)
+	{
+		EP_CRYPTO_KEY *key;
+
+		key = ep_crypto_key_read_mem(mdd + 4,
+				mdlen - 4,
+				EP_CRYPTO_KEYFORM_DER,
+				EP_CRYPTO_F_PUBLIC);
+		ep_crypto_key_print(key, fp, EP_CRYPTO_F_PUBLIC);
+		ep_crypto_key_free(key);
+	}
+	if (detail >= GDP_PR_PRETTY + 4)
+		ep_hexdump(mdd + 4, mdlen - 4, fp, EP_HEXDUMP_HEX, 0);
+}
 
 void
 gdp_md_dump(const gdp_md_t *gmd, FILE *fp, int detail, int indent)
@@ -454,7 +532,7 @@ gdp_md_dump(const gdp_md_t *gmd, FILE *fp, int detail, int indent)
 		fprintf(fp, "%sMetadata %2d, id 0x%08x, length %" PRIu32,
 				_gdp_pr_indent(indent), i,
 				md->md_id, md->md_len);
-		if (detail > 1)
+		if (detail >= GDP_PR_PRETTY + 1)
 		{
 			const char *tag = "unknown";
 
@@ -464,42 +542,34 @@ gdp_md_dump(const gdp_md_t *gmd, FILE *fp, int detail, int indent)
 					tag = "external id";
 					break;
 
-				case GDP_MD_UUID:
-					tag = "uuid";
-					break;
+				case GDP_MD_NONCE:
+					tag = "nonce";
+					fprintf(fp, " (nonce)\n");
+					if (detail >= GDP_PR_PRETTY + 2)
+						ep_hexdump(mdd, md->md_len, fp, EP_HEXDUMP_HEX, 0);
+					continue;
 
 				case GDP_MD_CTIME:
 					tag = "creation time";
 					break;
 
-				case GDP_MD_CID:
+				case GDP_MD_CREATOR:
 					tag = "creator";
 					break;
 
 				case GDP_MD_PUBKEY:
-					fprintf(fp, " (public key)\n");
-					{
-						int keylen = mdd[2] << 8 | mdd[3];
-						fprintf(fp, "%smd_alg %s (%d), keytype %s (%d), keylen %d\n",
-								_gdp_pr_indent(indent + 1),
-								ep_crypto_md_alg_name(mdd[0]), mdd[0],
-								ep_crypto_keytype_name(mdd[1]), mdd[1],
-								keylen);
-					}
-					if (detail > 1)
-					{
-						EP_CRYPTO_KEY *key;
+					fprintf(fp, " (deprecated public key)\n");
+					print_public_key(mdd, md->md_len, fp, detail);
+					continue;
 
-						key = ep_crypto_key_read_mem(mdd + 4,
-								md->md_len - 4,
-								EP_CRYPTO_KEYFORM_DER,
-								EP_CRYPTO_F_PUBLIC);
-						ep_crypto_key_print(key, fp, EP_CRYPTO_F_PUBLIC);
-						ep_crypto_key_free(key);
-					}
-					if (detail >= 4)
-						ep_hexdump(mdd + 4, md->md_len - 4,
-								fp, EP_HEXDUMP_HEX, 0);
+				case GDP_MD_OWNERPUBKEY:
+					fprintf(fp, " (owner public key)\n");
+					print_public_key(mdd, md->md_len, fp, detail);
+					continue;
+
+				case GDP_MD_WRITERPUBKEY:
+					fprintf(fp, " (writer public key)\n");
+					print_public_key(mdd, md->md_len, fp, detail);
 					continue;
 			}
 

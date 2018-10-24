@@ -1,19 +1,43 @@
 -- Schema for the external -> internal log name mapping
 
 --  ----- BEGIN LICENSE BLOCK -----
+--	GDP: Global Data Plane
+--	From the Ubiquitous Swarm Lab, 490 Cory Hall, U.C. Berkeley.
+--
+--	Copyright (c) 2015-2018, Regents of the University of California.
+--	All rights reserved.
+--
+--	Permission is hereby granted, without written agreement and without
+--	license or royalty fees, to use, copy, modify, and distribute this
+--	software and its documentation for any purpose, provided that the above
+--	copyright notice and the following two paragraphs appear in all copies
+--	of this software.
+--
+--	IN NO EVENT SHALL REGENTS BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT,
+--	SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST
+--	PROFITS, ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION,
+--	EVEN IF REGENTS HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+--
+--	REGENTS SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT
+--	LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+--	FOR A PARTICULAR PURPOSE. THE SOFTWARE AND ACCOMPANYING DOCUMENTATION,
+--	IF ANY, PROVIDED HEREUNDER IS PROVIDED "AS IS". REGENTS HAS NO
+--	OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS,
+--	OR MODIFICATIONS.
+--  ----- END LICENSE BLOCK -----
 
 -- the database is pretty simple....
-CREATE DATABASE IF NOT EXISTS gdp_names;
-USE gdp_names;
-CREATE TABLE IF NOT EXISTS gdp_names (
-	xname VARCHAR(255) PRIMARY KEY,
+CREATE DATABASE IF NOT EXISTS gdp_hongd;
+USE gdp_hongd;
+CREATE TABLE IF NOT EXISTS human_to_gdp (
+	hname VARCHAR(255) PRIMARY KEY,
 	gname BINARY(32));
 
 -- anonymous user for doing reads
 CREATE USER IF NOT EXISTS ''@'%';
-GRANT SELECT ON gdp_names TO ''@'%';
+GRANT SELECT (hname, gname) ON human_to_gdp TO ''@'%';
 
 -- privileged user for doing updates
 -- (should figure out a better way of managing the password)
 CREATE USER IF NOT EXISTS 'creation_service'@'%' IDENTIFIED BY 'changeme';
-GRANT INSERT ON gdp_names TO 'creation_service'@'%';
+GRANT INSERT ON human_to_gdp TO 'creation_service'@'%';

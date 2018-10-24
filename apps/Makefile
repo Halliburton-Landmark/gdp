@@ -116,7 +116,7 @@ LIBPROTO_C=	-lprotobuf-c
 LIBMYSQL=	`mysql_config --libs`
 LIBADD=		`sh ../adm/add-libs.sh`
 INCS=		${INCSEARCH} ${INCGDP} ${INCEP}
-LDFLAGS+=	${LIBSEARCH}
+LDFLAGS+=	${LIBSEARCH} ${SANITIZE}
 LDLIBS=		${LIBGDP} \
 		${LIBEP} \
 		${LIBEVENT2} \
@@ -130,7 +130,7 @@ WALL=		-Wall
 G=		-g
 O=		-O
 STD=
-COPTS=		${PG} ${WALL} $G $O ${STD}
+COPTS=		${PG} ${WALL} $G $O ${STD} ${SANITIZE}
 CFLAGS+=	${COPTS} ${INCS}
 MKDIR=		mkdir -p
 

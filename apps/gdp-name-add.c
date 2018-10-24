@@ -69,7 +69,7 @@ name_init(const char *db_host, const char *db_user, char *db_passwd)
 	unsigned int db_port = 0;		//TODO: should parse db_host for this
 
 	const char *db_name = ep_adm_getstrparam("swarm.gdp.namedb.database",
-											"gdp_names");
+											"gdp_hongd");
 	unsigned long db_flags = 0;
 
 	NameDb = mysql_init(NULL);
@@ -117,12 +117,12 @@ usage(void)
 {
 	fprintf(stderr,
 			"Usage: %s [-D dbgspec] [-H db_host] [-q] [-u db_user]\n"
-			"       external_name gdp_name\n"
+			"       human_name gdp_name\n"
 			"    -D  set debugging flags\n"
 			"    -H  database host name\n"
 			"    -q  suppress output (exit status only)\n"
 			"    -u  set database user name\n"
-			"    external_name is the human-friendly log name\n"
+			"    human_name is the human-friendly log name\n"
 			"    gdp_name is the base-64 encoded 256-bit internal name\n",
 			ep_app_getprogname());
 	exit(EX_USAGE);
@@ -132,7 +132,7 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	const char *xname;				// external name, text
+	const char *hname;				// external name, human-oriented text
 	const char *pname;				// internal name, base64-encoded
 	gdp_name_t gname;				// internal name, binary
 	const char *db_host = NULL;		// database host name
@@ -177,7 +177,7 @@ main(int argc, char **argv)
 	if (show_usage || argc-- != 2)
 		usage();
 
-	xname = *argv++;
+	hname = *argv++;
 	pname = *argv++;
 
 	// initialize the GDP library
@@ -221,7 +221,7 @@ main(int argc, char **argv)
 	// now attempt the actual database update
 	phase = "update";
 	{
-		int l = strlen(xname);
+		int l = strlen(hname);
 		char xescaped[2 * l + 1];
 		char gescaped[2 * sizeof (gdp_name_t) + 1];
 		char qbuf[1024];
@@ -231,14 +231,14 @@ main(int argc, char **argv)
 			gdp_pname_t pname;
 
 			ep_dbg_printf("adding %s -> %s\n",
-					xname, gdp_printable_name(gname, pname));
+					hname, gdp_printable_name(gname, pname));
 		}
 
-		mysql_real_escape_string(NameDb, xescaped, xname, l);
+		mysql_real_escape_string(NameDb, xescaped, hname, l);
 		mysql_real_escape_string(NameDb, gescaped, (const char *) gname,
 						sizeof (gdp_name_t));
 		const char *q =
-				"INSERT INTO gdp_names (xname, gname)\n"
+				"INSERT INTO human_to_gdp (hname, gname)\n"
 				"        VALUES('%s', '%s')";
 		snprintf(qbuf, sizeof qbuf, q, xescaped, gescaped);
 		ep_dbg_cprintf(Dbg, 28, "    %s\n", qbuf);

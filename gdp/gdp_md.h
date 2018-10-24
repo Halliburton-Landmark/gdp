@@ -70,9 +70,13 @@ struct gdp_md
 //XXX this doesn't belong here
 #define GDP_MD_EOLIST	0				// id: end of metadata list
 
+// make a copy of metadata
+gdp_md_t		*_gdp_md_clone(
+					gdp_md_t *gmd);				// metadata to clone
+
 // serialize an internal data structure to a network buffer
 size_t			_gdp_md_serialize(
-					gdp_md_t *gmd,			// metadata to serialize
+					const gdp_md_t *gmd,		// metadata to serialize
 					uint8_t **obufp);			// dynamically allocated output
 
 // deserialize a network buffer to an internal data structure
@@ -84,3 +88,9 @@ gdp_md_t		*_gdp_md_deserialize(
 void			_gdp_md_adddata(
 					gdp_md_t *gmd,
 					void *data);
+
+// compute a GDPname from metadata, optionally returning serialized version
+EP_STAT			_gdp_md_to_gdpname(
+					const gdp_md_t *gmd,		// in-memory metadata
+					gdp_name_t *gname_p,		// GDPname result buffer
+					uint8_t **serialized_md_p);	// serialized MD output

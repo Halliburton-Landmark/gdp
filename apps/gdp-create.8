@@ -12,23 +12,33 @@
 .Op Fl G Ar router-ip
 .Op Fl h Ar hash-alg
 .Op Fl k Ar key-type
-.Op Fl K Ar key-location
+.Op Fl K Ar owner-key-location
 .Op Fl b Ar key-bits
 .Op Fl c Ar curve-name
 .Op Fl q
 .Op Fl s Ar logd-gdp-addr
 .Op Fl S
+.Op Fl W Ar writer-key-location
 .Op Ar mdid = Ar metadata
 .Op Ar external-name
 .Sh DESCRIPTION
 .Nm gdp-create
-creates a new GDP log on a given log server.
-In its default mode it also creates a public/secret keypair
-associated with this log, with the public key stored in the log metadata.
+creates a new GDP object
+(sometimes called a
+.Ql "log"
+or a
+.Ql "Data Capsule" ,
+mostly for historic reasons)
+on a given log server.
+In its default mode it also creates a public/secret
+.Ql "owner"
+keypair associated with this object,
+with the public key stored in the object metadata.
 Additional (text-based) metadata can be added
 (arguably this should allow binary metadata as well).
 Optionally the log can be given a human-understandable name;
 if not specified a seemingly random name is made up.
+.
 .Ss "Metadata"
 User-specified metadata may be added when a log is created.
 The metadata name is stored as a 32-bit number and is generally represented
@@ -42,18 +52,31 @@ and the human-readable name.
 .Pp
 Metadata is immutable; there is no way to add, delete, or change metadata
 after the log is created.
+.
+.Ss "Key Management"
+GDP objects may have two secret keys associated with them:
+the
+.Ql owner
+key allows administrative control over the object and the
+.Ql writer
+key allows write access to the object.
+If the writer key is not specifies it defaults to the same as the owner key.
+.
 .Ss "Warning"
 This implementation will change in the future,
 and the command will probably be subsumed into a swarm service.
 .Sh OPTIONS
 .Bl -tag
+.
 .It Fl C
 Sets the name of the creator in the log metadata.
 If this is not specified it will be derived from system data.
 It should be in the form of an email address.
+.
 .It Fl D Ar debug-spec
 Turns on debugging flags using the libep-style format.
 Useful only with the code in hand.
+.
 .It Fl e Ar key-crypto
 Specifies symmetric encryption algorithm to use for storing the secret key.
 If
@@ -63,6 +86,7 @@ is
 then the key is stored unencrypted on disk.
 Defaults to
 .Va swarm.gdp.crypto.keyenc.alg .
+.
 .It Fl G Ar router-ip
 Contact the given IP address (which may be a DNS name)
 to get a connection to the GDP routing layer.
@@ -75,12 +99,14 @@ the names listed in the
 .Va swarm.gdp.routers
 runtime administrative parameter
 are searched.
+.
 .It Fl h Ar hash-alg
 Selects the hash (message digest) algorithm used when
 generating and checking signatures.
 When data is appended to the log,
 the log name, log metadata, record number, and record data
 is hashed using this algorithm and then that hash is signed.
+.
 .It Fl k Ar key-type
 Selects the type of signing key to be created for this log.
 It can be one of
@@ -91,13 +117,15 @@ or
 As a special case, the type
 .Li none
 suppresses creation of the keypair.
-.It Fl K Ar key-location
+.
+.It Fl K Ar owner-key-location
 This option has two purposes.
 First, if you want to use an existing keypair
 (formatted as a PEM file)
+as the owner key
 you can use the
 .Fl K
-flag to name the existing PEM file.
+flag to name an existing PEM file.
 If you want
 .Nm
 to create a keypair for you,
@@ -105,18 +133,20 @@ to create a keypair for you,
 can name either a file in which to store the secret key,
 or a directory into which the secret key will be written
 named the same as the internal name of the log (with
-.Va \&.pem
+.Va \&-owner.pem
 appended).
 If
 .Fl K
 is not specified, the value of the
 .Va swarm.gdp.crypto.key.dir
-administrative parameter will be used as a directory name,
+administrative parameter will be used
+as a colon-separated directory search path,
 which defaults to
 .Pa ./KEYS ,
 or to the current directory if the
 .Pa KEYS
 directory does not exist.
+.
 .It Fl b Ar key-bits
 If the key type is RSA or DSA,
 this parameter specifies the number of bits in the key.
@@ -129,12 +159,14 @@ Additionally, RSA keys use the
 .Va swarm.gdp.crypto.rsa.keyexp
 parameter to set the exponent.
 This parameter is ignored when creating EC key pairs.
+.
 .It Fl c Ar curve-name
 Sets the name of the curve to use for Elliptic Cryptography keys.
 This overrides the
 .Va swarm.gdp.crypto.ec.curve
 parameter.
 Ignored when creating RSA or DSA key pairs.
+.
 .It Fl q
 If set,
 .Nm
@@ -159,6 +191,12 @@ flag or set that administrative parameter.
 .It Fl S
 Skips the test to see if the log already exists before creating it.
 Used for debugging.
+.
+.It Fl W Ar writer-key-location
+Similar to
+.Fl K ,
+but for the writer key.
+If this is not specified, the writer key is the same as the owner key.
 .El
 .Sh EXIT STATUS
 .Bl -tag

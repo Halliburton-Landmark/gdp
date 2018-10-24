@@ -32,6 +32,7 @@
 */
 
 #include "gdp.h"
+#include "gdp_priv.h"
 
 #include <ep/ep_b64.h>
 #include <ep/ep_dbg.h>
@@ -42,7 +43,7 @@
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.name", "GDP name resolution and processing");
 
 
-static const char	*_GdpNameRoot;		// root of names ("current directory")
+static char			*_GdpNameRoot;		// root of names ("current directory")
 static MYSQL		*NameDb;			// name mapping database
 static const char	*DbTable;			// the name of the table with the mapping
 
@@ -61,8 +62,7 @@ void
 _gdp_name_init()
 {
 	// see if the user wants a root (namespace, "working directory", ...)
-	if (_GdpNameRoot == NULL)
-		_GdpNameRoot = getenv("GDP_NAME_ROOT");
+	gdp_name_root_set(getenv("GDP_NAME_ROOT"));
 	ep_dbg_cprintf(Dbg, 17, "_gdp_name_init: GDP_NAME_ROOT=%s\n",
 			_GdpNameRoot == NULL ? "" : _GdpNameRoot);
 
@@ -77,13 +77,13 @@ _gdp_name_init()
 	unsigned int db_port = 0;		//TODO: should parse db_host for this
 
 	const char *db_name = ep_adm_getstrparam("swarm.gdp.namedb.database",
-											"gdp_names");
+											"gdp_hongd");
 	const char *db_user = ep_adm_getstrparam("swarm.gdp.namedb.user",
 											"anonymous");
 	const char *db_passwd = ep_adm_getstrparam("swarm.gdp.namedb.passwd",
 											"");
 	unsigned long db_flags = 0;
-	DbTable = ep_adm_getstrparam("swarm.gdp.namedb.table", "gdp_names");
+	DbTable = ep_adm_getstrparam("swarm.gdp.namedb.table", "human_to_gdp");
 
 	NameDb = mysql_init(NULL);
 	if (NameDb == NULL)
@@ -163,7 +163,12 @@ gdp_print_name(const gdp_name_t name, FILE *fp)
 EP_STAT
 gdp_name_root_set(const char *root)
 {
-	_GdpNameRoot = root;
+	if (_GdpNameRoot != NULL)
+		ep_mem_free(_GdpNameRoot);
+	if (root == NULL)
+		_GdpNameRoot = NULL;
+	else
+		_GdpNameRoot = ep_mem_strdup(root);
 	return EP_STAT_OK;
 }
 
@@ -181,42 +186,110 @@ gdp_name_root_get(void)
 **		exactly GDP_GOB_PNAME_LEN (43) characters long and contain only
 **		valid URL-Base64 characters.  These are base64 decoded.
 **		All other names are considered human-friendly and are
-**		sha256-encoded to get the internal name.
+**		looked up in the GDP name directory to get the internal name.
+**
+**		If the GDP_NAME_ROOT environment variable is set, then the
+**		following algorithm is used:
+**
+**		(1) if the human name `hname` has a dot in it, try that name
+**			first without extension.
+**		(2) if not found, try GDP_NAME_ROOT.hname (whether or not there
+**			is a dot in `hname`).
+**		(3) if still not found and `hname` has no dot, try the unextended
+**			`hname` anyway.
+**
+**		For a transition period, the SHA256 of the hname is tried,
+**		either with or without extension depending on whether the
+**		name has a dot in it.
+**
+**		A caller may optionally pass in an `xname` buffer pointer to
+**		receive the name actually used after `GDP_NAME_ROOT`
+**		extension.
 */
 
 EP_STAT
-gdp_parse_name(const char *xname, gdp_name_t gname)
+gdp_name_parse(const char *hname, gdp_name_t gname, char **xnamep)
 {
 	EP_STAT estat = GDP_STAT_NAME_UNKNOWN;
-	char xnamebuf[256];			// for root-based extended name
+	char *xname = NULL;
+	int xnamelen;
 
-	if (strlen(xname) == GDP_GOB_PNAME_LEN)
+	if (strlen(hname) == GDP_GOB_PNAME_LEN)
 	{
 		// see if this is a base64-encoded name
-		estat = gdp_internal_name(xname, gname);
-	}
-	if (!EP_STAT_ISOK(estat))
-	{
-		// try to resolve the name using some resolution service
-		estat = gdp_name_resolve(xname, gname);
-	}
-	if (!EP_STAT_ISOK(estat) && _GdpNameRoot != NULL)
-	{
-		// resolve using name resolution service but extended name
-		snprintf(xnamebuf, sizeof xnamebuf, "%s.%s", _GdpNameRoot, xname);
-		xname = xnamebuf;
-		estat = gdp_name_resolve(xname, gname);
+		estat = gdp_internal_name(hname, gname);
+		if (EP_STAT_ISOK(estat))
+			goto done;
 	}
 
-	// following should be removed soon
-	if (!EP_STAT_ISOK(estat))
+	if (strchr(hname, '.') != NULL || _GdpNameRoot == NULL)
 	{
-		// assume GDP name is just the hash of the external name
-		ep_dbg_cprintf(Dbg, 8, "gdp_parse_name: using SHA256(%s)\n", xname);
-		ep_crypto_md_sha256((const uint8_t *) xname, strlen(xname), gname);
+		// have a dot or GDP_NAME_ROOT is not set
+		estat = gdp_name_resolve(hname, gname);
+		if (EP_STAT_ISOK(estat))
+			goto done;
+	}
+
+	if (_GdpNameRoot != NULL)
+	{
+		// try the extended name
+		xnamelen = strlen(_GdpNameRoot) + strlen(hname) + 2;
+		xname = ep_mem_malloc(xnamelen);
+		snprintf(xname, xnamelen, "%s.%s", _GdpNameRoot, hname);
+		estat = gdp_name_resolve(xname, gname);
+		if (EP_STAT_ISOK(estat))
+			goto done;
+
+		// final case, try the unextended, undotted hname
+		if (strchr(hname, '.') == NULL)
+		{
+			estat = gdp_name_resolve(hname, gname);
+			if (EP_STAT_ISOK(estat))
+				goto done;
+		}
+	}
+
+#if GDP_COMPAT_OLD_LOG_NAMES
+	//XXX temporary: fall back to SHA-256(human_name)
+	if (ep_adm_getboolparam("swarm.gdp.compat.lognames", true))
+	{
+		if (xname == NULL || strchr(hname, '.') != NULL)
+			xname = ep_mem_strdup(hname);
+		ep_dbg_cprintf(Dbg, 8, "gdp_name_parse: using SHA256(%s)\n", xname);
+		ep_crypto_md_sha256(xname, strlen(xname), gname);
 		estat = EP_STAT_OK;
 	}
+#endif
+done:
+	if (xnamep == NULL || !EP_STAT_ISOK(estat))
+	{
+		if (xname != NULL)
+			ep_mem_free(xname);
+		xname = NULL;
+	}
+	if (xnamep != NULL)
+		*xnamep = xname;
+
+	if (ep_dbg_test(Dbg, 12))
+	{
+		gdp_pname_t pname;
+		char ebuf[100];
+		ep_dbg_printf("gdp_name_parse: %s", hname);
+		if (xname != NULL && xname != hname)
+			ep_dbg_printf(" => %s", xname);
+		if (EP_STAT_ISOK(estat))
+			ep_dbg_printf(" => %s\n", gdp_printable_name(gname, pname));
+		else
+			ep_dbg_printf(": %s\n", ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
 	return estat;
+}
+
+EP_STAT
+gdp_parse_name(const char *hname, gdp_name_t gname)
+{
+	// back compat
+	return gdp_name_parse(hname, gname, NULL);
 }
 
 
@@ -246,7 +319,7 @@ gdp_name_is_valid(const gdp_name_t name)
 
 
 /*
-**  GDP_INTERNAL_NAME --- parse a string GDP name to internal representation
+**  Convert a base-64 encoded GDP name to internal representation.
 */
 
 EP_STAT
@@ -289,16 +362,18 @@ gdp_internal_name(const gdp_pname_t external, gdp_name_t internal)
 
 
 /*
-**  GDP_NAME_RESOLVE --- resolve an external name to an internal name
+**  GDP_NAME_RESOLVE --- resolve a human name to an internal name
+**
+**		This uses the external human-to-internal name database.
 */
 
 EP_STAT
-gdp_name_resolve(const char *xname, gdp_name_t gname)
+gdp_name_resolve(const char *hname, gdp_name_t gname)
 {
 	EP_STAT estat = EP_STAT_OK;
 	const char *phase;
 
-	ep_dbg_cprintf(Dbg, 19, "gdp_name_resolve(%s)\n", xname);
+	ep_dbg_cprintf(Dbg, 19, "gdp_name_resolve(%s)\n", hname);
 
 	if (NameDb == NULL)
 	{
@@ -308,14 +383,20 @@ gdp_name_resolve(const char *xname, gdp_name_t gname)
 
 	phase = "query";
 	{
-		int l = strlen(xname);
-		char escaped[2 * l + 1];
-		mysql_real_escape_string(NameDb, escaped, xname, l);
-		const char *q = "SELECT gname FROM %s WHERE xname = '%s' LIMIT 1";
-		char qbuf[strlen(q) + sizeof escaped + 1];
-		snprintf(qbuf, sizeof qbuf, q, DbTable, escaped);
+		int hname_len = strlen(hname);
+		char escaped_hname[2 * hname_len + 1];
+		mysql_real_escape_string(NameDb, escaped_hname, hname, hname_len);
+		int dbtable_len = strlen(DbTable);
+		char escaped_dbtable[2 * dbtable_len + 1];
+		mysql_real_escape_string(NameDb, escaped_dbtable, DbTable, dbtable_len);
+		const char *q = "SELECT gname FROM `%s` WHERE hname = '%s' LIMIT 1;";
+		char qbuf[strlen(q) + sizeof escaped_dbtable + sizeof escaped_hname + 1];
+		snprintf(qbuf, sizeof qbuf, q, escaped_dbtable, escaped_hname);
 		if (mysql_query(NameDb, qbuf) != 0)
+		{
+			ep_dbg_cprintf(Dbg, 1, "MySQL >>> %s\n", qbuf);
 			goto fail1;
+		}
 	}
 
 	phase = "results";
@@ -340,7 +421,7 @@ gdp_name_resolve(const char *xname, gdp_name_t gname)
 		{
 			ep_dbg_cprintf(Dbg, 1,
 					"gdp_name_resolve(%s): field len %ld, should be %zd\n",
-					xname, len[0], sizeof (gdp_name_t));
+					hname, len[0], sizeof (gdp_name_t));
 			estat = GDP_STAT_NAME_UNKNOWN;
 		}
 	}

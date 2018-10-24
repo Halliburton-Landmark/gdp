@@ -287,6 +287,7 @@ _gdp_gin_new(gdp_gob_t *gob)
 	}
 
 	gin->flags = GINF_INUSE;
+	gin->iomode = GDP_MODE_ANY;
 	gin->gob = gob;
 
 	VALGRIND_HG_CLEAN_MEMORY(gin, sizeof gin);
@@ -450,60 +451,6 @@ done:
 		ep_dbg_printf("gdp_init: %s\n",
 					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
-	return estat;
-}
-
-
-/*
-**	GDP_GIN_CREATE --- create a new GOB
-**
-**		Creation is single threaded to keep complexity down.
-*/
-
-static EP_THR_MUTEX		GdpCreateMutex		EP_THR_MUTEX_INITIALIZER;
-
-EP_STAT
-gdp_gin_create(gdp_name_t gobname,
-				gdp_name_t logdname,
-				gdp_md_t *gmd,
-				gdp_gin_t **pgin)
-{
-	EP_STAT estat;
-	gdp_name_t namebuf;
-	gdp_gob_t *gob = NULL;
-	gdp_gin_t *gin = NULL;
-
-	ep_dbg_cprintf(Dbg, 19, "\n>>> gdp_gob_create\n");
-	estat = GDP_CHECK_INITIALIZED;		// make sure gdp_init is done
-	EP_STAT_CHECK(estat, goto fail0);
-
-	// create is just too wierd --- single thread it
-	ep_thr_mutex_lock(&GdpCreateMutex);
-
-	if (gobname == NULL)
-	{
-		gobname = namebuf;
-		_gdp_newname(gobname, gmd);
-	}
-
-	estat = _gdp_gob_create(gobname, logdname, gmd, _GdpChannel,
-					GDP_REQ_ALLOC_RID, &gob);
-	if (EP_STAT_ISOK(estat))
-	{
-		if (!EP_ASSERT(GDP_GOB_ISGOOD(gob)))
-			estat = EP_STAT_ASSERT_ABORT;
-		gin = _gdp_gin_new(gob);
-		gin->iomode = GDP_MODE_ANY;
-	}
-	else
-	{
-fail0:
-		if (gob != NULL)
-			_gdp_gob_free(&gob);
-	}
-	ep_thr_mutex_unlock(&GdpCreateMutex);
-	prstat(estat, gin, "gdp_gob_create");
-	*pgin = gin;
 	return estat;
 }
 

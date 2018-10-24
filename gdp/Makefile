@@ -79,6 +79,7 @@ OBJS_MOST=	\
 	gdp_api.o \
 	gdp_buf.o \
 	gdp_chan.o \
+	gdp_create.o \
 	gdp_crypto.o \
 	gdp_datum.o \
 	gdp_event.o \

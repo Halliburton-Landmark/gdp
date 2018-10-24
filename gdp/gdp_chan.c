@@ -341,7 +341,7 @@ chan_read_cb(struct bufferevent *bev, void *ctx)
 	gdp_buf_t *ibuf = GDP_BUF_FROM_EVBUFFER(bufferevent_get_input(bev));
 	gdp_chan_t *chan = (gdp_chan_t *) ctx;
 	gdp_name_t src, dst;
-	gdp_seqno_t seqno;
+	gdp_seqno_t seqno = 0;
 
 	ep_dbg_cprintf(Dbg, 50, "chan_read_cb: fd %d, %zd bytes\n",
 			bufferevent_getfd(bev), gdp_buf_getlength(ibuf));

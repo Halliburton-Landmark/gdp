@@ -94,6 +94,7 @@ static struct ep_stat_to_string Stats[] =
 	{ GDP_STAT_CRYPTO_SIG_MISSING,		"signature missing",				},
 	{ GDP_STAT_CRYPTO_NO_PUB_KEY,		"missing public key",				},
 	{ GDP_STAT_CRYPTO_NO_SIG,			"datum missing required signature",	},
+	{ GDP_STAT_SVC_NAME_REQ,			"service name required",			},
 
 	// codes corresponding to command responses
 	{ GDP_STAT_ACK_END_OF_RESULTS,		"263 end of results",				},

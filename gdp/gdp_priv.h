@@ -50,6 +50,16 @@
 # define VALGRIND_HG_CLEAN_MEMORY(a, b)
 #endif
 
+#ifndef GDP_COMPAT_OLD_LOG_NAMES
+# define GDP_COMPAT_OLD_LOG_NAMES		1	// assume old style SHA(human) names
+#endif
+#ifndef GDP_COMPAT_OLD_PUBKEYS
+# define GDP_COMPAT_OLD_PUBKEYS			1	// try old public key metadata name
+#endif
+#ifndef GDP_DEFAULT_CREATION_SERVICE
+# define GDP_DEFAULT_CREATION_SERVICE	"edu.berkeley.eecs.creation.service"
+#endif
+
 typedef struct gdp_chan		gdp_chan_t;		// should be in gdp_chan.h?
 typedef uint16_t			gdp_seqno_t;	// should be in gdp_chan.h?
 typedef struct gdp_req		gdp_req_t;
@@ -367,11 +377,8 @@ EP_STAT			_gdp_gob_init_vrfy_ctx(		// initialize for proof verification
 						gdp_gob_t *gob);
 
 EP_STAT			_gdp_gob_create(			// create a new GDP object
-						gdp_name_t gobname,
-						gdp_name_t logdname,
 						gdp_md_t *gmd,
-						gdp_chan_t *chan,
-						uint32_t reqflags,
+						gdp_name_t logdname,
 						gdp_gob_t **pgob);
 
 EP_STAT			_gdp_gob_open(				// open a GOB
@@ -493,21 +500,25 @@ EP_STAT			_gdp_gob_fwd_append(		// forward APPEND (replication)
 						return NULL;									\
 			} while (false)
 
-#define _gdp_gin_lock(g)		_gdp_gin_lock_trace(g, __FILE__, __LINE__, #g)
-#define _gdp_gin_unlock(g)		_gdp_gin_unlock_trace(g, __FILE__, __LINE__, #g)
+gdp_gin_t		*_gdp_gin_new(				// create new GIN from GOB
+						gdp_gob_t *gob);
+
+void			_gdp_gin_free(				// free a GIN
+						gdp_gin_t *gin);
 
 void			_gdp_gin_lock_trace(		// lock the GIN mutex
 						gdp_gin_t *gin,
 						const char *file,
 						int line,
 						const char *id);
-
+#define _gdp_gin_lock(g)		_gdp_gin_lock_trace(g, __FILE__, __LINE__, #g)
 
 void			_gdp_gin_unlock_trace(		// unlock the GIN mutex
 						gdp_gin_t *gin,
 						const char *file,
 						int line,
 						const char *id);
+#define _gdp_gin_unlock(g)		_gdp_gin_unlock_trace(g, __FILE__, __LINE__, #g)
 
 
 /*
