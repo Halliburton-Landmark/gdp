@@ -48,7 +48,7 @@ case "$OS" in
 	package libevent-dev
 	package libevent-pthreads
 	package libsqlite3-dev
-	package libmysqlclient-dev
+	package libmariadb-dev
 	package libssl-dev
 	package uuid-dev
 	package lighttpd
@@ -79,7 +79,7 @@ case "$OS" in
 	package jansson
 	package protobuf-c
 	package sqlite3
-	package mysql57
+	package mariadb-10.2
 	if [ "$PKGMGR" = "brew" ]
 	then
 		package mosquitto
@@ -110,7 +110,7 @@ case "$OS" in
 	package avahi
 	package mosquitto
 	package sqlite3
-	package mysql57-client
+	package mariadb102-client
 	package hs-pandoc
 	;;
 
@@ -122,7 +122,7 @@ case "$OS" in
 	package jansson-devel
 	package avahi-devel
 	package sqlite3-devel
-	package mysql57-devel
+	package mariadb102-devel
 	package mosquitto
 	if [ -e /etc/systemd/system ]
 	then
@@ -141,7 +141,7 @@ case "$OS" in
 	package jansson-devel
 	package avahi-devel
 	package sqlite3-devel
-	package mysql57-devel
+	package mariadb102-devel
 	package mosquitto
 	if [ -e /etc/systemd/system ]
 	then
