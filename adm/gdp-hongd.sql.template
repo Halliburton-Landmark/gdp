@@ -27,17 +27,20 @@
 --  ----- END LICENSE BLOCK -----
 
 -- the database is pretty simple....
-CREATE DATABASE IF NOT EXISTS gdp_hongd;
+CREATE DATABASE IF NOT EXISTS gdp_hongd
+	DEFAULT CHARACTER SET 'utf8';
 USE gdp_hongd;
 CREATE TABLE IF NOT EXISTS human_to_gdp (
 	hname VARCHAR(255) PRIMARY KEY,
 	gname BINARY(32));
 
 -- anonymous user for doing reads
-CREATE USER IF NOT EXISTS ''@'%';
 GRANT SELECT (hname, gname) ON human_to_gdp TO ''@'%';
 
 -- privileged user for doing updates
 -- (should figure out a better way of managing the password)
-CREATE USER IF NOT EXISTS 'creation_service'@'%' IDENTIFIED BY 'changeme';
-GRANT INSERT ON human_to_gdp TO 'creation_service'@'%';
+-- (should use IF NOT EXISTS, but not supported in MariaDB 4.0, which
+-- is all that seems to be available on Ubuntu 16.04)
+CREATE USER 'gdp_creation_service'@'%'
+	IDENTIFIED BY '@CREATION_SERVICE_PASSWORD@';
+GRANT INSERT ON human_to_gdp TO 'gdp_creation_service'@'%';

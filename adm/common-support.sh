@@ -31,13 +31,42 @@ info() {
 
 warn() {
     if ! $quiet; then
-	echo "${Yel}${On_Bla}[WARN] $1${Reset}"
+	echo "${Bla}${On_Yel}[WARN] $1${Reset}"
+    fi
+}
+
+error() {
+    if ! $quiet; then
+	echo "${Red}${On_Whi}[ERROR] $1${Reset}"
     fi
 }
 
 fatal() {
 	echo "${Whi}${On_Red}[FATAL] $1${Reset}"
 	exit 1
+}
+
+# Read a password from the terminal
+case `echo "foo\c"`,`echo -n bar` in
+    *c*,-n*)	echo_n=		echo_c=		;;
+    *c*,*)	echo_n=-n	echo_c=		;;
+    *)		echo_n=		echo_c='\c'	;;
+esac
+
+#
+#  Read a password without echo.
+#  The first parameter is the name of the variable to set.
+#  The second parameter is an optional prompt.
+#
+read_passwd() {
+	local var=$1
+	local prompt="${2:-Password}"
+
+	stty -echo
+	echo $echo_n "${prompt}:" $echo_c
+	read $var
+	echo ""
+	stty echo
 }
 
 # Create a directory as the user gdp

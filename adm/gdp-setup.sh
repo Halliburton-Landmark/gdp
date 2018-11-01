@@ -48,7 +48,7 @@ case "$OS" in
 	package libevent-dev
 	package libevent-pthreads
 	package libsqlite3-dev
-	package libmariadb-dev
+	package libmariadbd-dev
 	package libssl-dev
 	package uuid-dev
 	package lighttpd

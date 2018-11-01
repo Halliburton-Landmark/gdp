@@ -221,7 +221,8 @@ main(int argc, char **argv)
 	// open database connection
 	phase = "database open";
 	if (db_user == NULL)
-		db_user = ep_adm_getstrparam("swarm.gdp.namedb.user", "creation_service");
+		db_user = ep_adm_getstrparam("swarm.gdp.namedb.user",
+									"gdp_creation_service");
 	estat = name_init(db_host, db_user, db_passwd);
 	if (!EP_STAT_ISOK(estat))
 	{
