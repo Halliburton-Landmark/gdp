@@ -140,7 +140,7 @@ SANITIZE=
 INCROOT=	..
 INCSEARCH=	${INCLOCAL} \
 		-I${INCROOT} \
-		`mysql_config --include` \
+		`mariadb_config --include` \
 		-I${LOCAL1}/include \
 		-I${LOCAL2}/include \
 		-I${LOCAL3}/include
@@ -150,7 +150,7 @@ LIBCRYPTO=	-lcrypto
 LIBPROTO_C=	-lprotobuf-c
 LIBAVAHI=	-lavahi-client -lavahi-common
 LIBSQLITE=	-lsqlite3
-LIBMYSQL=	`mysql_config --libs`
+LIBMYSQL=	`mariadb_config --libs`
 LIBADD=		`sh ../adm/add-libs.sh libgdp`
 INCEP=		-I${INCROOT}
 LIBEP=		-lep

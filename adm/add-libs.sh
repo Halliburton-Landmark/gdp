@@ -26,7 +26,7 @@ try_lib() {
 	fi
 }
 
-mysql_config --libs
+mariadb_config --libs
 try_lib execinfo
 try_lib systemd
 try_lib avahi-client

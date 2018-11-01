@@ -94,7 +94,7 @@ LOCAL3=		/usr/local/opt/openssl
 INCROOT=	..
 INCSEARCH=	${INCLOCAL} \
 		-I${INCROOT} \
-		`mysql_config --include` \
+		`mariadb_config --include` \
 		-I${LOCAL1}/include \
 		-I${LOCAL2}/include \
 		-I${LOCAL3}/include
@@ -113,7 +113,7 @@ LIBJANSSON=	-ljansson
 LIBEVENT2=	-levent -levent_pthreads -pthread
 LIBCRYPTO=	-lcrypto
 LIBPROTO_C=	-lprotobuf-c
-LIBMYSQL=	`mysql_config --libs`
+LIBMYSQL=	`mariadb_config --libs`
 LIBADD=		`sh ../adm/add-libs.sh`
 INCS=		${INCSEARCH} ${INCGDP} ${INCEP}
 LDFLAGS+=	${LIBSEARCH} ${SANITIZE}

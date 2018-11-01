@@ -38,7 +38,7 @@ INCSEARCH=	${INCLOCAL} \
 		-I${LOCAL1}/include \
 		-I${LOCAL2}/include \
 		-I${LOCAL3}/include \
-		`mysql_config --cflags`
+		`mariadb_config --cflags`
 LIBROOT=	${INCROOT}
 LIBSEARCH=	${LIBLOCAL} \
 		-L${LIBROOT}/gdp \
