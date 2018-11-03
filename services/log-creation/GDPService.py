@@ -30,16 +30,24 @@ import struct
 import logging
 
 
+def to_hex(data):
+    hex_repr = "".join([hex(ord(t))[2:] for t in data])
+    if len(data) > 0:
+        hex_repr = '\\x' + hex_repr
+    return hex_repr
+
+def to_hex_debug(data):
+    """with 20 chars in each line"""
+    hex_repr = data.encode("hex")
+    s = ""
+    for i in xrange(0, len(hex_repr), 40):
+        s += hex_repr[i:i+40] + "\n"
+    return s
+
 def pprint(d):
     """
     Just our own pprint function that behaves nicely with binary strings
     """
-
-    def to_hex(data):
-        hex_repr = "".join([hex(ord(t))[2:] for t in data])
-        if len(data) > 0:
-            hex_repr = '\\x' + hex_repr
-        return hex_repr
 
     s = "{" + "\n"
     for k in d.keys():
@@ -90,6 +98,8 @@ class GDPProtocol(Protocol):
         logging.info("%r, Advertising %d names", self, len(self.GDPaddrs))
         for addr in [self.myaddr] + self.GDPaddrs:
             advertisement = self.__make_ad(addr)
+            logging.debug("Sending advertisement: \n%s",
+                                    to_hex_debug(advertisement))
             reactor.callFromThread(self.transport.write, advertisement)
 
 
@@ -151,6 +161,8 @@ class GDPProtocol(Protocol):
                 self.terminateConnection("bogus version number")
                 logging.info("buflen: %d, datalen: %d, seekptr: %d, "
                         "version: %d", l1, l2, l, ord(__get_byte_num(0)))
+                __bogus_data = str(self.buffer) + str(data)
+                logging.debug("Bogus data:\n%s", to_hex_debug(__bogus_data))
                 break
 
             # calculate the header length.

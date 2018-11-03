@@ -21,6 +21,10 @@ import threading
 import logging
 import os
 import sys
+import struct
+from hashlib import sha256
+import mysql.connector as mariadb
+
 
 SERVICE_NAME = gdp.GDP_NAME('logcreationservice').internal_name()
 DEFAULT_ROUTER_PORT = 8007
@@ -48,12 +52,14 @@ GDP_NAK_C_BADREQ = 192
 
 class logCreationService(GDPService):
 
-    def __init__(self, dbname, router, GDPaddrs, logservers):
+    def __init__(self, dbname, router, GDPaddrs, logservers, namedb_info):
         """
         router: a 'host:port' string representing the GDP router
         GDPaddrs: a list of 256-bit addresses of this particular service
         logservers: a list of log-servers on the backend that we use
         dbname: sqlite database location
+        namedb_info: A remote database (mariadb) where we populate a
+                     human name => internal name mapping.
         """
 
         ## First call the __init__ of GDPService
@@ -88,6 +94,23 @@ class logCreationService(GDPService):
             self.cur.execute("CREATE INDEX ack_seen_ndx ON logs(ack_seen)")
             self.conn.commit()
 
+        self.namedb_info = namedb_info
+        if namedb_info.get("host", None) is not None:
+            logging.info("Initiating connection to directory server")
+            self.namedb_conn = mariadb.connect(
+                        host=namedb_info["host"],
+                        user=namedb_info.get("user", "anonymous"),
+                        password=namedb_info.get("passwd", ""),
+                        database=namedb_info.get("database", "gdp_hongd"))
+
+            ## XXX Not sure if we can share a single cursor, or whether
+            ## one ought to acquire a new cursor for each (potentially
+            ## concurrent) request. Check this later.
+            self.namedb_cur = self.namedb_conn.cursor()
+        else:
+            self.namedb_conn = None
+            self.namedb_cur = None
+
 
     def __del__(self):
 
@@ -120,17 +143,29 @@ class logCreationService(GDPService):
             ## First check for any error conditions. If any of the
             ## following occur, we ought to send back a NAK
             if req['src'] in self.logservers:
-                logging.info("error: received cmd %d from server", payload.cmd)
+                logging.warning("error: received cmd %d from server", payload.cmd)
                 return self.gen_nak(req, gdp_pb2.NAK_C_BADREQ)
 
             if payload.cmd != gdp_pb2.CMD_CREATE:
-                logging.info("error: recieved unknown request")
+                logging.warning("error: recieved unknown request")
                 return self.gen_nak(req, gdp_pb2.NAK_S_NOTIMPL)
 
             ## By now, we know the request is a CREATE request from a client
 
             ## figure out the data we need to insert in the database
-            logname = payload.cmd_create.logname
+            humanname, logname = self.extract_name(payload.cmd_create)
+
+            if humanname is not None and self.namedb_conn is not None:
+                ## Add this to the humanname=>logname mapping directory
+                try:
+                    # Note that logname is the internal 256-bit name
+                    # (and not a printable name)
+                    self.add_to_hongd(humanname, logname)
+                except mariadb.Error as error:
+                    logging.warning("Couldn't add mapping. %s", str(error))
+                    ## XXX what is the correct behavior? exit?
+                    return self.gen_nak(req, gdp_pb2.NAK_C_CONFLICT)
+
             srvname = random.choice(self.logservers)
             ## private information that we will need later
             creator = req['src']
@@ -175,7 +210,7 @@ class logCreationService(GDPService):
 
             except sqlite3.IntegrityError:
 
-                logging.info("Log already exists")
+                logging.warning("Log already exists")
                 return self.gen_nak(req, gdp_pb2.NAK_C_CONFLICT)
 
             ## Send a spoofed request to the logserver
@@ -184,7 +219,7 @@ class logCreationService(GDPService):
 
             ## Sanity checking
             if req['src'] not in self.logservers:
-                logging.info("error: received a response from non-logserver")
+                logging.warning("error: received a response from non-logserver")
                 return self.gen_nak(req, gdp_pb2.NAK_C_BADREQ)
 
             logging.info("Response from log-server, row %d", payload.rid)
@@ -205,7 +240,7 @@ class logCreationService(GDPService):
 
             if not good_resp:
 
-                logging.info("error: bogus response")
+                logging.warning("error: bogus response")
                 return self.gen_nak(req, gdp_pb2.NAK_C_BADREQ)
 
             else:
@@ -246,6 +281,77 @@ class logCreationService(GDPService):
 
         return resp
 
+    @staticmethod
+    def extract_name(create_msg):
+        """
+        returns a tuple (human name, internal name) from the Protobuf
+        CmdCreate message. Any changes to the create message format
+        should ideally only need changes here.
+
+        Note that this needs to peek into the serialized metadata..
+        """
+
+        def __deserialize_md(data):
+            """returns a dictionary"""
+            ret = {}
+
+            try:
+                nmd = struct.unpack("!H", data[0:2])[0]
+                offset = 2
+                tmplist = []    ## list of (md_id, md_len) tuples
+                for _ in xrange(nmd):
+                    md_id = struct.unpack("!I", data[offset:offset+4])[0]
+                    md_len = struct.unpack("!I", data[offset+4:offset+8])[0]
+                    offset += 8
+                    tmplist.append((md_id, md_len))
+
+                for (md_id, md_len) in tmplist:
+                    ret[md_id] = data[offset:offset+md_len]
+                    offset += md_len
+
+                if offset!=len(data):
+                    logging.warning("%d bytes leftover when parsing metadata",
+                                                            len(data)-offset)
+
+            except struct.error as e:
+                logging.warning("%s", str(e))
+                logging.warning("Probably incomplete data when parsing metadata")
+                ret = {}
+
+            return ret
+
+
+        ## Let's see if there's a human name in the metadata. Could be null
+        md_dict = __deserialize_md(create_msg.metadata.data)
+        humanname = md_dict.get(0x00584944, None)   # XID
+
+        if create_msg.HasField("logname"):
+            _logname = create_msg.logname
+        else:
+            _logname = None
+
+        ## Let's take the hash of the metadata, and see what we have
+        smd = create_msg.metadata.SerializeToString()
+        logname = sha256(smd).digest()
+        if _logname is not None and _logname != logname:
+            logging.debug("Overriding hash of metadata with provided name")
+            logname = _logname
+
+        ## just for debugging
+        __logname = gdp.GDP_NAME(logname,
+                    force_internal=True).printable_name()[:-1]
+        logging.info("Mapping '%s' => '%s'", humanname, __logname)
+
+        return (humanname, logname) 
+
+
+    def add_to_hongd(self, humanname, logname):
+        """perform the database operation"""
+        table = self.namedb_info.get("table", "human_to_gdp")
+        query = "insert into "+table+" (hname, gname) values (%s, %s)"
+        self.namedb_cur.execute(query, (humanname, logname))
+        self.namedb_conn.commit()
+
 
 if __name__ == "__main__":
 
@@ -269,6 +375,14 @@ if __name__ == "__main__":
                                 help="Log server(s) to be used for actual log "
                                      "creation, typically human readable names")
 
+    ## The following for namedb/hongd
+    parser.add_argument("--namedb_host", help="Hostname for namedb")
+    parser.add_argument("--namedb_user", help="Username for namedb")
+    parser.add_argument("--namedb_passwd", help="Password for namedb")
+    parser.add_argument("--namedb_database", help="Database name for namedb")
+    parser.add_argument("--namedb_table", help="Table name for namedb")
+
+
     args = parser.parse_args()
 
     ## done argument parsing, instantiate the service
@@ -282,13 +396,28 @@ if __name__ == "__main__":
     addrs = [gdp.GDP_NAME(x).internal_name() for x in args.addr]
     servers = [gdp.GDP_NAME(x).internal_name() for x in args.server]
 
+    namedb_info = {}
+    if args.namedb_host is not None:
+        namedb_info["host"] = args.namedb_host
+    if args.namedb_user is not None:
+        namedb_info["user"] = args.namedb_user
+    if args.namedb_passwd is not None:
+        namedb_info["passwd"] = args.namedb_passwd
+    if args.namedb_database is not None:
+        namedb_info["database"] = args.namedb_database
+    if args.namedb_table is not None:
+        namedb_info["table"] = args.namedb_table
+
+
     logging.info("Starting a log-creation service...")
     logging.info(">> Connecting to %s", router)
     logging.info(">> Servicing names %r", args.addr)
     logging.info(">> Using log servers %r", args.server)
+    logging.info(">> Human name directory at %r", args.namedb_host)
 
     ## instantiate the service
-    service = logCreationService(args.dbname, router, addrs, servers)
+    service = logCreationService(args.dbname, router, addrs, servers,
+                                                            namedb_info)
 
     ## all done, start the service (and sleep indefinitely)
     logging.info("Starting logcreationservice")
