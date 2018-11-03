@@ -2,7 +2,7 @@
 
 set -e
 
-PACKAGES="git libevent-dev libevent-pthreads-2.0-5 libsqlite3-dev libssl-dev uuid-dev libjansson-dev protobuf-c-compiler libavahi-client-dev libsystemd-dev" 
+PACKAGES="git libevent-dev libevent-pthreads-2.0-5 libsqlite3-dev libssl-dev uuid-dev libjansson-dev protobuf-c-compiler libavahi-client-dev libsystemd-dev libmysqlclient-dev libmariadb-client-lgpl-dev"
 
 apt-get update
 apt-get install -y $PACKAGES
