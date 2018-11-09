@@ -149,7 +149,6 @@ LIBEVENT2=	-levent -levent_pthreads
 LIBCRYPTO=	-lcrypto
 LIBPROTO_C=	-lprotobuf-c
 LIBAVAHI=	-lavahi-client -lavahi-common
-LIBSQLITE=	-lsqlite3
 LIBMYSQL=	`mariadb_config --libs`
 LIBADD=		`sh ../adm/add-libs.sh libgdp`
 INCEP=		-I${INCROOT}
@@ -166,7 +165,6 @@ LDLIBS=		${LIBEP} \
 		${LIBCRYPTO} \
 		${LIBPROTO_C} \
 		${LIBAVAHI} \
-		${LIBSQLITE} \
 		${LIBMYSQL} \
 		${LIBADD}
 CC=		cc
