@@ -103,7 +103,7 @@ LIBSQLITE=	-lsqlite3
 LIBMYSQL=	`mariadb_config --libs`
 LIBADD=		`sh ../adm/add-libs.sh gdplogd`
 INCS=		${INCSEARCH} ${INCGDP} ${INCEP}
-LDFLAGS+=	${LIBSEARCH} ${SANITIZE}
+LDFLAGS+=	${LIBSEARCH} ${SANITIZE} ${LDADD}
 LDLIBS=		${LIBGDP} \
 		${LIBEP} \
 		${LIBEVENT2} \
@@ -120,7 +120,7 @@ G=		-g
 O=		-O
 STD=
 COPTS=		${PG} ${WALL} $G $O ${STD} ${SANITIZE}
-CFLAGS+=	${COPTS} ${INCS}
+CFLAGS+=	${COPTS} ${INCS} ${CCADD}
 MKDIR=		mkdir -p
 
 OBJS=	\
