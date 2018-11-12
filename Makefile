@@ -54,15 +54,6 @@ all-clientonly:
 	(cd gdp;	${MAKE} all)
 	(cd apps;	${MAKE} all)
 
-all-static:
-	(cd ep;		${MAKE} LDADD=-Wl,-Bstatic all)
-	(cd gdp;	${MAKE} LDADD=-Wl,-Bstatic all)
-	(cd scgilib;	${MAKE} LDADD=-Wl,-Bstatic all)
-	(cd gdplogd;	${MAKE} LDADD=-Wl,-Bstatic all)
-	(cd apps;	${MAKE} LDADD=-Wl,-Bstatic all)
-	(cd util;	${MAKE} LDADD=-Wl,-Bstatic all)
-	(cd examples;	${MAKE} LDADD=-Wl,-Bstatic all)
-
 # Build without avahi, the zero-conf facility that
 # can be tricky to compile under Mac OS X.
 all_noavahi:
