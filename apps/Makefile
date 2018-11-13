@@ -144,7 +144,7 @@ all_noavahi:
 gdp-log-check.o: ../gdplogd/logd_disklog.c ../gdplogd/logd_gcl.c
 
 gdp-name-add.o: gdp-name-add.c
-	${CC} -c -o $@ ${CFLAGS} `mysql_config --cflags` gdp-name-add.c
+	${CC} -c -o $@ ${CFLAGS} `mariadb_config --cflags` gdp-name-add.c
 
 gdp-rest:	gdp-rest.c ../scgilib/scgilib.o
 	${CC} ${INCS} -o $@ ${LDFLAGS} gdp-rest.c ${LDLIBS} ../scgilib/scgilib.o
