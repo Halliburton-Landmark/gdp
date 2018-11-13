@@ -159,7 +159,7 @@ LIBSEARCH=	${LIBLOCAL} \
 		-L${LOCAL1}/lib \
 		-L${LOCAL2}/lib \
 		-L${LOCAL3}/lib
-LDFLAGS+= 	${LIBSEARCH} ${SANITIZE} ${LDADD}
+LDFLAGS+= 	${LIBSEARCH} ${SANITIZE}
 LDLIBS=		${LIBEP} \
 		${LIBEVENT2} \
 		${LIBCRYPTO} \
@@ -213,8 +213,7 @@ ${OBJS}: ${HFILES}
 gdp.pb-c.c gdp.pb-c.h: gdp.proto
 	${PROTOC_C} --c_out=. gdp.proto
 
-gdp_version.o: gdp_version.c ${OBJS_MOST} Makefile gdp_version.h \
-		../git-version.txt
+gdp_version.o: gdp_version.c ${OBJS_MOST} Makefile gdp_version.h
 	${CC} ${CFLAGS} \
 		-D_VERSION_INFO_="\"`sh ../adm/get-version-info.sh`\"" \
 		-c gdp_version.c
@@ -222,8 +221,8 @@ gdp_version.o: gdp_version.c ${OBJS_MOST} Makefile gdp_version.h \
 gdp_version.h: gdp_version.template gdp_version.sh Makefile
 	sh gdp_version.sh ${GDP_VERSION_MAJOR} ${GDP_VERSION_MINOR} ${GDP_VERSION_PATCH}
 
-../git-version.txt:
-	../adm/get-version-info.sh > /dev/null
+#../git-version.txt:
+#	../adm/get-version-info.sh > /dev/null
 
 #
 #  Administrative stuff
