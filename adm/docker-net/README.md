@@ -1,5 +1,7 @@
 **Note: This is for V2. Eventually, the V2 distinction should be dropped.**
 
+***NOTA BENE: This is not up to date.  It's still to be done.***
+
 # Introduction
 
 This directory contains a very basic setup for
