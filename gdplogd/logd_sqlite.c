@@ -230,6 +230,7 @@ static struct pragma_name
 						{ "cache_size",				NULL,				},
 						{ "page_size",				NULL,				},
 						{ "journal_size_limit",		NULL,				},
+						{ "busy_timeout",			"20",				},
 						{ NULL,						NULL				},
 					};
 static char			*SqlitePragmasSQL;		// SQL to set pragmas

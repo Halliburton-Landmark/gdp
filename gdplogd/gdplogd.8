@@ -226,6 +226,18 @@ May be useful for some debugging scenarios.
 Default to
 .Li true .
 .
+.It swarm.gdplogd.sqlite.pragma.busy_timeout
+Set the timeout when SQLite will retry to get a lock
+if the initial attempt fails.
+This might occur if some other process is trying to write the database
+while
+.Nm 
+is trying to read,
+or holds a read lock when
+.Nm
+wants to write.
+Defaults to 20 milliseconds.
+.
 .It swarm.gdplogd.sqlite.pragma.cache_size
 Set the SQLite cache size.
 Defaults to the built-in SQLite default.
