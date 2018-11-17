@@ -59,6 +59,10 @@
 #include <sys/stat.h>
 
 // allow environment to override admin parameters
+//	There are probably security considerations here, but we try
+//	to limit checks for variables that might be in the local
+//	ep_adm_params directory.  Should probably be turned off for
+//	production.
 #ifndef EP_CONF_ADM_ENV_OVERRIDE
 # define EP_CONF_ADM_ENV_OVERRIDE	1
 #endif
@@ -239,7 +243,13 @@ getparamval(
 	// allow environment to override admin parameters
 	if (getuid() == geteuid() && getuid() != 0)
 	{
-		const char *val = getenv(pname);
+		int l = strlen(pname) + 1;
+		char evname[l];
+		strlcpy(evname, pname, l);
+		char *p = evname;
+		while ((p = strchr(p, '.')) != NULL)
+			*p = '_';
+		const char *val = getenv(evname);
 		if (val != NULL)
 			return val;
 	}
