@@ -30,7 +30,7 @@ then
 fi
 
 eval set -- "$args"
-morearg=true
+moreargs=true
 do_install=true
 while $moreargs
 do
