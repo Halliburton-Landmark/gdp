@@ -41,26 +41,11 @@
 //#include <ep/ep_string.h>
 #include <gdp/gdp.h>
 
-//#include <openssl/rsa.h>
-//#include <openssl/engine.h>
-//#include <openssl/pem.h>
-
-//#include <unistd.h>
-//#include <fcntl.h>
-//#include <getopt.h>
-//#include <netdb.h>
 #include <string.h>
 #include <sysexits.h>
-//#include <unistd.h>
-//#include <sys/stat.h>
 
 
-// minimum secure key length
-#ifndef GDP_MIN_KEY_LEN
-//# define GDP_MIN_KEY_LEN		1024
-#endif // GDP_MIN_KEY_LEN
-
-static EP_DBG	Dbg = EP_DBG_INIT("gdp-create", "Create new log");
+//static EP_DBG	Dbg = EP_DBG_INIT("gdp-create", "Create new log");
 
 
 // command line options
