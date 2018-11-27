@@ -26,7 +26,7 @@ EX_NOPERM=77
 EX_CONFIG=78
 
 # if we are running as root, start over as gdp
-test `whoami` = "root" && exec sudo -u $GDP_USER $0 "$@"
+test `whoami` = "root" && exec sudo -E -u $GDP_USER $0 "$@"
 
 debug=false
 if [ "x$1" = "x-D" ]
