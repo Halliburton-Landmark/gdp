@@ -6,8 +6,9 @@
 
 set -e
 
-: ${BRANCH:=${VER:-master}}
-test ${BRANCH} = "latest" && BRANCH=master
+: ${VER:=latest}
+: ${BRANCH:=r$VER}
+test ${BRANCH} = "rlatest" && BRANCH=master
 : ${REPO:=git://repo.eecs.berkeley.edu/projects/swarmlab/gdp.git}
 
 # ideally this would leverage adm/gdp-setup.sh to avoid duplication

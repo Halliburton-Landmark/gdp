@@ -7,6 +7,15 @@
 ##	docker build --target gdp-dev-c -t gdp-dev-c .
 ##
 ##  There are also parameters you can set using --build-arg:
+##	VER			The version tag on the resulting image.
+##	BRANCH			The source code branch to use.
+##	REPO			The URI of the source code repo (used to
+##				fetch the gdp-src-base code).
+##
+##  Others can also be set this way, but they are normally not defined
+##  at build time, since the usual approach is to pick these up at
+##  run time when the container starts.  They can be used for special
+##  circumstances (building custom images for special customers).
 ##	GDP_ROUTER		The default router for clients (IP address).
 ##	GDP_HONGD_SERVER	The Human to GDP name directory (IP address).
 ##	GDP_CREATION_SERVICE	The default creation service name (GDPname).
@@ -26,7 +35,7 @@
 #
 
 FROM ubuntu:16.04 as gdp-src-base
-ARG GDP_ROUTER=gdp-01.eecs.berkeley.edu
+ARG GDP_ROUTER
 ENV GDP_ROUTER=$GDP_ROUTER
 ARG GDP_CREATION_SERVICE
 ENV GDP_CREATION_SERVCE=$GDP_CREATION_SERVICE
@@ -34,6 +43,7 @@ ARG GDP_HONGD_SERVER
 ENV GDP_HONGD_SERVER=$GDP_HONGD_SERVER
 ARG VER=latest
 ENV VER=$VER
+ENV GDP_VER=2
 ARG BRANCH=master
 ENV BRANCH=$BRANCH
 COPY setup-src.sh /src/
@@ -88,6 +98,10 @@ RUN adduser --system --uid 123 --group gdp
 #RUN apk install \
 #	avahi-libs-0.7-r1 \
 #	XXX more XXX
+# Following should be in a separate image (so that the actual
+# gdp-run-base image is minimized).  We can do that when we
+# convert to alpine.
+RUN rm -rf /src/gdp
 
 
 ############################################################

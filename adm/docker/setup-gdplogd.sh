@@ -18,9 +18,10 @@ mkdir -p $SYSLOGDIR
 chown gdp:gdp $SYSLOGDIR
 
 mkdir -p /etc/ep_adm_params
+cat > /etc/ep_adm_params/gdp <<- EOF
+EOF
 cat > /etc/ep_adm_params/gdplogd <<- EOF
 	swarm.gdp.zeroconf.enable=false
-	swarm.gdp.routers=$GDP_ROUTER
 	swarm.gdplogd.log.dir=$GDP_LOG_ROOT
 EOF
-chown gdp:gdp /etc/ep_adm_params/gdplogd
+chown gdp:gdp /etc/ep_adm_params/*
