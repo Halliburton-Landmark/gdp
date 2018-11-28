@@ -59,6 +59,9 @@
 #ifndef GDP_DEFAULT_CREATION_SERVICE
 # define GDP_DEFAULT_CREATION_SERVICE	"edu.berkeley.eecs.creation.service"
 #endif
+#ifndef GDP_DEFAULT_DATA_ROOT
+# define GDP_DEFAULT_DATA_ROOT			"/var/swarm/gdp"
+#endif
 
 typedef struct gdp_chan		gdp_chan_t;		// should be in gdp_chan.h?
 typedef uint16_t			gdp_seqno_t;	// should be in gdp_chan.h?
@@ -978,6 +981,17 @@ void			_gdp_sign_metadata(			// sign the metadata
 
 const char		*_gdp_pr_indent(			// return indenting for debug output
 						int indent);
+
+void			_gdp_adm_readparams(		// read admin params w/ versioning
+						const char *name);		// base of config name
+
+EP_STAT			_gdp_adm_path_find(			// find file in path via getstrparam
+						const char *dir_param,
+						const char *dir_def,
+						const char *file_param,
+						const char *file_def,
+						char *path_buf,
+						size_t path_buf_len);
 
 
 /*

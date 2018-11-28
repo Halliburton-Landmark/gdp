@@ -1019,11 +1019,11 @@ gdp_init_phase_0(const char *progname)
 	_GdpDumpFuncs = ep_funclist_new("GDP debug dump functions");
 
 	// initialize runtime parameters
-	ep_adm_readparams("gdp");
+	_gdp_adm_readparams("gdp");
 	if (progname == NULL)
 		progname = ep_app_getprogname();
 	if (progname != NULL)
-		ep_adm_readparams(progname);
+		_gdp_adm_readparams(progname);
 	ep_crypto_init(0);
 
 	// clear out spurious errors

@@ -159,8 +159,10 @@ parameter described in
 .
 .It swarm.gdplogd.log.dir
 The directory in which physical logs are written.
+It is relative to
+.Li swarm.gdp.data.root .
 Defaults to
-.Qq Pa /var/swarm/gdp/glogs .
+.Qq Pa glogs .
 .
 .It swarm.gdplogd.gob.mode
 The file mode to use when creating on-disk log files.

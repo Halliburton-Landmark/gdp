@@ -42,8 +42,8 @@
 **			physical layout.
 */
 
-// default directory for GDP Log storage
-#define GDP_LOG_DIR			"/var/swarm/gdp/glogs"
+// default directory for GDP Log storage (relative to GDP_DEFAULT_DATA_ROOT)
+#define GDP_DEFAULT_LOG_DIR	"glogs"
 
 // magic numbers and versions for on-disk database
 #define GLOG_MAGIC			UINT32_C(0x47434C30)	// 'GCL0'

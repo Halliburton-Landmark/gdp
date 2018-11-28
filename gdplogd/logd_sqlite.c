@@ -57,9 +57,9 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.sqlite", "GDP Log Daemon SQLite Physica
 #define GOB_PATH_MAX		200			// max length of pathname
 
 static bool			SQLiteInitialized = false;
-static const char	*LogDir;			// the gob data directory
 static int			GOBfilemode;		// the file mode on create
 static uint32_t		DefaultLogFlags;	// as indicated
+static char			LogDir[GOB_PATH_MAX];	// the gob data directory
 
 #define GETPHYS(gob)	((gob)->x->physinfo)
 
@@ -295,7 +295,16 @@ sqlite_init(void)
 	EP_STAT estat = EP_STAT_OK;
 
 	// find physical location of GOB directory
-	LogDir = ep_adm_getstrparam("swarm.gdplogd.log.dir", GDP_LOG_DIR);
+	estat = _gdp_adm_path_find("swarm.gdp.data.root", GDP_DEFAULT_DATA_ROOT,
+							"swarm.gdplogd.log.dir", GDP_DEFAULT_LOG_DIR,
+							LogDir, sizeof LogDir);
+	if (!EP_STAT_ISOK(estat))
+	{
+		char ebuf[100];
+		ep_dbg_cprintf(Dbg, 1, "sqlite_init: _gdp_adm_path_find => %s\n",
+				ep_stat_tostr(estat, ebuf, sizeof ebuf));
+		return estat;
+	}
 
 	// we will run out of that directory
 	if (chdir(LogDir) != 0)

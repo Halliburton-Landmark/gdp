@@ -32,11 +32,13 @@
 
 #include "gdp.h"
 #include "gdp_md.h"
+#include "gdp_version.h"
 
 #include <event2/event.h>
 
 #include <ep/ep_crypto.h>
 #include <ep/ep_dbg.h>
+#include <ep/ep_string.h>
 
 //static EP_DBG	Dbg = EP_DBG_INIT("gdp.util", "GDP utility routines");
 
@@ -87,4 +89,83 @@ _gdp_pr_indent(int indent)
 	if (indent > INDENT_MAX)
 		indent = INDENT_MAX;
 	return &spaces[(INDENT_MAX - indent) * INDENT_PER];
+}
+
+
+/*
+**  _GDP_ADM_READPARAMS --- like ep_adm_readparams with versioning
+**
+**		For a given NAME, tries param files named
+**			NAME
+**			NAME$GDP_VERSION_MAJOR
+**			NAME$GDP_VERSION_MAJOR.$GDP_VERSION_MINOR
+**		Later values overwrite earlier values.
+*/
+
+void
+_gdp_adm_readparams(const char *name)
+{
+	int nlen = strlen(name);
+	char nbuf[nlen + 20];
+
+	// if program name already has major version, strip it off
+	// (this is primarily to simplify gdplogd2 special case)
+	snprintf(nbuf, sizeof nbuf, "%d", GDP_VERSION_MAJOR);
+	if (strcmp(nbuf, &name[nlen - strlen(nbuf)]) == 0)
+		nlen -= strlen(nbuf);
+
+	// try name, name<MAJOR>, name<MAJOR>.<MINOR>
+	snprintf(nbuf, sizeof nbuf, "%.*s", nlen, name);
+	ep_adm_readparams(nbuf);
+	snprintf(nbuf, sizeof nbuf, "%.*s%d", nlen, name,
+				GDP_VERSION_MAJOR);
+	ep_adm_readparams(nbuf);
+	snprintf(nbuf, sizeof nbuf, "%.*s%d.%d", nlen, name,
+				GDP_VERSION_MAJOR, GDP_VERSION_MINOR);
+	ep_adm_readparams(nbuf);
+}
+
+
+/*
+**  _GDP_ADM_PATH_FIND --- find a parametrically-defined path
+**
+**		This indirects through the ep_adm_*param interface to find
+**		path names.
+**
+**		This _might_ be generic enough to move into libep.
+*/
+
+EP_STAT
+_gdp_adm_path_find(
+			const char *dir_param,
+			const char *dir_def,
+			const char *file_param,
+			const char *file_def,
+			char *path_buf,
+			size_t path_buf_len)
+{
+	const char *dir;
+	const char *file;
+
+	if (file_param == NULL)
+		file = file_def;
+	else
+		file = ep_adm_getstrparam(file_param, file_def);
+	if (file == NULL)
+		file = "";
+	else if (file[0] == '/')
+	{
+		snprintf(path_buf, path_buf_len, "%s", file);
+		return EP_STAT_OK;
+	}
+
+	if (dir_param == NULL)
+		dir = dir_def;
+	else
+		dir = ep_adm_getstrparam(dir_param, dir_def);
+	if (dir == NULL)
+		dir = "";
+
+	snprintf(path_buf, path_buf_len, "%s/%s", dir, file);
+	return EP_STAT_OK;
 }
