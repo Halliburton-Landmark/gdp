@@ -93,8 +93,8 @@ RUN make install-client && cd / && rm -r src
 
 #FROM alpine:latest AS gdp-run-base
 FROM gdp-src-base AS gdp-run-base
-#RUN addgroup -g 321 gdp && adduser -S -u 321 -G gdp gdp
-RUN adduser --system --uid 123 --group gdp
+#RUN addgroup -g 133 gdp && adduser -S -u 133 -G gdp gdp
+RUN adduser --system --uid 133 --group gdp
 #RUN apk install \
 #	avahi-libs-0.7-r1 \
 #	XXX more XXX
@@ -113,13 +113,12 @@ RUN rm -rf /src/gdp
 #	It is possible to override the default router.
 #
 #	You have to run this with:
-#		glogs=/var/swarm/gdp/glogs	# set as appropriate
+#		datadir=/var/swarm/gdp		# set as appropriate
 #		uid=<unique name>		# set as appropriate
 #		router=<router name>		# optional
 #		gdplogd_name=<name root>	# optional
 #		docker run \
-#			-v $glogs:/var/swarm/gdp/glogs \
-#			-p 8009:8009 \
+#			-v $datadir:/var/swarm/gdp \
 #			-e GDP_ROUTER=$router \
 #			-e GDPLOGD_NAME=$gdplogd_name \
 #			gdplogd
@@ -130,6 +129,9 @@ RUN rm -rf /src/gdp
 #		which is essentially a random number.  This means that
 #		attempts to create logs on this log server will need to
 #		be customized each time the container starts up.
+#
+#	The spawn-gdplogd.sh script should set this up for you, starting
+#	from the host system parameter files.
 #
 
 FROM gdp-run-base AS gdplogd

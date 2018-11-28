@@ -67,8 +67,14 @@ unset paramfiles
 rm $tmpfile
 
 # fixed arguments: data (log) location
-: ${swarm_gdplogd_log_dir:=/var/swarm/gdp/glogs}
-args="-v $swarm_gdplogd_log_dir:/var/swarm/gdp/glogs"
+: ${swarm_gdp_data_dir:=/var/swarm/gdp}
+: ${swarm_gdplogd_log_dir:=glogs}
+pwd
+cd $swarm_gdp_data_dir		# in case log_dir uses relative path
+$debug && echo swarm_gdp_data_dir=$swarm_gdp_data_dir PWD=$PWD
+cd $swarm_gdplogd_log_dir	# might be relative or absolute
+$debug && echo swarm_gdplogd_log_dir=$swarm_gdplogd_log_dir PWD=$PWD
+args="-v $PWD:/var/swarm/gdp/glogs"
 
 # name of log server
 if [ -z "$swarm_gdplogd_gdpname" ]; then

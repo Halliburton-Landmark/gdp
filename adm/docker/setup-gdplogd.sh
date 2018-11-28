@@ -7,10 +7,10 @@
 set -e
 
 # database directory inside container
-: ${GDP_LOG_ROOT:=/var/swarm/gdp/glogs}
-mkdir -p $GDP_LOG_ROOT
-chown gdp:gdp $GDP_LOG_ROOT
-chmod 750 $GDP_LOG_ROOT
+: ${GDP_DATA_ROOT:=/var/swarm/gdp}
+mkdir -p $GDP_DATA_ROOT/glogs
+chown gdp:gdp $GDP_DATA_ROOT $GDP_DATA_ROOT/glogs
+chmod 750 $GDP_DATA_ROOT $GDP_DATA_ROOT/glogs
 
 # system log files inside container
 SYSLOGDIR=/var/log/gdp
@@ -19,9 +19,9 @@ chown gdp:gdp $SYSLOGDIR
 
 mkdir -p /etc/ep_adm_params
 cat > /etc/ep_adm_params/gdp <<- EOF
+	swarm.gdp.data.root=$GDP_DATA_ROOT
 EOF
 cat > /etc/ep_adm_params/gdplogd <<- EOF
 	swarm.gdp.zeroconf.enable=false
-	swarm.gdplogd.log.dir=$GDP_LOG_ROOT
 EOF
 chown gdp:gdp /etc/ep_adm_params/*
