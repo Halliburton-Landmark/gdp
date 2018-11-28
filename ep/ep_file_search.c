@@ -36,6 +36,9 @@
 
 /*
 **  EP_FILE_SEARCH --- locate a file or directory in a search path
+**
+**	If the file name ends with a slash, search for a directory,
+**	otherwise search for a non-directory.
 */
 
 EP_STAT
@@ -52,6 +55,15 @@ ep_file_search(
 
 	if (fname != NULL)
 	{
+		// if fname is an absolute path, just use it
+		//XXX should really do directory check
+		if (fname[0] == '/')
+		{
+			snprintf(fnbuf, fnbuf_len, "%s", fname);
+			return EP_STAT_OK;
+		}
+
+		// not absolute: let's search
 		flen = strlen(fname);
 		// if fname ends in slash, we are looking for a directory
 		find_dir = fname[flen - 1] == '/';
@@ -77,10 +89,10 @@ ep_file_search(
 		}
 
 		if (flen > 0)
-			snprintf(fnbuf, sizeof fnbuf_len, "%.*s/%.*s",
+			snprintf(fnbuf, fnbuf_len, "%.*s/%.*s",
 					(int) dlen, dp, (int) flen, fname);
 		else
-			snprintf(fnbuf, sizeof fnbuf_len, "%.*s",
+			snprintf(fnbuf, fnbuf_len, "%.*s",
 					(int) dlen, dp);
 		struct stat st;
 		if (stat(fnbuf, &st) != 0)
