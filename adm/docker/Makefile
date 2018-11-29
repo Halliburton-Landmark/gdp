@@ -3,7 +3,14 @@ BRANCH=		master
 DOCKER=		docker
 DOCKERFLAGS=
 
-all: gdp-src-base gdp-dev-c gdp-run-base gdplogd
+ALL=		 gdp-src-base gdp-dev-c gdp-run-base gdplogd
+
+all: ${ALL}
+
+#
+#  Build individual images for external use.
+#	Intermediate images are build automagically.
+#
 
 # image containing source code and prerequisites
 gdp-src-base:	.FORCE
@@ -35,5 +42,22 @@ gdplogd:	.FORCE
 gdp_router:	.FORCE
 	${DOCKER} ${DOCKERFLAGS} build --target gdp_router \
 		-t gdp_router:${VER} .
+
+#
+#  Push images to our registry
+#	Should only push those images appropriate for external use.
+#	Assumes the REGISTRY_USER is logged in (see docker login --help
+#		and ~/.docker/config.json).
+#
+REGISTRY_HOST=	gdp.cs.berkeley.edu:5005
+REGISTRY_USER=	eric
+REGISTRY=	${REGISTRY_HOST}/${REGISTRY_USER}
+
+push: ${ALL}
+	for image in ${ALL}; do \
+		echo "Pushing $${image}"; \
+		${DOCKER} tag $${image} ${REGISTRY}/$${image}:${VER}; \
+		${DOCKER} push ${REGISTRY}/$${image}:${VER}; \
+	done
 
 .FORCE:
