@@ -68,7 +68,7 @@ _gdp_name_init()
 
 	// open a connection to the external => internal mapping database
 	const char *db_host = ep_adm_getstrparam("swarm.gdp.namedb.host",
-											NULL);
+											GDP_DEFAULT_NAMEDB_HOST);
 	if (db_host == NULL)
 	{
 		ep_dbg_cprintf(Dbg, 1, "_gdp_name_init: no name database available\n");

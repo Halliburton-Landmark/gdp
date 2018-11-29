@@ -62,6 +62,9 @@
 #ifndef GDP_DEFAULT_DATA_ROOT
 # define GDP_DEFAULT_DATA_ROOT			"/var/swarm/gdp"
 #endif
+#ifndef GDP_DEFAULT_NAMEDB_HOST
+# define GDP_DEFAULT_NAMEDB_HOST		"gdp-hongd.cs.berkeley.edu"
+#endif
 
 typedef struct gdp_chan		gdp_chan_t;		// should be in gdp_chan.h?
 typedef uint16_t			gdp_seqno_t;	// should be in gdp_chan.h?

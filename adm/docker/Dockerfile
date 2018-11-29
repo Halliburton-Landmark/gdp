@@ -93,8 +93,9 @@ RUN make install-client && cd / && rm -r src
 
 #FROM alpine:latest AS gdp-run-base
 FROM gdp-src-base AS gdp-run-base
-#RUN addgroup -g 133 gdp && adduser -S -u 133 -G gdp gdp
-RUN adduser --system --uid 133 --group gdp
+ARG GDP_UID=133
+#RUN addgroup -g $GDP_UID gdp && adduser -S -u $GDP_UID -G gdp gdp
+RUN adduser --system --uid $GDP_UID --group gdp
 #RUN apk install \
 #	avahi-libs-0.7-r1 \
 #	XXX more XXX

@@ -15,6 +15,7 @@ TMP=/tmp
 : ${GDP_VER=$GDP_VERSION_MAJOR}
 : ${GDPLOGD_LOG:=$GDP_LOG_DIR/gdplogd.log}
 : ${GDPLOGD_BIN:=$GDP_ROOT/sbin/gdplogd$GDP_VER}
+: ${GDP_UID:=133}
 export GDP_VER
 
 ## be sure we're running as root
@@ -26,14 +27,14 @@ info "Preparing install into GDP_ROOT=$GDP_ROOT"
 if ! grep -q "^${GDP_GROUP}:" /etc/group
 then
 	info "Creating group $GDP_GROUP"
-	addgroup --system $GDP_GROUP
+	addgroup --system --gid $GDP_UID $GDP_GROUP
 fi
 
 ## create "gdp" user
 if ! grep -q "^${GDP_USER}:" /etc/passwd
 then
 	info "Creating user $GDP_USER"
-	adduser --system --ingroup $GDP_GROUP $GDP_USER
+	adduser --system --uid $GDP_UID --ingroup $GDP_GROUP $GDP_USER
 fi
 
 umask 0022

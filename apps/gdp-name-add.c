@@ -34,6 +34,7 @@
 #include <ep/ep_app.h>
 #include <ep/ep_dbg.h>
 #include <gdp/gdp.h>
+#include <gdp/gdp_priv.h>	// cheat, for GDP_DEFAULT_NAMEDB_HOST
 
 #include <mysql.h>
 
@@ -59,7 +60,8 @@ name_init(const char *db_host, const char *db_user, char *db_passwd)
 
 	// open a connection to the external => internal mapping database
 	if (db_host == NULL)
-		db_host = ep_adm_getstrparam("swarm.gdp.namedb.host", NULL);
+		db_host = ep_adm_getstrparam("swarm.gdp.namedb.host",
+								GDP_DEFAULT_NAMEDB_HOST);
 	if (db_host == NULL)
 	{
 		ep_app_error("No database name available; set swarm.gdp.namedb.host");

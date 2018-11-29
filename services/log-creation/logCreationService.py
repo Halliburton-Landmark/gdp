@@ -98,7 +98,7 @@ class logCreationService(GDPService):
         if namedb_info.get("host", None) is not None:
             logging.info("Initiating connection to directory server")
             self.namedb_conn = mariadb.connect(
-                        host=namedb_info["host"],
+                        host=namedb_info.get("host", "gdp-hongd.cs.berkeley.edu"),
                         user=namedb_info.get("user", "anonymous"),
                         password=namedb_info.get("passwd", ""),
                         database=namedb_info.get("database", "gdp_hongd"))
