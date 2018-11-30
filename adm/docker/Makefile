@@ -5,7 +5,9 @@ DOCKERFLAGS=
 
 ALL=		 gdp-src-base gdp-dev-c gdp-run-base gdplogd
 
-all: ${ALL}
+all: docker-build
+
+docker-build: ${ALL}
 
 #
 #  Build individual images for external use.
@@ -53,7 +55,11 @@ REGISTRY_HOST=	gdp.cs.berkeley.edu:5005
 REGISTRY_USER=	eric
 REGISTRY=	${REGISTRY_HOST}/${REGISTRY_USER}
 
-push: ${ALL}
+docker-pull:
+	${DOCKER} pull ubuntu:16.04
+	${DOCKER} pull alpine:latest
+
+docker-push: ${ALL}
 	for image in ${ALL}; do \
 		echo "Pushing $${image}"; \
 		${DOCKER} tag $${image} ${REGISTRY}/$${image}:${VER}; \
