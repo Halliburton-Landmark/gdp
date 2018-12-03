@@ -48,22 +48,24 @@ gdp_router:	.FORCE
 #
 #  Push images to our registry
 #	Should only push those images appropriate for external use.
-#	Assumes the REGISTRY_USER is logged in (see docker login --help
+#	Assumes the DOCKER_REG_USER is logged in (see docker login --help
 #		and ~/.docker/config.json).
 #
-REGISTRY_HOST=	gdp.cs.berkeley.edu:5005
-REGISTRY_USER=	eric
-REGISTRY=	${REGISTRY_HOST}/${REGISTRY_USER}
+DOCKER_REG_HOST=	gdp.cs.berkeley.edu:5005
+DOCKER_REG_USER=	eric
+DOCKER_REG=		${DOCKER_REG_HOST}/${DOCKER_REG_USER}
+UBUNTU_VER=		16.04
+ALPINE_VER=		latest
 
 docker-pull:
-	${DOCKER} pull ubuntu:16.04
-	${DOCKER} pull alpine:latest
+	${DOCKER} pull ubuntu:${UBUNTU_VER}
+	${DOCKER} pull alpine:${ALPINE_VER}
 
 docker-push: ${ALL}
 	for image in ${ALL}; do \
 		echo "Pushing $${image}"; \
-		${DOCKER} tag $${image} ${REGISTRY}/$${image}:${VER}; \
-		${DOCKER} push ${REGISTRY}/$${image}:${VER}; \
+		${DOCKER} tag $${image} ${DOCKER_REG}/$${image}:${VER}; \
+		${DOCKER} push ${DOCKER_REG}/$${image}:${VER}; \
 	done
 
 .FORCE:
