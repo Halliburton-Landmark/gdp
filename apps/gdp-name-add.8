@@ -29,7 +29,7 @@ is read from the keyboard.
 This does
 .Em not
 use the
-.Va swarm.gdp.namedb.passwd
+.Va swarm.gdp.hongdb.passwd
 administrative parameter since that is for the account that reads the database,
 not the account that writes the database.
 .Pp
@@ -48,7 +48,7 @@ Useful only with the code in hand.
 .It Fl H Ar database-host-name
 The DNS name of the host that maintains the database.
 This overrides the
-.Va swarm.gdp.namedb.host
+.Va swarm.gdp.hongdb.host
 runtime administrative parameter.
 .
 .It Fl u database-user-name
@@ -57,7 +57,7 @@ This must have INSERT permission on the mapping table.
 Defaults to
 .Li creation_service .
 Note that this is a different user from that specified in the
-.Va swarm.gdp.namedb.user
+.Va swarm.gdp.hongdb.user
 parameter.
 .El
 .Sh EXIT STATUS
@@ -71,10 +71,10 @@ Command line parameters are incorrect.
 See
 .Xr gdp 7
 for documentation for
-.Va swarm.gdp.namedb.host ,
-.Va swarm.gdp.namedb.database ,
+.Va swarm.gdp.hongdb.host ,
+.Va swarm.gdp.hongdb.database ,
 and
-.Va swarm.gdp.namedb.table .
+.Va swarm.gdp.hongdb.table .
 .\".Sh ENVIRONMENT
 .\".Sh FILES
 .Sh SEE ALSO

@@ -92,7 +92,7 @@ PARAMS=/etc/ep_adm_params
 mkdir -p $PARAMS
 cat > $PARAMS/gdp <<- EOF
 	swarm.gdp.routers=$GDP_ROUTER
-	swarm.gdp.namedb.host=$GDP_HONGD_SERVER
+	swarm.gdp.hongdb.host=$GDP_HONGD_SERVER
 EOF
 if ! test -z "$GDP_CREATION_SERVICE"; then
 	echo "swarm.gdp.create.service=$GDP_CREATION_SERVICE" >> $PARAMS/gdp

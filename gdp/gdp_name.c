@@ -67,8 +67,8 @@ _gdp_name_init()
 			_GdpNameRoot == NULL ? "" : _GdpNameRoot);
 
 	// open a connection to the external => internal mapping database
-	const char *db_host = ep_adm_getstrparam("swarm.gdp.namedb.host",
-											GDP_DEFAULT_NAMEDB_HOST);
+	const char *db_host = ep_adm_getstrparam("swarm.gdp.hongdb.host",
+											GDP_DEFAULT_HONGDB_HOST);
 	if (db_host == NULL)
 	{
 		ep_dbg_cprintf(Dbg, 1, "_gdp_name_init: no name database available\n");
@@ -76,14 +76,14 @@ _gdp_name_init()
 	}
 	unsigned int db_port = 0;		//TODO: should parse db_host for this
 
-	const char *db_name = ep_adm_getstrparam("swarm.gdp.namedb.database",
+	const char *db_name = ep_adm_getstrparam("swarm.gdp.hongdb.database",
 											"gdp_hongd");
-	const char *db_user = ep_adm_getstrparam("swarm.gdp.namedb.user",
+	const char *db_user = ep_adm_getstrparam("swarm.gdp.hongdb.user",
 											"anonymous");
-	const char *db_passwd = ep_adm_getstrparam("swarm.gdp.namedb.passwd",
+	const char *db_passwd = ep_adm_getstrparam("swarm.gdp.hongdb.passwd",
 											"");
 	unsigned long db_flags = 0;
-	DbTable = ep_adm_getstrparam("swarm.gdp.namedb.table", "human_to_gdp");
+	DbTable = ep_adm_getstrparam("swarm.gdp.hongdb.table", "human_to_gdp");
 
 	NameDb = mysql_init(NULL);
 	if (NameDb == NULL)

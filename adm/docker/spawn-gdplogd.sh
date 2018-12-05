@@ -93,8 +93,8 @@ export GDP_ROUTER="${swarm_gdp_routers}"
 test -z "${swarm_gdp_routers}" || args="$args -e GDP_ROUTER"
 
 # name of Human-Oriented Name to GDPname Directory server (IP address)
-export GDP_HONGD_SERVER="$swarm_gdp_namedb_host"
-test -z "$swarm_gdp_namedb_host" || args="$args -e GDP_HONGD_SERVER"
+export GDP_HONGD_SERVER="$swarm_gdp_hongdb_host"
+test -z "$swarm_gdp_hongdb_host" || args="$args -e GDP_HONGD_SERVER"
 
 # additional arguments to gdplogd itself (passed in environment)
 args="$args -e GDPLOGD_ARGS"

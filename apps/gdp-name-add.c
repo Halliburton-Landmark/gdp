@@ -34,7 +34,7 @@
 #include <ep/ep_app.h>
 #include <ep/ep_dbg.h>
 #include <gdp/gdp.h>
-#include <gdp/gdp_priv.h>	// cheat, for GDP_DEFAULT_NAMEDB_HOST
+#include <gdp/gdp_priv.h>	// cheat, for GDP_DEFAULT_HONGDB_HOST
 
 #include <mysql.h>
 
@@ -60,17 +60,17 @@ name_init(const char *db_host, const char *db_user, char *db_passwd)
 
 	// open a connection to the external => internal mapping database
 	if (db_host == NULL)
-		db_host = ep_adm_getstrparam("swarm.gdp.namedb.host",
-								GDP_DEFAULT_NAMEDB_HOST);
+		db_host = ep_adm_getstrparam("swarm.gdp.hongdb.host",
+								GDP_DEFAULT_HONGDB_HOST);
 	if (db_host == NULL)
 	{
-		ep_app_error("No database name available; set swarm.gdp.namedb.host");
+		ep_app_error("No database name available; set swarm.gdp.hongdb.host");
 		estat = GDP_STAT_NAK_SVCUNAVAIL;
 		goto fail0;
 	}
 	unsigned int db_port = 0;		//TODO: should parse db_host for this
 
-	const char *db_name = ep_adm_getstrparam("swarm.gdp.namedb.database",
+	const char *db_name = ep_adm_getstrparam("swarm.gdp.hongdb.database",
 											"gdp_hongd");
 	unsigned long db_flags = 0;
 
@@ -223,7 +223,7 @@ main(int argc, char **argv)
 	// open database connection
 	phase = "database open";
 	if (db_user == NULL)
-		db_user = ep_adm_getstrparam("swarm.gdp.namedb.user",
+		db_user = ep_adm_getstrparam("swarm.gdp.hongdb.user",
 									"gdp_creation_service");
 	estat = name_init(db_host, db_user, db_passwd);
 	if (!EP_STAT_ISOK(estat))

@@ -166,7 +166,7 @@ cat <<- EOF
 	runtime GDP configuration.  This will normally be in /etc/ep_adm_params/gdp
 	or /usr/local/etc/ep_adm_params/gdp.  There should be a line in that
 	file that reads:
-	   swarm.gdp.namedb.host=$fqdn
+	   swarm.gdp.hongdb.host=$fqdn
 	Everything else should be automatic.
 
 	We have plans to improve this in the future.

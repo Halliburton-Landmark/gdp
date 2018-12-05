@@ -89,7 +89,7 @@ on the host system on which the image is run.
   mappings may be accessed.  At the moment there is no default,
   but there probably should be until we come up with a scalable,
   federated solution.  In the meantime, there can be only one of
-  these in any GDP cluster.  Inherited from `swarm.gdp.namedb.host`.
+  these in any GDP cluster.  Inherited from `swarm.gdp.hongdb.host`.
 
 
 # Running Docker Instances
@@ -126,7 +126,7 @@ for parameters.  In particular, it uses the following parameters:
 * `swarm.gdp.routers` sets the default set of routers.  If set,
   this will override the `GDP_ROUTER` parameter set when the image
   was built.
-* `swarm.gdp.namedb.host` overrides `GDP_HONGD_SERVER`.  It has
+* `swarm.gdp.hongdb.host` overrides `GDP_HONGD_SERVER`.  It has
   no default.
 * `swarm.gdplogd.gdpname` overrides `GDPLOGD_NAME`.  Defaults
   to the reversed name of the host on which the container is

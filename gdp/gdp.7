@@ -331,28 +331,28 @@ If it does not get a response in this many milliseconds
 it will retry.
 Defaults to 10000 (ten seconds).
 .
-.It swarm.gdp.namedb.database
+.It swarm.gdp.hongdb.database
 The name of the database holding the mappings
 from a human-oriented name to an internal GDPname.
 Defaults to
 .Li gdp_hongd
 (human-oriented to GDPname directory).
 .
-.It swarm.gdp.namedb.host
+.It swarm.gdp.hongdb.host
 The DNS name of the host on which the database resides.
 Currently no default; this must be set.
 .
-.It swarm.gdp.namedb.passwd
+.It swarm.gdp.hongdb.passwd
 The password for the database user.
 Defaults to the empty string,
 as appropriate for anonymous users.
 .
-.It swarm.gdp.namedb.table
+.It swarm.gdp.hongdb.table
 The name of the table with the mappings.
 Defaults to
 .Li human_to_gdp .
 .
-.It swarm.gdp.namedb.user
+.It swarm.gdp.hongdb.user
 The name of the database user to do the update.
 This user must have SELECT permission on the database
 to do a name lookup
