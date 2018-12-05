@@ -18,9 +18,9 @@ test $? != 0 && echo "Usage: $0 [-D]" >&2 && exit 1
 set -- $args
 debug=false
 : ${VER:=latest}
-for arg
+while true
 do
-	case "$arg" in
+	case "$1" in
 	  -D)
 		debug=true
 		;;

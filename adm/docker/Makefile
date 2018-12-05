@@ -1,5 +1,5 @@
 VER=		latest
-BRANCH=		master
+BRANCH=		default
 DOCKER=		docker
 DOCKERFLAGS=
 
@@ -18,6 +18,7 @@ docker-build: ${ALL}
 gdp-src-base:	.FORCE
 	${DOCKER} ${DOCKERFLAGS} build --target gdp-src-base \
 		--build-arg BRANCH=${BRANCH} \
+		--build-arg VER=${VER} \
 		-t gdp-src-base:${VER} .
 
 # image for application development in C
@@ -52,7 +53,7 @@ gdp_router:	.FORCE
 #		and ~/.docker/config.json).
 #
 DOCKER_REG_HOST=	gdp.cs.berkeley.edu:5005
-DOCKER_REG_USER=	eric
+DOCKER_REG_USER=	gdp
 DOCKER_REG=		${DOCKER_REG_HOST}/${DOCKER_REG_USER}
 UBUNTU_VER=		16.04
 ALPINE_VER=		latest

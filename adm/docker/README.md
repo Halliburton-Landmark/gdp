@@ -30,6 +30,8 @@ There are also two images that are intended for use only from with
   applications, but not including a full Ubuntu distribution, notably
   excluding development tools.  For example, see the `Dockerfile`
   entry for `gdplogd` to see how to use this.
+  _[[Right now this uses `gdp-dev-c` as the base, but that should be
+  changed to use alpine.]]_
 
 
 # Building Docker Images
@@ -37,7 +39,8 @@ There are also two images that are intended for use only from with
 Running `make` should be sufficient to build the standard set of
 images.  Note that it builds the image but does not push them to
 a registry.  *We should create a GDP registry for this.*
-A `make` variable `VER` is used as the tag of all of these images.
+A `make` variable `VER` is used as the tag of all of these images;
+this is normally the version version of the GDP release.
 For example, when building version 1.2.3 of the GDP, you **should**
 use:
 
@@ -72,24 +75,28 @@ the Docker Image.  To pass in arguments, use:
 
 These are mostly values that will be stored in the parameter
 files in the resulting image.  They can all be overridden when
-starting up a container (see below for instructions).
+starting up a container (see below for instructions).  They
+are inherited from the runtime administrative parameter files
+on the host system on which the image is run.
 
-* `GDP_ROUTER` — the default GDP router.
+* `GDP_ROUTER` — the default GDP router.  Inherited from the
+  `swarm.gdp.routers` administrative parameter.
 * `GDP_CREATION_SERVICE` — The GDPname of the default log creation
-  service.  At the moment there is no default.
+  service.  Inherited from `swarm.gdp.create.service` if set;
+  otherwise, there is no default for now.
 * `GDP_HONGD_SERVER` — The IP hostname of the Human-Oriented Name
   to GDPname Directory server (actually the MariaDB server) where
   mappings may be accessed.  At the moment there is no default,
   but there probably should be until we come up with a scalable,
   federated solution.  In the meantime, there can be only one of
-  these in any GDP cluster.
+  these in any GDP cluster.  Inherited from `swarm.gdp.namedb.host`.
 
 
 # Running Docker Instances
 
 ## Running `gdp-dev-c` and `gdp-dev-python`
 
-***To Be Done.***
+***To Be Written.***
 
 ## Running `gdplogd`
 

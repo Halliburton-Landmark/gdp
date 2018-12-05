@@ -6,10 +6,50 @@
 
 set -e
 
+# throttle debconf errors
+export DEBIAN_FRONTEND=noninteractive
+
+args=`getopt b:Dr:v: $*`
+test $? != 0 && echo "Usage $0 [-b branch] [-r repo] [-v ver]" >&2 && exit 64
+set -- $args
+debug=false
+while true
+do
+	$debug && echo "Parsing $*"
+	case "$1" in
+	  -b)
+		BRANCH=$2
+		shift
+		;;
+	  -D)
+		debug=true
+		;;
+	  -r)
+		REPO=$2
+		shift
+		;;
+	  -v)
+		VER=$2
+		shift
+		;;
+	  --)
+		shift
+		break;;
+	esac
+	shift
+done
+
 : ${VER:=latest}
-: ${BRANCH:=r$VER}
-test ${BRANCH} = "rlatest" && BRANCH=master
-: ${REPO:=git://repo.eecs.berkeley.edu/projects/swarmlab/gdp.git}
+test "$BRANCH" = "default" && BRANCH="r$VER"
+test "$BRANCH" = "rlatest" && BRANCH=master
+test "$REPO" = "default" && REPO="git://repo.eecs.berkeley.edu/projects/swarmlab/gdp.git"
+
+if $debug; then
+	echo VER=$VER BRANCH=$BRANCH REPO=$REPO
+	echo args=$*
+	exit 0
+fi
+
 
 # ideally this would leverage adm/gdp-setup.sh to avoid duplication
 PACKAGES=`sed -e 's/*.*//' << 'EOF'
@@ -24,6 +64,7 @@ PACKAGES=`sed -e 's/*.*//' << 'EOF'
 	libssl-dev
 	libsystemd-dev
 	protobuf-c-compiler
+	sudo
 	uuid-dev
 EOF
 `

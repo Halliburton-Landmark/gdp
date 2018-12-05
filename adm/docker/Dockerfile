@@ -8,9 +8,12 @@
 ##
 ##  There are also parameters you can set using --build-arg:
 ##	VER			The version tag on the resulting image.
+##				Defaults to "latest".
 ##	BRANCH			The source code branch to use.
+##				Defaults to "master".
 ##	REPO			The URI of the source code repo (used to
 ##				fetch the gdp-src-base code).
+##				Defaults to the Berkeley repo.
 ##
 ##  Others can also be set this way, but they are normally not defined
 ##  at build time, since the usual approach is to pick these up at
@@ -27,28 +30,64 @@
 
 ############################################################
 #
-#  The source code.  This isn't intended for distribution, but is
-#  just a build step for other containers.
+#  The source code.  This isn't intended for distribution or for
+#  end user use, but is just a build step for other containers.
 #	Installs prerequisite packages.
 #	Installs the source code (from git).
 #	Compiles (but does not install) the code.
+#	Creates basic parameter files.
+#
+#  This is used as the basis for customer development environments,
+#  system installs (e.g. gdplogd), and other similar images.
+#
+#  See comments below for parameters that can be specified at build
+#  time or imported at run time.  Most of these can (for now) be
+#  left unchanged if you are joining the Berkeley-based GDP cluster.
+#  If you want to create a private universe you'll probably have to
+#  change several of them.
 #
 
 FROM ubuntu:16.04 as gdp-src-base
+
+#  Parameters:
+
+# The default routers (IP address or DNS names with semicolon separators);
+# if not set, Berkeley routers are used.  For a private cluster they
+# _must_ be defined.
 ARG GDP_ROUTER
 ENV GDP_ROUTER=$GDP_ROUTER
+
+# The name of the creation service.  Default is the Berkeley cluster.
+# For a private cluster, an alternative name should be used.
 ARG GDP_CREATION_SERVICE
 ENV GDP_CREATION_SERVCE=$GDP_CREATION_SERVICE
+
+# The IP name of the Human-Oriented Name to GDPname directory server.
+# This is actually a MariaDB or MySQL server.
 ARG GDP_HONGD_SERVER
 ENV GDP_HONGD_SERVER=$GDP_HONGD_SERVER
+
+# The version number ("tag") of the resulting image.
 ARG VER=latest
-ENV VER=$VER
+
+# The major version number of the GDP code.  Should match GDP_VERSION_MAJOR
+# in gdp/Makefile.  Used for creating file names.  It is not well defined.
 ENV GDP_VER=2
-ARG BRANCH=master
-ENV BRANCH=$BRANCH
+
+# The URI of the source code repo.  If "default" it uses the Berkeley repo.
+ARG REPO="default"
+
+# The branch in the source code repo.  If "default" it will use branch
+# "r$VER" (that is, the version number preceded by the letter "r", per
+# our convention for naming releases.  If "$VER" is "latest", then this
+# becomes "master".
+ARG BRANCH="default"
+
+# And now for the real work.
 COPY setup-src.sh /src/
 WORKDIR /src
-RUN VER=$VER /src/setup-src.sh && cd / && rm /src/setup-src.sh
+RUN VER=$VER /src/setup-src.sh -r "${REPO}" -b "${BRANCH}" && \
+		cd / && rm /src/setup-src.sh
 
 
 ############################################################
@@ -61,11 +100,8 @@ RUN VER=$VER /src/setup-src.sh && cd / && rm /src/setup-src.sh
 
 FROM gdp-src-base AS gdp-dev-c
 
-# stop stupid debconf errors
-#ENV DEBIAN_FRONTEND noninteractive
-
-WORKDIR /src/gdp
-RUN make install-client && cd / && rm -r src
+COPY setup-dev-c.sh /src
+RUN /src/setup-dev-c.sh && rm /src/setup-dev-c.sh
 
 
 ############################################################
@@ -76,26 +112,31 @@ RUN make install-client && cd / && rm -r src
 #
 
 #FROM gdp-src-base AS gdp-dev-python
-#COPY setup-python.sh /src/
-#WORKDIR /src
 #
-#RUN /src/setup-python.sh && rm /src/setup-python.sh
+#COPY setup-dev-python.sh /src/
+#RUN /src/setup-dev-python.sh && rm /src/setup-dev-python.sh
 
 
 ############################################################
 #
 #  The base instance for a minimal execution environment.
 #  Only to be used as a base for other containers.
-#	Should be based on alpine, but I couldn't figure out how
-#	to install the libraries needed to make the code work.
-#	Static linking failed, and `apk` is inscrutable.
+#	XXX  Should be based on alpine, but I couldn't figure out how
+#	XXX  to easily install the libraries needed to make the code
+#	XXX  work.  Static linking failed, and `apk` is inscrutable.
+#	XXX  This should get fixed someday.
 #
 
 #FROM alpine:latest AS gdp-run-base
-FROM gdp-src-base AS gdp-run-base
+FROM gdp-dev-c AS gdp-run-base
+
+# The choice of uid 133 is arbitrary, but it should match the
+# uid in the host's /etc/passwd file since the data volume
+# is mounted from the host into the container.
 ARG GDP_UID=133
 #RUN addgroup -g $GDP_UID gdp && adduser -S -u $GDP_UID -G gdp gdp
 RUN adduser --system --uid $GDP_UID --group gdp
+
 #RUN apk install \
 #	avahi-libs-0.7-r1 \
 #	XXX more XXX

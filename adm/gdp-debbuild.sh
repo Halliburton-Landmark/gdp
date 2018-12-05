@@ -58,9 +58,9 @@ fi
 set -- $args
 
 ver=UNKNOWN
-for arg
+while true
 do
-	case "$arg" in
+	case "$1" in
 	   -e)
 		email=$2
 		shift 2;;
@@ -70,6 +70,9 @@ do
 	   -v)
 		ver=$2
 		shift 2;;
+	   --)
+		shift
+		break;;
 	esac
 done
 
