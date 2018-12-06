@@ -1,5 +1,12 @@
 # GDP Directory Daemon (Interim Version 2)
 
+This service contains the routing information for the GDP.  ***[[Check
+that this is accurate.]]***
+
+***Note Well: this is NOT the Human-Oriented Name to GDPname directory
+service.***  That service also uses MariaDB, so you may be able to skip
+some of the early setup steps if it is already installed.
+
 The gdp-directoryd interim version 2 binary depends upon the
 co-located installation and configuration of a MariaDB Server and
 several supporting packages including the OCGraph plugin.
@@ -47,7 +54,7 @@ Continuing from the prior section:
 	
     $ cd services/gdp-directoryd
 
-Replace the password -- specifically, edit the #define IDENTIFIED_BY
+Replace the password -- specifically, edit the `#define IDENTIFIED_BY`
 "<password>" line within gdp-directoryd.c -- to match the password
 change, if any, made to the setup.sql file when following the MariaDB
 Configuration instructions above.

@@ -15,10 +15,13 @@ show databases;
 # PRODUCTION NOTE: change 'testblackbox' here and in the directory daemon source
 # to some suitable secret ahead of build and installation.
 #
-grant all privileges on blackbox.* TO 'gdpr'@'127.0.0.1' identified by 'testblackbox' with grant option;
-select user, host from mysql.user;
+GRANT ALL PRIVILEGES ON blackbox.*
+	TO 'gdpr'@'127.0.0.1'
+	IDENTIFIED BY 'testblackbox'
+	WITH GRANT OPTION;
+SELECT user, host FROM mysql.user;
 
-# grant all privileges will automatically create the user if not exists, as if
-# create user 'gdpr'@'127.0.0.1';
+# GRANT ALL PRIVILEGES will automatically create the user if not exists, as if
+# CREATE USER 'gdpr'@'127.0.0.1';
 
 # ==============================================================================

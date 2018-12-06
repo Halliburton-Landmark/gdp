@@ -78,11 +78,18 @@ install_maria_db() {
 }
 
 
-# probably needs to be customized for other OSes
+# needs to be customized for other OSes
 control_service() {
 	cmd=$1
 	svc=$2
-	sudo -s service $cmd $svc
+	case "$OS" in
+	  "ubuntu" | "debian" | "raspbian")
+		sudo -s service $cmd $svc
+		;;
+	  *)
+		fatal "%0: unknown OS $OS"
+		;;
+	esac
 }
 
 
@@ -192,7 +199,7 @@ initialize_mariadb() {
 	warn "Attempting to initialize MariaDB."
 	info "You will need to create a new root password for the database."
 	info "This is not the same as your system root password."
-	while ! read_root_password true
+	while ! read_new_password root_passwd
 	do
 		echo "Try again -- Enter new root password for database"
 	done
