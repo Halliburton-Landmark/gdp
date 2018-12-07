@@ -31,19 +31,23 @@ info() {
 
 warn() {
     if ! $quiet; then
-	echo "${Bla}${On_Yel}[WARN] $1${Reset}"
+	echo "${Yel}${On_Bla}[WARN] $1${Reset}"
     fi
 }
 
 error() {
     if ! $quiet; then
-	echo "${Red}${On_Whi}[ERROR] $1${Reset}"
+	echo "${Red}${On_Bla}[ERROR] $1${Reset}"
     fi
 }
 
 fatal() {
 	echo "${Whi}${On_Red}[FATAL] $1${Reset}"
 	exit 1
+}
+
+action() {
+	echo "${Bla}${On_Yel}[ACTION REQUIRED] $1${Reset}"
 }
 
 # Read a password from the terminal
