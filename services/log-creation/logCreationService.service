@@ -1,16 +1,29 @@
+#
+#  This systemd service file is specific to servers at Berkeley.
+#
+#       Feel free to adapt it for your use, but please do not attempt
+#       to use it without modification.
+#
+
 [Unit]
 Description=GDP log-creation service
 After=network-online.target
-OnFailure=unit-status-mail@%n.service  
-
+OnFailure=unit-status-mail@%n.service
 
 [Service]
 Type=simple
+Restart=always
+StandardOutput=syslog
+StandardError=inherit
+SyslogIdentifier=logCreationService2
+
 ; Following should be tweaked for individual environments
 User=gdp
-WorkingDirectory=/opt/log-creation
-ExecStart=/usr/bin/python logCreationService.py \
-        -i gdp-01.eecs.berkeley.edu -p 8007 -d logs.db \
+WorkingDirectory=/opt/log-creation2
+ExecStart=/usr/bin/python logCreationService2.py \
+         -i gdp-01.eecs.berkeley.edu \
+         -p 8009 \
+         -d logs$2.db \
          -a "edu.berkeley.eecs.gdp-01.gdplogd" \
             "edu.berkeley.eecs.gdp-02.gdplogd" \
             "edu.berkeley.eecs.gdp-03.gdplogd" \
@@ -18,12 +31,9 @@ ExecStart=/usr/bin/python logCreationService.py \
          -s "edu.berkeley.eecs.gdp-01.gdplogd.physical" \
             "edu.berkeley.eecs.gdp-02.gdplogd.physical" \
             "edu.berkeley.eecs.gdp-03.gdplogd.physical" \
-            "edu.berkeley.eecs.gdp-04.gdplogd.physical" 
-
-Restart=always
-StandardOutput=syslog
-StandardError=inherit
-SyslogIdentifier=logCreationService
+            "edu.berkeley.eecs.gdp-04.gdplogd.physical" \
+         --namedb_user="gdp_creation_service" \
+         --namedb_pw_file="/etc/gdp/creation_service_pw.txt" \
 
 [Install]
 WantedBy=multi-user.target

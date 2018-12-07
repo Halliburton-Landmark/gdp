@@ -8,17 +8,37 @@
 #	That may (probably will) change in the future.
 #
 
+debug=false
+skip_install=false
+args=`getopt Di $*`
+if [ $? != 0 ]; then
+	echo "Usage: $0 [-D] [-i]" >&2
+	exit 64
+fi
+eval set -- $args
+while true
+do
+	case "$1" in
+	  -D)
+		debug=true
+		;;
+	  -i)
+		skip_install=true
+		;;
+	  --)
+		shift
+		break;;
+	esac
+	shift
+done
+
+set -e
 cd `dirname $0`/..
 root=`pwd`
 . $root/adm/common-support.sh
 
-debug=false
-if [ "$1" = "-D" ]; then
-	debug=true
-	shift
-fi
-
-info "Installing Human-Oriented Name to GDPname Directory Service (HONGDS)."
+info "Installing Human-Oriented Name to GDPname Directory Service (HONGD)."
+$skip_install && info "   (Skipping installation of MariaDB.)"
 
 #
 #  We need the Fully Qualified Domain Name because MariaDB/MySQL uses
@@ -143,14 +163,19 @@ create_hongd_db() {
 #	done
 	creation_service_password=`dd if=/dev/random bs=1 count=9 | base64`
 	hongd_sql=$root/adm/gdp-hongd.sql.template
-	if ! sed \
+	if sed \
 		-e "s@CREATION_SERVICE_PASSWORD@$creation_service_password" \
 		$hongd_sql | sudo mysql
 	then
+		pwfile=creation_service_pw.txt
+		(umask 0137 && echo $creation_service_password > $pwfile)
+		sudo chown gdp:gdp $pwfile
+		action "Copy $pwfile to /etc/gdp/$pwfile"
+		action "  on the system running the log creation service."
+		action "  It should be owned by gdp:gdp, mode 640."
+	else
 		error "Unable to initialize HONGD database."
 	fi
-	warn "Creation service password is $creation_service_password."
-	warn "Save this password; the creation service will need it."
 }
 
 
@@ -160,7 +185,7 @@ create_hongd_db() {
 
 set_fqdn
 $debug && echo fqdn = $fqdn
-install_maria_db
+$skip_install || install_maria_db
 create_hongd_db
 
 info "Please read the following instructions."

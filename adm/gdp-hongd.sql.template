@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS human_to_gdp (
 	gname BINARY(32));
 
 -- anonymous user for doing reads
+CREATE USER ''@'%';
 GRANT SELECT (hname, gname) ON human_to_gdp TO ''@'%';
 
 -- privileged user for doing updates

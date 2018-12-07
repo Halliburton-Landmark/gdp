@@ -99,7 +99,7 @@ class logCreationService(GDPService):
             logging.info("Initiating connection to directory server")
             self.namedb_conn = mariadb.connect(
                         host=namedb_info.get("host", "gdp-hongd.cs.berkeley.edu"),
-                        user=namedb_info.get("user", "anonymous"),
+                        user=namedb_info.get("user", "gdp_creation_service"),
                         password=namedb_info.get("passwd", ""),
                         database=namedb_info.get("database", "gdp_hongd"))
 
@@ -379,6 +379,7 @@ if __name__ == "__main__":
     parser.add_argument("--namedb_host", help="Hostname for namedb")
     parser.add_argument("--namedb_user", help="Username for namedb")
     parser.add_argument("--namedb_passwd", help="Password for namedb")
+    parser.add_argument("--namedb_pw_file", help="File containing namedb passwd")
     parser.add_argument("--namedb_database", help="Database name for namedb")
     parser.add_argument("--namedb_table", help="Table name for namedb")
 
@@ -403,6 +404,9 @@ if __name__ == "__main__":
         namedb_info["user"] = args.namedb_user
     if args.namedb_passwd is not None:
         namedb_info["passwd"] = args.namedb_passwd
+    elif args.namedb_pw_file is not None:
+        with open(args.namedb_pw_file) as pwfile:
+            namedb_info["passwd"] = pwfile.readline()
     if args.namedb_database is not None:
         namedb_info["database"] = args.namedb_database
     if args.namedb_table is not None:
