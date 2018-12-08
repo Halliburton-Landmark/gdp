@@ -1,4 +1,4 @@
-<!-- Use "pandoc -sS -o README-CAAPI.html README-CAAPI.md" to process this to HTML -->
+***This documentation is out of date as of 2018-12-07.***
 
 OTHER INTERFACES TO THE GLOBAL DATAPLANE
 ========================================
@@ -17,7 +17,7 @@ other TerraSwarm demonstrations made and continue to make use of the
 RESTful GDP Gateway deployment.
 
 If you want to use the deployed RESTful GDP Gateway, please browse to
-the https://gdp-rest-01.eecs.berkeley.edu/ home page, which will
+the <https://gdp-rest-01.eecs.berkeley.edu/> home page, which will
 present hotlinks to the RESTful API (`doc/gdp-rest-interface.html`)
 and to python client usage example(s). Be advised that gdp-rest-01
 will not respond to non-SSL-protected (http://) traffic, and requires
@@ -48,3 +48,7 @@ Key-Value lookups can be done in Python using
 incorporation into larger Python programs.
 
 <!-- vim: set ai sw=4 sts=4 ts=4 : -->
+
+<!-- Use
+	pandoc -sS -o README-CAAPI.html README-CAAPI.md
+to process this to HTML -->

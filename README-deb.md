@@ -1,5 +1,3 @@
-<!-- Use "pandoc -sS -o README-deb.html README-deb.md" to process this to HTML -->
-
 INSTALLING THE GLOBAL DATAPLANE FROM .DEB PACKAGES
 ==================================================
 
@@ -11,6 +9,10 @@ other platforms is certainly welcome.
 **This README is only relevant if you are installing from the Debian
 packages.  Those packages are *not* included with the source distribution.
 If you are installing from source, please read `README-compiling.md`.**
+
+***Nota Bene:*** we are switching to doing packaging using Docker
+images rather than Debian packages.  This transition is not yet complete.
+We apologize for any confusion.
 
 Package structure:
 =================
@@ -42,4 +44,7 @@ In case it fails because of missing dependencies, you can fix it by
 
     sudo apt-get -f install
 
+<!-- Use
+	pandoc -sS -o README-deb.html README-deb.md
+to process this to HTML -->
 <!-- vim: set ai sw=4 sts=4 ts=4 : -->

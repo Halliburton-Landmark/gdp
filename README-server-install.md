@@ -1,6 +1,3 @@
-<!-- Use
-	pandoc -sS -o README-server-install.html README-server-install.md
-to process this to HTML -->
 
 INSTALLING A GLOBAL DATAPLANE SERVER FROM SOURCE CODE
 =====================================================
@@ -9,6 +6,11 @@ These instructions are relevant *only* if you are installing the
 server code from the source tree.  If you have installed the
 server code from a package, or if it is already installed, read
 the document `doc/gdp-server-admin.md`.
+
+Generally speaking, we are moving toward distributions using Docker
+images (first choice) and Debian packages.  Installations from
+source should only be used if you are collaborating with us on the
+base system.
 
 These steps assume you are building and installing the code from the
 source tree.  If you are using a Debian package, see the instructions
@@ -45,7 +47,7 @@ Details
 If you want to change defaults, create `/usr/local/etc/gdp.conf.sh`
 or `/etc/gdp.conf.sh`.  This is read as a shell file, and should
 consist of NAME=value definitions.  There are several parameters
-that can be changed, the most useful of which is GDP_ROOT.
+that can be changed, the most useful of which is `GDP_ROOT`.
 
 There are three cases for `GDP_ROOT`:
 
@@ -103,3 +105,6 @@ Proceed to the documenet `doc/gdp-server-admin.md` for details about
 post-install operation.
 
 <!-- vim: set ai sw=4 sts=4 ts=4 : -->
+<!-- Use
+	pandoc -sS -o README-server-install.html README-server-install.md
+to process this to HTML -->

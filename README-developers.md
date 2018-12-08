@@ -1,13 +1,17 @@
-<!-- Use "pandoc -sS -o README-developers.html README-developers.md" to process this to HTML -->
-
 DEVELOPING THE GLOBAL DATAPLANE
 ===============================
 
 This file describes things that someone working on developing the
-GDP should know.  It is incomplete.
+GDP should know.  It is (extremely) incomplete.
 
 See the files `README-compiling.md` and `README-admin.md`
 before you read this file.
+
+If you are working with the Berkeley GDP group, it is ***essential***
+that you get a login on <https://gdp.cs.berkeley.edu> so you have access
+to the news, forums, and wiki.  We welcome account requests from bona
+fide researchers.  If you are a spammer, well, find someplace else to
+spread your poison.
 
 
 Setting Debug Flags
@@ -34,3 +38,4 @@ To enable debugging for all patterns, use "`*=`_level_" or
 just "_level_", for example "`*=18`" or "`18`".
 
 <!-- vim: set ai sw=4 sts=4 ts=4 : -->
+<!-- Use "pandoc -sS -o README-developers.html README-developers.md" to process this to HTML -->
