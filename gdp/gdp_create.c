@@ -749,6 +749,29 @@ gdp_gin_create(
 			human_name == NULL ? "~no name~" : human_name);
 
 	/*
+	**  Verify that the human_name is not a Chimera
+	*/
+
+	if (human_name != NULL)
+	{
+		if (human_name[0] == '\0')
+		{
+			// valid, but same as nothing
+			human_name = NULL;
+		}
+		else
+		{
+			gdp_name_t iname;
+			if (EP_STAT_ISOK(gdp_internal_name(human_name, iname)))
+			{
+				// this is a valid base64-encoded name: confusion reigns
+				estat = GDP_STAT_GDP_NAME_INVALID;
+				goto fail0;
+			}
+		}
+	}
+
+	/*
 	**  Fill in some invariant (for this invocation) metadata.
 	*/
 
@@ -885,6 +908,7 @@ fail1:
 			gci_remove_key(&gci->writer_key, NULL, gname, "writer");
 	}
 fail0:
-	gdp_md_free(gmd);
+	if (gmd != NULL)
+		gdp_md_free(gmd);
 	return estat;
 }

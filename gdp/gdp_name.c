@@ -165,7 +165,7 @@ gdp_name_root_set(const char *root)
 {
 	if (_GdpNameRoot != NULL)
 		ep_mem_free(_GdpNameRoot);
-	if (root == NULL)
+	if (root == NULL || root[0] == '\0')
 		_GdpNameRoot = NULL;
 	else
 		_GdpNameRoot = ep_mem_strdup(root);
@@ -205,6 +205,9 @@ gdp_name_root_get(void)
 **		A caller may optionally pass in an `xname` buffer pointer to
 **		receive the name actually used after `GDP_NAME_ROOT`
 **		extension.
+**
+**		Returns a warning if the old back compatible algorithm (hash
+**		the human name to get the internal name) was used.
 */
 
 EP_STAT
@@ -213,6 +216,13 @@ gdp_name_parse(const char *hname, gdp_name_t gname, char **xnamep)
 	EP_STAT estat = GDP_STAT_NAME_UNKNOWN;
 	char *xname = NULL;
 	int xnamelen;
+
+	if (hname == NULL || hname[0] == '\0')
+	{
+		// no human name to parse
+		estat = GDP_STAT_GDP_NAME_INVALID;
+		goto done;
+	}
 
 	if (strlen(hname) == GDP_GOB_PNAME_LEN)
 	{
@@ -257,7 +267,7 @@ gdp_name_parse(const char *hname, gdp_name_t gname, char **xnamep)
 			xname = ep_mem_strdup(hname);
 		ep_dbg_cprintf(Dbg, 8, "gdp_name_parse: using SHA256(%s)\n", xname);
 		ep_crypto_md_sha256(xname, strlen(xname), gname);
-		estat = EP_STAT_OK;
+		estat = GDP_STAT_OLD_GDPNAME;
 	}
 #endif
 done:

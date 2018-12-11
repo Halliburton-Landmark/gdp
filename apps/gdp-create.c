@@ -256,22 +256,46 @@ main(int argc, char **argv)
 	// name is optional ; if omitted one will be created
 	if (argc-- > 0)
 		gobxname = *argv++;
+	if (gobxname != NULL && gobxname[0] == '0')
+		gobxname = NULL;
 
 	if (show_usage || argc > 0)
 		usage();
 
 	if (gobxname != NULL)
 	{
+		// check validity of the name
+		gdp_name_t gobiname;
+		if (EP_STAT_ISOK(gdp_internal_name(gobxname, gobiname)))
+		{
+			// this is a valid base64-encooded log name: not appropriate
+			estat = GDP_STAT_GDP_NAME_INVALID;
+			if (!quiet)
+			{
+				ep_app_error("Cannot choose internal GDPname (%s)",
+						gobxname);
+				exit(EX_CANTCREAT);
+			}
+		}
 		if (!skip_existence_test)
 		{
-			// make sure it doesn't already exist
-			gdp_name_t gobiname;
+			/*
+			**  If the external name is already known in the
+			**  Human-Oriented Name to GDPname directory, OR if the
+			**  hashed (old-style) internal name can be found,
+			**  then there is a conflict.
+			*/
+
 			gin = NULL;
-			if (EP_STAT_ISOK(estat = gdp_parse_name(gobxname, gobiname)) &&
-				EP_STAT_ISOK(estat = gdp_gin_open(gobiname, GDP_MODE_RO,
-												NULL, &gin)))
+			estat = gdp_name_parse(gobxname, gobiname, NULL);
+			if (EP_STAT_ISWARN(estat))
 			{
-				// oops, we shouldn't be able to open it
+				// iname used is the SHA256 of the xname
+				estat = gdp_gin_open(gobiname, GDP_MODE_RO, NULL, &gin);
+			}
+			if (EP_STAT_ISOK(estat))
+			{
+				// oops, we shouldn't be able to parse or open it
 				if (gin != NULL)
 					(void) gdp_gin_close(gin);
 				if (!quiet)
@@ -296,7 +320,9 @@ main(int argc, char **argv)
 	{
 		phase = "setting creation service";
 		estat = gdp_create_info_set_creation_service(gci, logdxname);
-		EP_STAT_CHECK(estat, goto fail1);
+		// OK if iname is hash of xname, which presents as a warning
+		if (EP_STAT_ISFAIL(estat))
+			goto fail1;
 	}
 
 	if (owner_keyfile != NULL)
@@ -327,6 +353,16 @@ main(int argc, char **argv)
 						key_bits, key_curve, key_enc_alg_name);
 	}
 	EP_STAT_CHECK(estat, goto fail1);
+
+	// if the user specified an unqualified name and we have a root name,
+	// use the extended name.
+	const char *root = gdp_name_root_get();
+	char xnamebuf[GDP_HUMAN_NAME_MAX + 1];
+	if (gobxname != NULL && strchr(gobxname, '.') == NULL && root != NULL)
+	{
+		snprintf(xnamebuf, sizeof xnamebuf, "%s.%s", root, gobxname);
+		gobxname = xnamebuf;
+	}
 
 	/*
 	**  Hello sailor, this is where the actual creation happens

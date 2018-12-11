@@ -19,15 +19,15 @@
 .Op Fl s Ar logd-gdp-addr
 .Op Fl S
 .Op Fl W Ar writer-key-location
-.Op Ar mdid = Ar metadata
+.Op Ar mdid=metadata ...
 .Op Ar external-name
 .Sh DESCRIPTION
 .Nm gdp-create
-creates a new GDP object
+creates a new GDP object,
+a.k.a.
+.Ql "Data Capsule"
 (sometimes called a
 .Ql "log"
-or a
-.Ql "Data Capsule" ,
 mostly for historic reasons)
 on a given log server.
 In its default mode it also creates a public/secret
@@ -38,6 +38,27 @@ Additional (text-based) metadata can be added
 (arguably this should allow binary metadata as well).
 Optionally the log can be given a human-understandable name;
 if not specified a seemingly random name is made up.
+.
+.Pp
+The human-oriented name has certain requirements:
+.Bl -bullet
+.
+.It
+It may not look like the base64-encoded internal name of any log.
+.
+.It
+It may not already be listed in the Human-Oriented to GDPname Directory (HONGD).
+.
+.It
+It may not have an equal sign in it.
+.El
+.
+.Pp
+Also, if the human-oriented name has no dots but the
+.Ev GDP_NAME_ROOT
+environment variable is set,
+the two will be appended in the same way as described in
+.Xr gdp 7 .
 .
 .Ss "Metadata"
 User-specified metadata may be added when a log is created.
@@ -278,7 +299,16 @@ The default server on which to create logs.
 Overridden by
 .Fl s .
 .El
-.\".Sh ENVIRONMENT
+.Sh ENVIRONMENT
+.Bl -tag
+.
+.It GDP_NAME_ROOT
+If set, this is prepended to any human-oriented names
+that do not already have dots in them.
+This is an easy way to make your log names unique.
+See
+.Xr gdp 7
+for details.
 .\".Sh FILES
 .Sh SEE ALSO
 .Xr gdp 7 ,
@@ -287,7 +317,8 @@ Overridden by
 .Bl -bullet
 .It
 To create a GDP log on a default server:
-.Dl gdp-create edu.berkeley.cs.eric.log00
+.Dl newlog=edu.berkeley.cs.eric.example
+.Dl gdp-create $newlog
 The secret key will be written into a a file named
 .Pa KEYS/<something>.pem ,
 where
@@ -296,13 +327,13 @@ is the base-64-encoded internal name of the log, e.g.,
 .Li 1KZy5jy1QpghTe8QBmDQGqdz3a_9tVP3qp6uxlOeJdk.pem .
 The password for encrypting this key will be read from the standard input.
 .It
-To create a GDP log on log server named edu.berkeley.eecs.gdp-01 using defaults:
-.Dl logd=edu.berkeley.eecs.gdp-01.gdplogd
-.Dl gdp-create -s $logd edu.berkeley.cs.eric.log01
-.It
-To create a log named
+To create a GDP log named
 .Li $newlog
-on the server named
+on log server named edu.berkeley.eecs.gdp-01 using defaults:
+.Dl logd=edu.berkeley.eecs.gdp-01.gdplogd
+.Dl gdp-create -s $logd $newlog
+.It
+To create a log on the server named
 .Li $logd
 encrypted with a 1024-bit RSA key,
 leaving the unencrypted key in a file named
@@ -320,6 +351,7 @@ will print the base-64-encoded name of the new log.
 You should be careful to record that,
 since it is your only way to access the log.
 .El
+.
 .Sh BUGS
 There should be some way to provide the key password
 other than reading it from the standard input.

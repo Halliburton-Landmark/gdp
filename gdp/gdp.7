@@ -5,11 +5,100 @@
 .Nm GDP
 .Nd the Global Data Plane
 .Sh DESCRIPTION
+This description is an introduction to the existing GDP implementation.
+It is not intended as an introduction to the GDP itself.
+For that, start at
+.UR https://gdp.cs.berkeley.edu/redmine/projects/gdp
+https://gdp.cs.berkeley.edu/redmine/projects/gdp.
+.UE
+.Pp
 The Global Data Plane consists of two major components:
 the routing layer transfers data using internal, flat namespace addresses,
 and the storage layer manages data modeled on
 append-only, immutable, record-based logs.
-
+.Pp
+A major goal of the GDP is to ensure that clients can validate
+that all data are true
+using cryptographic techniques.
+The primary tools used are public key cryptography
+and Merkle trees.
+This is based on the fundamental premise that,
+if you know the name of a data object,
+you can verify that the contents of the object are accurate,
+even if the server on which that data have been stored is corrupt.
+.
+.Ss Data Model
+Data are structured as opaque, append-only, record-based logs.
+Opaque means that the system makes no attempt to parse or interpret
+the data, i.e., each record is a blob
+indexed by the hash of the contents,
+with a
+.Qq "record number"
+index for human convenience.
+The model allows for gaps and forks in the data stream.
+.Pp
+Names are globally unique, 256-bit names
+that are cryptographic hashes of the log metadata,
+from which the cryptographic proof of the provenance
+of the log data can itself be demonstrated.
+See below for more detail.
+.Pp
+More generally, the GDP deals with
+.Qq "GDP Objects"
+(or
+.Qq "GOBs" ) ,
+since other objects such as services share this namespace.
+Logs are part of this namespace,
+but it also includes log servers,
+helper services,
+routing nodes,
+and potentially other actors.
+.
+.Ss Naming
+GOBs are named using a globally unique 256-bit name
+known as a
+.Qq GDPname
+that is typically
+a SHA-256 hash of the metadata associated with the object.
+Metadata always contains the public half of a keypair held by the creator
+(other information is included in the metadata
+to ensure uniqueness even if the keypair is shared).
+The metadata includes the public half of a public-secret keypair
+that is used to validate the contents of the GOB.
+Any application knowing the internal name of a GOB
+can validate that the metadata
+and then use the public key from that metadata
+to validate the data itself.
+.Pp
+In many cases,
+GOBs have an external (human-oriented) name associated with them.
+The mapping from the human name to the internal name
+is saved in the Human-Oriented to GDPname Directory (HONGD).
+At the moment all names (internal and human)
+must be globally unique
+(we may relax the rules for human-oriented names
+when we create true name spaces,
+but we expect GDPnames to remain unique).
+.Pp
+To make it easier to use globally unique human-oriented names,
+users can set the
+.Ev GDP_NAME_ROOT
+environment variable as a primitive
+.Qq "name space" .
+For example, if that variable is set to
+.Qq edu.berkeley.eecs.eric ,
+attempts to access
+.Qq demo
+will try to look up
+.Qq edu.berkeley.eecs.eric.demo .
+Names already containing dots will be tried without modification
+before this modification is attempted.
+It is strongly recommended that GDP users set this variable
+in their system startup files
+to avoid conflicts.
+By convention, the reversed domain name and user name
+are used for this purpose, as demonstrated in the above example.
+.
 .Sh ADMINISTRATIVE PARAMETERS
 There are several administrative parameters that can be used to tune
 various parts of the GDP and associated support code.
@@ -35,6 +124,7 @@ files named
 .Pa default ,
 .Pa gdp ,
 and the name of the program itself.
+Some programs may choose to search other names.
 The first file of a given name that is found in the search path is read,
 and all the different names are read,
 so at most one file named
@@ -492,19 +582,27 @@ Overrides
 .Bl -tag
 .
 .It GDP_NAME_ROOT
-If sent, the value of this environment variable
+If set, the value of this environment variable
 is prepended to names that do not have any dots in them.
+This can be used to provide simplistic name spaces.
 For example if
 .Ev GDP_NAME_ROOT =
-com.example, a lookup of
+com.example.user, a lookup of
 .Li foo
 would actually look up
-.Li com.example.foo .
-This can be used to provide simplistic name spaces.
+.Li com.example.user.foo .
+A lookup of
+.Li foo.bar
+would check to see if
+.Li foo.bar
+exists; if it does not, it would try
+.Li com.example.user.foo.bar .
 .
 .El
 .
 .Sh SEE ALSO
+https://gdp.cs.berkeley.edu/redmine/projects/gdp
+.br
 .Xr gdplogd 8
 .
 .Sh BUGS
@@ -513,3 +611,5 @@ Routers should be discovered rather than configured in.
 Subscription lease timeouts should be per-subscription
 and communicated between the application and
 .Xr gdplogd 8 .
+.Pp
+Not all of the cryptographic guarantees are fully implemented yet.

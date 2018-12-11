@@ -388,6 +388,7 @@ EP_STAT			gdp_internal_name(
 					gdp_name_t internal);
 
 // parse a (possibly human-friendly) GDP object name
+#define GDP_HUMAN_NAME_MAX		255		// maximum length of human-oriented name
 EP_STAT			gdp_name_parse(
 					const char *hname,		// human text version of name
 					gdp_name_t gname,		// output: internal name

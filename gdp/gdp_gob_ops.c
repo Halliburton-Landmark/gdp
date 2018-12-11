@@ -120,7 +120,8 @@ _gdp_gob_create(
 			return GDP_STAT_SVC_NAME_REQ;
 		}
 		estat = gdp_name_parse(p, service_name, NULL);
-		if (!EP_STAT_ISOK(estat))
+		// let SHA256(human_name) warning slip through
+		if (EP_STAT_ISFAIL(estat))
 		{
 			ep_dbg_cprintf(Dbg, 1,
 					"_gdp_gob_create: cannot parse service name %s\n",
