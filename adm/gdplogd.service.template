@@ -1,6 +1,6 @@
 [Unit]
 Description=GDP log daemon
-After=gdp-router-click.service
+After=gdp-router-click2.service
 Requires=network-online.target
 After=network-online.target
 
