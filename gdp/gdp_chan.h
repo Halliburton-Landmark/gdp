@@ -191,9 +191,9 @@ typedef struct gdp_adcert		gdp_adcert_t;		// advertising cert
 // no flags defined in this octet yet
 
 /*** values for sequence_number, frag offset field (octets 4-7) ***/
-#define GDP_PKT_SEQNO_SHIFT			16		// the number of bits to shift
+#define GDP_PKT_SEQNO_SHIFT			17		// the number of bits to shift
 #define GDP_PKT_SEQNO_MASK			0x7fff	// the sequence number mask
-#define GDP_PKT_SEQNO_MF			0x80000000	// more fragments bit
+#define GDP_PKT_SEQNO_MF			0x10000	// more fragments bit
 #define GDP_PKT_SEQNO_FOFF_MASK		0xffff	// fragment offset mask
 
 // L4 sequence number
