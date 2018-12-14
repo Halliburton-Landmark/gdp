@@ -16,6 +16,8 @@ import hashlib
 import subprocess
 import datetime
 import argparse
+import psutil
+import signal
 import os
 from os.path import basename
 import time
@@ -82,6 +84,14 @@ class cmdlineMonitor(object):
             while task.poll() is None and __timeout > 0:
                 time.sleep(1)
                 __timeout -= 1
+            ## make sure the process is terminated after timeout
+            if task.poll() is None:
+                print "[Killing]",
+                self.__kill_proc(task)
+
+            if task.poll() is None:
+                print "> ## Can't terminate %s" % str(self.cmd)
+
             self.end_time = time.ctime()
 
             out.seek(0)
@@ -91,6 +101,37 @@ class cmdlineMonitor(object):
             self.stderr = err.read()
 
         return self.status
+
+    @staticmethod
+    def __kill_proc(task):
+        """ kill the process (including children) for a given PID """
+
+        pid = task.pid
+
+        ## First, kill the children
+        ## https://psutil.readthedocs.io/en/latest/#kill-process-tree
+        parent = psutil.Process(pid)
+        children = parent.children(recursive=True)
+
+        # First ask nicely
+        for p in children:
+            p.send_signal(signal.SIGKILL)
+        time.sleep(1)
+        # Now try the heavy handed approach
+        for p in children:
+            try:
+                p.send_signal(signal.SIGTERM)
+            except (OSError, psutil.NoSuchProcess) as e:
+                pass
+        time.sleep(1)
+
+        # Now, kill the parent process
+        if task.poll() is None:
+            task.terminate()    # ask to terminate nicely
+            time.sleep(1)
+            if task.poll() is None:
+                task.kill()         # just kill the process
+                time.sleep(1)
 
 
     def get_brief_report(self):
