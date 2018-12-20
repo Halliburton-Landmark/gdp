@@ -4,12 +4,13 @@
 #  Set up Human-Oriented Name to GDPname Directory Service (HONGDS)
 #
 #	We're assuming MariaDB here, although MySQL can work.  The issue
-#	(as of this writing) is about licenses, not functionality.
-#	That may (probably will) change in the future.
+#	(as of this writing) is about licenses, not functionality.  That
+#	may (probably will) change in the future, since it appears that
+#	recent versions of MariaDB have better support for replication.
 #
 
 debug=false
-skip_install=false
+install_mariadb=false
 args=`getopt Di $*`
 if [ $? != 0 ]; then
 	echo "Usage: $0 [-D] [-i]" >&2
@@ -23,7 +24,7 @@ do
 		debug=true
 		;;
 	  -i)
-		skip_install=true
+		install_mariadb=true
 		;;
 	  --)
 		shift
@@ -38,7 +39,6 @@ root=`pwd`
 . $root/adm/common-support.sh
 
 info "Installing Human-Oriented Name to GDPname Directory Service (HONGD)."
-$skip_install && info "   (Skipping installation of MariaDB.)"
 
 #
 #  We need the Fully Qualified Domain Name because MariaDB/MySQL uses
@@ -69,8 +69,8 @@ set_fqdn() {
 #  Install appropriate packages for MariaDB.  On some systems this can
 #  require additional operations to make sure the package is current.
 #
-install_maria_db() {
-	info "Installing mariadb packages"
+install_mariadb_packages() {
+	info "Installing MariaDB packages"
 	case "$OS" in
 	   "ubuntu" | "debian" | "raspbian")
 		sudo apt-get update
@@ -80,14 +80,16 @@ install_maria_db() {
 
 	   "darwin")
 		sudo port selfupdate
-		package mariadb-10.2-server
-		sudo port select mysql mariadb-10.2
-		sudo port load mariadb-10.2-server
+		: ${GDP_MARIADB_VERSION:="10.2"}
+		package mariadb-${GDP_MARIADB_VERSION}-server
+		sudo port select mysql mariadb-$GDP_MARIADB_VEFRSION
+		sudo port load mariadb-${GDP_MARIADB_VERSION}-server
 		;;
 
 	   "freebsd")
 		sudo pkg update
-		package mariadb102-server
+		: ${GDP_MARIADB_VERSION:="102"}
+		package mariadb${GDP_MARIADB_VERSION}-server
 		package base64
 		;;
 
@@ -185,7 +187,7 @@ create_hongd_db() {
 
 set_fqdn
 $debug && echo fqdn = $fqdn
-$skip_install || install_maria_db
+$skip_install && install_mariadb_packages
 create_hongd_db
 
 info "Please read the following instructions."
