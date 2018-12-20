@@ -34,14 +34,15 @@ CREATE TABLE IF NOT EXISTS human_to_gdp (
 	hname VARCHAR(255) PRIMARY KEY,
 	gname BINARY(32));
 
--- anonymous user for doing reads
-CREATE USER ''@'%';
-GRANT SELECT (hname, gname) ON human_to_gdp TO ''@'%';
+-- minimally privileged user for doing reads, no password required
+CREATE USER IF NOT EXISTS 'gdp_user'@'%';
+GRANT SELECT (hname, gname) ON human_to_gdp TO 'gdp_user'@'%';
 
 -- privileged user for doing updates
 -- (should figure out a better way of managing the password)
 -- (should use IF NOT EXISTS, but not supported in MariaDB 4.0, which
 -- is all that seems to be available on Ubuntu 16.04)
-CREATE USER 'gdp_creation_service'@'%'
+CREATE USER IF NOT EXISTS 'gdp_creation_service'@'%'
 	IDENTIFIED BY '@CREATION_SERVICE_PASSWORD@';
-GRANT INSERT ON human_to_gdp TO 'gdp_creation_service'@'%';
+GRANT SELECT, INSERT ON human_to_gdp
+	TO 'gdp_creation_service'@'%';

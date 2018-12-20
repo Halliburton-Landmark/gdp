@@ -79,7 +79,7 @@ _gdp_name_init()
 	const char *db_name = ep_adm_getstrparam("swarm.gdp.hongdb.database",
 											"gdp_hongd");
 	const char *db_user = ep_adm_getstrparam("swarm.gdp.hongdb.user",
-											"anonymous");
+											"gdp_user");
 	const char *db_passwd = ep_adm_getstrparam("swarm.gdp.hongdb.passwd",
 											"");
 	unsigned long db_flags = 0;
