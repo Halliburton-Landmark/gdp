@@ -299,7 +299,11 @@ EP_STAT
 gdp_parse_name(const char *hname, gdp_name_t gname)
 {
 	// back compat
-	return gdp_name_parse(hname, gname, NULL);
+	EP_STAT estat;
+	estat = gdp_name_parse(hname, gname, NULL);
+	if (EP_STAT_ISWARN(estat))
+		estat = EP_STAT_OK;
+	return estat;
 }
 
 

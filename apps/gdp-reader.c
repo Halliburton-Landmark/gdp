@@ -644,7 +644,7 @@ main(int argc, char **argv)
 
 	// parse the name (either base64-encoded or symbolic)
 	estat = gdp_parse_name(argv[0], gobname);
-	if (!EP_STAT_ISOK(estat))
+	if (EP_STAT_ISFAIL(estat))
 	{
 		ep_app_message(estat, "illegal log name syntax:\n\t%s", argv[0]);
 		exit(EX_USAGE);

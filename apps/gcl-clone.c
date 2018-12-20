@@ -136,7 +136,7 @@ main(int argc, char **argv)
 
 	// open the existing log to get the metadata
 	estat = gdp_parse_name(gclxname, gcliname);
-	if (!EP_STAT_ISOK(estat))
+	if (EP_STAT_ISFAIL(estat))
 	{
 		ep_app_error("Cannot parse source name %s: %s", gclxname,
 				ep_stat_tostr(estat, ebuf, sizeof ebuf));
@@ -167,7 +167,7 @@ main(int argc, char **argv)
 	{
 		gdp_name_t logdiname;
 		estat = gdp_parse_name(*argv, logdiname);
-		if (!EP_STAT_ISOK(estat))
+		if (EP_STAT_ISFAIL(estat))
 		{
 			ep_app_error("Cannot parse log name %s: %s", *argv++,
 					ep_stat_tostr(estat, ebuf, sizeof ebuf));

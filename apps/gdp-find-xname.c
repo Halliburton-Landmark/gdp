@@ -99,7 +99,7 @@ main(int argc, char **argv)
 	ep_time_nanosleep(INT64_C(100000000));
 
 	estat = gdp_parse_name(argv[0], gdpiname);
-	if (!EP_STAT_ISOK(estat))
+	if (EP_STAT_ISFAIL(estat))
 		ep_app_fatal("Cannot parse log name %s", argv[0]);
 	estat = gdp_gin_open(gdpiname, GDP_MODE_RO, NULL, &gin);
 	EP_STAT_CHECK(estat, goto fail1);

@@ -335,9 +335,14 @@ main(int argc, char **argv)
 	}
 
 	// open a GDP object with the provided name
-	gdp_parse_name(argv[0], gdpiname);
-	estat = gdp_gin_open(gdpiname, GDP_MODE_AO, info, &gin);
-	EP_STAT_CHECK(estat, goto fail1);
+	estat = gdp_parse_name(argv[0], gdpiname);
+	if (EP_STAT_ISFAIL(estat))
+		goto fail1;
+	else
+	{
+		estat = gdp_gin_open(gdpiname, GDP_MODE_AO, info, &gin);
+		EP_STAT_CHECK(estat, goto fail1);
+	}
 
 	if (!Quiet)
 	{
