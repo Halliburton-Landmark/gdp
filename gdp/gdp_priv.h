@@ -57,7 +57,7 @@
 # define GDP_COMPAT_OLD_PUBKEYS			1	// try old public key metadata name
 #endif
 #ifndef GDP_DEFAULT_CREATION_SERVICE
-# define GDP_DEFAULT_CREATION_SERVICE	"edu.berkeley.eecs.creation.service"
+# define GDP_DEFAULT_CREATION_SERVICE	"edu.berkeley.eecs.gdp.service.creation"
 #endif
 #ifndef GDP_DEFAULT_DATA_ROOT
 # define GDP_DEFAULT_DATA_ROOT			"/var/swarm/gdp"
