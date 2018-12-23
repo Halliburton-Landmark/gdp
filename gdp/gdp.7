@@ -284,11 +284,11 @@ gdplogd .
 Defaults to
 .Li true .
 .
-.It swarm.gdp.create.service
+.It swarm.gdp.creation-service.name
 The name of the creation service to use
 for creating a new GDP Object.
 Defaults to
-.Dq edu.berkeley.eecs.creation.service
+.Dq edu.berkeley.eecs.gdp.service.creation
 unless overridden by setting the
 .Dv GDP_DEFAULT_CREATION_SERVICE
 compile-time macro to a local value when compiling the code.
@@ -433,9 +433,13 @@ The DNS name of the host on which the database resides.
 Currently no default; this must be set.
 .
 .It swarm.gdp.hongdb.passwd
-The password for the database user.
+The password for the database user
+used to access the hongdb database.
 Defaults to the empty string,
 as appropriate for anonymous users.
+Note that this is not the same as the password for the
+GDP Creation Service,
+which has rights to update the database as well as access it.
 .
 .It swarm.gdp.hongdb.table
 The name of the table with the mappings.
@@ -449,7 +453,7 @@ to do a name lookup
 or INSERT permission
 to add a new name.
 Defaults to
-.Li anonymous .
+.Li gdp_user .
 .
 .It swarm.gdp.reconnect.delay
 If a GDP application (either client or server) loses contact with

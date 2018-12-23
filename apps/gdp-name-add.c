@@ -57,6 +57,7 @@ EP_STAT
 name_init(const char *db_host, const char *db_user, char *db_passwd)
 {
 	EP_STAT estat = EP_STAT_OK;
+	bool i_own_passwd = false;
 
 	// open a connection to the external => internal mapping database
 	if (db_host == NULL)
@@ -87,9 +88,12 @@ name_init(const char *db_host, const char *db_user, char *db_passwd)
 		char prompt_buf[100];
 		snprintf(prompt_buf, sizeof prompt_buf, "Password for %s: ", db_user);
 		db_passwd = getpass(prompt_buf);
+		i_own_passwd = true;
 	}
 
 	// attempt the actual connect and authentication
+	ep_dbg_printf("host %s, user %s, passwd %s, name %s\n",
+			db_host, db_user, db_passwd, db_name);
 	if (mysql_real_connect(NameDb, db_host, db_user, db_passwd,
 							db_name, db_port, NULL, db_flags) == NULL)
 	{
@@ -108,7 +112,7 @@ fail1:
 	}
 fail0:
 	// make sure password isn't visible to intruders
-	if (db_passwd != NULL)
+	if (db_passwd != NULL && i_own_passwd)
 		memset(db_passwd, 0, strlen(db_passwd));
 	return estat;
 }
@@ -118,15 +122,21 @@ void
 usage(void)
 {
 	fprintf(stderr,
-			"Usage: %s [-D dbgspec] [-H db_host] [-q] [-u db_user]\n"
-			"       human_name gdp_name\n"
+			"Usage: %s [-D dbgspec] [-H db_host] [-p passwd] [-P pw_file]\n"
+			"        [-q] [-u db_user] human_name gdp_name\n"
 			"    -D  set debugging flags\n"
-			"    -H  database host name\n"
+			"    -H  database host name (default: %s)\n"
+			"    -p  database password\n"
+			"    -P  name of file containing password\n"
 			"    -q  suppress output (exit status only)\n"
-			"    -u  set database user name\n"
-			"    human_name is the human-friendly log name\n"
-			"    gdp_name is the base-64 encoded 256-bit internal name\n",
-			ep_app_getprogname());
+			"    -u  database creation service user name (default: %s)\n"
+			"human_name is the human-oriented log name\n"
+			"gdp_name is the base-64 encoded 256-bit internal name\n",
+			ep_app_getprogname(),
+			ep_adm_getstrparam("swarm.gdp.hongdb.host",
+								GDP_DEFAULT_HONGDB_HOST),
+			ep_adm_getstrparam("swarm.gdp.hongdb.creation-service.user",
+								"gdp_creation_service"));
 	exit(EX_USAGE);
 }
 
@@ -140,6 +150,7 @@ main(int argc, char **argv)
 	const char *db_host = NULL;		// database host name
 	const char *db_user = NULL;		// database user name
 	char *db_passwd = NULL;			// associated password
+	const char *db_passwd_file = NULL;	// file containing associated password
 	bool quiet = false;
 	int opt;
 	EP_STAT estat = EP_STAT_OK;
@@ -148,7 +159,7 @@ main(int argc, char **argv)
 	const char *phase;
 
 	// collect command-line arguments
-	while ((opt = getopt(argc, argv, "D:H:qu:")) > 0)
+	while ((opt = getopt(argc, argv, "D:H:p:P:qu:")) > 0)
 	{
 		switch (opt)
 		{
@@ -158,6 +169,14 @@ main(int argc, char **argv)
 
 		 case 'H':
 			db_host = optarg;
+			break;
+
+		 case 'p':
+			db_passwd = optarg;
+			break;
+
+		 case 'P':
+			db_passwd_file = optarg;
 			break;
 
 		 case 'q':
@@ -192,6 +211,26 @@ main(int argc, char **argv)
 		goto fail0;
 	}
 
+	if (db_passwd == NULL)
+	{
+		if (db_passwd_file == NULL)
+			db_passwd_file = ep_adm_getstrparam(
+								"swarm.gdp.hongdb.creation-service.passwd-file",
+								"/etc/gdp/creation_service_pw.txt");
+		if (db_passwd_file != NULL)
+		{
+			FILE *pw_fp = fopen(db_passwd_file, "r");
+			if (pw_fp != NULL)
+			{
+				char pbuf[128];
+
+				if (fgets(pbuf, sizeof pbuf, pw_fp) != NULL && pbuf[0] != '\0')
+					db_passwd = strdup(pbuf);
+				fclose(pw_fp);
+			}
+		}
+	}
+
 	// translate GDP name from base64 to binary
 	phase = "name translate";
 	estat = gdp_internal_name(pname, gname);
@@ -223,7 +262,7 @@ main(int argc, char **argv)
 	// open database connection
 	phase = "database open";
 	if (db_user == NULL)
-		db_user = ep_adm_getstrparam("swarm.gdp.hongdb.user",
+		db_user = ep_adm_getstrparam("swarm.gdp.hongdb.creation-service.user",
 									"gdp_creation_service");
 	estat = name_init(db_host, db_user, db_passwd);
 	if (!EP_STAT_ISOK(estat))

@@ -8,6 +8,9 @@
 .Nm gdp-name-add
 .Op Fl D Ar debug-spec
 .Op Fl H Ar database-host-name
+.Op Fl p Ar database-password
+.Op Fl P Ar database-password-file
+.Op Fl q
 .Op Fl u Ar database-user-name
 .Ar human-name
 .Ar gdp-name
@@ -51,11 +54,34 @@ This overrides the
 .Va swarm.gdp.hongdb.host
 runtime administrative parameter.
 .
+.It Fl p Ar database-password
+The password for the database account used to update the database.
+If this is not set, the
+.Fl P
+is is consulted.
+.
+.It Fl P Ar database-password-file
+The name of a file containing the database password.
+This is more secure than using
+.Fl p
+since the password will not show up in a
+.Xr ps 1
+output.
+If not specified,
+defaults to the value of the
+.Va swarm.gdp.hongdb.creation-service.passwd-file
+administrative parameter,
+which in turn defaults to
+.Pa /etc/gdp/creation_service_pw.txt .
+If this file cannot be read,
+the command invoker will be prompted for a password.
+.
 .It Fl u database-user-name
 The name of the database user to update the database.
 This must have INSERT permission on the mapping table.
-Defaults to
-.Li creation_service .
+Defaults to the value of the
+.Va swarm.gdp.hongdb.creation-service.user
+administrative parameter.
 Note that this is a different user from that specified in the
 .Va swarm.gdp.hongdb.user
 parameter.
@@ -68,6 +94,22 @@ The database cannot be accessed.
 Command line parameters are incorrect.
 .El
 .Sh ADMINISTRATIVE PARAMETERS
+.Bl -tag
+.
+.It swarm.gdp.hongdb.creation-service.user
+The name of the database user with permissions to update the
+human-oriented name to GDPname database.
+Defaults to
+.Li gdp_creation_service .
+.
+.It swarm.gdp.hongdb.creation-service.passwd-file
+The name of the default password file.
+This can be overridden using the
+.Fl P
+flag.
+Defaults to
+.Pa /etc/gdp/creation_service_pw.txt .
+.El
 See
 .Xr gdp 7
 for documentation for
