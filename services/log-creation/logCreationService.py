@@ -97,11 +97,17 @@ class logCreationService(GDPService):
         self.namedb_info = namedb_info
         if namedb_info.get("host", None) is not None:
             logging.info("Initiating connection to directory server")
+            _host = namedb_info.get("host", "gdp-hongd.cs.berkeley.edu")
+            _user = namedb_info.get("user", "gdp_creation_service")
+            _password = namedb_info.get("passwd", "")
+            _database = namedb_info.get("database", "gdp_hongd")
+            logging.info("Opening database %r host %r user %r",
+                        _database, _host, _user)
             self.namedb_conn = mariadb.connect(
-                        host=namedb_info.get("host", "gdp-hongd.cs.berkeley.edu"),
-                        user=namedb_info.get("user", "gdp_creation_service"),
-                        password=namedb_info.get("passwd", ""),
-                        database=namedb_info.get("database", "gdp_hongd"))
+                        host=_host,
+                        user=_user,
+                        password=_password,
+                        database=_database)
 
             ## XXX Not sure if we can share a single cursor, or whether
             ## one ought to acquire a new cursor for each (potentially
@@ -406,7 +412,7 @@ if __name__ == "__main__":
         namedb_info["passwd"] = args.namedb_passwd
     elif args.namedb_pw_file is not None:
         with open(args.namedb_pw_file) as pwfile:
-            namedb_info["passwd"] = pwfile.readline()
+            namedb_info["passwd"] = pwfile.readline().rstrip()
     if args.namedb_database is not None:
         namedb_info["database"] = args.namedb_database
     if args.namedb_table is not None:
