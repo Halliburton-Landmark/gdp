@@ -61,6 +61,7 @@ MAN7ALL=
 MAN8ALL=	\
 		gdp-create.8 \
 		gdp-delete.8 \
+		gdp-name-add.8 \
 #		gdp-log-check.8 \
 #		gcl-clone.8 \
 #		log-view.8 \
