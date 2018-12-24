@@ -46,3 +46,14 @@ CREATE USER IF NOT EXISTS 'gdp_creation_service'@'%'
 	IDENTIFIED BY '@CREATION_SERVICE_PASSWORD@';
 GRANT SELECT, INSERT ON human_to_gdp
 	TO 'gdp_creation_service'@'%';
+
+-- convenience script to query service
+DELIMITER //
+CREATE OR REPLACE PROCEDURE
+	hname2gname(pat VARCHAR(255))
+  BEGIN
+	SELECT hname, HEX(gname)
+	FROM human_to_gdp
+	WHERE hname LIKE IFNULL(pat, '%');
+  END //
+DELIMITER ;
