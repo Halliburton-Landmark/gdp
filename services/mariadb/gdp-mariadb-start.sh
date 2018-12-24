@@ -56,6 +56,9 @@ if ! [ -d $GDP_MARIADB_DATADIR/mysql ]; then
 	dockerargs="$dockerargs -e MARIADB_ROOT_PASSWORD"
 fi
 
+# a bit funky... remove old instance of this container (and ignore error)
+docker container rm $GDP_MARIADB_DOCKERID > /dev/null 2>&1 || true
+
 docker run \
 	--name $GDP_MARIADB_DOCKERID \
 	--user $GDP_MARIADB_USER \
