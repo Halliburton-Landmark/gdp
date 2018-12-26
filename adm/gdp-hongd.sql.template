@@ -47,6 +47,9 @@ CREATE USER IF NOT EXISTS 'gdp_creation_service'@'%'
 GRANT SELECT, INSERT ON human_to_gdp
 	TO 'gdp_creation_service'@'%';
 
+-- administrative role
+CREATE ROLE IF NOT EXISTS 'gdp_admin';
+
 -- convenience script to query service
 DELIMITER //
 CREATE OR REPLACE PROCEDURE
@@ -57,3 +60,4 @@ CREATE OR REPLACE PROCEDURE
 	WHERE hname LIKE IFNULL(pat, '%');
   END //
 DELIMITER ;
+GRANT EXECUTE ON PROCEDURE hname2gname TO 'gdp_admin';
