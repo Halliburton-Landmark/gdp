@@ -6,6 +6,8 @@
 #  These macros are intended to be sourced into other shell files
 #
 
+#################### MANIFEST CONSTANTS ####################
+
 Reset='[0m'    # Text Reset
 
 # Regular           Bold                Underline           High Intensity      BoldHigh Intens     Background          High Intensity Backgrounds
@@ -18,6 +20,16 @@ Pur='[0;35m';     BPur='[1;35m';    UPur='[4;35m';    IPur='[0;95m';    BIPu
 Cya='[0;36m';     BCya='[1;36m';    UCya='[4;36m';    ICya='[0;96m';    BICya='[1;96m';   On_Cya='[46m';    On_ICya='[0;106m';
 Whi='[0;37m';     BWhi='[1;37m';    UWhi='[4;37m';    IWhi='[0;97m';    BIWhi='[1;97m';   On_Whi='[47m';    On_IWhi='[0;107m';
 
+# matches sysexits.h (see man sysexits)
+EX_OK=0
+EX_USAGE=64
+EX_UNAVAILABLE=69
+EX_SOFTWARE=70
+EX_OSFILE=72
+EX_CANTCREATE=73
+EX_NOPERM=77
+EX_CONFIG=78
+
 #################### FUNCTIONS ####################
 
 : ${quiet:=false}
@@ -25,29 +37,29 @@ Whi='[0;37m';     BWhi='[1;37m';    UWhi='[4;37m';    IWhi='[0;97m';    BIWh
 # Error/Information messages
 info() {
     if ! $quiet; then
-	echo "${Gre}${On_Bla}[INFO] $1${Reset}"
+	echo "${Gre}${On_Bla}[INFO] $1${Reset}" 2>&1
     fi
 }
 
 warn() {
     if ! $quiet; then
-	echo "${Yel}${On_Bla}[WARN] $1${Reset}"
+	echo "${Yel}${On_Bla}[WARN] $1${Reset}" 2>&1
     fi
 }
 
 error() {
     if ! $quiet; then
-	echo "${Red}${On_Bla}[ERROR] $1${Reset}"
+	echo "${Red}${On_Bla}[ERROR] $1${Reset}" 2>&1
     fi
 }
 
 fatal() {
-	echo "${Whi}${On_Red}[FATAL] $1${Reset}"
-	exit 1
+	echo "${Whi}${On_Red}[FATAL] $1${Reset}" 2>&1
+	exit ${2:-$EX_UNAVAILABLE}
 }
 
 action() {
-	echo "${Bla}${On_Yel}[ACTION REQUIRED] $1${Reset}"
+	echo "${Bla}${On_Yel}[ACTION REQUIRED] $1${Reset}" 2>&1
 }
 
 # Read a password from the terminal
