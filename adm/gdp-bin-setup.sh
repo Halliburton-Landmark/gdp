@@ -12,11 +12,16 @@ cd `dirname $0`/..
 TMP=/tmp
 . adm/common-support.sh
 . adm/gdp-version.sh
-: ${GDP_VER=$GDP_VERSION_MAJOR}
-: ${GDPLOGD_LOG:=$GDP_LOG_DIR/gdplogd.log}
-: ${GDPLOGD_BIN:=$GDP_ROOT/sbin/gdplogd$GDP_VER}
 : ${GDP_UID:=133}
-export GDP_VER
+
+# pick a router set.  Define GDP_ROUTERS to use private routers.
+berkeley_routers=`sed -e 's/#.*//' << 'EOF'
+	gdp-01.eecs.berkeley.edu
+	gdp-02.eecs.berkeley.edu
+	gdp-03.eecs.berkeley.edu
+	gdp-04.eecs.berkeley.edu
+EOF
+: ${GDP_ROUTERS:=$berkeley_routers}
 
 ## be sure we're running as root
 test `whoami` = "root" || exec sudo $0 "$@"
@@ -69,14 +74,14 @@ mkdir_gdp $GDP_KEYS_DIR 0750
 ## set up default runtime administrative parameters
 hostname=`hostname`
 
-# determine default router set --- customized for Berkeley servers!!!
-routers=`echo gdp-01 gdp-02 gdp-03 gdp-04 |
+# determine default router set
+routers=`echo $GDP_ROUTERS |
 		tr ' ' '\n' |
 		grep -v $hostname |
 		shuf |
 		tr '\n' ';' |
-		sed -e 's/;/.eecs.berkeley.edu; /g' -e 's/; $//' `
-if echo $hostname | grep -q '^gdp-0'
+		sed -e 's/; *$//' `
+if echo $GDP_ROUTERS | grep -q $hostname
 then
 	routers="127.0.0.1; $routers"
 fi
