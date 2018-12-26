@@ -13,9 +13,6 @@
 { test -r /usr/local/etc/gdp${GDP_VER}.conf.sh && . /usr/local/etc/gdp${GDP_VER}.conf.sh; }
 
 # configure defaults
-: ${GDP_ROOT:=/usr}
-: ${GDP_LOG_DIR:=/var/log/gdp}
-: ${GDP_USER:=gdp}
 # the docker name for this container
 : ${GDP_MARIADB_DOCKERID:=gdp-mariadb}
 # the version of the container to load
