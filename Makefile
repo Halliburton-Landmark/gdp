@@ -3,7 +3,7 @@
 #	GDP: Global Data Plane
 #	From the Ubiquitous Swarm Lab, 490 Cory Hall, U.C. Berkeley.
 #
-#	Copyright (c) 2015-2017, Regents of the University of California.
+#	Copyright (c) 2015-2018, Regents of the University of California.
 #	All rights reserved.
 #
 #	Permission is hereby granted, without written agreement and without
@@ -38,58 +38,58 @@ CLEANEXTRA=	gdp-client*.deb gdp-server*.deb python-gdp*.deb \
 all: all-nodoc
 
 all-nodoc:
-	(cd ep;		${MAKE} all)
-	(cd gdp;	${MAKE} all)
-	(cd scgilib;	${MAKE} all)
-	(cd gdplogd;	${MAKE} all)
-	(cd apps;	${MAKE} all)
-	(cd util;	${MAKE} all)
-	(cd examples;	${MAKE} all)
+	(cd ep &&	${MAKE} all)
+	(cd gdp &&	${MAKE} all)
+	(cd gdplogd &&	${MAKE} all)
+	(cd apps &&	${MAKE} all)
+	(cd util &&	${MAKE} all)
+	(cd examples &&	${MAKE} all)
+	(cd scgilib &&	${MAKE} all)
 
 all-withdoc: all-nodoc
-	(cd doc;	${MAKE} all)	# needs pandoc
+	(cd doc &&	${MAKE} all)	# needs pandoc
 
 all-clientonly:
-	(cd ep;		${MAKE} all)
-	(cd gdp;	${MAKE} all)
-	(cd apps;	${MAKE} all)
+	(cd ep &&	${MAKE} all)
+	(cd gdp &&	${MAKE} all)
+	(cd apps &&	${MAKE} all)
 
 # Build without avahi, the zero-conf facility that
 # can be tricky to compile under Mac OS X.
 all_noavahi:
-	(cd ep;		${MAKE} all)
-	(cd gdp;	${MAKE} all_noavahi)
-	(cd scgilib;	${MAKE} all)
-	(cd gdplogd;	${MAKE} all_noavahi)
-	(cd apps;	${MAKE} all_noavahi)
-	(cd util;	${MAKE} all)
-	(cd examples;	${MAKE} all_noavahi)
-	(cd lang/js;	${MAKE} all_noavahi)
+	(cd ep &&	${MAKE} all)
+	(cd gdp &&	${MAKE} all_noavahi)
+	(cd scgilib &&	${MAKE} all)
+	(cd gdplogd &&	${MAKE} all_noavahi)
+	(cd apps &&	${MAKE} all_noavahi)
+	(cd util &&	${MAKE} all)
+	(cd examples &&	${MAKE} all_noavahi)
+	(cd lang/js &&	${MAKE} all_noavahi)
 
 clean:
-	(cd doc;	${MAKE} clean)
-	(cd ep;		${MAKE} clean)
-	(cd gdp;	${MAKE} clean)
-	(cd scgilib;	${MAKE} clean)
-	(cd gdplogd;	${MAKE} clean)
-	(cd apps;	${MAKE} clean)
-	(cd util;	${MAKE} clean)
-	(cd examples;	${MAKE} clean)
+	(cd doc &&	${MAKE} clean)
+	(cd ep &&	${MAKE} clean)
+	(cd gdp &&	${MAKE} clean)
+	(cd scgilib &&	${MAKE} clean)
+	(cd gdplogd &&	${MAKE} clean)
+	(cd apps &&	${MAKE} clean)
+	(cd util &&	${MAKE} clean)
+	(cd examples &&	${MAKE} clean)
 	rm -f ${CLEANEXTRA}
 
 # Install code used by GDP-based application developers
 install-client:
-	(cd ep;		${MAKE} install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
-	(cd gdp;	${MAKE} install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
-	(cd apps;	${MAKE} install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
+	(cd ep &&	${MAKE} install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
+	(cd gdp &&	${MAKE} install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
+	(cd apps &&	${MAKE} install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
 
 # Install code used by the log server
 install-gdplogd:
-	(cd gdplogd;	${MAKE} install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
-	(cd util;	${MAKE} install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
+	(cd gdplogd &&	${MAKE} install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
+	(cd util &&	${MAKE} install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
 
 install-doc:
-	(cd doc;	${MAKE} install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
+	(cd doc &&	${MAKE} install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
 
 # Split it into sub-targets to mimic our distribution, also
 #   used by the debian packaging scripts. So if you change it here,
@@ -99,8 +99,8 @@ install: install-client install-gdplogd install-doc
 	cp -rp examples ${DOCDIR}
 
 install-local:
-	(cd ep;		${MAKE} install-local)
-	(cd gdp;	${MAKE} install-local)
+	(cd ep &&	${MAKE} install-local)
+	(cd gdp &&	${MAKE} install-local)
 
 GDPROOT=	~gdp
 GDPALL=		adm/start-* \
@@ -126,26 +126,26 @@ tags: .FORCE
 
 # Install Python interface in system paths. Optional
 install-python: install-client
-	(cd lang/python; $(MAKE) install) 
+	(cd lang/python &&	$(MAKE) install) 
 
 
 # Build the Java interface to the GDP. Optional for the GDP per se.
 all_Java:
-	(cd lang/java; ${MAKE} clean all)
+	(cd lang/java &&	${MAKE} clean all)
 
 install_Java:
-	(cd lang/java; ${MAKE} clean install)
+	(cd lang/java &&	${MAKE} clean install)
 
 clean_Java:
-	(cd lang/java; ${MAKE} clean)
+	(cd lang/java &&	${MAKE} clean)
 
 # Build the Node.js/JavaScript GDP accessing apps and the Node.js/JS
 # RESTful GDP interface.  Optional for the GDP per se.
 all_JavaScript:
-	(cd lang/js; ${MAKE} clean all)
+	(cd lang/js &&		${MAKE} clean all)
 
 clean_JavaScript:
-	(cd lang/js; ${MAKE} clean)
+	(cd lang/js &&		${MAKE} clean)
 
 # Build the debian-style package.  Must be done on the oldest system
 # around because of dependencies.
@@ -161,10 +161,15 @@ UPDATE_LICENSE=	${ADM}/update-license.sh
 
 update-license:
 	${UPDATE_LICENSE} Makefile *.[ch]
-	(cd ep;		 ${MAKE} update-license)
-	(cd gdp;	 ${MAKE} update-license)
-	(cd gdplogd;	 ${MAKE} update-license)
-	(cd apps;	 ${MAKE} update-license)
+	(cd ep &&	 ${MAKE} update-license)
+	(cd gdp &&	 ${MAKE} update-license)
+	(cd gdplogd &&	 ${MAKE} update-license)
+	(cd apps &&	 ${MAKE} update-license)
+	(cd doc &&	 ${MAKE} update-license)
+	(cd lang &&	 ${MAKE} update-license)
+	(cd test &&	 ${MAKE} update-license)
+	(cd examples &&	 ${MAKE} update-license)
+	(cd util &&	 ${MAKE} update-license)
 
 # Not made by default
 READMES_HTML= \

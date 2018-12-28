@@ -42,6 +42,12 @@ ${DOCDIR}:
 install: ${DOCDIR} ${PUBALL}
 	cp ${PUBALL} ${DOCDIR}
 
+ADM=		../adm
+UPDATE_LICENSE=	${ADM}/update-license.sh
+
+update-license:
+	${UPDATE_LICENSE} Makefile ${ALL}
+
 PANDOC=		pandoc
 PANFLAGS=	-sS -c gdpdoc.css --self-contained
 

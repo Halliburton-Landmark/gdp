@@ -89,3 +89,9 @@ clean:
 
 ${ALLDIRS}:
 	${MKDIR} $@
+
+ADM=		../adm
+UPDATE_LICENSE=	${ADM}/update-license.sh
+
+update-license:
+	${UPDATE_LICENSE} Makefile *.[ch]

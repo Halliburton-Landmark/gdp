@@ -1,3 +1,12 @@
+#
+#  Utilities not specific to the GDP.
+#
+
+#
+#  ----- BEGIN LICENSE BLOCK -----
+#  ----- END LICENSE BLOCK -----
+#
+
 BINALL=		llogger \
 
 SBINALL=
@@ -43,5 +52,11 @@ install:	${ALLDIRS} ${PUBALL} FORCE
 
 ${ALLDIRS}:
 	${MKDIR} $@
+
+ADM=		../adm
+UPDATE_LICENSE=	${ADM}/update-license.sh
+
+update-license:
+	${UPDATE_LICENSE} Makefile ${ALL}
 
 FORCE:

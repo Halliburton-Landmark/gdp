@@ -6,9 +6,6 @@
 GDP_SRC_ROOT=	../../..
 ADM=		${GDP_SRC_ROOT}/adm
 
-run:
-	${GDP_SRC_ROOT}/test/setupAndRun.sh ./runPythonTests.sh
-
 UPDATE_LICENSE=	${ADM}/update-license.sh
 
 update-license:
