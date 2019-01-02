@@ -65,6 +65,12 @@
 #ifndef GDP_DEFAULT_HONGDB_HOST
 # define GDP_DEFAULT_HONGDB_HOST		"gdp-hongd.cs.berkeley.edu"
 #endif
+#ifndef GDP_DEFAULT_HONGD_USER
+# define GDP_DEFAULT_HONGD_USER			"gdp_user"
+#endif
+#ifndef GDP_DEFAULT_HONGD_PASSWD
+# define GDP_DEFAULT_HONGD_PASSWD		GDP_DEFAULT_HONGD_USER
+#endif
 
 typedef struct gdp_chan		gdp_chan_t;		// should be in gdp_chan.h?
 typedef uint16_t			gdp_seqno_t;	// should be in gdp_chan.h?

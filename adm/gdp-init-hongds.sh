@@ -163,10 +163,16 @@ create_hongd_db() {
 #	do
 #		error "Try again"
 #	done
+	creation_service_name="gdp_creation_service"
 	creation_service_password=`dd if=/dev/random bs=1 count=9 | base64`
+	gdp_user_name="gdp_user"
+	gdp_user_password="gdp_user"
 	hongd_sql=$root/adm/gdp-hongd.sql.template
 	if sed \
+		-e "s@CREATION_SERVICE_NAME@$creation_service_name" \
 		-e "s@CREATION_SERVICE_PASSWORD@$creation_service_password" \
+		-e "s@GDP_USER_NAME@$gdp_user_name" \
+		-e "s@GDP_USER_PASSWORD@$gdp_user_password" \
 		$hongd_sql | sudo mysql
 	then
 		pwfile=creation_service_pw.txt

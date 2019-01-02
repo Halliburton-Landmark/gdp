@@ -79,9 +79,9 @@ _gdp_name_init()
 	const char *db_name = ep_adm_getstrparam("swarm.gdp.hongdb.database",
 											"gdp_hongd");
 	const char *db_user = ep_adm_getstrparam("swarm.gdp.hongdb.user",
-											"gdp_user");
+											GDP_DEFAULT_HONGD_USER);
 	const char *db_passwd = ep_adm_getstrparam("swarm.gdp.hongdb.passwd",
-											"");
+											GDP_DEFAULT_HONGD_PASSWD);
 	unsigned long db_flags = 0;
 	DbTable = ep_adm_getstrparam("swarm.gdp.hongdb.table", "human_to_gdp");
 
