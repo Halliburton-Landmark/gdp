@@ -264,8 +264,16 @@ print_pb_datum(const GdpDatum *d, FILE *fp, int indent)
 	else
 		fprintf(fp, "\n%ssig=%p [%zd]", _gdp_pr_indent(indent),
 					d->sig, d->sig->sig.len);
-	fprintf(fp, ", data[%zd]=\n", d->data.len);
-	ep_hexdump(d->data.data, d->data.len, fp, EP_HEXDUMP_ASCII, 0);
+	fprintf(fp, ", data[%zd]=", d->data.len);
+	if (ep_dbg_test(Dbg, 42))
+	{
+		fprintf(fp, "\n");
+		ep_hexdump(d->data.data, d->data.len, fp, EP_HEXDUMP_ASCII, 0);
+	}
+	else
+	{
+		fprintf(fp, "(omitted)\n");
+	}
 }
 
 
@@ -323,12 +331,18 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 				gdp_printable_name(msg->cmd_create->logname.data, pname);
 			else
 				logname = "(NULL)";
-			fprintf(fp, "cmd_create:\n%slogname=%s\n%smetadata=\n",
+			fprintf(fp, "cmd_create:\n%slogname=%s\n%smetadata=",
 					_gdp_pr_indent(indent), logname,
 					_gdp_pr_indent(indent + 1));
-			ep_hexdump(msg->cmd_create->metadata->data.data,
-						msg->cmd_create->metadata->data.len,
-						fp, EP_HEXDUMP_ASCII, 0);
+			if (!ep_dbg_test(Dbg, 42))
+				fprintf(fp, "(omitted)\n");
+			else
+			{
+				fprintf(fp, "\n");
+				ep_hexdump(msg->cmd_create->metadata->data.data,
+							msg->cmd_create->metadata->data.len,
+							fp, EP_HEXDUMP_ASCII, 0);
+			}
 		}
 		break;
 
@@ -414,15 +428,17 @@ _gdp_msg_dump(const gdp_msg_t *msg, FILE *fp, int indent)
 						fp, EP_HEXDUMP_TERSE, 0);
 		}
 		fprintf(fp, "%smetadata ", _gdp_pr_indent(indent + 1));
-		if (msg->ack_success->has_metadata)
+		if (!msg->ack_success->has_metadata)
+			fprintf(fp, "(none)\n");
+		else if (!ep_dbg_test(Dbg, 42))
+			fprintf(fp, "(omitted)\n");
+		else
 		{
 			fprintf(fp, "\n");
 			ep_hexdump(msg->ack_success->metadata.data,
 						msg->ack_success->metadata.len,
 						fp, EP_HEXDUMP_ASCII, 0);
 		}
-		else
-			fprintf(fp, "(none)\n");
 		break;
 
 	case GDP_MESSAGE__BODY_ACK_CHANGED:

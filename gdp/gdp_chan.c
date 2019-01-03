@@ -930,7 +930,7 @@ send_helper(gdp_chan_t *chan,
 	// now write header to the socket
 	bufferevent_lock(chan->bev);
 	EP_ASSERT((pbp - pb) == MIN_HEADER_LENGTH);
-	if (ep_dbg_test(Dbg, 33))
+	if (ep_dbg_test(Dbg, 42))
 	{
 		ep_dbg_printf("send_helper: sending %zd octets:\n",
 					payload_len + (pbp - pb));
@@ -979,7 +979,7 @@ _gdp_chan_send(gdp_chan_t *chan,
 			gdp_buf_t *payload,
 			int tos)
 {
-	if (ep_dbg_test(Dbg, 32))
+	if (ep_dbg_test(Dbg, 42))
 	{
 		size_t l = evbuffer_get_length(payload);
 		uint8_t *p = evbuffer_pullup(payload, l);
