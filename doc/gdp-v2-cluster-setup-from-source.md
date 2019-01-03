@@ -1,7 +1,7 @@
 # Setting Up a Version 2 GDP Cluster From Source
 
-This describes how to set up a GDP version 2 cluster.  It assumes
-that you are:
+This describes how to set up a private GDP version 2 cluster.
+It assumes that you are:
 
  1.  Compiling from source code.
  2.  Running on Ubuntu 16.04.  It should work on Ubuntu 18.04 but
@@ -9,14 +9,15 @@ that you are:
      FreeBSD 11.2.  It probably will not work on Ubuntu 14.04 since
      we require systemd.
  3.  _Not_ connecting into the existing Berkeley infrastructure.
-     If you are, you don't need many of these steps.
+     If you are, you don't need most of these steps.
 
 ***These instructions are largely untested.  Please let us know
 how they can be improved.***
 
 Note that many of the included scripts assume you are using the
 Berkeley infrastructure and reference Berkeley-specific hosts.  You
-will probably have to hand edit some scripts.
+will probably have to hand edit some scripts.  A `grep -i` for
+`berkeley.edu` will probably find most of them.
 
 The basic outline is:
 
@@ -30,12 +31,16 @@ The basic outline is:
  * Set up one or more GDP routers.
  * Set up at least one gdplogd (log data server).
  * Set up the Log Creation Service.
- * XXX
+ * Check configuration.
 
 Note that these instructions assume they are all being run in one
 shell session.  In particular, some variables are set in one step
 and then used in later steps.  If you are not installing everything
 on the same machine you may need to duplicate configuration steps.
+
+In the future we will have many of these components packaged as
+precompiled Docker containers, but for now you have to compile
+yourself.
 
 ## Gathering Information
 
@@ -48,7 +53,7 @@ where GDP services will be installed and run.  Things to decide:
  * Which host will run the Log Creation Service.  This can be
    a virtual machine or be run in a Docker container.
  * Which host will run the MariaDB instance used to store the
-   HONGD database.
+   HONGD database.  This currently runs in a Docker container.
 
 ## Fetching the Source Code
 
@@ -83,7 +88,7 @@ on the host system).
 
 ## Set Up GDP Router(s)
 
-**Rick, please fill in**
+***Rick, please fill in***
 
     GDP_ROUTERS=[space-separated list of GDP router nodes]
     export GDP_ROUTERS
@@ -118,6 +123,11 @@ prior step "Set up MariaDB and HONGD."
 Check the runtime configuration files for rationality.
 
     vi /etc/ep_adm_params/*
+
+## Language Bindings
+
+These instructions only install the `C` language bindings.  If you want
+other languages, look in `$root/lang` and follow the `README` files.
 
 ## MISSING ITEMS
 
