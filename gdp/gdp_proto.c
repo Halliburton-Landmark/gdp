@@ -188,7 +188,7 @@ _gdp_invoke(gdp_req_t *req)
 		{
 			estat = _gdp_req_unsend(req);
 			EP_STAT_CHECK(estat, break);
-//			estat = GDP_STAT_INVOKE_TIMEOUT;	//XXX why?
+			estat = GDP_STAT_INVOKE_TIMEOUT;
 			if (retries > 1)
 			{
 				// if ETIMEDOUT, maybe the router had a glitch:
