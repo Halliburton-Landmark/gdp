@@ -1077,7 +1077,7 @@ EP_STAT gdp_create_info_new_writer_key(
     <br>
     <hr width="100%" size="2">
     <h4> Name</h4>
-    gdp_getstat &mdash; Return information about a GCL&nbsp; <span class="warning">[NOT
+    gdp_getstat &mdash; Return information about a GIN&nbsp; <span class="warning">[NOT
       YET IMPLEMENTED] </span>
     <h4> Synopsis</h4>
     <pre>EP_STAT gdp_getstat(gdp_name_t gobname,
@@ -1178,7 +1178,7 @@ EP_STAT gdp_create_info_new_writer_key(
       Each record has a record number, a commit timestamp, associated data, and
       possible signature information if the record was signed.&nbsp; Record
       numbers are of type <code>gdp_recno_t</code> and count up by one as
-      records are added (i.e., record numbers are unique within a GCL and
+      records are added (i.e., record numbers are unique within a GOB and
       dense).&nbsp; Data is represented in dynamic buffers, as described below.
     </p>
     <h3>4.1&nbsp; Datum Headers</h3>
@@ -1349,7 +1349,7 @@ typedef struct
       man page for details.&nbsp; The public part of the key is inserted into
       the log metadata and stored with the log.&nbsp; The secret part is stored
       somewhere on your local filesystem, typically <span class="filename">KEYS/<span
-          class="variable">gcl-id</span>.pem</span>.&nbsp; Normally <span class="command">gcl-create</span>
+          class="variable">gob-id</span>.pem</span>.&nbsp; Normally <span class="command">gdp-create</span>
       will encrypt the secret key with another key entered from the command
       line, although this can also be turned off.</p>
     <p>When a GDP application attempts to open a log using <span class="function">gdp_gin_open</span>,
@@ -1449,7 +1449,7 @@ typedef struct
       like the best approach. Having the user assign a name seems like a
       non-starter, if only because of the possibility of conflicts.</p>
     <p> There will probably be some need for external naming, e.g., some overlay
-      directory structure. That might be a different gcl_type.</p>
+      directory structure. That might be a different gob_type.</p>
     <p> This seems like an open research topic.</p>
     <h3> C.3 Orphans, Expiration, Charging, and Accounting</h3>
     <p> If a GOB isn't linked into a directory structure and everyone forgets

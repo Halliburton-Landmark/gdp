@@ -247,10 +247,10 @@ available file descriptors available,
 the cache is swept again with a 3.75 minute (225 seconds) maximum age.
 The default is half the per-process maximum number of open files.
 .
-.It swarm.gdp.cache.reclaim.maxgcls
-Limit the number of GCLs to be examined during a reclaim operation.
+.It swarm.gdp.cache.reclaim.maxgobs
+Limit the number of GOBs to be examined during a reclaim operation.
 This is intended for debugging (to detect loops in the usage time list).
-If the number of GCLs in the cache exceed this number
+If the number of GOBs in the cache exceed this number
 an assertion failure will be thrown.
 Defaults to
 .Li 100000 .
@@ -283,6 +283,13 @@ Mostly relevant to
 gdplogd .
 Defaults to
 .Li true .
+.
+.It swarm.gdp.create.service (deprecated)
+The name of the creation service to use
+for creating a new GDP Object.
+Only checked if
+.Va swarm.gdp.creation-service.name
+is not set.
 .
 .It swarm.gdp.creation-service.name
 The name of the creation service to use

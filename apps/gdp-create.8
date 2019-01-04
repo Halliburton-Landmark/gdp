@@ -200,7 +200,7 @@ is a way to ensure that a log exists without give an error if it already exists.
 The name of the log daemon on which to create the physical instantiation
 of the log.
 If not specified, the value of the
-.Va swarm.gdp.gdp-create.server
+.Va swarm.gdp.creation-service.name
 administrative will be used.
 If that is not set,
 it will default to one of the servers at Berkeley.
@@ -294,8 +294,9 @@ Defaults to
 .Li ec .
 Overridden by
 .Fl k .
-.It swarm.gdp.gdp-create.server
-The default server on which to create logs.
+.
+.It swarm.gdp.creation-service.name
+The GDPname of the creation service.
 Overridden by
 .Fl s .
 .El

@@ -59,7 +59,7 @@
     </ul>
     <h2> Terminology</h2>
     <dl>
-      <dt>GCL</dt>
+      <dt>GOB</dt>
       <dd>Global Data Plane Channel/Log.&nbsp; This represents an addressable
         entity in the Global Data Plane, which may be a log or a service.<br>
       </dd>
@@ -211,7 +211,7 @@
       indicates messages to be interpreted by the routing layer.</p>
     <p> </p>
     <p>Source (32 octets).&nbsp; The source of this PDU.&nbsp; For data
-      originating from a named GCL it will be the name of that GCL; otherwise it
+      originating from a named GOB it will be the name of that GOB; otherwise it
       will be the address of the program instance, which in general will change
       when the program is restarted.<br>
     </p>
@@ -347,7 +347,7 @@
     <p>Sequence Number (8 octets; optional).&nbsp; When the PDU is signed, this
       field is included with the signature to avoid replay attacks.&nbsp; It
       must be strictly increasing.&nbsp; [[Across all time?&nbsp; How is this
-      stored in the GCL?]]<br>
+      stored in the GOB?]]<br>
     </p>
     <p>Commit Timestamp (16 octets; optional).&nbsp; Contains the commit
       timestamp on received data.&nbsp; [[Merge with Sequence Number??]]</p>
@@ -745,10 +745,10 @@
           </td>
           <td valign="top">66<br>
           </td>
-          <td valign="top">Create a GCL.&nbsp; It must be addressed to the Log
+          <td valign="top">Create a GOB.&nbsp; It must be addressed to the Log
             Daemon instance on which the data should be stored.&nbsp; The data
-            contains the name of the new GCL and the GCL metadata.&nbsp; It is
-            an error if the GCL already exists.&nbsp; <span class="note">[[Need
+            contains the name of the new GOB and the GOB metadata.&nbsp; It is
+            an error if the GOB already exists.&nbsp; <span class="note">[[Need
               to have creations moderated by a creation service.]]</span><br>
           </td>
         </tr>
@@ -757,9 +757,9 @@
           </td>
           <td valign="top">67<br>
           </td>
-          <td valign="top">Open a GCL for append only.&nbsp; The GCL must
+          <td valign="top">Open a GOB for append only.&nbsp; The GOB must
             already exist.&nbsp; This command is not required, but it can be
-            used to test for the existence of a GCL and pre-allocate resources.<br>
+            used to test for the existence of a GOB and pre-allocate resources.<br>
           </td>
         </tr>
         <tr>
@@ -767,8 +767,8 @@
           </td>
           <td valign="top">68<br>
           </td>
-          <td valign="top">Open a GCL for read only.&nbsp; This is not required,
-            but can be used to test for the existence of a GCL.<br>
+          <td valign="top">Open a GOB for read only.&nbsp; This is not required,
+            but can be used to test for the existence of a GOB.<br>
           </td>
         </tr>
         <tr>
@@ -776,7 +776,7 @@
           </td>
           <td valign="top">69<br>
           </td>
-          <td valign="top">Close a GCL.&nbsp; This is not required.&nbsp; It is
+          <td valign="top">Close a GOB.&nbsp; This is not required.&nbsp; It is
             just a hint to the server that resources will not be needed soon.<br>
           </td>
         </tr>
@@ -796,7 +796,7 @@
           </td>
           <td valign="top">71<br>
           </td>
-          <td valign="top">Append a record to a GCL.&nbsp; The payload contains
+          <td valign="top">Append a record to a GOB.&nbsp; The payload contains
             the data to write.&nbsp; In the future, this must be signed.&nbsp;
             The returned ACK_CREATED message contains the record number and the
             commit timestamp.<br>
@@ -807,7 +807,7 @@
           </td>
           <td valign="top">72<br>
           </td>
-          <td valign="top">Subscribe to a GCL.&nbsp; The Record Number header
+          <td valign="top">Subscribe to a GOB.&nbsp; The Record Number header
             field contains the first record number to return and the data
             contains the number of records to return.&nbsp; In the future, a
             timeout may be included.&nbsp; This will cause ACK_CONTENT commands
@@ -829,20 +829,20 @@
           </td>
           <td valign="top">74<br>
           </td>
-          <td valign="top">Return GCL metadata.<br>
+          <td valign="top">Return GOB metadata.<br>
           </td>
         </tr>
         <tr>
           <td style="vertical-align: top; background-color: white;">CMD_OPEN_RA</td>
           <td style="vertical-align: top; background-color: white;">75</td>
-          <td style="vertical-align: top; background-color: white;">Open GCL for
+          <td style="vertical-align: top; background-color: white;">Open GOB for
             read and/or append.</td>
         </tr>
         <tr>
           <td style="vertical-align: top; background-color: white;">CMD_NEWSEGMENT</td>
           <td style="vertical-align: top; background-color: white;">76</td>
           <td style="vertical-align: top; background-color: white;">Create a new
-            segment for a GCL.&nbsp; This creates a new data file for a
+            segment for a GOB.&nbsp; This creates a new data file for a
             log.&nbsp; This is a physical operation only: there are no semantic
             differences between records in different segments.</td>
         </tr>
@@ -1207,37 +1207,37 @@
     </h3>
     <p>[[For future use.]]<br>
     </p>
-    <h3>GCL Creation (CMD_CREATE)</h3>
+    <h3>GOB Creation (CMD_CREATE)</h3>
     <p><i><b>At the moment this command is in an interim form.&nbsp; It will
           change in the future.</b></i><br>
     </p>
-    <p>Currently, attempts to create a GCL must be directed to a specific Log
+    <p>Currently, attempts to create a GOB must be directed to a specific Log
       Daemon (i.e., the destination field in the PDU is that of the daemon
       itself, not the name of the log to be created).&nbsp; The name of the log
       is contained in the payload.&nbsp; The name is followed by optional
-      metadata which will be associated with the new GCL.<br>
+      metadata which will be associated with the new GOB.<br>
     </p>
     <p>[[Need separate service to do location placement, resource balancing,
       etc.&nbsp; A bit issue will be key management; you don't want to have
       every log server respond to the same secret key (that wouldn't be very
       private!), but there has to be some way to do things cross-ADMD.]]<br>
     </p>
-    <h3>GCL Open and Close (CMD_OPEN_AO, CMD_OPEN_RO, CMD_CLOSE)</h3>
+    <h3>GOB Open and Close (CMD_OPEN_AO, CMD_OPEN_RO, CMD_CLOSE)</h3>
     <p>[[All optional.]]<br>
     </p>
     <h3> </h3>
-    <h3>On-Wire GCL Metadata Format (CMD_CREATE, CMD_GETMETADATA)<br>
+    <h3>On-Wire GOB Metadata Format (CMD_CREATE, CMD_GETMETADATA)<br>
     </h3>
-    <p>The format of on-wire metadata is defined in the document <a href="gdp-gcl-metadata.html">GDP
-        GCL Metadata</a>.<br>
+    <p>The format of on-wire metadata is defined in the document <a href="gdp-gob-metadata.html">GDP
+        GOB Metadata</a>.<br>
     </p>
     <h3>Reading Data (CMD_READ, CMD_MULTIREAD, CMD_SUBSCRIBE)</h3>
-    <p>The READ command is addressed to the GCL to be read.&nbsp; The record
+    <p>The READ command is addressed to the GOB to be read.&nbsp; The record
       number to read is given in the Record Number field in the PDU
       header.&nbsp; The payload is unused.<br>
     </p>
     <p>The MULTIREAD command returns multiple records.&nbsp; It is addressed to
-      the GCL to be read.&nbsp; The record number in the header is the number of
+      the GOB to be read.&nbsp; The record number in the header is the number of
       the first record to be read; if this is negative it starts relative to the
       last record, so if a log has five records numbered 1&ndash;5, a start of
       &ndash;3 returns records 3, 4, and 5.&nbsp; The payload has a 32-bit
@@ -1251,7 +1251,7 @@
       subscriptions may continue indefinitely into the future.<br>
     </p>
     <h3>Writing Data (CMD_APPEND)</h3>
-    <p>The append command is directed to the GCL to be written.&nbsp; The
+    <p>The append command is directed to the GOB to be written.&nbsp; The
       payload is the data to be added.&nbsp; In the future, this will be
       required to have a signature field.<br>
     </p>
@@ -1277,7 +1277,7 @@
     <h2>Protocol Operation</h2>
     <p>Note that there are two models for different actors in the GDP.&nbsp; One
       is the logical model where there are clients that initiate requests (e.g.,
-      sensor clients posting data to a GCL) and servers that process requests
+      sensor clients posting data to a GOB) and servers that process requests
       (e.g., GDP Log daemons that collect that data and store it).&nbsp; This is
       similar to standard Internet services such as email.&nbsp; The second is a
       routing model, where both clients and servers initiate communication with
@@ -1301,7 +1301,7 @@
         address the initiator.</li>
       <li>(Optional)&nbsp; Initiator advertises the 256-bit names of any
         resources it cares to make available.&nbsp; For example, a GDP Log node
-        would advertise the names of the GCLs it had available.</li>
+        would advertise the names of the GOBs it had available.</li>
       <li>Initiator starts listening for incoming requests, possibly in a
         separate thread.&nbsp; For example, even sensor nodes must respond to
         heartbeats from the routing layer.<br>
@@ -1333,7 +1333,7 @@
     </p>
     <h2>Security Considerations</h2>
     <p>The data content is completely opaque to the GDP and is expected to be
-      encrypted (there are some exceptions, e.g., GCL metadata).&nbsp; However,
+      encrypted (there are some exceptions, e.g., GOB metadata).&nbsp; However,
       the header metadata is always plaintext.&nbsp; This suggests certain
       possible attacks.<br>
     </p>

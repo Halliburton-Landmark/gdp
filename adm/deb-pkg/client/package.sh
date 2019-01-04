@@ -22,7 +22,7 @@ VER=$GDP_VERSION_MAJOR.$GDP_VERSION_MINOR.$GDP_VERSION_PATCH
 # Setup the files that checkinstall needs. No way to specify
 #   the location. Sad.
 cp $scriptdir/description-pak .
-cat $common/postinstall-pak $scriptdir/postinstall-pak > postinstall-pak
+cat $common/postinstall-pak > postinstall-pak
 chmod +x postinstall-pak
 
 # Build package

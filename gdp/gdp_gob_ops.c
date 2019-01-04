@@ -78,6 +78,16 @@ _gdp_gob_newname(gdp_gob_t *gob)
 static const char *
 get_default_creation_service_name(void)
 {
+	const char *p;
+	p = ep_adm_getstrparam("swarm.gdp.creation-service.name", NULL);
+	if (p != NULL)
+		return p;
+	p = ep_adm_getstrparam("swarm.gdp.create.service", NULL);	//BACK COMPAT
+	if (p != NULL)
+		return p;
+	p = ep_adm_getstrparam("swarm.gdp.create.server", NULL);	//BACK COMPAT
+	if (p != NULL)
+		return p;
 	return GDP_DEFAULT_CREATION_SERVICE;
 }
 
@@ -110,10 +120,7 @@ _gdp_gob_create(
 
 	if (!gdp_name_is_valid(service_name))
 	{
-		const char *p;
-		p = ep_adm_getstrparam("swarm.gdp.create.service", NULL);
-		if (p == NULL)
-			p = get_default_creation_service_name();
+		const char *p = get_default_creation_service_name();
 		if (p == NULL)
 		{
 			ep_dbg_cprintf(Dbg, 1, "_gdp_gob_create: no service name\n");

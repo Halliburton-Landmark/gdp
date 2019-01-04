@@ -69,7 +69,7 @@ since the password will not show up in a
 output.
 If not specified,
 defaults to the value of the
-.Va swarm.gdp.hongdb.creation-service.passwd-file
+.Va swarm.gdp.creation-service.passwd-file
 administrative parameter,
 which in turn defaults to
 .Pa /etc/gdp/creation_service_pw.txt .
@@ -80,7 +80,7 @@ the command invoker will be prompted for a password.
 The name of the database user to update the database.
 This must have INSERT permission on the mapping table.
 Defaults to the value of the
-.Va swarm.gdp.hongdb.creation-service.user
+.Va swarm.gdp.creation-service.user
 administrative parameter.
 Note that this is a different user from that specified in the
 .Va swarm.gdp.hongdb.user
@@ -96,13 +96,13 @@ Command line parameters are incorrect.
 .Sh ADMINISTRATIVE PARAMETERS
 .Bl -tag
 .
-.It swarm.gdp.hongdb.creation-service.user
+.It swarm.gdp.creation-service.user
 The name of the database user with permissions to update the
 human-oriented name to GDPname database.
 Defaults to
 .Li gdp_creation_service .
 .
-.It swarm.gdp.hongdb.creation-service.passwd-file
+.It swarm.gdp.creation-service.passwd-file
 The name of the default password file.
 This can be overridden using the
 .Fl P

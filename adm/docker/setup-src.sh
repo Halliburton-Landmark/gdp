@@ -95,5 +95,5 @@ cat > $PARAMS/gdp <<- EOF
 	swarm.gdp.hongdb.host=$GDP_HONGD_SERVER
 EOF
 if ! test -z "$GDP_CREATION_SERVICE"; then
-	echo "swarm.gdp.create.service=$GDP_CREATION_SERVICE" >> $PARAMS/gdp
+	echo "swarm.gdp.creation-service.name=$GDP_CREATION_SERVICE" >> $PARAMS/gdp
 fi

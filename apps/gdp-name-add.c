@@ -135,7 +135,7 @@ usage(void)
 			ep_app_getprogname(),
 			ep_adm_getstrparam("swarm.gdp.hongdb.host",
 								GDP_DEFAULT_HONGDB_HOST),
-			ep_adm_getstrparam("swarm.gdp.hongdb.creation-service.user",
+			ep_adm_getstrparam("swarm.gdp.creation-service.user",
 								"gdp_creation_service"));
 	exit(EX_USAGE);
 }
@@ -215,7 +215,7 @@ main(int argc, char **argv)
 	{
 		if (db_passwd_file == NULL)
 			db_passwd_file = ep_adm_getstrparam(
-								"swarm.gdp.hongdb.creation-service.passwd-file",
+								"swarm.gdp.creation-service.passwd-file",
 								"/etc/gdp/creation_service_pw.txt");
 		if (db_passwd_file != NULL)
 		{
@@ -262,7 +262,7 @@ main(int argc, char **argv)
 	// open database connection
 	phase = "database open";
 	if (db_user == NULL)
-		db_user = ep_adm_getstrparam("swarm.gdp.hongdb.creation-service.user",
+		db_user = ep_adm_getstrparam("swarm.gdp.creation-service.user",
 									"gdp_creation_service");
 	estat = name_init(db_host, db_user, db_passwd);
 	if (!EP_STAT_ISOK(estat))

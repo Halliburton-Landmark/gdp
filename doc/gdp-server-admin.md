@@ -19,24 +19,24 @@ Considerations for the GDP Data
 
 For obvious reasons GDP data files should be on a filesystem
 that has a reasonable amount of free space.  The default is
-`/var/swarm/gdp/gcls`.  The `adm/init-gdp-server.sh` script
+`/var/swarm/gdp/glogs`.  The `adm/init-gdp-server.sh` script
 creates this directory if it doesn not already exist, but if
 you want to put it on a separate filesystem you might want to
 do that in advance.  For example:
 
-	sudo mkdir -p /var/swarm/gdp/gcls
+	sudo mkdir -p /var/swarm/gdp/glogs
 	sudo chown -R gdp:gdp /var/swarm
-	mount /dev/bigfs /var/swarm/gdp/gcls
+	mount /dev/bigfs /var/swarm/gdp/glogs
 
 The directory should be mode 700 or 750, owned by gdp:gdp:
 
-	sudo chmod -R 750 /var/swarm/gdp/gcls
+	sudo chmod -R 750 /var/swarm/gdp/glogs
 
 Mode 750 is just to allow users in the gdp group to be able
 to peek into the directory.  This should be limited to
 people who are maintaining the GDP.
 They still won't be able to read the files unless you change
-the `swarm.gdplogd.gcl.mode` parameter to change the default
+the `swarm.gdplogd.gob.mode` parameter to change the default
 file mode from 0600 to something more permissive.  Note that
 the umask may modify this value.
 
@@ -44,7 +44,7 @@ Adjust Administrative Parameters
 --------------------------------
 
 If you want to change parameters such as socket numbers or the
-GCL directory you can do so without recompiling.  Configuration
+GOB directory you can do so without recompiling.  Configuration
 files are simple "name=value" pairs, one per line.  There is
 a built-in search path
 "`.ep_adm_params:~/.ep_adm_params:/usr/local/etc/ep_adm_params:/etc/ep_adm_params`"
@@ -69,7 +69,7 @@ by "gdp-01.eecs.berkeley.edu; gdp-02.eecs.berkeley.edu"
 (these are run by us for your convenience).  This
 parameter is only consulted if Zeroconf fails.
 
-`swarm.gdplogd.gcl.dir`		(file: `gdplogd`)
+`swarm.gdp.data.root`		(file: `gdplogd`)
 
 > This is the name of the directory you created in
 the previous step.  It only applies on nodes that
@@ -78,7 +78,7 @@ are running a log daemon.
 `swarm.gdplogd.gdpname`		(file: `gdplogd`)
 
 > This is a user-friendly name for the name of the
-log daemon.  You'll need this for creating GCLs,
+log daemon.  You'll need this for creating GOBs,
 as described below.  If you don't specify this,
 the name is chosen randomly each time gdplogd
 starts up, which would be very inconvenient.
@@ -93,12 +93,12 @@ This tells application
 programs where to look for routers if Zeroconf fails.
 In file `/usr/local/etc/ep_adm_params/gdplogd`:
 
-	swarm.gdplogd.gcl.dir=/var/swarm/gdp/gcls
+	swarm.gdp.data.root=/var/swarm/gdp/glogs
 	swarm.gdplogd.gdpname=com.example.mygdp.gdplogd
 
-This tells `gdplogd` where to store GCL log data (only needed if not
+This tells `gdplogd` where to store GOB log data (only needed if not
 using the default, which is what is shown here) and what name to use
-on startup (only needed for the `gcl-create` command, but very
+on startup (only needed for the `gob-create` command, but very
 important to have set).
 
 Installing and Starting the GDP Routing Daemon
@@ -207,22 +207,20 @@ the number of cores available.  Can also be set (with
 finer control) using the `libep.thr.pool.min_workers`
 and `libep.thr.pool.max_workers` parameters.
 
-Creating a GCL
+Creating a Log
 --------------
 
 For the time being, to create your own logs you'll need the
-GDP name (_not_ the DNS name) of the log server that will
-store the log.  This can be set as an administrative parameter,
+GDP name (_not_ the DNS name) of the creation service to create
+the log.  This can be set as an administrative parameter,
 and the internal form is printed out as the log server starts up.
-We run three log servers at Berkeley you can use:
+We run a creation service at Berkeley named
+`edu.berkeley.eecs.gdp.service.creation`.
 
-	edu.berkeley.eecs.gdp-01.gdplogd
-	edu.berkeley.eecs.gdp-02.gdplogd
-	edu.berkeley.eecs.gdp-03.gdplogd
-
-You can set a default server on which to create logs using the
-`swarm.gdp.gcl-create.server` administrative parameter, or on
-the `gcl-create` command line using the `-s` flag.
+If you are running your own creation service, you can change
+that default using the
+`swarm.gdp.creation-service.name` administrative parameter, or on
+the `gob-create` command line using the `-s` flag.
 
 You'll also need to select a name for your log.  We
 recommend using a name that is unlikely to clash with other
@@ -234,15 +232,15 @@ _institution_`.`_project_`.`_user_`.`_name_.  For example,
 would be a reasonable choice.  To actually create the log on
 a given server, use
 
-> `gcl-create -s` _servername_ _logname_
+> `gdp-create -s` _servicename_ _logname_
 
 where the `-s` flag is optional.  For example, if the
-`swarm.gdp.gcl-create.server` default value is set to
-`edu.berkeley.eecs.gdp-01.gdplogd`, the following two commands
+`swarm.gdp.creation-service.name` default value is set to
+`com.example.gdp.service.creation`, the following two commands
 are equivalent:
 
-	gcl-create -s edu.berkeley.eecs.gdp-01.gdplogd edu.berkeley.eecs.swarmlab.eric.sensor23
-	gcl-create edu.berkeley.eecs.swarmlab.eric.sensor23
+	gdp-create -s com.example.gdp.service.creation edu.berkeley.eecs.swarmlab.eric.sensor23
+	gdp-create edu.berkeley.eecs.swarmlab.eric.sensor23
 
 The good news is that this the only time you'll need to know
 the name of the log server.
@@ -294,33 +292,33 @@ have to change any of these.
 	`.:KEYS:~/.swarm/gdp/keys:/usr/local/etc/swarm/gdp/keys:/etc/swarm/gdp/keys`.
 
 * `swarm.gdp.crypto.key.dir` &mdash; the directory in which to store the
-	secret keys when creating a GCL.  Defaults to `KEYS`.
-	Can be overridden by gcl-create `-K` flag.
+	secret keys when creating a GOB.  Defaults to `KEYS`.
+	Can be overridden by gdp-create `-K` flag.
 
 * `swarm.gdp.crypto.hash.alg` &mdash; the default hashing algorithm.
-	Defaults to `sha256`.  Can be overridden by gcl-create
+	Defaults to `sha256`.  Can be overridden by gdp-create
 	`-h` _alg_ flag.
 
 * `swarm.gdp.crypto.sign.alg` &mdash; the default signing algorithm.
-	Defaults to `ec`.  Can be overridden by gcl-create
+	Defaults to `ec`.  Can be overridden by gdp-create
 	`-k` flag.
 
 * `swarm.gdp.crypto.keyenc.alg` &mdash; the default secret key encryption
 	algorithm.  Defaults to "aes192".  A value of "none"
-	turns off encryption.  Can be overridden by gcl-create
+	turns off encryption.  Can be overridden by gdp-create
 	`-e` flag.
 
 * `swarm.gdp.crypto.ec.curve` &mdash; the default curve to use when
 	creating an EC key.  Defaults to sect283r1 (subject
-	to change).  Can be overridden by gcl-create `-c` flag.
+	to change).  Can be overridden by gdp-create `-c` flag.
 
 * `swarm.gdp.crypto.dsa.keylen` &mdash; the default size of an RSA
 	signature key in bits.  Defaults to 2048.  Can be
-	overridden by gcl-create `-b` flag.
+	overridden by gdp-create `-b` flag.
 
 * `swarm.gdp.crypto.rsa.keylen` &mdash; the default size of an RSA
 	signature key in bits.  Defaults to 2048.  Can be
-	overridden by gcl-create `-b` flag.
+	overridden by gdp-create `-b` flag.
 
 * `swarm.gdp.crypto.rsa.keyexp` &mdash; the exponent for an RSA signature
 	key.  Defaults to 3.
@@ -341,8 +339,12 @@ have to change any of these.
 * `swarm.gdp.zeroconf.proto` &mdash; the protocol used in zeroconf queries.
 	Defaults to `_gdp._tcp`.
 
-* `swarm.gdplogd.gcl.dir` &mdash; the directory in which log data will
-	be stored.  Defaults to `/var/swarm/gdp/gcls`.
+* `swarm.gdp.data.root` &mdash; the directory in which log data will
+	be stored.  Defaults to `/var/swarm/gdp`.
+
+* `swarm.gdplogd.log.dir` &mdash; the directory that holds the actual
+    data logs.  If this is not an absolute path it is relative to
+	`swarm.gdp.data.root`.  Defaults to `glogs`.
 
 * `swarm.gdplogd.advertise.interval` &mdash; how often to renew
     advertisements of known logs.  If set to zero advertisments are
@@ -351,7 +353,7 @@ have to change any of these.
 * `swarm.gdplogd.reclaim.interval` &mdash; how often to wake up to
 	reclaim unused resources.  Defaults to 15 (seconds).
 
-* `swarm.gdplogd.reclaim.age` &mdash; how long a GCL is permitted to
+* `swarm.gdplogd.reclaim.age` &mdash; how long a GOB is permitted to
 	sit idle before its resources are reclaimed.  Defaults
 	to 300 (seconds, i.e., five minutes).
 
@@ -375,7 +377,7 @@ have to change any of these.
 	words where only the first letter is significant.
 	Values are `verify` (signature must verify if it
 	exists), `required` (signature must be present if the
-	GCL has a public key), and/or `pubkeyreq` (public
+	GOB has a public key), and/or `pubkeyreq` (public
 	key is required).  For now, defaults to `verify`.
 
 * `swarm.gdplogd.sequencing.allowdups` &mdash;
@@ -395,8 +397,8 @@ have to change any of these.
 	to 600 (seconds).
 
 
-* `swarm.rest.kv.gclname` &mdash; the name of the GCL to use for the
-	key-value store.  Defaults to "`swarm.rest.kv.gcl`".
+* `swarm.rest.kv.logname` &mdash; the name of the GOB to use for the
+	key-value store.  Defaults to "`swarm.rest.kv.log`".
 
 * `swarm.rest.prefix` &mdash; the REST prefix (e.g., `/gdp/v1/`).
 

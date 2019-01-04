@@ -82,7 +82,7 @@ on the host system on which the image is run.
 * `GDP_ROUTER` — the default GDP router.  Inherited from the
   `swarm.gdp.routers` administrative parameter.
 * `GDP_CREATION_SERVICE` — The GDPname of the default log creation
-  service.  Inherited from `swarm.gdp.create.service` if set;
+  service.  Inherited from `swarm.gdp.creation-service.name` if set;
   otherwise, there is no default for now.
 * `GDP_HONGD_SERVER` — The IP hostname of the Human-Oriented Name
   to GDPname Directory server (actually the MariaDB server) where
