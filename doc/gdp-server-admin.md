@@ -69,19 +69,25 @@ by "gdp-01.eecs.berkeley.edu; gdp-02.eecs.berkeley.edu"
 (these are run by us for your convenience).  This
 parameter is only consulted if Zeroconf fails.
 
-`swarm.gdp.data.root`		(file: `gdplogd`)
+`swarm.gdp.data.root`		(file: `gdp`)
 
-> This is the name of the directory you created in
-the previous step.  It only applies on nodes that
-are running a log daemon.
+> This is the root of a subtree storing persistent data, including log
+data and keys.  It is the parent of the directory you created in the
+previous step.
+
+`swarm.gdplogd.log.dir`		(file: `gdplogd`)
+
+> The name of the directory relative to `swarm.gdp.data.root` that
+stores actual GDP log data.  It only applies on nodes that are running
+a log daemon.  Defaults to `glogs`.
 
 `swarm.gdplogd.gdpname`		(file: `gdplogd`)
 
-> This is a user-friendly name for the name of the
-log daemon.  You'll need this for creating GOBs,
-as described below.  If you don't specify this,
-the name is chosen randomly each time gdplogd
-starts up, which would be very inconvenient.
+> This is a user-friendly name for the name of the log daemon.
+This is necessary so the log creation service can address a
+physical log server.  It doesn't have to be publicly advertised.
+If you don't specify this, the name is chosen randomly each time
+`gdplogd` starts up.
 
 ### Example
 
@@ -93,7 +99,7 @@ This tells application
 programs where to look for routers if Zeroconf fails.
 In file `/usr/local/etc/ep_adm_params/gdplogd`:
 
-	swarm.gdp.data.root=/var/swarm/gdp/glogs
+	swarm.gdp.data.root=/var/swarm/gdp
 	swarm.gdplogd.gdpname=com.example.mygdp.gdplogd
 
 This tells `gdplogd` where to store GOB log data (only needed if not
