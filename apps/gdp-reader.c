@@ -128,7 +128,6 @@ do_simpleread(gdp_gin_t *gin,
 {
 	EP_STAT estat = EP_STAT_OK;
 	gdp_datum_t *datum = gdp_datum_new();
-	bool first_record = true;
 
 	// change the "infinity" sentinel to make the loop easier
 	if (numrecs == 0)
@@ -181,7 +180,6 @@ do_simpleread(gdp_gin_t *gin,
 		// move to next record
 		recno = gdp_datum_getrecno(datum) + 1;
 		estat = gdp_gin_read_by_recno(gin, recno, datum);
-		first_record = false;
 	}
 
 	// print the final value
@@ -190,7 +188,7 @@ do_simpleread(gdp_gin_t *gin,
 
 	// end of data is returned as a "not found" error: turn it into a warning
 	//    to avoid scaring the unsuspecting user
-	if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOTFOUND) && !first_record)
+	if (EP_STAT_IS_SAME(estat, GDP_STAT_NAK_NOTFOUND))
 		estat = EP_STAT_END_OF_FILE;
 
 done:
