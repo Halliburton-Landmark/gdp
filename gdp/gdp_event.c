@@ -259,43 +259,6 @@ _gdp_event_free_all(gdp_gin_t *gin)
 	return EP_STAT_OK;
 }
 
-
-/*
-**  Insert an event into an active list.
-**
-**		We don't do any sorting here since it is presumably already
-**		done when inserting into the pending list.
-*/
-
-static void
-insert_active_event(gdp_event_t *gev,
-		struct gev_list *list)
-{
-	EP_ASSERT_POINTER_VALID(gev);
-
-	if (ep_dbg_test(Dbg, 48))
-	{
-		const char *where;
-
-		if (list == &ActiveList)
-			where = "active";
-		else if (list == &CallbackList)
-			where = "callback";
-		else
-			where = "unknown";
-		ep_dbg_printf("insert_active_event: adding event %p (%d) to %s list\n",
-				gev, gev->type, where);
-	}
-	if (gev->type == _GDP_EVENT_FREE)
-	{
-		ep_dbg_cprintf(Dbg, 1, "insert_active_event(%p): event is free\n", gev);
-		return;
-	}
-
-	TAILQ_INSERT_TAIL(list, gev, queue);
-}
-
-
 /*
 **	Same, but for a pending event.
 **		This is essentially an insertion sort based on sequence number.
@@ -348,11 +311,16 @@ insert_pending_event(gdp_event_t *gev,
 		}
 
 		// done ("no more results") always goes at end of list
+		ep_dbg_cprintf(Dbg, 41,
+				"insert_pending_event(DONE): seq %5" PRIgdp_seqno
+				", rseq %5" PRIgdp_seqno "\n",
+				gev->seqno, req->seqnext);
 		ep_time_deltanow(&done_to, &gev->timeout);
 		TAILQ_INSERT_TAIL(&req->events, gev, queue);
 	}
 	else
 	{
+		// compute the normal (data) timeout
 		static EP_TIME_SPEC data_to = { EP_TIME_NOTIME };
 		if (!EP_TIME_IS_VALID(&data_to))
 		{
@@ -363,36 +331,66 @@ insert_pending_event(gdp_event_t *gev,
 		}
 		ep_time_deltanow(&data_to, &gev->timeout);
 
+		// search backwards through the list to find where this event fits
 		gdp_event_t *next_ev = TAILQ_LAST(&req->events, gev_list);
-		if (next_ev == NULL || modulo_gt(gev->seqno, next_ev->seqno))
+		if (next_ev == NULL ||
+				gev->type == GDP_EVENT_DONE ||
+				(modulo_gt(gev->seqno, next_ev->seqno) &&
+				 next_ev->type != GDP_EVENT_DONE))
 		{
+			// event belongs at the end of the list
 			if (ep_dbg_test(Dbg, 46))
 			{
-				gdp_seqno_t next_seq = GDP_SEQNO_NONE;
+				const char *tag = (gev->seqno == req->seqnext) ? "" : " -";
 				if (next_ev != NULL)
-					next_seq = next_ev->seqno;
-				ep_dbg_printf("insert_pending_event: seqno %" PRIgdp_seqno
-							" in order (next %" PRIgdp_seqno
-							" %" PRIgdp_seqno ")\n",
-						gev->seqno, req->seqnext, next_seq);
+				{
+					ep_dbg_printf("insert_pending_event(%p): seq %5" PRIgdp_seqno
+								", next %5" PRIgdp_seqno
+								", rseq %5" PRIgdp_seqno "%s\n",
+							gev, gev->seqno, next_ev->seqno, req->seqnext, tag);
+				}
+				else
+				{
+					ep_dbg_printf("insert_pending_event(%p): seq %5" PRIgdp_seqno
+								", next -----"
+								", rseq %5" PRIgdp_seqno "%s\n",
+							gev, gev->seqno, req->seqnext, tag);
+				}
 			}
 			TAILQ_INSERT_TAIL(&req->events, gev, queue);
 		}
 		else
 		{
-			ep_dbg_cprintf(Dbg, 42,
-					"insert_pending_event: seqno %" PRIgdp_seqno
-					", next seqno %" PRIgdp_seqno " %" PRIgdp_seqno"\n",
-					gev->seqno, next_ev->seqno, req->seqnext);
+			if (ep_dbg_test(Dbg, 42))
+			{
+				const char *tag = (gev->seqno == req->seqnext) ? "+" : "*";
+				ep_dbg_printf("insert_pending_event(%p): seq %5" PRIgdp_seqno
+						", next %5" PRIgdp_seqno
+						", rseq %5" PRIgdp_seqno " %s\n",
+						gev, gev->seqno, next_ev->seqno, req->seqnext, tag);
+			}
 
 			// find correct position in list
-			gdp_event_t *this_ev = next_ev;
-			while ((next_ev = TAILQ_PREV(this_ev, gev_list, queue)) != NULL &&
-					modulo_gt(gev->seqno, this_ev->seqno))
-				this_ev = next_ev;
-			TAILQ_INSERT_BEFORE(this_ev, gev, queue);
+			if (next_ev->type == GDP_EVENT_DONE)
+				next_ev = TAILQ_PREV(next_ev, gev_list, queue);
+
+			while (next_ev != NULL && modulo_gt(next_ev->seqno, gev->seqno))
+				next_ev = TAILQ_PREV(next_ev, gev_list, queue);
+			if (next_ev == NULL)
+				TAILQ_INSERT_HEAD(&req->events, gev, queue);
+			else
+				TAILQ_INSERT_BEFORE(next_ev, gev, queue);
 		}
 	}
+
+	if (ep_dbg_test(Dbg, 58))
+	{
+		for (gev = TAILQ_FIRST(&req->events); gev != NULL;
+						gev = TAILQ_NEXT(gev, queue))
+			ep_dbg_printf(" %d", gev->seqno);
+	}
+
+	// now figure out what should be delivered to the application
 	_gdp_event_trigger_pending(req, false);
 }
 
@@ -461,6 +459,8 @@ done_timeout(int unused, short what, void *req_)
 static void
 _gdp_event_trigger(gdp_event_t *gev, gdp_req_t *req)
 {
+	EP_ASSERT_POINTER_VALID(gev);
+
 	if (ep_dbg_test(Dbg, 48))
 	{
 		ep_dbg_printf("_gdp_event_trigger: gev %p req %p seqno %" PRIgdp_seqno
@@ -471,25 +471,41 @@ _gdp_event_trigger(gdp_event_t *gev, gdp_req_t *req)
 					EP_TIME_FMT_HUMAN | EP_TIME_FMT_SIGFIG6);
 		ep_dbg_printf("    timeout %s\n", tbuf);
 	}
-	req->seqnext = (gev->seqno + 1) % GDP_SEQNO_BASE;
-	if (gev->type == GDP_EVENT_DONE &&
-			EP_UT_BITSET(GDP_REQ_PERSIST, req->flags))
+	if (gev->type == _GDP_EVENT_FREE)
 	{
-		// more results will come later
-		ep_dbg_cprintf(Dbg, 49, "  ... deferring done pdu\n");
-		insert_active_event(gev, &req->events);
+		EP_ASSERT_PRINT("_gdp_event_trigger(%p): event is free", gev);
+		return;
 	}
-	else if (gev->cb == NULL)
+	req->seqnext = (gev->seqno + 1) % GDP_SEQNO_BASE;
+
+	if (ep_dbg_test(Dbg, 48))
+	{
+		const char *where;
+
+		if (gev->cb == NULL)
+			where = "active";
+		else
+			where = "callback";
+		ep_dbg_printf("_gdp_event_trigger: adding event %p (%d) to %s list\n",
+				gev, gev->type, where);
+	}
+	if (gev->type == _GDP_EVENT_FREE)
+	{
+		ep_dbg_cprintf(Dbg, 1, "_gdp_event_trigger(%p): event is free\n", gev);
+		return;
+	}
+
+	if (gev->cb == NULL)
 	{
 		ep_thr_mutex_lock(&ActiveListMutex);
-		insert_active_event(gev, &ActiveList);
+		TAILQ_INSERT_TAIL(&ActiveList, gev, queue);
 		ep_thr_cond_broadcast(&ActiveListSig);
 		ep_thr_mutex_unlock(&ActiveListMutex);
 	}
 	else
 	{
 		ep_thr_mutex_lock(&CallbackListMutex);
-		insert_active_event(gev, &CallbackList);
+		TAILQ_INSERT_TAIL(&CallbackList, gev, queue);
 		ep_thr_cond_signal(&CallbackListSig);
 		ep_thr_mutex_unlock(&CallbackListMutex);
 	}
@@ -521,20 +537,34 @@ _gdp_event_trigger_pending(gdp_req_t *req, bool flush)
 
 		ep_time_format(&now, tbuf, sizeof tbuf,
 					EP_TIME_FMT_HUMAN | EP_TIME_FMT_SIGFIG6);
-		ep_dbg_printf("_gdp_event_trigger_pending: "
-					"req %p seqnext %d flush %d\n"
-				"    now %s first %p\n",
-				req, req->seqnext, flush,
-				tbuf, TAILQ_FIRST(&req->events));
+		ep_dbg_printf("_gdp_event_trigger_pending: req %p seqnext %d flush %d\n"
+					"    now %s first %p\n",
+					req, req->seqnext, flush,
+					tbuf, TAILQ_FIRST(&req->events));
 	}
 
 	while ((gev = TAILQ_FIRST(&req->events)) != NULL)
 	{
+		/*
+		**  We want to trigger an event if:
+		**		* we are flushing everything, or
+		**		* the event is the next one we expect, or
+		**		* the event has passed its timeout
+		**	Otherwise we leave it in the list and add a timeout.
+		*/
+
+		ep_dbg_cprintf(Dbg, 56, "  gseq %d rseq %d  ",
+				gev->seqno, req->seqnext);
 		if (!flush &&
 				gev->seqno != req->seqnext &&
 				ep_time_before(&now, &gev->timeout))
+		{
+			ep_dbg_cprintf(Dbg, 56, "break\n");
 			break;
+		}
 
+		ep_dbg_cprintf(Dbg, 56, "trigger %s\n",
+				gev->type == GDP_EVENT_DONE ? "DONE" : "DATA");
 		// we need to trigger this event
 		TAILQ_REMOVE(&req->events, gev, queue);
 		_gdp_event_trigger(gev, req);
@@ -630,6 +660,7 @@ _gdp_event_add_from_req(gdp_req_t *req)
 	EP_STAT estat = EP_STAT_OK;
 	int evtype;
 	GdpMessage *msg = req->rpdu->msg;
+	gdp_seqno_t seqno = GDP_SEQNO_NONE;
 
 	GDP_MSG_CHECK(req->rpdu, return EP_STAT_ASSERT_ABORT);
 
@@ -646,11 +677,13 @@ _gdp_event_add_from_req(gdp_req_t *req)
 
 	  case GDP_ACK_CONTENT:
 		evtype = GDP_EVENT_DATA;
+		seqno = req->rpdu->seqno;
 		break;
 
 	  case GDP_ACK_END_OF_RESULTS:
 		// end of subscription
 		evtype = GDP_EVENT_DONE;
+		seqno = req->rpdu->seqno;
 		break;
 
 	  case GDP_ACK_CREATED:
@@ -699,17 +732,15 @@ _gdp_event_add_from_req(gdp_req_t *req)
 	gev->udata = req->sub_cbarg;
 	gev->cb = req->sub_cbfunc;
 	gev->datum = gdp_datum_new();
+	gev->seqno = seqno;
 	EP_TIME_INVALIDATE(&gev->timeout);
 	if (msg->cmd == GDP_ACK_CONTENT)
 	{
 		EP_ASSERT(msg->ack_content->dl->n_d == 1);		//FIXME: should handle multiples
 		_gdp_datum_from_pb(gev->datum, msg->ack_content->dl->d[0], msg->sig);
-		gev->seqno = req->rpdu->seqno;
 	}
 
-	// schedule the event for future delivery
-	ep_dbg_cprintf(Dbg, 40,
-			"_gdp_event_add_from_req: event %p pending\n", gev);
+	// schedule the event for delivery
 	insert_pending_event(gev, req);
 	return estat;
 }
@@ -863,18 +894,3 @@ gdp_event_getstat(gdp_event_t *gev)
 	EP_ASSERT_POINTER_VALID(gev);
 	return gev->stat;
 }
-
-
-/*
-**  [insert event]
-**		get time of day
-**		compute maturation time for new event
-**		sort new event into req list
-**		[do timeout actions]
-**		if req list only has EoR:
-**			set a long term timeout
-**
-**	[do timeout actions]
-**		post events that have matured or can be posted immediately
-**		set timeout for next maturation time
-*/
