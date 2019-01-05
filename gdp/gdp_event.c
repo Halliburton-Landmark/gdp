@@ -46,8 +46,8 @@
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.event", "GDP event handling");
 
-#define DATA_TO_DEFAULT	10000		// "content" timeout (in usec)
-#define DONE_TO_DEFAULT	50000		// "no more results" timeout (in usec)
+#define DATA_TO_DEFAULT	100000		// "content" timeout (in usec)
+#define DONE_TO_DEFAULT	250000		// "no more results" timeout (in usec)
 
 
 // free (unused) events

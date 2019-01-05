@@ -392,6 +392,20 @@ How many seconds to allow an event loop to run before restarting it.
 This is only needed in some versions of the underlying event library.
 Defaults to 30.
 .
+.It swarm.gdp.event.timeout.data
+How many microseconds to wait for missing data
+before delivering what is available to the application.
+It is only relevant if the network reorders or drops data.
+Defaults to 100000 (100 milliseconds).
+.
+.It swarm.gdp.event.timeout.done
+How many microseconds to wait for missing data
+before delivering what is available to the application
+after an "end of results" has been delivered.
+It is only relevant if the network reorders or drops data.
+If this is too short it is possible that results will be dropped.
+Defaults to 250000 (250 milliseconds).
+.
 .It swarm.gdp.ignore.sigpipe
 If set, the
 .Li SIGPIPE
