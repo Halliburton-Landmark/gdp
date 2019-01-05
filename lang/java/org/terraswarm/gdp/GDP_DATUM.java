@@ -60,7 +60,7 @@ class GDP_DATUM {
      * Create a new dataum.
      */
     public GDP_DATUM() {
-        this.gdp_datum_ptr = Gdp20Library.INSTANCE.gdp_datum_new();
+        this.gdp_datum_ptr = Gdp21Library.INSTANCE.gdp_datum_new();
         _did_i_create_it = true;
         return;
     }
@@ -80,7 +80,7 @@ class GDP_DATUM {
      */
     public void finalize() { 
         if (_did_i_create_it == true) {
-            Gdp20Library.INSTANCE.gdp_datum_free(this.gdp_datum_ptr);
+            Gdp21Library.INSTANCE.gdp_datum_free(this.gdp_datum_ptr);
         }
     }
     
@@ -89,7 +89,7 @@ class GDP_DATUM {
      * @return Record number
      */
     public long getrecno() {
-        long recno = Gdp20Library.INSTANCE.gdp_datum_getrecno(
+        long recno = Gdp21Library.INSTANCE.gdp_datum_getrecno(
                                         this.gdp_datum_ptr);
         return recno;
     }
@@ -100,7 +100,7 @@ class GDP_DATUM {
      */
     public EP_TIME_SPEC getts() {
         EP_TIME_SPEC ts = new EP_TIME_SPEC();
-        Gdp20Library.INSTANCE.gdp_datum_getts(this.gdp_datum_ptr, ts);
+        Gdp21Library.INSTANCE.gdp_datum_getts(this.gdp_datum_ptr, ts);
         return ts;
     }
     
@@ -109,9 +109,9 @@ class GDP_DATUM {
      * @return Length of buffer
      */
     public NativeSize getdlen() {
-        PointerByReference buf = Gdp20Library.INSTANCE.gdp_datum_getbuf(
+        PointerByReference buf = Gdp21Library.INSTANCE.gdp_datum_getbuf(
                                         this.gdp_datum_ptr);
-        NativeSize len = Gdp20Library.INSTANCE.gdp_buf_getlength(buf);
+        NativeSize len = Gdp21Library.INSTANCE.gdp_buf_getlength(buf);
         return len;
     }
     
@@ -122,10 +122,10 @@ class GDP_DATUM {
      * buffer is null.
      */
     public byte[] getbuf(){
-        PointerByReference buf = Gdp20Library.INSTANCE.gdp_datum_getbuf(
+        PointerByReference buf = Gdp21Library.INSTANCE.gdp_datum_getbuf(
                 this.gdp_datum_ptr);
-        NativeSize len = Gdp20Library.INSTANCE.gdp_buf_getlength(buf);
-        Pointer bufptr = Gdp20Library.INSTANCE.gdp_buf_getptr(buf, len);
+        NativeSize len = Gdp21Library.INSTANCE.gdp_buf_getlength(buf);
+        Pointer bufptr = Gdp21Library.INSTANCE.gdp_buf_getptr(buf, len);
         if (bufptr == null) {
             return null;
         }
@@ -152,9 +152,9 @@ class GDP_DATUM {
         }
 
         // Now feed this data into the gdp buffer
-        PointerByReference dbuf = Gdp20Library.INSTANCE.gdp_datum_getbuf(
+        PointerByReference dbuf = Gdp21Library.INSTANCE.gdp_datum_getbuf(
                                     this.gdp_datum_ptr);
-        Gdp20Library.INSTANCE.gdp_buf_write(dbuf, pointer, 
+        Gdp21Library.INSTANCE.gdp_buf_write(dbuf, pointer, 
                                 new NativeSize(data.length));
     }
 

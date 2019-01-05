@@ -49,7 +49,21 @@ import org.terraswarm.gdp.NativeSize; // Fixed by cxh in makefile.
  * @author Nitesh Mor
  */
 
-class GDP_MD {
+public class GDP_MD {
+
+    // See the C-API for an explanation of why these magic numbers were chosen.
+
+    public static final int GDP_MD_XID          = 0x00584944; // XID (external id)
+    public static final int GDP_MD_PUBKEY       = 0x00505542; // PUB (public key, deprecated)
+    public static final int GDP_MD_OWNERPUBKEY  = 0x004F504B; // OPK (owner public key)
+    public static final int GDP_MD_WRITERPUBKEY = 0x0057504B; // WPK (writer public key)
+    public static final int GDP_MD_CTIME        = 0x0043544D; // CTM (creation time)
+    public static final int GDP_MD_EXPIRE       = 0x0058544D; // XTM (expiration date/time)
+    public static final int GDP_MD_CREATOR      = 0x00434944; // CID (creator id)
+    public static final int GDP_MD_SYNTAX       = 0x0053594E; // SYN (data syntax: json, xml, etc.)
+    public static final int GDP_MD_LOCATION     = 0x004C4F43; // LOC (location: lat/long)
+    public static final int GDP_MD_NONCE        = 0x004E4F4E; // NON (unique nonce)
+
     
     /**
      * Pass a pointer to an already allocated gdp_md_t C structure.
@@ -62,11 +76,20 @@ class GDP_MD {
     }
     
     /**
-     * If called without an existing pointer, we allocated a new 
+     * If called without an existing pointer, we allocate a new 
      * C gdp_md_t structure.
      */
     public GDP_MD() {
-        this.gdp_md_ptr = Gdp20Library.INSTANCE.gdp_md_new(0);
+        this.gdp_md_ptr = Gdp21Library.INSTANCE.gdp_md_new(0);
+        this.did_i_create_it = true;
+    }
+ 
+    /**
+     * If called without an existing pointer with non-zero entries,
+     * we allocate a new C gdp_md_t structure with appropriate args.
+     */
+    public GDP_MD(int entries) {
+        this.gdp_md_ptr = Gdp21Library.INSTANCE.gdp_md_new(entries);
         this.did_i_create_it = true;
     }
     
@@ -75,16 +98,19 @@ class GDP_MD {
      */
     public void finalize() {        
         if (this.did_i_create_it) {
-            Gdp20Library.INSTANCE.gdp_md_free(this.gdp_md_ptr);
+            Gdp21Library.INSTANCE.gdp_md_free(this.gdp_md_ptr);
         }
     }
     
     /**
      * Add a new entry to the metadata
      * @param md_id  ID for the metadata. Internally a 32-bit unsigned integer
-     * @param data  The corresponding data.
+     * @param data  The corresponding data. We automatically calculate length
+     *              and pass to the corresponding C routine.
      */
-    public void add(int md_id, byte[] data) {
+    public void add(int md_id, byte[] data) throws GDPException {
+
+        EP_STAT estat;
         
         // FIXME: figure out if we need to have a +1 for len
         NativeSize len = new NativeSize(data.length);
@@ -101,8 +127,12 @@ class GDP_MD {
             pointer.setByte(i,data[i]);
         }
                 
-        Gdp20Library.INSTANCE.gdp_md_add(this.gdp_md_ptr, md_id,
+        estat = Gdp21Library.INSTANCE.gdp_md_add(this.gdp_md_ptr, md_id,
                 len, pointer);
+
+        // don't forget error checking
+        GDP.check_EP_STAT(estat, "GDP_MD.java: Adding metadata entry (" +
+                                        md_id + ") failed.");
     }
 
     
@@ -114,7 +144,9 @@ class GDP_MD {
      *          A hashMap seems to be the best choice, since there's no tuple
      *          type in Java.
      */ 
-    public HashMap<Integer, byte[]> get(int index){
+    public HashMap<Integer, byte[]> get(int index) throws GDPException {
+
+        EP_STAT estat;
 
         // Pointer to hold the md_id
         IntBuffer md_id_ptr = IntBuffer.allocate(1);
@@ -125,8 +157,10 @@ class GDP_MD {
         // Pointer to the buffer to hold the value
         PointerByReference p = new PointerByReference();
         
-        Gdp20Library.INSTANCE.gdp_md_get(this.gdp_md_ptr, 
+        estat = Gdp21Library.INSTANCE.gdp_md_get(this.gdp_md_ptr, 
                 index, md_id_ptr, new NativeSizeByReference(len), p);
+
+        GDP.check_EP_STAT(estat, "GDP_MD.java: gdp_md_get(" + index + ") failed.");
         
         // get the md_id
         int md_id = md_id_ptr.get(0);
@@ -146,15 +180,19 @@ class GDP_MD {
      * @param md_id ID we are searching for
      * @return the value associated with <code>md_id</code> 
      */
-    public byte[] find(int md_id) {
+    public byte[] find(int md_id) throws GDPException {
+
+        EP_STAT estat;
 
         // to hold the length of the buffer
         NativeSize len = new NativeSize();
         // Pointer to the buffer to hold the value
         PointerByReference p = new PointerByReference();
         
-        Gdp20Library.INSTANCE.gdp_md_find(this.gdp_md_ptr, 
+        estat = Gdp21Library.INSTANCE.gdp_md_find(this.gdp_md_ptr, 
                 md_id, new NativeSizeByReference(len), p);
+
+        GDP.check_EP_STAT(estat, "GDP_MD.java: gdp_md_find(" + md_id + ") failed.");
         
         Pointer pointer = p.getValue();
         byte[] bytes = pointer.getByteArray(0, len.intValue());

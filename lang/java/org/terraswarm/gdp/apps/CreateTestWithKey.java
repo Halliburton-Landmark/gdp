@@ -34,32 +34,32 @@ public class CreateTestWithKey {
         GDP_NAME logdName = new GDP_NAME(args[2]);
 
         Map<Integer, byte[]> m = new HashMap<Integer, byte[]>();
-        m.put(GDP.GDP_MD_XID, args[0].getBytes());
+        m.put(GDP_MD.GDP_MD_XID, args[0].getBytes());
 
         // This is where we read the keyfile into memory.
-        PointerByReference EPKeyPtr = Gdp20Library.INSTANCE.ep_crypto_key_read_file(
+        PointerByReference EPKeyPtr = Gdp21Library.INSTANCE.ep_crypto_key_read_file(
                             keyfile,
-                            Gdp20Library.INSTANCE.EP_CRYPTO_KEYFORM_PEM,
-                            Gdp20Library.INSTANCE.EP_CRYPTO_F_SECRET);
+                            Gdp21Library.INSTANCE.EP_CRYPTO_KEYFORM_PEM,
+                            Gdp21Library.INSTANCE.EP_CRYPTO_F_SECRET);
 
         // We need to write the public part in a buffer, which will be
         // placed in the metadata. The actual formatting of data is
         // not really exposed to programmers for the moment (i.e. documentaed);
         // this is based on `gdp-create.c`.
 
-        Pointer PubKey = new Memory(Gdp20Library.INSTANCE.EP_CRYPTO_MAX_DER);
-        EP_STAT estat = Gdp20Library.INSTANCE.ep_crypto_key_write_mem(EPKeyPtr, PubKey,
-                            new NativeSize(Gdp20Library.INSTANCE.EP_CRYPTO_MAX_DER),
-                            Gdp20Library.INSTANCE.EP_CRYPTO_KEYFORM_DER,
+        Pointer PubKey = new Memory(Gdp21Library.INSTANCE.EP_CRYPTO_MAX_DER);
+        EP_STAT estat = Gdp21Library.INSTANCE.ep_crypto_key_write_mem(EPKeyPtr, PubKey,
+                            new NativeSize(Gdp21Library.INSTANCE.EP_CRYPTO_MAX_DER),
+                            Gdp21Library.INSTANCE.EP_CRYPTO_KEYFORM_DER,
                             0,
                             Pointer.NULL,
-                            Gdp20Library.INSTANCE.EP_CRYPTO_F_PUBLIC);
+                            Gdp21Library.INSTANCE.EP_CRYPTO_F_PUBLIC);
         // number of bytes written to memory
         int keylen = estat.code;
 
         byte[] buf = new byte[4 + keylen];
-        buf[0] = (byte) Gdp20Library.INSTANCE.EP_CRYPTO_MD_SHA256;
-        buf[1] = (byte) Gdp20Library.INSTANCE.ep_crypto_keytype_fromkey(EPKeyPtr);
+        buf[0] = (byte) Gdp21Library.INSTANCE.EP_CRYPTO_MD_SHA256;
+        buf[1] = (byte) Gdp21Library.INSTANCE.ep_crypto_keytype_fromkey(EPKeyPtr);
 
         // I don't quite understand the significance of the keylength field.
         // It's set to 0, and is ignored for the most part.
@@ -69,7 +69,7 @@ public class CreateTestWithKey {
         // add these bytes to the metadata.
         for (int i=0; i<keylen; i++)
             buf[i+4] = PubKey.getByte(i);
-        m.put(GDP.GDP_MD_PUBKEY, buf);
+        m.put(GDP_MD.GDP_MD_PUBKEY, buf);
         
         System.out.println("Creating log " + args[0]);
         

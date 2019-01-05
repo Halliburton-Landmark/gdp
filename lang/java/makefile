@@ -34,8 +34,8 @@
 # If you change the GDP version, see the instructions in package.html
 #
 GDPLIBMAJVER=2
-GDPLIBMINVER=0
-GDP_PATCH_VERSION=3
+GDPLIBMINVER=1
+GDP_PATCH_VERSION=2
 
 GDP_MAJOR_MINOR_VERSION=$(GDPLIBMAJVER).$(GDPLIBMINVER)
 
@@ -196,6 +196,7 @@ JSRCS = $(JSRCS_LIB) $(JSRCS_APPS)
 CLASSPATH = $(JNA_JAR):$(JNAERATOR_RUNTIME_JAR):$(PWD)
 
 JAVAC = javac
+# JFLAGS = -Xlint:deprecation
 
 .SUFFIXES: .class .java
 .java.class:
@@ -241,7 +242,7 @@ runReaderTestSubscribe: all
 ### 
 
 clean:
-	rm -f jna _* org/terraswarm/gdp/*.class org/terraswarm/gdp/EP* org/terraswarm/gdp/e* org/terraswarm/gdp/*Library.java org/terraswarm/gdp/apps/*.class $(GDP_JAR).jar
+	cp org/terraswarm/gdp/EP_CRYPTO_KEY.java /tmp/EP_CRYPTO_KEY.java ; rm -f jna _* org/terraswarm/gdp/*.class org/terraswarm/gdp/EP* org/terraswarm/gdp/e* org/terraswarm/gdp/*Library.java org/terraswarm/gdp/apps/*.class $(GDP_JAR).jar ; mv /tmp/EP_CRYPTO_KEY.java org/terraswarm/gdp/.
 	rm -rf darwin linux-x86-64-rhel linux-x86-64
 	@echo "Run 'make distclean' to remove $(BUILD_JARS)"
 

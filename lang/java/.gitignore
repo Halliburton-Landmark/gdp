@@ -7,7 +7,7 @@ darwin
 linux-x86-64-rhel
 linux-x86-64
 !GDP*.java
-!EP_CRYPTO.java
+!EP_CRYPTO_KEY.java
 !ReaderTest.java
 !ReaderTestSubscribe.java
 !CreateTest.java

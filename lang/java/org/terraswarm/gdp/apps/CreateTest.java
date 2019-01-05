@@ -28,7 +28,7 @@ public class CreateTest {
         GDP_NAME logdName = new GDP_NAME(args[1]);
 
         Map<Integer, byte[]> m = new HashMap<Integer, byte[]>();
-        m.put(GDP.GDP_MD_XID, args[0].getBytes());
+        m.put(GDP_MD.GDP_MD_XID, args[0].getBytes());
         
         System.out.println("Creating log " + args[0]);
         
