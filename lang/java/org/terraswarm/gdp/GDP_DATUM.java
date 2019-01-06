@@ -54,14 +54,13 @@ import org.terraswarm.gdp.NativeSize; // Fixed by cxh in makefile.
  *
  */
 class GDP_DATUM {
-    // TODO: Make sure there are no memory leaks. Implement a destructor.</p>
 
     /**
      * Create a new dataum.
      */
     public GDP_DATUM() {
         this.gdp_datum_ptr = Gdp21Library.INSTANCE.gdp_datum_new();
-        _did_i_create_it = true;
+        this.did_i_create_it = true;
         return;
     }
     
@@ -71,7 +70,7 @@ class GDP_DATUM {
      */    
     public GDP_DATUM(PointerByReference d) {
         this.gdp_datum_ptr = d;
-        _did_i_create_it = false;
+        this.did_i_create_it = false;
         return;
     }
     
@@ -79,11 +78,29 @@ class GDP_DATUM {
      * If we allocated memory ourselves, free it.
      */
     public void finalize() { 
-        if (_did_i_create_it == true) {
+        if (this.did_i_create_it == true) {
             Gdp21Library.INSTANCE.gdp_datum_free(this.gdp_datum_ptr);
         }
     }
     
+
+    public void reset() {
+        Gdp21Library.INSTANCE.gdp_datum_reset(this.gdp_datum_ptr);
+    }
+
+    // TODO implement gdp_datum_copy
+
+    // TODO implement gdp_datum_hash
+
+    // TODO implement gdp_datum_hash_equal
+
+    public void vrfy(GDP_GIN gin) throws GDPException{
+        EP_STAT estat;
+        estat = Gdp21Library.INSTANCE.gdp_datum_vrfy(
+                        this.gdp_datum_ptr, gin.ginh);
+        GDP.check_EP_STAT(estat, "gdp_datum_vrfy failed");
+    }
+
     /**
      * Get the associated record number.
      * @return Record number
@@ -158,11 +175,13 @@ class GDP_DATUM {
                                 new NativeSize(data.length));
     }
 
+    // TODO implement gdp_datum_getsig
+
     // The associated C data structure.
     public PointerByReference gdp_datum_ptr = null;
 
     // To keep track of whether we need to free the associated C memory.
-    private boolean _did_i_create_it = false;
+    private boolean did_i_create_it = false;
     
 
 }

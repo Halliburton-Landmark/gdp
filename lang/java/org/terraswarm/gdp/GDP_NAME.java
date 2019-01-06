@@ -115,6 +115,33 @@ public class GDP_NAME {
         }
     }
 
+
+    public static byte[] resolve(String hname) {
+        EP_STAT estat;
+        ByteBuffer gname = ByteBuffer.allocate(32);
+        estat = Gdp21Library.INSTANCE.gdp_name_resolve(hname, gname);
+        return gname.array();
+    }
+
+    // XXX not sure what this is supposed to do. Not implemented
+    // in C interface yet. I am guessing this is to update the
+    // human name to GDP name mapping. Marking this as static,
+    // since that doesn't have any reliance on a specific GDP_NAME
+    // object.
+    public static void update(String hname, byte[] gname) {
+        byte[] gname_copy = gname.clone();
+        ByteBuffer tmp = ByteBuffer.wrap(gname_copy);
+        Gdp21Library.INSTANCE.gdp_name_update(hname, tmp);
+    }
+
+    public void root_set(String root) {
+        Gdp21Library.INSTANCE.gdp_name_root_set(root);
+    }
+
+    public String root_get() {
+        return Gdp21Library.INSTANCE.gdp_name_root_get();
+    }
+
     /////////////// PRIVATE MEMBERS ///////////////////////
     
     // to hold the 256-bit binary name
@@ -149,7 +176,8 @@ public class GDP_NAME {
      * Parse the (presumably) printable name to return an internal name
      * @param s A potential printable name
      * @return A 32-byte long internal name
-     * @exception GDPException If a GDP C function returns a code great than or equal to Gdp21Library.EP_STAT_SEV_WARN.     
+     * @exception GDPException If a GDP C function returns a code great
+     *                         than or equal to Gdp21Library.EP_STAT_SEV_WARN.     
      */
     private byte[] __parse_name(String s) throws GDPException {
         ByteBuffer dst = ByteBuffer.allocate(32); // FIXME
@@ -167,20 +195,36 @@ public class GDP_NAME {
      * @param internal_name
      * @return
      */
-    
     private byte[] __get_printable_name(byte[] internal_name) {
         
         byte[] internal_name_copy = internal_name.clone();
         
         ByteBuffer internal = ByteBuffer.wrap(internal_name_copy);
         ByteBuffer printable = ByteBuffer.allocate(this.PNAME_LEN+1);
-        
-                
+
         Gdp21Library.INSTANCE.gdp_printable_name(internal, printable);
         // no problem, since we don't need bytebuffer interface to this
         // memory anymore.
         
         return printable.array();
+    }
+
+    /**
+      * Generate internal name from printable name
+      * @param printable_name
+      * @return
+      */
+    private byte[] __get_internal_name(byte[] printable_name) {
+
+        byte[] printable_name_copy = printable_name.clone();
+
+        ByteBuffer internal = ByteBuffer.allocate(32);
+        ByteBuffer printable = ByteBuffer.wrap(printable_name_copy);
+
+        Gdp21Library.INSTANCE.gdp_internal_name(printable, internal);
+
+        return internal.array();
+
     }
 }
  
