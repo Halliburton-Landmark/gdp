@@ -59,7 +59,7 @@ _gdp_name_shutdown(void)
 }
 
 void
-_gdp_name_init()
+_gdp_name_init(void)
 {
 	// see if the user wants a root (namespace, "working directory", ...)
 	gdp_name_root_set(getenv("GDP_NAME_ROOT"));
@@ -204,7 +204,7 @@ gdp_name_root_get(void)
 **
 **		A caller may optionally pass in an `xname` buffer pointer to
 **		receive the name actually used after `GDP_NAME_ROOT`
-**		extension.
+**		extension.  It is up to the application to free that memory.
 **
 **		Returns a warning if the old back compatible algorithm (hash
 **		the human name to get the internal name) was used.
@@ -271,7 +271,7 @@ gdp_name_parse(const char *hname, gdp_name_t gname, char **xnamep)
 	}
 #endif
 done:
-	if (xnamep == NULL || !EP_STAT_ISOK(estat))
+	if (xnamep == NULL || EP_STAT_ISFAIL(estat))
 	{
 		if (xname != NULL)
 			ep_mem_free(xname);

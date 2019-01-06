@@ -54,23 +54,23 @@ uint8_t	Xlations[] =
 		0,	10, 11, 12, 13, 14, 15, 0,
 	};
 
-int
+EP_STAT
 parse_hex(const char *s, gdp_name_t gdpiname)
 {
 	int i;
 
 	if (strlen(s) != 64)
-		return 1;
+		return EP_STAT_ERROR;
 
 	for (i = 0; i < 32; i++)
 	{
 		if (!isxdigit(s[0]) || !isxdigit(s[1]))
-			return 1;
-		gdpiname[i] = (Xlations[s[0] - 0x30]) << 4 | (Xlations[s[1] - 0x30]);
+			return EP_STAT_ERROR;
+		gdpiname[i] = (Xlations[s[0] - '0']) << 4 | (Xlations[s[1] - '0']);
 		s += 2;
 	}
 
-	return 0;
+	return EP_STAT_OK;
 }
 
 void
@@ -90,7 +90,7 @@ int
 main(int argc, char **argv)
 {
 	int opt;
-	unsigned int i;
+	EP_STAT estat;
 	bool show_usage = false;
 	gdp_name_t gdpiname;
 	gdp_pname_t gdppname;
@@ -131,11 +131,21 @@ main(int argc, char **argv)
 
 	// don't really need to initialize the GDP library for this, but
 	// we do need the name lookup part of this --- cheat and use
-	// an internal interface.
+	// internal interfaces.
+	// DON'T TRY THIS AT HOME, KIDS!!!
 	gdp_init_phase_0(NULL);
+	extern void _gdp_name_init(void);
+	_gdp_name_init();
 
-	if (parse_hex(argv[0], gdpiname) != 0)
-		gdp_parse_name(argv[0], gdpiname);
+	char *xname = argv[0];
+	estat = parse_hex(argv[0], gdpiname);
+	if (!EP_STAT_ISOK(estat))
+		estat = gdp_name_parse(argv[0], gdpiname, &xname);
+	if (EP_STAT_ISFAIL(estat))
+	{
+		ep_app_message(estat, "Cannot parse name \"%s\"", argv[0]);
+		exit(EX_USAGE);
+	}
 	gdp_printable_name(gdpiname, gdppname);
 	if (show_b64)
 	{
@@ -143,6 +153,7 @@ main(int argc, char **argv)
 	}
 	else if (show_hex)
 	{
+		unsigned int i;
 		for (i = 0; i < sizeof gdpiname; i++)
 			fprintf(stdout, "%02x", gdpiname[i]);
 		fprintf(stdout, "\n");
@@ -154,9 +165,11 @@ main(int argc, char **argv)
 	else
 	{
 		fprintf(stdout,
+				"human:     %s\n"
 				"printable: %s\n"
 				"hex:       ",
-				gdppname);
+				xname, gdppname);
+		unsigned int i;
 		for (i = 0; i < sizeof gdpiname; i++)
 			fprintf(stdout, "%02x", gdpiname[i]);
 		fprintf(stdout, "\n");
