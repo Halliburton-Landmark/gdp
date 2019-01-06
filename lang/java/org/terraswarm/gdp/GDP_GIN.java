@@ -64,10 +64,11 @@ public class GDP_GIN {
      * @param name   Name of the log, which will be created if necessary.
      * @param iomode Should this be opened read only, read-append,
      * append-only.  See {@link #GDP_MODE}.
+     * @param info  GDP_OPEN_INFO associated with this particular in-memory instance
      * @exception GDPException If a GDP C function returns a code great than or
      *              equal to Gdp21Library.EP_STAT_SEV_WARN.
      */
-    public GDP_GIN(GDP_NAME name, GDP_MODE iomode) throws GDPException {
+    public GDP_GIN(GDP_NAME name, GDP_MODE iomode, GDP_OPEN_INFO info) throws GDPException {
 
         System.out.println("GDP_GIN.java: GDP_GIN(" + name +
                            "(" + new String(name.printable_name()) +
@@ -77,13 +78,14 @@ public class GDP_GIN {
         PointerByReference ginhByReference = new PointerByReference();
         this.iomode = iomode;
         this.gclName = name.internal_name();
+        this.open_info = info;
         
         // Open the GCL.
-        GDP.dbg_set("*=20");
-        estat = Gdp21Library.INSTANCE.gdp_gin_open(
-                            ByteBuffer.wrap(this.gclName), 
-                            iomode.ordinal(), (PointerByReference) null, 
-                            ginhByReference);
+        // GDP.dbg_set("*=20");
+
+        estat = Gdp21Library.INSTANCE.gdp_gin_open(ByteBuffer.wrap(this.gclName), 
+                                iomode.ordinal(), info.gdp_open_info_ptr, 
+                                ginhByReference);
 
         // check return status; throw exception if need be.
         GDP.check_EP_STAT(estat, "gdp_gin_open(" +
@@ -96,8 +98,41 @@ public class GDP_GIN {
         assert this.ginh != null;
 
         // Add ourselves to the global map of pointers=>objects 
+        // XXX Not sure if this is needed anymore with v2 API
         _allGclhs.put(this.ginh, this);
     }
+
+    /** Remove the gcl from the global list and 
+     *  free the associated pointer.
+     *  Note that finalize() is only called when the 
+     *  garbage collector decides that there are no
+     *  references to an object.  There is no guarantee 
+     *  that an object will be gc'd and that finalize
+     *  will be called.
+     */
+     public void finalize() {
+        close();
+    }
+
+    /** Close the GCL.
+     */
+    public void close() {
+        // If close() is called twice, then the C code aborts the process.
+        // See https://gdp.cs.berkeley.edu/redmine/issues/83
+
+        //  Added synchronization, see https://gdp.cs.berkeley.edu/redmine/issues/107
+        synchronized (ginh) {
+            if (ginh != null) {
+                // Remove ourselves from the global list.
+                _allGclhs.remove(ginh);
+                
+                // Free the associated gdp_gin_t.
+                Gdp21Library.INSTANCE.gdp_gin_close(ginh);
+                ginh = null;
+            }
+        }
+    }
+
 
     ///////////////////////////////////////////////////////////////////
     ////                   public fields                           ////
@@ -119,6 +154,11 @@ public class GDP_GIN {
     public GDP_MODE iomode;
 
     /**
+     * Open info associated wit this GIN
+     */
+    public GDP_OPEN_INFO open_info;
+
+    /**
      * I/O mode for a log.
      * <ul>
      * <li> ANY: for internal use only </li>
@@ -131,9 +171,128 @@ public class GDP_GIN {
         ANY, RO, AO, RA
     }
 
+    ///////////////////////////////////////////////////////////////////////
+    //////   Creation, deletion ahead (Static methods). Be careful.  //////
+    ///////////////////////////////////////////////////////////////////////
+
+    /**
+     * Create a GCL.
+     * 
+     * @param logName   Name of the log to be created
+     * @param logdName  Name of the log server where this should be 
+     *                  placed.
+     * @param metadata  Metadata to be added to the log. 
+     * @exception GDPException If a GDP C function returns a code great than or
+     *            equal to Gdp21Library.EP_STAT_SEV_WARN.
+     */
+    public static void create(GDP_NAME logName, GDP_NAME logdName, 
+                    Map<Integer, byte[]> metadata) throws GDPException {
+        System.out.println("GDP_GIN.java: create(" + logName +
+                            ", " + ", " + logdName + ", " + metadata + ")");
+        EP_STAT estat;
+        
+        // Get the 256-bit internal names for log and logd
+        ByteBuffer logNameInternal = ByteBuffer.wrap(logName.internal_name());
+        ByteBuffer logdNameInternal = ByteBuffer.wrap(logdName.internal_name());
+        
+        // Just create a throwaway pointer.
+        Pointer tmpPtr = null;
+        
+        // Metadata processing.
+        GDP_MD m = new GDP_MD();
+        for (int k: metadata.keySet()) {
+            m.add(k, metadata.get(k));
+        }
+       
+        /* FIXME: this needs to be fixed. Very temporary workaround to get things
+           compile in the meantime.
+ 
+        estat = Gdp21Library.INSTANCE.gdp_gin_create(
+                        logNameInternal, logdNameInternal,
+                        m.gdp_md_ptr, new PointerByReference(tmpPtr));
+        
+        */
+        // XXX this is incorrect. FIXME
+        estat = Gdp21Library.INSTANCE.gdp_gin_create(
+                        null, "SomeExternalName", new PointerByReference(tmpPtr));
+
+        GDP.check_EP_STAT(estat, "gdp_gin_create(" + 
+                          logNameInternal + ", " +
+                          logdNameInternal + ", " +
+                          m.gdp_md_ptr + " new PointerByReference(" + tmpPtr + ")) failed.");
+        
+        return;
+    }
+    
+    /**
+     * Create a GCL (with empty metadata).
+     * @param logName   Name of the log
+     * @param logdName  Name of the logserver that should host this log
+     * @exception GDPException If a GDP C function returns a code great than or
+     *            equal to Gdp21Library.EP_STAT_SEV_WARN.
+     */
+    public static void create(String logName, String logdName)
+                                            throws GDPException {
+        GDP_GIN.create(new GDP_NAME(logName), new GDP_NAME(logdName));
+    }
+    /**
+     * Create a GCL (with empty metadata).
+     * @param logName   Name of the log
+     * @param logdName  Name of the logserver that should host this log
+     * @exception GDPException If a GDP C function returns a code great than or
+     *            equal to Gdp21Library.EP_STAT_SEV_WARN.
+     */
+    public static void create(GDP_NAME logName, GDP_NAME logdName)
+                                            throws GDPException {
+        GDP_GIN.create(logName, logdName, new HashMap<Integer, byte[]>());
+    }
+
+    /** 
+     * Create a new GCL.
+     * This method is a convenience method used to create a GCL
+     * when the GDP_MODE enum is not available, such as when
+     * creating a GCL from JavaScript.
+     *
+     * @param name   Name of the log.
+     * @param iomode Opening mode (0: for internal use only,
+     *        1: read-only, 2: read-append, 3: append-only)
+     * @param logdName  Name of the log server where this should be 
+     *                  placed if it does not yet exist.
+     * @exception GDPException If a GDP C function returns a code great than or
+     *            equal to Gdp21Library.EP_STAT_SEV_WARN.
+     */
+    public static GDP_GIN newGCL(GDP_NAME name, int iomode, GDP_NAME logdName)
+                                                          throws GDPException {
+        System.out.println("GDP_GIN.java: newGCL(" + name + 
+                                ", " + iomode + ", " + logdName + ")");
+        // The GDP Accessor uses this method
+        GDP_MODE gdp_mode = GDP_MODE.ANY;
+        switch (iomode) {
+        case 0:
+            gdp_mode = GDP_MODE.ANY;
+            break;
+        case 1:
+            gdp_mode = GDP_MODE.RO;
+            break;
+        case 2:
+            gdp_mode = GDP_MODE.AO;
+            break;
+        case 3:
+            gdp_mode = GDP_MODE.RA;
+            break;
+        default:
+            throw new IllegalArgumentException(
+                            "Mode must be 0-3, instead it was: " + iomode);
+        }
+
+        GDP_GIN.create(name, logdName);
+        return new GDP_GIN(name, gdp_mode);
+    }
+
+
    
     ///////////////////////////////////////////////////////////////////
-    ////                   public methods                          ////
+    ////           public methods: append and friends              ////
     ///////////////////////////////////////////////////////////////////
 
     /**
@@ -224,150 +383,11 @@ public class GDP_GIN {
         this.append_async(datum);
     }
 
-    /** Close the GCL.
-     */
-    public void close() {
-        // If close() is called twice, then the C code aborts the process.
-        // See https://gdp.cs.berkeley.edu/redmine/issues/83
 
-        //  Added synchronization, see https://gdp.cs.berkeley.edu/redmine/issues/107
-        synchronized (ginh) {
-            if (ginh != null) {
-                // Remove ourselves from the global list.
-                _allGclhs.remove(ginh);
-                
-                // Free the associated gdp_gin_t.
-                Gdp21Library.INSTANCE.gdp_gin_close(ginh);
-                ginh = null;
-            }
-        }
-    }
+    ///////////////////////////////////////////////////////////////////
+    ////             public methods: read and friends              ////
+    ///////////////////////////////////////////////////////////////////
 
-    /**
-     * Create a GCL.
-     * 
-     * @param logName   Name of the log to be created
-     * @param logdName  Name of the log server where this should be 
-     *                  placed.
-     * @param metadata  Metadata to be added to the log. 
-     * @exception GDPException If a GDP C function returns a code great than or
-     *            equal to Gdp21Library.EP_STAT_SEV_WARN.
-     */
-    public static void create(GDP_NAME logName, GDP_NAME logdName, 
-                    Map<Integer, byte[]> metadata) throws GDPException {
-        System.out.println("GDP_GIN.java: create(" + logName +
-                            ", " + ", " + logdName + ", " + metadata + ")");
-        EP_STAT estat;
-        
-        // Get the 256-bit internal names for log and logd
-        ByteBuffer logNameInternal = ByteBuffer.wrap(logName.internal_name());
-        ByteBuffer logdNameInternal = ByteBuffer.wrap(logdName.internal_name());
-        
-        // Just create a throwaway pointer.
-        Pointer tmpPtr = null;
-        
-        // Metadata processing.
-        GDP_MD m = new GDP_MD();
-        for (int k: metadata.keySet()) {
-            m.add(k, metadata.get(k));
-        }
-       
-        /* FIXME: this needs to be fixed. Very temporary workaround to get things
-           compile in the meantime.
- 
-        estat = Gdp21Library.INSTANCE.gdp_gin_create(
-                        logNameInternal, logdNameInternal,
-                        m.gdp_md_ptr, new PointerByReference(tmpPtr));
-        
-        */
-        // XXX this is incorrect. FIXME
-        estat = Gdp21Library.INSTANCE.gdp_gin_create(
-                        null, "SomeExternalName", new PointerByReference(tmpPtr));
-
-        GDP.check_EP_STAT(estat, "gdp_gin_create(" + 
-                          logNameInternal + ", " +
-                          logdNameInternal + ", " +
-                          m.gdp_md_ptr + " new PointerByReference(" + tmpPtr + ")) failed.");
-        
-        return;
-    }
-    
-    /**
-     * Create a GCL (with empty metadata).
-     * @param logName   Name of the log
-     * @param logdName  Name of the logserver that should host this log
-     * @exception GDPException If a GDP C function returns a code great than or
-     *            equal to Gdp21Library.EP_STAT_SEV_WARN.
-     */
-    public static void create(String logName, String logdName)
-                                            throws GDPException {
-        GDP_GIN.create(new GDP_NAME(logName), new GDP_NAME(logdName));
-    }
-    /**
-     * Create a GCL (with empty metadata).
-     * @param logName   Name of the log
-     * @param logdName  Name of the logserver that should host this log
-     * @exception GDPException If a GDP C function returns a code great than or
-     *            equal to Gdp21Library.EP_STAT_SEV_WARN.
-     */
-    public static void create(GDP_NAME logName, GDP_NAME logdName)
-                                            throws GDPException {
-        GDP_GIN.create(logName, logdName, new HashMap<Integer, byte[]>());
-    }
-
-    /** Remove the gcl from the global list and 
-     *  free the associated pointer.
-     *  Note that finalize() is only called when the 
-     *  garbage collector decides that there are no
-     *  references to an object.  There is no guarantee 
-     *  that an object will be gc'd and that finalize
-     *  will be called.
-     */
-     public void finalize() {
-        close();
-    }
-
-    /** 
-     * Create a new GCL.
-     * This method is a convenience method used to create a GCL
-     * when the GDP_MODE enum is not available, such as when
-     * creating a GCL from JavaScript.
-     *
-     * @param name   Name of the log.
-     * @param iomode Opening mode (0: for internal use only,
-     *        1: read-only, 2: read-append, 3: append-only)
-     * @param logdName  Name of the log server where this should be 
-     *                  placed if it does not yet exist.
-     * @exception GDPException If a GDP C function returns a code great than or
-     *            equal to Gdp21Library.EP_STAT_SEV_WARN.
-     */
-    public static GDP_GIN newGCL(GDP_NAME name, int iomode, GDP_NAME logdName)
-                                                          throws GDPException {
-        System.out.println("GDP_GIN.java: newGCL(" + name + 
-                                ", " + iomode + ", " + logdName + ")");
-        // The GDP Accessor uses this method
-        GDP_MODE gdp_mode = GDP_MODE.ANY;
-        switch (iomode) {
-        case 0:
-            gdp_mode = GDP_MODE.ANY;
-            break;
-        case 1:
-            gdp_mode = GDP_MODE.RO;
-            break;
-        case 2:
-            gdp_mode = GDP_MODE.AO;
-            break;
-        case 3:
-            gdp_mode = GDP_MODE.RA;
-            break;
-        default:
-            throw new IllegalArgumentException(
-                            "Mode must be 0-3, instead it was: " + iomode);
-        }
-
-        GDP_GIN.create(name, logdName);
-        return new GDP_GIN(name, gdp_mode);
-    }
 
     /**
      * Read a record by record number.
@@ -428,6 +448,11 @@ public class GDP_GIN {
 
         return;
     }
+
+    ///////////////////////////////////////////////////////////////////
+    ////         public methods: subscriptions and friends         ////
+    ///////////////////////////////////////////////////////////////////
+
 
     /** 
      * Start a subscription to a log.
