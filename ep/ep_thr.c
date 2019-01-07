@@ -333,6 +333,12 @@ _ep_thr_mutex_destroy(EP_THR_MUTEX *mtx,
 				ep_thr_gettid());
 	}
 #endif // EP_OPT_EXTENDED_MUTEX_CHECK & 0x01
+#if EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
+	if (mtx->magic != _EP_THR_MUTEX_MAGIC)
+		ep_assert_print(file, line, "mutex %s bad magic %x",
+				name, mtx->magic);
+	mtx->magic = 0xDEADBEEF;
+#endif // EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
 	if ((err = pthread_mutex_destroy(pmtx)) != 0)
 		diagnose_thr_err(err, "mutex_destroy", file, line, name, mtx);
 	return err;
@@ -403,6 +409,9 @@ _ep_thr_mutex_lock(EP_THR_MUTEX *mtx,
 			mtx, name);
 	}
 #elif EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
+	if (mtx->magic != _EP_THR_MUTEX_MAGIC)
+		ep_assert_print(file, line, "mutex %s bad magic %x",
+				name, mtx->magic);
 	if (mtx->locker == ep_thr_gettid())
 	{
 		ep_dbg_cprintf(Dbg, 1,
@@ -478,6 +487,9 @@ _ep_thr_mutex_trylock(EP_THR_MUTEX *mtx,
 			mtx, name, file, line);
 	}
 #elif EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
+	if (mtx->magic != _EP_THR_MUTEX_MAGIC)
+		ep_assert_print(file, line, "mutex %s bad magic %x",
+				name, mtx->magic);
 	if (mtx->locker == ep_thr_gettid())
 	{
 		// this is not necessarily an error
@@ -527,6 +539,9 @@ _ep_thr_mutex_unlock(EP_THR_MUTEX *mtx,
 				file, line,
 				pmtx->__data.__owner, ep_thr_gettid());
 #elif EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
+	if (mtx->magic != _EP_THR_MUTEX_MAGIC)
+		ep_assert_print(file, line, "mutex %s bad magic %x",
+				name, mtx->magic);
 	if (mtx->locker != ep_thr_gettid())
 	{
 		ep_dbg_cprintf(Dbg, 1,
@@ -605,9 +620,18 @@ _ep_thr_mutex_tryunlock(EP_THR_MUTEX *mtx,
 
 
 int
-_ep_thr_mutex_check(EP_THR_MUTEX *mtx)
+_ep_thr_mutex_check(
+		EP_THR_MUTEX *mtx,
+		const char *file,
+		int line,
+		const char *mstr)
 {
 	CHECKMTX(mtx, "check ===");
+#if EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
+	if (mtx->magic != _EP_THR_MUTEX_MAGIC)
+		ep_assert_print(file, line, "mutex %s bad magic %x",
+				mstr, mtx->magic);
+#endif
 	return 0;
 }
 
@@ -644,6 +668,9 @@ ep_thr_mutex_assert_islocked(
 				mstr, m, pmtx->__data.__owner, ep_thr_gettid());
 	return false;
 #elif EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
+	if (m->magic != _EP_THR_MUTEX_MAGIC)
+		ep_assert_print(file, line, "mutex %s bad magic %x",
+				mstr, m->magic);
 	if (m->locker == 0)
 		ep_assert_print(file, line, "mutex %s (%p) is not locked "
 				"(should be %" EP_THR_PRItid ")",
@@ -685,6 +712,9 @@ ep_thr_mutex_assert_isunlocked(
 			mstr, m, pmtx->__data.__owner, ep_thr_gettid());
 	return false;
 #elif EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
+	if (m->magic != _EP_THR_MUTEX_MAGIC)
+		ep_assert_print(file, line, "mutex %s bad magic %x",
+				mstr, m->magic);
 	if (m->locker == 0)
 		return true;
 	ep_assert_print(file, line,
@@ -721,6 +751,9 @@ ep_thr_mutex_assert_i_own(
 			mstr, m, pmtx->__data.__owner, ep_thr_gettid());
 	return false;
 #elif EP_OPT_EXTENDED_MUTEX_CHECK & 0x02
+	if (m->magic != _EP_THR_MUTEX_MAGIC)
+		ep_assert_print(file, line, "mutex %s bad magic %x",
+				mstr, m->magic);
 	if (m->locker == ep_thr_gettid())
 		return true;
 	ep_assert_print(file, line,
