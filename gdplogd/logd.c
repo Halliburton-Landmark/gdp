@@ -340,7 +340,7 @@ main(int argc, char **argv)
 
 	// initialize physical logs (expand this if multiple log implementations)
 	phase = "gcl physlog";
-	estat = GdpSqliteImpl.init();
+	estat = GdpSqliteImpl.init(NULL);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// initialize the protocol module
