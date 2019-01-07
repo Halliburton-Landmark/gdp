@@ -256,7 +256,7 @@ sqlite_init_pragmas(void)
 	{
 		SqlitePragmasSQL = ep_mem_malloc(qlen + 1);
 		snprintf(SqlitePragmasSQL, qlen + 1, "%s", gdp_buf_getptr(sqlbuf, qlen));
-		ep_dbg_cprintf(Dbg, 0, "SQLite3 Pragmas:\n%s", SqlitePragmasSQL);
+		ep_dbg_cprintf(Dbg, 10, "SQLite3 Pragmas:\n%s", SqlitePragmasSQL);
 	}
 }
 
@@ -290,20 +290,25 @@ sqlite_set_pragmas(struct sqlite3 *db, const char *logname)
 */
 
 static EP_STAT
-sqlite_init(void)
+sqlite_init(const char *logroot)
 {
 	EP_STAT estat = EP_STAT_OK;
 
 	// find physical location of GOB directory
-	estat = _gdp_adm_path_find("swarm.gdp.data.root", GDP_DEFAULT_DATA_ROOT,
+	if (logroot != NULL)
+		strlcpy(LogDir, logroot, sizeof LogDir);
+	else
+	{
+		estat = _gdp_adm_path_find("swarm.gdp.data.root", GDP_DEFAULT_DATA_ROOT,
 							"swarm.gdplogd.log.dir", GDP_DEFAULT_LOG_DIR,
 							LogDir, sizeof LogDir);
-	if (!EP_STAT_ISOK(estat))
-	{
-		char ebuf[100];
-		ep_dbg_cprintf(Dbg, 1, "sqlite_init: _gdp_adm_path_find => %s\n",
-				ep_stat_tostr(estat, ebuf, sizeof ebuf));
-		return estat;
+		if (!EP_STAT_ISOK(estat))
+		{
+			char ebuf[100];
+			ep_dbg_cprintf(Dbg, 1, "sqlite_init: _gdp_adm_path_find => %s\n",
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
+			return estat;
+		}
 	}
 
 	// we will run out of that directory
@@ -819,6 +824,7 @@ sqlite_open(gdp_gob_t *gob)
 	ep_dbg_cprintf(Dbg, 20, "sqlite_open(%s)\n", gob->pname);
 
 	// allocate space for physical data
+	EP_ASSERT(gob->x != NULL);
 	EP_ASSERT(GETPHYS(gob) == NULL);
 	phase = "physinfo_alloc";
 	errno = 0;

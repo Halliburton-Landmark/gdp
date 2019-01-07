@@ -178,7 +178,8 @@ typedef EP_STAT		gdp_result_cb_t(
 // the service switch entry
 struct gob_phys_impl
 {
-	EP_STAT		(*init)(void);
+	EP_STAT		(*init)(
+						const char *log_dir);
 	EP_STAT		(*read_by_hash)(
 						gdp_gob_t *gob,
 						gdp_hash_t *hash,

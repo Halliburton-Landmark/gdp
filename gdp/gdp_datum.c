@@ -252,23 +252,30 @@ gdp_datum_print(const gdp_datum_t *datum, FILE *fp, uint32_t flags)
 		fprintf(fp, "%s\n", datum->inuse ? "" : ", !inuse");
 	}
 
-	if (EP_UT_BITSET(GDP_DATUM_PRMETAONLY, flags))
-		goto done;
-
-	if (EP_UT_BITSET(GDP_DATUM_PRTEXT, flags))
-		fprintf(fp, "%.*s\n", l, d);
-	else
-		ep_hexdump(d, l, fp, EP_HEXDUMP_ASCII, 0);
+	if (!EP_UT_BITSET(GDP_DATUM_PRMETAONLY, flags))
+	{
+		if (EP_UT_BITSET(GDP_DATUM_PRTEXT, flags))
+			fprintf(fp, "%.*s\n", l, d);
+		else
+			ep_hexdump(d, l, fp, EP_HEXDUMP_ASCII, 0);
+	}
 
 	if (EP_UT_BITSET(GDP_DATUM_PRSIG, flags))
 	{
-		if (datum->sig != NULL && EP_UT_BITSET(GDP_DATUM_PRDEBUG, flags))
+		if (datum->sig != NULL)
 		{
 			size_t siglen;
-			fprintf(fp, "  sig\n");
 			d = gdp_sig_getptr(datum->sig, &siglen);
-			ep_hexdump(d, siglen, fp, EP_HEXDUMP_HEX, 0);
+			if (siglen > 0)
+			{
+				fprintf(fp, "  sig\n");
+				ep_hexdump(d, siglen, fp, EP_HEXDUMP_HEX, 0);
+			}
+			else
+				fprintf(fp, "  empty sig\n");
 		}
+		else
+			fprintf(fp, "  no sig\n");
 	}
 done:
 	funlockfile(fp);

@@ -26,7 +26,6 @@
 #  ----- END LICENSE BLOCK -----
 #
 
-#ALL=	gdp-create gdp-writer gdp-reader gdp-rest rw-bench log-view
 BINALL_ZC=	gdp-zcbrowse
 BINALL=		\
 		log-exists \
@@ -42,10 +41,10 @@ SBINALL=	\
 		gdp-name-add \
 		gdp-name-xlate \
 		gdp-delete \
+		gdp-log-view \
 		$(SBINALL_ZC) \
 		gdp-rest \
 #		gdp-log-check \
-#		log-view \
 
 MAN1ALL=	gdp-reader.1 \
 		gdp-writer.1 \
@@ -61,10 +60,10 @@ MAN7ALL=
 MAN8ALL=	\
 		gdp-create.8 \
 		gdp-delete.8 \
+		gdp-log-view.8 \
 		gdp-name-add.8 \
 #		gdp-log-check.8 \
 #		gcl-clone.8 \
-#		log-view.8 \
 
 MANALL=		${MAN1ALL} ${MAN3ALL} ${MAN5ALL} ${MAN7ALL} ${MAN8ALL}
 
@@ -115,6 +114,7 @@ LIBEVENT2=	-levent -levent_pthreads -pthread
 LIBCRYPTO=	-lcrypto
 LIBPROTO_C=	-lprotobuf-c
 LIBMYSQL=	`mariadb_config --libs`
+LIBSQLITE=	-lsqlite3
 LIBADD=		`sh ../adm/add-libs.sh`
 INCS=		${INCSEARCH} ${INCGDP} ${INCEP}
 LDFLAGS+=	${LIBSEARCH} ${SANITIZE} ${LDADD}
@@ -143,6 +143,11 @@ all_noavahi:
 	${MAKE}	STD=-DGDP_OSCF_USE_ZEROCONF=0 LIBAVAHI= BINALL_ZC= SBINALL_ZC= all
 
 gdp-log-check.o: ../gdplogd/logd_disklog.c ../gdplogd/logd_gcl.c
+
+gdp-log-view: gdp-log-view.o
+	${CC} ${INCS} -o $@ ${LDFLAGS} gdp-log-view.o ${LDLIBS} ${LIBSQLITE}
+
+gdp-log-view.o: gdp-log-view.c ../gdplogd/logd_sqlite.c
 
 gdp-name-add.o: gdp-name-add.c
 	${CC} -c -o $@ ${CFLAGS} `mariadb_config --cflags` gdp-name-add.c

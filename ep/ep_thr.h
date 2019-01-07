@@ -203,7 +203,8 @@ extern int	_ep_thr_mutex_unlock(EP_THR_MUTEX *mtx,
 				const char *file, int line, const char *name);
 extern int	_ep_thr_mutex_tryunlock(EP_THR_MUTEX *mtx,
 				const char *file, int line, const char *name);
-extern int	ep_thr_mutex_check(EP_THR_MUTEX *mtx);
+extern int	_ep_thr_mutex_check(EP_THR_MUTEX *mtx,
+				const char *file, int line, const char *name);
 #define		ep_thr_mutex_init(mtx, type)	_ep_thr_mutex_init(mtx, type, \
 				__FILE__, __LINE__, #mtx)
 #define		ep_thr_mutex_destroy(mtx)	_ep_thr_mutex_destroy(mtx, \
@@ -215,6 +216,8 @@ extern int	ep_thr_mutex_check(EP_THR_MUTEX *mtx);
 #define		ep_thr_mutex_unlock(mtx)	_ep_thr_mutex_unlock(mtx, \
 				__FILE__, __LINE__, #mtx)
 #define		ep_thr_mutex_tryunlock(mtx)	_ep_thr_mutex_tryunlock(mtx, \
+				__FILE__, __LINE__, #mtx)
+#define		ep_thr_mutex_check(mtx)		_ep_thr_mutex_check(mtx, \
 				__FILE__, __LINE__, #mtx)
 
 #if EP_OPT_EXTENDED_MUTEX_CHECK
