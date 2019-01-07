@@ -37,6 +37,7 @@
 
 #include <ep/ep_app.h>
 #include <ep/ep_dbg.h>
+#include <ep/ep_hexdump.h>
 
 #include <ctype.h>
 #include <getopt.h>
@@ -70,7 +71,7 @@ parse_hex(const char *s, gdp_name_t gdpiname)
 		s += 2;
 	}
 
-	return EP_STAT_OK;
+	return GDP_STAT_OK_NAME_HEX;
 }
 
 void
@@ -140,7 +141,9 @@ main(int argc, char **argv)
 	char *xname = argv[0];
 	estat = parse_hex(argv[0], gdpiname);
 	if (!EP_STAT_ISOK(estat))
+	{
 		estat = gdp_name_parse(argv[0], gdpiname, &xname);
+	}
 	if (EP_STAT_ISFAIL(estat))
 	{
 		ep_app_message(estat, "Cannot parse name \"%s\"", argv[0]);
@@ -164,15 +167,15 @@ main(int argc, char **argv)
 	}
 	else
 	{
+		char ebuf[64];
 		fprintf(stdout,
+				"method:    %s\n"
 				"human:     %s\n"
 				"printable: %s\n"
 				"hex:       ",
+				ep_stat_tostr_terse(estat, ebuf, sizeof ebuf),
 				xname, gdppname);
-		unsigned int i;
-		for (i = 0; i < sizeof gdpiname; i++)
-			fprintf(stdout, "%02x", gdpiname[i]);
-		fprintf(stdout, "\n");
+		ep_hexdump(gdpiname, sizeof gdpiname, stdout, EP_HEXDUMP_TERSE, 0);
 	}
 	exit(EX_OK);
 }

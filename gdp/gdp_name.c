@@ -229,7 +229,11 @@ gdp_name_parse(const char *hname, gdp_name_t gname, char **xnamep)
 		// see if this is a base64-encoded name
 		estat = gdp_internal_name(hname, gname);
 		if (EP_STAT_ISOK(estat))
+		{
+			estat = GDP_STAT_OK_NAME_PNAME;
+			xname = ep_mem_strdup(hname);
 			goto done;
+		}
 	}
 
 	if (strchr(hname, '.') != NULL || _GdpNameRoot == NULL)
@@ -267,7 +271,7 @@ gdp_name_parse(const char *hname, gdp_name_t gname, char **xnamep)
 			xname = ep_mem_strdup(hname);
 		ep_dbg_cprintf(Dbg, 8, "gdp_name_parse: using SHA256(%s)\n", xname);
 		ep_crypto_md_sha256(xname, strlen(xname), gname);
-		estat = GDP_STAT_OLD_GDPNAME;
+		estat = GDP_STAT_NAME_SHA;
 	}
 #endif
 done:
@@ -384,7 +388,7 @@ gdp_internal_name(const gdp_pname_t external, gdp_name_t internal)
 EP_STAT
 gdp_name_resolve(const char *hname, gdp_name_t gname)
 {
-	EP_STAT estat = EP_STAT_OK;
+	EP_STAT estat = GDP_STAT_OK_NAME_HONGD;
 	const char *phase;
 
 	ep_dbg_cprintf(Dbg, 19, "gdp_name_resolve(%s)\n", hname);
@@ -392,7 +396,8 @@ gdp_name_resolve(const char *hname, gdp_name_t gname)
 	if (NameDb == NULL)
 	{
 		ep_dbg_cprintf(Dbg, 19, "    ... no database\n");
-		return GDP_STAT_NAME_UNKNOWN;
+		estat = GDP_STAT_NAME_UNKNOWN;
+		goto fail0;
 	}
 
 	phase = "query";
@@ -451,6 +456,7 @@ fail1:
 		if (EP_STAT_ISOK(estat))
 			estat = GDP_STAT_MYSQL_ERROR;
 	}
+fail0:
 	if (ep_dbg_test(Dbg, 19))
 	{
 		char ebuf[100];

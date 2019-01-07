@@ -186,6 +186,10 @@ char		*ep_stat_tostr(
 			EP_STAT estat,
 			char *buf,
 			size_t bsize);
+char		*ep_stat_tostr_terse(
+			EP_STAT estat,
+			char *buf,
+			size_t bsize);
 
 // return string representation of severity (in natural language)
 const char	*ep_stat_sev_tostr(

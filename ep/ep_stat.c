@@ -250,6 +250,30 @@ ep_stat_tostr(EP_STAT stat,
 }
 
 
+/*
+**  Same, but gives more detail on "OK" and only shows text.
+*/
+
+char *
+ep_stat_tostr_terse(EP_STAT stat,
+		char *buf,
+		size_t blen)
+{
+	if (EpStatStrings != NULL)
+	{
+		const char *s = (const char *) ep_hash_search(
+					EpStatStrings, sizeof stat, &stat);
+		if (s != NULL)
+		{
+			strlcpy(buf, s, blen);
+			return buf;
+		}
+	}
+
+	return ep_stat_tostr(stat, buf, blen);
+}
+
+
 /***********************************************************************
 **
 **  EP_STAT_SEV_TOSTR -- return printable version of a status severity

@@ -95,7 +95,6 @@ static struct ep_stat_to_string Stats[] =
 	{ GDP_STAT_CRYPTO_NO_PUB_KEY,		"missing public key",				},
 	{ GDP_STAT_CRYPTO_NO_SIG,			"datum missing required signature",	},
 	{ GDP_STAT_SVC_NAME_REQ,			"service name required",			},
-	{ GDP_STAT_OLD_GDPNAME,				"using old (insecure) GDPname",		},
 
 	// codes corresponding to command responses
 	{ GDP_STAT_ACK_END_OF_RESULTS,		"263 end of results",				},
@@ -124,6 +123,12 @@ static struct ep_stat_to_string Stats[] =
 	{ GDP_STAT_NAK_REPLICATE_FAIL,		"514 couldn't write W replicas",	},
 
 	{ GDP_STAT_NAK_NOROUTE,				"600 no route available",			},
+
+	// specialized success/warning codes from gdp_name_parse
+	{ GDP_STAT_NAME_SHA,				"old (insecure) GDPname",			},
+	{ GDP_STAT_OK_NAME_HONGD,			"human-oriented name directory",	},
+	{ GDP_STAT_OK_NAME_PNAME,			"printable internal name",			},
+	{ GDP_STAT_OK_NAME_HEX,				"printable hexidecimal",			},
 
 	// end of list sentinel
 	{ EP_STAT_OK,						NULL							},
