@@ -16,7 +16,7 @@ public class CreateTest {
     public static void main(String[] args) throws GDPException{
 
         // Just to check any error output
-        GDP.dbg_set("*=10");
+        GDP.dbg_set("*=50");
 
         if (args.length<2) { // usage
             System.out.print("Usage: <logname> <creation service name>");
@@ -27,11 +27,11 @@ public class CreateTest {
         String logName = args[0];
         String creationServiceName = args[1];
 
-        System.out.println("Creating log " + logName + 
-                            " by contacting " + creationServiceName);
-
         GDP_CREATE_INFO gci = new GDP_CREATE_INFO();
         gci.set_creation_service(creationServiceName);
+
+        System.out.println("Creating log " + logName + 
+                            " by contacting " + creationServiceName);
 
         GDP_GIN.create(gci, logName);
         return;

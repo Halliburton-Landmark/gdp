@@ -188,11 +188,10 @@ public class GDP_GIN {
 
         EP_STAT estat;
         // Just create a throwaway pointer.
-        Pointer tmpPtr = null;
+        PointerByReference tmp = new PointerByReference();
         
         estat = Gdp21Library.INSTANCE.gdp_gin_create(
-                                gci.gdp_create_info_ptr, external_name,
-                                new PointerByReference(tmpPtr));
+                                gci.gdp_create_info_ptr, external_name, tmp);
 
         GDP.check_EP_STAT(estat, "Creation of " + external_name + " failed.");
     }
@@ -379,47 +378,6 @@ public class GDP_GIN {
         // Get the event pointer. ginh can be null.
         PointerByReference gdp_event_ptr = Gdp21Library.INSTANCE.gdp_event_next(ginh, timeout);
         return new GDP_EVENT(gdp_event_ptr);
-
-        /*
-
-        if (gdp_event_ptr == null) {
-            return new HashMap<String, Object>();
-            //throw new NullPointerException("gdp_event_next(" + ginh + ", " + timeout
-            //        + ") returned null");
-        }
-        // Get the data associated with this event.
-        // If gdp_event_gettype() is passed a NULL, then an assertion is thrown
-        // and process exits.
-        int type = Gdp21Library.INSTANCE.gdp_event_gettype(gdp_event_ptr);
-        PointerByReference datum_ptr = Gdp21Library.INSTANCE
-                            .gdp_event_getdatum(gdp_event_ptr);
-        EP_STAT event_ep_stat = Gdp21Library.INSTANCE
-                            .gdp_event_getstat(gdp_event_ptr);
-        PointerByReference _ginhByReference = Gdp21Library.INSTANCE
-                            .gdp_event_getgin(gdp_event_ptr);
-        Pointer _ginh = _ginhByReference.getValue();
-                            
-        
-        GDP_DATUM datum = new GDP_DATUM(datum_ptr);
-        // create a datum dictionary.
-        HashMap<String, Object> datum_dict = new HashMap<String, Object>();
-        datum_dict.put("recno", datum.getrecno());
-        datum_dict.put("ts", datum.getts());
-        datum_dict.put("data", datum.getbuf());
-        // TODO Fix signatures
-        
-        HashMap<String, Object> gdp_event = new HashMap<String, Object>();
-        gdp_event.put("gcl_handle", _allGclhs.get(_ginh));
-        gdp_event.put("datum", datum_dict);
-        gdp_event.put("type", type);
-        gdp_event.put("stat", event_ep_stat);
-        
-        // free the event structure
-        Gdp21Library.INSTANCE.gdp_event_free(gdp_event_ptr);
-        
-        return gdp_event;
-
-        */
     }
     
 
