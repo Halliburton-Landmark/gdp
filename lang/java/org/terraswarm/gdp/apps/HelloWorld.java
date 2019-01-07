@@ -54,6 +54,7 @@ public class HelloWorld {
             GDP_GIN g = new GDP_GIN(gn, GDP_GIN.GDP_MODE.RA);
        
             GDP_DATUM d = new GDP_DATUM();
+            d.reset();
             d.setbuf((new Date().toString()).getBytes());
             g.append(d, null);
         

@@ -76,7 +76,7 @@ public class GDP_GIN {
                            "), " + iomode);
         EP_STAT estat;
         
-        //PointerByReference gdp_gin_ptr = new PointerByReference();
+        PointerByReference _gdp_gin_ptr = new PointerByReference();
         this.iomode = iomode;
         this.gclName = name.internal_name();
         this.open_info = info;
@@ -86,7 +86,7 @@ public class GDP_GIN {
 
         estat = Gdp21Library.INSTANCE.gdp_gin_open(ByteBuffer.wrap(this.gclName), 
                                 iomode.ordinal(), info.gdp_open_info_ptr, 
-                                this.gdp_gin_ptr);
+                                _gdp_gin_ptr);
 
         // check return status; throw exception if need be.
         GDP.check_EP_STAT(estat, "gdp_gin_open(" +
@@ -95,6 +95,7 @@ public class GDP_GIN {
                           this.gdp_gin_ptr + ") failed.");
 
         // Associate the C pointer to this object.
+        this.gdp_gin_ptr = _gdp_gin_ptr;
         this.ginh = this.gdp_gin_ptr.getValue();
         assert this.ginh != null;
 
@@ -212,8 +213,14 @@ public class GDP_GIN {
 
         EP_STAT estat;
         _checkGclh(this.ginh);
-        estat = Gdp21Library.INSTANCE.gdp_gin_append(this.gdp_gin_ptr,
-                                datum.gdp_datum_ptr, prevhash.gdp_hash_ptr);
+
+        if (prevhash == null) {
+            estat = Gdp21Library.INSTANCE.gdp_gin_append(this.ginh,
+                                datum.gdp_datum_ptr, null);
+        } else {
+            estat = Gdp21Library.INSTANCE.gdp_gin_append(this.ginh,
+                                datum.gdp_datum_ptr, prevhash.gdp_hash_ptr.getValue());
+        }
         GDP.check_EP_STAT(estat, "gdp_gin_append(" + this.ginh +
                          ", " + datum.gdp_datum_ptr + ") failed.");
         return;
@@ -244,7 +251,7 @@ public class GDP_GIN {
         PointerByReference datums_ptr = new PointerByReference(
                                             datums.get(0).gdp_datum_ptr.getValue());
         estat = Gdp21Library.INSTANCE.gdp_gin_append_async(
-                                this.gdp_gin_ptr, 1, datums_ptr, null, null, null);
+                                this.ginh, 1, datums_ptr, null, null, null);
         GDP.check_EP_STAT(estat, "gdp_gin_append_async(" + this.ginh +
                             ", " + datums.get(0).gdp_datum_ptr + "null, null) failed.");
     }
@@ -268,13 +275,12 @@ public class GDP_GIN {
         EP_STAT estat;
         _checkGclh(this.ginh);
 
-        PointerByReference datum_ptr = new PointerByReference();
+        GDP_DATUM datum = new GDP_DATUM();
         estat = Gdp21Library.INSTANCE.gdp_gin_read_by_recno(
-                                this.gdp_gin_ptr, recno, datum_ptr);
+                                this.ginh, recno, datum.gdp_datum_ptr);
         GDP.check_EP_STAT(estat, "gdp_gin_read() failed.");
-        assert (datum_ptr != null);
 
-        return new GDP_DATUM(datum_ptr);
+        return datum;
     }
 
     /** 
@@ -294,7 +300,7 @@ public class GDP_GIN {
         _checkGclh(this.ginh);
 
         estat = Gdp21Library.INSTANCE.gdp_gin_read_by_recno_async(
-                            this.gdp_gin_ptr, firstrec, nrecs, null, null);
+                            this.ginh, firstrec, nrecs, null, null);
 
         GDP.check_EP_STAT(estat, "gdp_gin_read_by_recno_async() failed.");
     }
@@ -318,7 +324,7 @@ public class GDP_GIN {
         EP_STAT estat;
         _checkGclh(this.ginh);
         estat = Gdp21Library.INSTANCE.gdp_gin_subscribe_by_recno(
-                                    this.gdp_gin_ptr, start, nrecs,
+                                    this.ginh, start, nrecs,
                                         null, null, null);
 
         GDP.check_EP_STAT(estat, "gdp_gin_subscribe_by_recno() failed.");
@@ -328,7 +334,7 @@ public class GDP_GIN {
     public void unsubscribe() throws GDPException {
         EP_STAT estat;
         _checkGclh(this.ginh);
-        estat = Gdp21Library.INSTANCE.gdp_gin_unsubscribe(this.gdp_gin_ptr, null, null);
+        estat = Gdp21Library.INSTANCE.gdp_gin_unsubscribe(this.ginh, null, null);
         GDP.check_EP_STAT(estat, "gdp_gin_unsubscribe() failed.");
     }
 
@@ -360,7 +366,7 @@ public class GDP_GIN {
             return _helper_get_next_event(null, timeout);
         } else {
             _checkGclh(obj.ginh);
-            return _helper_get_next_event(obj.gdp_gin_ptr, timeout);
+            return _helper_get_next_event(obj.ginh, timeout);
         }
     }
     
@@ -368,7 +374,7 @@ public class GDP_GIN {
     ////                   private methods                         ////
 
     
-    public static GDP_EVENT _helper_get_next_event(PointerByReference ginh, EP_TIME_SPEC timeout) {
+    public static GDP_EVENT _helper_get_next_event(Pointer ginh, EP_TIME_SPEC timeout) {
         
         // Get the event pointer. ginh can be null.
         PointerByReference gdp_event_ptr = Gdp21Library.INSTANCE.gdp_event_next(ginh, timeout);
