@@ -47,16 +47,13 @@ import org.terraswarm.gdp.NativeSize; // Fixed by cxh in makefile.
  * data is stored in a buffer (which unsurprisingly acts like a
  * buffer).
  *
- * <p> This is for internal use only, for users the GDP DATUM is more
- * like a dictionary, represented with a HashMap.</p>
- *
  * @author nitesh mor
  *
  */
-class GDP_DATUM {
+public class GDP_DATUM {
 
     /**
-     * Create a new dataum.
+     * Create a new datum.
      */
     public GDP_DATUM() {
         this.gdp_datum_ptr = Gdp21Library.INSTANCE.gdp_datum_new();

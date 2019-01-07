@@ -19,21 +19,21 @@ public class CreateTest {
         GDP.dbg_set("*=10");
 
         if (args.length<2) { // usage
-            System.out.print("Usage: <logname> <server name>");
+            System.out.print("Usage: <logname> <creation service name>");
             System.out.println();
             return;
         }
 
-        GDP_NAME logName = new GDP_NAME(args[0]);
-        GDP_NAME logdName = new GDP_NAME(args[1]);
+        String logName = args[0];
+        String creationServiceName = args[1];
 
-        Map<Integer, byte[]> m = new HashMap<Integer, byte[]>();
-        m.put(GDP_MD.GDP_MD_XID, args[0].getBytes());
-        
-        System.out.println("Creating log " + args[0]);
-        
-        GDP_GIN.create(logName, logdName, m);
-        
+        System.out.println("Creating log " + logName + 
+                            " by contacting " + creationServiceName);
+
+        GDP_CREATE_INFO gci = new GDP_CREATE_INFO();
+        gci.set_creation_service(creationServiceName);
+
+        GDP_GIN.create(gci, logName);
         return;
         
     }

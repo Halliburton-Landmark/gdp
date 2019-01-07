@@ -53,12 +53,12 @@ public class ReaderTestSubscribe {
             System.out.println("Opening object");
             GDP_GIN g = new GDP_GIN(gn, GDP_GIN.GDP_MODE.RA);
 
-            g.subscribe_by_recno(0, 0, null);
+            g.subscribe_by_recno(0, 0);
             for (;;) {
-                HashMap<String, Object> event = GDP_GIN.get_next_event(null, null);
-                if ((int) event.get("type") == 2) { break; }
-                HashMap<String, Object> datum = (HashMap<String, Object>) event.get("datum");
-                System.out.print(new String((byte[]) datum.get("data"), "UTF-8"));
+                GDP_EVENT event = GDP_GIN.get_next_event(null, null);
+                if (event.gettype() == 2) { break; }
+                GDP_DATUM datum = event.getdatum();
+                System.out.print(new String((byte[]) datum.getbuf(), "UTF-8"));
                 System.out.println();
             }
         } catch (Throwable throwable) {

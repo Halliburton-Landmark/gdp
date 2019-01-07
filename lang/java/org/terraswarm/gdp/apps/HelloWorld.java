@@ -52,11 +52,13 @@ public class HelloWorld {
             GDP_NAME gn = new GDP_NAME(logname);
             System.out.println("Opening GIN");
             GDP_GIN g = new GDP_GIN(gn, GDP_GIN.GDP_MODE.RA);
+       
+            GDP_DATUM d = new GDP_DATUM();
+            d.setbuf((new Date().toString()).getBytes());
+            g.append(d, null);
         
-            g.append((new Date().toString()).getBytes());
-        
-            HashMap<String, Object> returnDatum = g.read_by_recno(-1);
-            byte[] data = (byte[]) returnDatum.get("data");
+            GDP_DATUM returnDatum = g.read_by_recno(-1);
+            byte[] data = returnDatum.getbuf();
             for (int i=0; i<data.length; i++) {
                 System.out.print((char) data[i]);
             }
