@@ -229,7 +229,8 @@ pr_verbose_metadata(gdp_gob_t *gob, int plev)
 static EP_STAT
 show_rec(EP_STAT estat, gdp_datum_t *datum, gdp_result_ctx_t *ctx)
 {
-	uint32_t pflags = (uint32_t) ctx;
+	uintptr_t ptrint = (uintptr_t) ctx;
+	uint32_t pflags = (uint32_t) ptrint;
 	if (EP_STAT_IS_SAME(estat, GDP_STAT_ACK_CONTENT))
 		gdp_datum_print(datum, stdout, pflags);
 	else
