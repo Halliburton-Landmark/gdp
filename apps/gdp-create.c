@@ -328,7 +328,8 @@ main(int argc, char **argv)
 	if (owner_keyfile != NULL)
 	{
 		phase = "setting owner key";
-		EP_CRYPTO_KEY *key = ep_crypto_key_read_file(owner_keyfile, 0, 0);
+		EP_CRYPTO_KEY *key;
+		key = ep_crypto_key_read_file(owner_keyfile, 0, EP_CRYPTO_F_SECRET);
 		estat = gdp_create_info_set_owner_key(gci, key, dig_alg_name);
 	}
 	else if (dig_alg_name != NULL || key_alg_name != NULL ||
@@ -343,7 +344,8 @@ main(int argc, char **argv)
 	if (writer_keyfile != NULL)
 	{
 		phase = "setting writer key";
-		EP_CRYPTO_KEY *key = ep_crypto_key_read_file(writer_keyfile, 0, 0);
+		EP_CRYPTO_KEY *key;
+		key = ep_crypto_key_read_file(writer_keyfile, 0, EP_CRYPTO_F_SECRET);
 		estat = gdp_create_info_set_writer_key(gci, key, dig_alg_name);
 	}
 	else if (separate_writer_key)
