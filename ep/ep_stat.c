@@ -42,7 +42,7 @@
 #include <ep_registry.h>
 #include <ep_hash.h>
 #include <ep_thr.h>
-#include <string.h>
+#include <ep_string.h>
 
 
 /***********************************************************************
