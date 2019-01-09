@@ -72,7 +72,15 @@ but is modified by the
 flag.
 .
 .It Fl v
-Prints the log name and a summary of the standard
+Prints the log name,
+the number of records in the log,
+and the external human-oriented name of the log (if any).
+This format is intended to be machine parsable.
+.
+.It Fl vv
+Prints the log name,
+the number of records,
+and a summary of the standard
 .Qq "built in"
 metadata such as
 External Name,
@@ -80,21 +88,17 @@ Creation Time,
 and
 Creator.
 .
-.It Fl vv
-Shows log header information for all segments
-including all metadata entries.
-.
 .It Fl vvv
 As with
 .Fl vv ,
-but includes all record metadata information,
-including record number, file offset, timestamp, etc.
+but includes all metadata information.
 .
 .It Fl vvvv
-Adds hex dump off record metadata and data content.
+Adds hex dump of metadata values
+and the record metadata (record number, length, timestamp, and signature).
 .
 .It Fl vvvvv
-Adds details of record number index.
+Includes the content of all records.
 .
 .El
 .

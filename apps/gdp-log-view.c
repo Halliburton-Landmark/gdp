@@ -186,6 +186,7 @@ pr_verbose_metadata(gdp_gob_t *gob, int plev)
 
 				default:
 					printf("\n");
+					printtype = 1;
 					break;
 			}
 			if (printtype == 1)
@@ -243,7 +244,7 @@ EP_STAT
 show_log(gdp_name_t log_name, int plev)
 {
 	gdp_pname_t log_pname;
-	gdp_gob_t *gob;
+	gdp_gob_t *gob = NULL;
 	EP_STAT estat;
 
 	(void) gdp_printable_name(log_name, log_pname);
@@ -252,7 +253,6 @@ show_log(gdp_name_t log_name, int plev)
 		printf("%s\n", log_pname);
 		return EP_STAT_OK;
 	}
-	printf("\nLog %s:\n", log_pname);
 
 	// create a GOB data structure for this log
 	estat = _gdp_gob_new(log_name, &gob);
@@ -264,22 +264,36 @@ show_log(gdp_name_t log_name, int plev)
 	estat = sqlite_open(gob);
 	EP_STAT_CHECK(estat, goto fail0);
 
-	printf("    nrecs = %" PRIgdp_recno "\n", gob->nrecs);
-
 	// figure out what we want to actually print
+	if (plev == 1)
+	{
+		size_t md_len;
+		const void *md_data;
+
+		estat = gdp_md_find(gob->gob_md, GDP_MD_XID, &md_len, &md_data);
+		if (!EP_STAT_ISOK(estat))
+		{
+			md_data = (void *) "-";
+			md_len = 1;
+		}
+		printf("%s %" PRIgdp_recno " %.*s\n",
+				log_pname, gob->nrecs, (int) md_len, (const char *) md_data);
+		goto done;
+	}
+	if (plev >= 3)
+		printf("\n----------------------------------------------------------\n");
+	printf("Log %s: %" PRIgdp_recno " recs\n", log_pname, gob->nrecs);
 	uint32_t pflags = GDP_DATUM_PRMETAONLY;
-	if (plev >= 1)
-		pflags |= GDP_DATUM_PRDEBUG;
-	if (plev >= 2)
+	if (plev >= 3)
 	{
 		pflags |= GDP_DATUM_PRSIG;
 		pr_verbose_metadata(gob, plev);
 	}
-	if (plev >= 4)
+	if (plev >= 5)
 		pflags &= ~GDP_DATUM_PRMETAONLY;
 
 	// now dump the contents
-	if (plev >= 3)
+	if (plev >= 4)
 	{
 		printf("\n    --------------- Data ---------------\n");
 		uintptr_t intptrpflags = pflags;
@@ -287,8 +301,16 @@ show_log(gdp_name_t log_name, int plev)
 								(void *) intptrpflags);
 	}
 
+	if (false)
+	{
+		char ebuf[60];
 fail0:
-	_gdp_gob_free(&gob);
+		fprintf(stderr, "%s: %s\n",
+				log_pname, ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
+done:
+	if (gob != NULL)
+		_gdp_gob_free(&gob);
 	return estat;
 }
 
