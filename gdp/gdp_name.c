@@ -269,7 +269,7 @@ gdp_name_parse(const char *hname, gdp_name_t gname, char **xnamep)
 	{
 		if (xname == NULL || strchr(hname, '.') != NULL)
 			xname = ep_mem_strdup(hname);
-		ep_dbg_cprintf(Dbg, 8, "gdp_name_parse: using SHA256(%s)\n", xname);
+		ep_dbg_cprintf(Dbg, 28, "gdp_name_parse: using SHA256(%s)\n", xname);
 		ep_crypto_md_sha256(xname, strlen(xname), gname);
 		estat = GDP_STAT_NAME_SHA;
 	}
@@ -360,7 +360,7 @@ gdp_internal_name(const gdp_pname_t external, gdp_name_t internal)
 	{
 		char ebuf[100];
 
-		ep_dbg_cprintf(Dbg, 2,
+		ep_dbg_cprintf(Dbg, 22,
 				"gdp_internal_name: ep_b64_decode failure\n"
 				"\tname = %s\n"
 				"\tstat = %s\n",
@@ -369,7 +369,7 @@ gdp_internal_name(const gdp_pname_t external, gdp_name_t internal)
 	}
 	else if (EP_STAT_TO_INT(estat) != sizeof (gdp_name_t))
 	{
-		ep_dbg_cprintf(Dbg, 2,
+		ep_dbg_cprintf(Dbg, 22,
 				"gdp_internal_name: ep_b64_decode length failure (%d != %zd)\n",
 				EP_STAT_TO_INT(estat), sizeof (gdp_name_t));
 		estat = EP_STAT_ABORT;
