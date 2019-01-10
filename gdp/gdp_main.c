@@ -1296,6 +1296,7 @@ _gdp_router_event(
 	}
 
 fail0:
+	if (ep_dbg_test(Dbg, 23))
 	{
 		char ebuf[100];
 		ep_dbg_printf("_gdp_router_event: %s\n",
