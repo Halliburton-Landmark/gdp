@@ -78,11 +78,12 @@ void
 usage(void)
 {
 	fprintf(stderr,
-			"Usage: %s [-b] [-D dbgspec] [-h] gdp_name\n"
+			"Usage: %s [-b] [-D dbgspec] [-f] [-h] [-o] gdp_name\n"
 			"    -b  print printable base64 name\n"
 			"    -D  set debugging flags\n"
 			"    -f  show file name root\n"
-			"    -h  print hexadecimal name\n",
+			"    -h  print hexadecimal name\n"
+			"    -o  show old-style (sha256) name\n",
 			ep_app_getprogname());
 	exit(EX_USAGE);
 }
@@ -95,11 +96,14 @@ main(int argc, char **argv)
 	bool show_usage = false;
 	gdp_name_t gdpiname;
 	gdp_pname_t gdppname;
+	gdp_pname_t *gdp_psha;
+	gdp_pname_t gdp_psha_buf;
 	bool show_b64 = false;
 	bool show_hex = false;
 	bool show_file_name = false;
+	bool show_old_form = false;
 
-	while ((opt = getopt(argc, argv, "bD:fh")) > 0)
+	while ((opt = getopt(argc, argv, "bD:fho")) > 0)
 	{
 		switch (opt)
 		{
@@ -117,6 +121,10 @@ main(int argc, char **argv)
 
 			case 'h':
 				show_hex = true;
+				break;
+
+			case 'o':
+				show_old_form = true;
 				break;
 
 			default:
@@ -149,7 +157,21 @@ main(int argc, char **argv)
 		ep_app_message(estat, "Cannot parse name \"%s\"", argv[0]);
 		exit(EX_USAGE);
 	}
+	if (xname == NULL)
+		xname = argv[0];
 	gdp_printable_name(gdpiname, gdppname);
+	if (EP_STAT_IS_SAME(estat, GDP_STAT_OK_NAME_PNAME))
+	{
+		gdp_psha = &gdppname;
+	}
+	else
+	{
+		gdp_name_t rawsha;
+		ep_crypto_md_sha256(xname, strlen(xname), rawsha);
+		gdp_printable_name(rawsha, gdp_psha_buf);
+		gdp_psha = &gdp_psha_buf;
+	}
+
 	if (show_b64)
 	{
 		fprintf(stdout, "%s\n", gdppname);
@@ -165,6 +187,10 @@ main(int argc, char **argv)
 	{
 		fprintf(stdout, "_%02x/%s\n", gdpiname[0], gdppname);
 	}
+	else if (show_old_form)
+	{
+		fprintf(stdout, "%s\n", *gdp_psha);
+	}
 	else
 	{
 		char ebuf[64];
@@ -172,9 +198,10 @@ main(int argc, char **argv)
 				"method:    %s\n"
 				"human:     %s\n"
 				"printable: %s\n"
+				"old form:  %s\n"
 				"hex:       ",
 				ep_stat_tostr_terse(estat, ebuf, sizeof ebuf),
-				xname, gdppname);
+				xname, gdppname, *gdp_psha);
 		ep_hexdump(gdpiname, sizeof gdpiname, stdout, EP_HEXDUMP_TERSE, 0);
 	}
 	exit(EX_OK);
