@@ -158,6 +158,7 @@ debian-package: all
 
 ADM=		adm
 UPDATE_LICENSE=	${ADM}/update-license.sh
+GET_VERSION_INFO=	${ADM}/get-version-info.sh
 
 update-license:
 	${UPDATE_LICENSE} Makefile *.[ch]
@@ -170,6 +171,9 @@ update-license:
 	(cd test &&	 ${MAKE} update-license)
 	(cd examples &&	 ${MAKE} update-license)
 	(cd util &&	 ${MAKE} update-license)
+
+git-version.txt: .FORCE
+	${GET_VERSION_INFO} > /dev/null
 
 # Not made by default
 READMES_HTML= \
