@@ -365,7 +365,8 @@ gdp_create_info_set_writer_key(
 static char *
 gci_key_file_name(const char *key_dir_path,
 				const gdp_name_t gname,
-				const char *key_scope)
+				const char *key_scope,
+				const char *key_suffix)
 {
 	EP_STAT estat = EP_STAT_OK;
 
@@ -385,12 +386,16 @@ gci_key_file_name(const char *key_dir_path,
 	size_t len = strlen(key_dir_name) + sizeof pbuf + 6;
 	if (key_scope != NULL)
 		len += strlen(key_scope) + 1;
+	if (key_suffix == NULL)
+		key_suffix = "";
+	len += strlen(key_suffix);
 	key_file_name = (char *) ep_mem_malloc(len);
 	if (key_scope != NULL)
-		snprintf(key_file_name, len, "%s/%s-%s.pem",
-				key_dir_name, pbuf, key_scope);
+		snprintf(key_file_name, len, "%s/%s-%s.pem%s",
+				key_dir_name, pbuf, key_scope, key_suffix);
 	else
-		snprintf(key_file_name, len, "%s/%s.pem", key_dir_name, pbuf);
+		snprintf(key_file_name, len, "%s/%s.pem%s",
+				key_dir_name, pbuf, key_suffix);
 	return key_file_name;
 }
 
@@ -424,7 +429,7 @@ gci_save_key(
 
 	if (gcik->key != NULL)
 	{
-		char *key_file_name = gci_key_file_name(key_dir_path, gname, key_scope);
+		char *key_file_name = gci_key_file_name(key_dir_path, gname, key_scope, NULL);
 		int fd;
 		FILE *fp;
 		int oflags = O_WRONLY | O_CREAT | O_TRUNC;
@@ -481,13 +486,16 @@ gci_remove_key(
 {
 	EP_STAT estat = EP_STAT_OK;
 	char *key_file_name;
+	char *backup_file_name;
 
 	if (!EP_ASSERT(gcik != NULL && gcik->key != NULL))
 		return EP_STAT_ASSERT_ABORT;
 
-	key_file_name = gci_key_file_name(key_dir_path, gname, key_scope);
-	unlink(key_file_name);;
+	key_file_name = gci_key_file_name(key_dir_path, gname, key_scope, NULL);
+	backup_file_name = gci_key_file_name(key_dir_path, gname, key_scope, "BAK");
+	rename(key_file_name, backup_file_name);
 	ep_mem_free(key_file_name);
+	ep_mem_free(backup_file_name);
 	return estat;
 }
 
