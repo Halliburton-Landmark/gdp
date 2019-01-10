@@ -52,8 +52,8 @@
 #include <sys/stat.h>
 
 // leverage existing code (this is a hack!)
-#define LOG_VIEW	1
-#define Dbg			DbgLogdSqlite
+#define GDP_LOG_VIEW	1
+#define Dbg				DbgLogdSqlite
 #include "../gdplogd/logd_sqlite.c"
 #undef Dbg
 

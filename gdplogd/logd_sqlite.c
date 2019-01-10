@@ -538,6 +538,11 @@ physinfo_dump(gob_physinfo_t *phys, FILE *fp)
 }
 
 
+#if GDP_LOG_VIEW
+# define SQLITE_OPEN_FLAGS	(SQLITE_OPEN_READONLY)
+#else
+# define SQLITE_OPEN_FLAGS	(SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE)
+#endif
 
 /*
 **  SQLITE_CREATE --- create a brand new GOB on disk
@@ -589,8 +594,7 @@ sqlite_create(gdp_gob_t *gob, gdp_md_t *gmd)
 
 	// now open (and thus create) the actual database
 	phase = "sqlite3_open_v2";
-	rc = sqlite3_open_v2(db_path, &phys->db,
-					SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL);
+	rc = sqlite3_open_v2(db_path, &phys->db, SQLITE_OPEN_FLAGS, NULL);
 	CHECK_RC(rc, goto fail1);
 
 	phase = "sqlite3_extended_result_codes";
