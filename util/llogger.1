@@ -9,10 +9,13 @@
 .Op Fl a
 .Op Fl s Ar sigfigs
 .Op Fl t
-.Ar file-name
+.Op Fl u
+.Op Ar file-name
 .Sh DESCRIPTION
 .Nm
-reads data from the standard input,
+is similar to a non-syslog version of
+.Xr logger 1 .
+It reads data from the standard input,
 timestamps it,
 and writes it to the indicated output
 .Ar file-name .
@@ -21,25 +24,34 @@ If the
 is removed or renamed it is re-created;
 this makes it possible to rotate log files
 without restarting the process being logged.
-It is similar to a non-syslog version of
-.Xr logger 1 .
+If
+.Ar file-name
+is omitted it defaults to the standard output;
+this just timestamps text lines.
 .Sh OPTIONS
 .Bl -tag
+.
 .It Fl a
 Append to output
 .Ar file-name .
 Normally the output is overwritten.
+.
 .It Fl s Ar sigfigs
 Output the indicated number of digits of fractional seconds.
 The default is 6.
+.
 .It Fl t
 In addition to logging,
 .Dq tee
 the output to stdout.
+.
+.It Fl u
+Show dates in UTC instead of local time.
+.El
 .\".Sh EXIT STATUS
 .\".Sh ENVIRONMENT
 .\".Sh FILES
-.\".Sh SEE ALSO
+.Sh SEE ALSO
 .Xr logger 1
 .\".Sh EXAMPLES
 .\".Sh BUGS

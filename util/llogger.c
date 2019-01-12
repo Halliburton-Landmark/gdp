@@ -56,8 +56,9 @@ main(int argc, char **argv)
 	ino_t prev_ino = -1;
 	bool tee = false;
 	int sigfigs = 6;
+	bool utc = false;
 
-	while ((opt = getopt(argc, argv, "as:t")) > 0)
+	while ((opt = getopt(argc, argv, "as:tu")) > 0)
 	{
 		switch (opt)
 		{
@@ -71,6 +72,10 @@ main(int argc, char **argv)
 
 		case 't':
 			tee = true;
+			break;
+
+		case 'u':
+			utc = true;
 			break;
 		}
 	}
@@ -116,7 +121,10 @@ main(int argc, char **argv)
 		}
 
 		gettimeofday(&tv, NULL);
-		tm = gmtime(&tv.tv_sec);
+		if (utc)
+			tm = gmtime(&tv.tv_sec);
+		else
+			tm = localtime(&tv.tv_sec);
 		long usec = tv.tv_usec;
 		char fractional_seconds[10];
 
