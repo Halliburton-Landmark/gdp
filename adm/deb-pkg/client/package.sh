@@ -43,6 +43,7 @@ fakeroot checkinstall -D --install=no --fstrans=yes -y \
 			libavahi-client-dev,
 			libavahi-common-dev,
 			libavahi-client3,
+			libmariadb-client-lgpl-dev,
 			avahi-daemon" \
 	    --nodoc \
 	    --strip=no \
