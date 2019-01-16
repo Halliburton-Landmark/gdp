@@ -112,11 +112,22 @@ prior step "Set up MariaDB and HONGD."
         sudo cp /dev/stdin /etc/gdp/creation_service_pw.txt)
     sudo chown gdp:gdp /etc/gdp /etc/gdp/creation_service_pw.txt
     cd $root/gdp/services/log-creation
+    make  # generates the required protobuf bindings
     sudo mkdir -p /opt/log-creation2
     sudo cp *.py /opt/log-creation2
     sudo cp logCreationService.service \
         /etc/systemd/system/logCreationService2.service
     sudo systemctl daemon-reload
+
+Note that you will need to have the C client library and Python bindings
+installed. Additionally, you may have to satisfy the other dependencies.
+
+    sudo apt-get install python-twisted python-mysql.connector
+    sudo apt-get install protobuf-compiler python-protobuf # SEE BELOW
+
+You do need to pay attention to the protobuf version. The default ubuntu
+repositories have a very old version, which may or may not work. If you
+want to install a more recent-ish version, see toward the end.
 
 ## Check Configuration
 
@@ -132,3 +143,28 @@ other languages, look in `$root/lang` and follow the `README` files.
 ## MISSING ITEMS
 
 What have I forgotten?
+
+## Appendix: Manually installing a recent version of protobuf
+
+*A rough outline of downloading and installing protobuf-3.5.1 (or some
+similar recent-ish version) to make it work with Python.*
+
+You need to install the compiler and associated libraries, as well as the
+python bindings. Here is a rough process, please pay attention to what
+you are executing instead of blindly copying and pasting.
+
+    wget https://github.com/protocolbuffers/protobuf/releases/download/v3.5.1/protobuf-cpp-3.5.1.tar.gz
+    tar xvzf protobuf-cpp-3.5.1.tar.gz
+    sudo apt-get install autoconf automake libtool curl make g++ unzip
+    ( cd protobuf-3.5.1 && \
+      ./configure && \
+      make && \
+      make check && \
+      sudo make install && \
+      sudo ldconfig )
+    wget https://github.com/protocolbuffers/protobuf/releases/download/v3.5.1/protobuf-python-3.5.1.tar.gz
+    tar xvzf protobuf-python-3.5.1.tar.gz
+    sudo apt-get install python-setuptools
+    ( cd protobuf-3.5.1/python && \
+      python setup.py build && \
+      sudo python setup.py install )
