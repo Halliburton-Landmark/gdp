@@ -110,10 +110,10 @@ be essentially the same as it would be if `gdplogd` were not run in
 a container.  For example, it examines the usual parameters files:
 
 ```
-	/etc/ep_adm_params/gdp
-        /etc/ep_adm_params/gdplogd
-        /usr/local/etc/ep_adm_params/gdp
-        /usr/local/etc/ep_adm_params/gdplogd
+        /etc/gdp/params/gdp
+        /etc/gdp/params/gdplogd
+        /usr/local/etc/gdp/params/gdp
+        /usr/local/etc/gdp/params/gdplogd
         $HOME/.ep_adm_params/gdp
         $HOME/.ep_adm_params/gdplogd
 ```

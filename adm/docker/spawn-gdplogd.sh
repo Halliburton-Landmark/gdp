@@ -31,15 +31,16 @@ do
 	shift
 done
 
+: ${GDP_ETC:=/etc/gdp}
 #  This parses the same files that would be used if the daemon were not
 #  running in a container and passes them into the container using
 #  environment variables.  It only handles a small set of important
 #  variables.
 paramfiles=`cat <<-EOF
-	/etc/ep_adm_params/gdp
-	/etc/ep_adm_params/gdplogd
-	/usr/local/etc/ep_adm_params/gdp
-	/usr/local/etc/ep_adm_params/gdplogd
+	/etc/gdp/params/gdp
+	/etc/gdp/params/gdplogd
+	/usr/local/etc/gdp/params/gdp
+	/usr/local/etc/gdp/params/gdplogd
 	$HOME/.ep_adm_params/gdp
 	$HOME/.ep_adm_params/gdplogd
 EOF

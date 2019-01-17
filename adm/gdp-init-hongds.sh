@@ -203,8 +203,8 @@ cat <<- EOF
 
 	All GDP client hosts that want to use Human-Oriented Names (hint: this will
 	be almost all of them) need to have a pointer to this service in their
-	runtime GDP configuration.  This will normally be in /etc/ep_adm_params/gdp
-	or /usr/local/etc/ep_adm_params/gdp.  There should be a line in that
+	runtime GDP configuration.  This will normally be in /etc/gdp/params/gdp
+	or /usr/local/etc/gdp/params/gdp.  There should be a line in that
 	file that reads:
 	   swarm.gdp.hongdb.host=$fqdn
 	Everything else should be automatic.

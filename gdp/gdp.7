@@ -108,16 +108,27 @@ Only parameters applying to multiple programs are documented here.
 .Ss Syntax and Location
 Administrative parameters are located in files located by a search path
 that can be set using the
-.Ev PARAM_PATH
+.Ev EP_PARAM_PATH
 environment variable, giving a colon-separated list of directories
 in which to search for configuration files.
 This defaults to
 .Bd -literal -offset indent
+\&.gdp/params
 \&.ep_adm_params
+~/.gdp/params
 ~/.ep_adm_params
+/usr/local/etc/gdp/params
 /usr/local/etc/ep_adm_params
+/etc/gdp/params
 /etc/ep_adm_params
 .Ed
+The
+.Qq ep_adm_params
+options are historic and may go away in the future.
+Best practice is to link
+.Pa /etc/ep_adm_params
+to
+.Pa /etc/gdp/params .
 .Pp
 When a GDP program starts up it searches for
 files named

@@ -16,7 +16,7 @@ GDP_KEYS_DIR=$GDP_ETC/keys
 GDP_LOG_DIR=/var/log/gdp
 GDP_SYSLOG_FACILITY=local4
 GDP_SYSLOG_LEVEL=notice
-EP_PARAMS=/etc/ep_adm_params
+EP_PARAMS=$GDP_ETC/params
 
 # gdp-02 and gdp-04 are not accessible to the outside world at the moment
 #DEFAULT_ROUTERS="gdp-01 gdp-02 gdp-03 gdp-04"

@@ -53,17 +53,17 @@ There are three cases for `GDP_ROOT`:
 
   * `GDP_ROOT` = `/usr` means that everything will be installed
     in the "normal" system directories: `/usr/bin`, `/usr/sbin`,
-	`/var/log`, and `/etc/gdp`.  Note that files in `/etc` are in
-	a subdirectory.  This is the default.
-  * `GDP_ROOT` = ~gdp (that is, the home directory for user
-    `gdp`) means that everything will be installed in that
-	directory: ~gdp/bin, ~gdp/sbin, ~gdp/log, and ~gdp/etc.
-	Administrative paramters will be stored in ~gdp/.ep_adm_params
-	(and hence will be available only to user `gdp`).
+    `/var/log`, and `/etc/gdp`.  Note that files in `/etc` are in
+    a subdirectory.  This is the default.
+  * `GDP_ROOT` = `/usr/local` or `/opt/local` means that everything
+    will be installed in subdirectories of `GDP_ROOT` with the
+    exception of configuration files, which will be stored in
+    `GDP_ROOT/etc/gdp`.
   * Otherwise everything is installed in subdirectories of
     the indicated directory.  For example, if `GDP_ROOT` is
-	`/usr/local/gdp` then all installation will go into that
-	directory instead of the system directories.
+    `/home/gdp` then all installation will go into that
+    directory instead of the system directories, i.e.,
+    `/home/gdp/bin`, `/home/gdp/etc`, etc.
 
 Other locations can be set explicitly (rather that deriving from
 `GDP_ROOT`):
@@ -82,8 +82,7 @@ necessary for initializing a server.  This:
 
 This script does have some Berkeley dependencies that may require
 editing some files after you have run the script.  These will
-be located in the directory `$GDP_ROOT/ep_adm_params` or
-`~gdp/.ep_adm_params`.
+be located in the directory `$GDP_ETC/params`.
 
 The parameter `swarm.gdp.routers` (file `gdp`) is set to the
 list of hosts to search to find a GDP router.  This will be

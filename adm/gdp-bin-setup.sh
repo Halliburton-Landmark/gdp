@@ -56,19 +56,30 @@ then
 	mkdir_gdp lib
 fi
 
-# convert /etc/gdp/ep_adm_params => /etc/ep_adm_params
-if [ `basename $GDP_ETC` = "gdp" ]
+# convert /etc/ep_adm_params => /etc/gdp/params
+mkdir_gdp $GDP_ETC
+EP_PARAMS=$GDP_ETC/params
+if [ "$GDP_ETC" = "/etc/gdp" -o				\
+     "$GDP_ETC" = "/usr/local/etc/gdp" -o		\
+     "$GDP_ETC" = "/opt/local/etc/gdp" ]
 then
-	EP_PARAMS=`dirname $GDP_ETC`/ep_adm_params
-elif [ "$GDP_ROOT" = "~${GDP_USER}" ]
+	if [ -d `dirname $GDP_ETC`/ep_adm_params -a ! -e $GDP_ETC/params ]
+	then
+		# relocate /etc/ep_adm_params to /etc/gdp/params
+		mv `dirname $GDP_ETC`/ep_adm_params $GDP_ETC/params
+	fi
+	if [ ! -e `dirname $GDP_ETC`/ep_adm_params ]
+	then
+		# create legacy link if it doesn't already exist
+		(cd `dirname $GDP_ETC`; ln -s gdp/params ep_adm_params)
+	fi
+fi
+if [ ! -d $GDP_ETC/params ]
 then
-	EP_PARAMS=$GDP_ROOT/.ep_adm_params
-else
-	EP_PARAMS=$GDP_ETC/ep_adm_params
+	mkdir_gdp $EP_PARAMS
+	(cd `dirname $GDP_ETC`; ln -s gdp/params ep_adm_params)
 fi
 
-mkdir_gdp $GDP_ETC
-mkdir_gdp $EP_PARAMS
 mkdir_gdp $GDP_KEYS_DIR 0750
 
 ## set up default runtime administrative parameters
@@ -95,8 +106,8 @@ info "Creating $EP_PARAMS/gdp"
 } > $TMP/gdp.params
 if [ ! -f $EP_PARAMS/gdp ]
 then
+	mkfile_gdp $EP_PARAMS/gdp
 	cp $TMP/gdp.params $EP_PARAMS/gdp
-	chown ${GDP_USER}:${GDP_GROUP} $EP_PARAMS/gdp
 	cat $EP_PARAMS/gdp
 elif cmp -s $TMP/gdp.params $EP_PARAMS/gdp
 then

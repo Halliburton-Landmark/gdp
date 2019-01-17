@@ -131,6 +131,9 @@ read_param_file(char *path)
 **  GET_PARAM_PATH --- create the search path
 **
 **	Instances of "~" are converted to refer to the home directory.
+**	Searches for directories named ".?gdp/params" even though that's
+**		a layering violation (libep is not libgdp-specific).
+**	But also searches ep_adm_params for historic reasons.
 */
 
 static char *
@@ -151,17 +154,22 @@ get_param_path(void)
 	{
 		if (getuid() == geteuid())
 		{
-			strlcpy(pathbuf, ".ep_adm_params:", sizeof pathbuf);
+			strlcpy(pathbuf, ".gdp/params:.ep_adm_params:",
+					sizeof pathbuf);
 			path = getenv("HOME");
 			if (path != NULL)
 			{
 				strlcat(pathbuf, path, sizeof pathbuf);
-				strlcat(pathbuf, "/.ep_adm_params:",
-						sizeof pathbuf);
+				strlcat(pathbuf, "/.gdp/params:", sizeof pathbuf);
+				strlcat(pathbuf, path, sizeof pathbuf);
+				strlcat(pathbuf, "/.ep_adm_params:", sizeof pathbuf);
 			}
 		}
 		strlcat(pathbuf,
-			"/usr/local/etc/ep_adm_params:/etc/ep_adm_params",
+			"/usr/local/etc/gdp/params"
+			":/etc/gdp/params"
+			":/usr/local/etc/ep_adm_params"
+			":/etc/ep_adm_params",
 			sizeof pathbuf);
 	}
 	else

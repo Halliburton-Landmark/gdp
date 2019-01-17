@@ -48,7 +48,7 @@ configuration file at all &mdash; it should "just work."
 
 Configuration files are simple "name=value" pairs, one per line.
 There is a built-in search path
-"`.ep_adm_params:~/.ep_adm_params:/usr/local/etc/ep_adm_params:/etc/ep_adm_params`"
+"`.gdp/params:~/.gdp/params:/usr/local/etc/gdp/params:/etc/gdp/params`"
 that can be overridden the `EP_PARAM_PATH` environment variable.
 (Note: if a program is running setuid then only the two
 system paths are searched, and `EP_PARAM_PATH` is ignored.)
@@ -68,7 +68,7 @@ Zeroconf fails.
 
 #### Example
 
-In file `/usr/local/etc/ep_adm_params/gdp`:
+In file `/etc/gdp/params/gdp`:
 
 	swarm.gdp.routers=mygdp.example.com; gdp-01.eecs.berkeley.edu; gdp-02.eecs.berkeley.edu
 

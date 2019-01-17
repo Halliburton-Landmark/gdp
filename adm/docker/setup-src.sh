@@ -88,7 +88,7 @@ cd gdp && make
 
 set -e
 
-PARAMS=/etc/ep_adm_params
+PARAMS=/etc/gdp/params
 mkdir -p $PARAMS
 cat > $PARAMS/gdp <<- EOF
 	swarm.gdp.routers=$GDP_ROUTER

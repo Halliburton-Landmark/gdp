@@ -175,15 +175,13 @@ configure_defaults() {
     if [ "$GDP_ROOT" = "/usr" ]
     then
 	    : ${GDP_ETC:=/etc/gdp}
-	    : ${EP_PARAMS:=/etc/ep_adm_params}
     elif [ "$GDP_ROOT" = "/usr/local" -o "$GDP_ROOT" = "/opt/local" ]
     then
 	    : ${GDP_ETC:=$GDP_ROOT/etc/gdp}
-	    : ${EP_PARAMS:=/usr/local/etc/ep_adm_params}
     else
 	    : ${GDP_ETC:=$GDP_ROOT/etc}
-	    : ${EP_PARAMS:=/usr/local/etc/ep_adm_params}
     fi
+    : ${EP_PARAMS:=$GDP_ETC/params}
     : ${GDP_USER:=gdp}
     : ${GDP_GROUP:=$GDP_USER}
     : ${GDP_LOG_DIR:=/var/log/gdp}

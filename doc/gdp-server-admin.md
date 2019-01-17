@@ -47,7 +47,7 @@ If you want to change parameters such as socket numbers or the
 GOB directory you can do so without recompiling.  Configuration
 files are simple "name=value" pairs, one per line.  There is
 a built-in search path
-"`.ep_adm_params:~/.ep_adm_params:/usr/local/etc/ep_adm_params:/etc/ep_adm_params`"
+"`.gdp/params:~/.gdp/params:/usr/local/etc/gdp/params:/etc/gdp/params`"
 that can be overridden the `EP_PARAM_PATH` environment variable.
 (Note: if a program is running setuid then only the two
 system paths are searched, and `EP_PARAM_PATH` is ignored.)
@@ -91,13 +91,13 @@ If you don't specify this, the name is chosen randomly each time
 
 ### Example
 
-In file `/usr/local/etc/ep_adm_params/gdp`:
+In file `/etc/gdp/params/gdp`:
 
 	swarm.gdp.routers=mygdp.example.com; gdp-01.eecs.berkeley.edu; gdp-02.eecs.berkeley.edu
 
 This tells application
 programs where to look for routers if Zeroconf fails.
-In file `/usr/local/etc/ep_adm_params/gdplogd`:
+In file `/etc/gdp/params/gdplogd`:
 
 	swarm.gdp.data.root=/var/swarm/gdp
 	swarm.gdplogd.gdpname=com.example.mygdp.gdplogd

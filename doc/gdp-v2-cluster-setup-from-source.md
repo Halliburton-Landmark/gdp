@@ -133,7 +133,7 @@ want to install a more recent-ish version, see toward the end.
 
 Check the runtime configuration files for rationality.
 
-    vi /etc/ep_adm_params/*
+    vi /etc/gdp/params/*
 
 ## Language Bindings
 
