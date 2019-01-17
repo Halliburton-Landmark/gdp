@@ -72,10 +72,9 @@ rm $tmpfile
 : ${swarm_gdplogd_log_dir:=glogs}
 pwd
 cd $swarm_gdp_data_dir		# in case log_dir uses relative path
-$debug && echo swarm_gdp_data_dir=$swarm_gdp_data_dir PWD=$PWD
 cd $swarm_gdplogd_log_dir	# might be relative or absolute
-$debug && echo swarm_gdplogd_log_dir=$swarm_gdplogd_log_dir PWD=$PWD
 args="-v $PWD:/var/swarm/gdp/glogs"
+args="$args -v ${GDP_ETC}:/etc/gdp:ro"
 
 # name of log server
 if [ -z "$swarm_gdplogd_gdpname" ]; then
@@ -98,15 +97,20 @@ export GDP_HONGD_SERVER="$swarm_gdp_hongdb_host"
 test -z "$swarm_gdp_hongdb_host" || args="$args -e GDP_HONGD_SERVER"
 
 # additional arguments to gdplogd itself (passed in environment)
-args="$args -e GDPLOGD_ARGS"
+test -z "$GDPLOGD_ARGS" || args="$args -e GDPLOGD_ARGS"
 
 if $debug; then
+	echo ""
 	echo "=== Environment ==="
-	env
+	env | grep GDP
+	echo ""
 	echo "=== Command Line Args ==="
 	echo "$*"
+	echo ""
 	echo "=== Command ==="
-	echo "exec docker run $args gdplogd:$VER $*"
+	echo "exec docker run $args $@ gdplogd:$VER"
 else
-	exec docker run $args gdplogd:$VER $*
+	echo =$GDPLOGD_ARGS=
+	echo "exec docker run $args $@ gdplogd:$VER"
+	exec docker run $args "$@" gdplogd:$VER
 fi

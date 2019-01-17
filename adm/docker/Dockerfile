@@ -135,14 +135,12 @@ FROM gdp-dev-c AS gdp-run-base
 # is mounted from the host into the container.
 ARG GDP_UID=133
 #RUN addgroup -g $GDP_UID gdp && adduser -S -u $GDP_UID -G gdp gdp
-RUN adduser --system --uid $GDP_UID --group gdp
 
-#RUN apk install \
-#	avahi-libs-0.7-r1 \
-#	XXX more XXX
-# Following should be in a separate image (so that the actual
-# gdp-run-base image is minimized).  We can do that when we
-# convert to alpine.
+COPY setup-run-base.sh /
+RUN env GDP_UID=$GDP_UID /setup-run-base.sh && rm /setup-run-base.sh
+VOLUME /etc/gdp
+
+# could be in setup-run-base.sh
 RUN rm -rf /src/gdp
 
 
@@ -155,22 +153,15 @@ RUN rm -rf /src/gdp
 #	It is possible to override the default router.
 #
 #	You have to run this with:
-#		datadir=/var/swarm/gdp		# set as appropriate
-#		uid=<unique name>		# set as appropriate
-#		router=<router name>		# optional
-#		gdplogd_name=<name root>	# optional
+#		datadir=/var/swarm/gdp
+#		export GDP_ROUTER="<router name>"
+#		export GDPLOGD_NAME="<unique name>"
 #		docker run \
+#			-v /etc/gdp:/etc/gdp:ro \
 #			-v $datadir:/var/swarm/gdp \
-#			-e GDP_ROUTER=$router \
-#			-e GDPLOGD_NAME=$gdplogd_name \
+#			-e GDP_ROUTER \
+#			-e GDPLOGD_NAME \
 #			gdplogd
-#
-#	If GDP_ROUTER isn't set it defaults to gdp-01.eecs.berkeley.edu;
-#		it would be better if this pointed to a local router.
-#	If GDPLOGD_NAME isn't set it defaults to the container name,
-#		which is essentially a random number.  This means that
-#		attempts to create logs on this log server will need to
-#		be customized each time the container starts up.
 #
 #	The spawn-gdplogd.sh script should set this up for you, starting
 #	from the host system parameter files.
@@ -183,16 +174,14 @@ ARG GDP_ROUTER=gdp-01.eecs.berkeley.edu
 ENV GDP_ROUTER=$GDP_ROUTER
 VOLUME /var/swarm/gdp/glogs
 
-COPY setup-gdplogd.sh start-gdplogd.sh /src/
+COPY setup-gdplogd.sh /src/
+COPY start-gdplogd.sh /usr/sbin/
 COPY --from=gdp-src-base \
 	/src/gdp/gdplogd/gdplogd2 \
-	/src/gdp/adm/gdplogd-wrapper.sh \
 		/usr/sbin/
-COPY --from=gdp-src-base \
-	/src/gdp/util/llogger \
-		/usr/bin/
 
 RUN /src/setup-gdplogd.sh && rm /src/setup-gdplogd.sh
 USER gdp:gdp
 
-CMD ["/bin/sh", "/src/start-gdplogd.sh"]
+ENTRYPOINT [ "/bin/sh", "-c", "/usr/sbin/start-gdplogd.sh" ]
+CMD [ "-D2" ]
