@@ -21,6 +21,7 @@ public class CreateTestWithKey {
     public static void main(String[] args) throws GDPException{
 
         // Just to check any error output
+        GDP.gdp_init();
         GDP.dbg_set("*=10");
 
         if (args.length<3) { // usage

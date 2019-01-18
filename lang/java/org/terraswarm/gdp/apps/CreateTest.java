@@ -16,6 +16,7 @@ public class CreateTest {
     public static void main(String[] args) throws GDPException{
 
         // Just to check any error output
+        GDP.gdp_init();
         GDP.dbg_set("*=50");
 
         if (args.length<2) { // usage
@@ -28,6 +29,8 @@ public class CreateTest {
         String creationServiceName = args[1];
 
         GDP_CREATE_INFO gci = new GDP_CREATE_INFO();
+        // this should be set to something more sane
+        gci.set_creator("GDPJavaInterface", "BERKELEY.EDU");
         gci.set_creation_service(creationServiceName);
 
         System.out.println("Creating log " + logName + 
