@@ -355,6 +355,9 @@ class logCreationService(GDPService):
         """perform the database operation"""
         table = self.namedb_info.get("table", "human_to_gdp")
         query = "insert into "+table+" (hname, gname) values (%s, %s)"
+        if not self.namedb_conn.is_connected():
+            logging.warning("HONGD connection seems to be lost. Reconnecting")
+            self.namedb_conn.reconnect(attempts=3, delay=1)
         self.namedb_cur.execute(query, (humanname, logname))
         self.namedb_conn.commit()
 
