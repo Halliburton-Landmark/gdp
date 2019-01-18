@@ -60,14 +60,12 @@ public class GDP_GIN {
     /** 
      * Initialize a new Global Data Plane GIN
      *
-     * Signatures are not yet supported, but are taken care of by the C library.
-     *
      * @param name   Name of the log, which will be created if necessary.
      * @param iomode Should this be opened read only, read-append,
-     * append-only.  See {@link #GDP_MODE}.
-     * @param info  GDP_OPEN_INFO associated with this particular in-memory instance
-     * @exception GDPException If a GDP C function returns a code great than or
-     *              equal to Gdp21Library.EP_STAT_SEV_WARN.
+     *               append-only.  See {@link #GDP_MODE}.
+     * @param info   GDP_OPEN_INFO associated with this particular in-memory instance
+     * @exception    GDPException If a GDP C function returns a code great than or
+     *               equal to Gdp21Library.EP_STAT_SEV_WARN.
      */
     public GDP_GIN(GDP_NAME name, GDP_MODE iomode, GDP_OPEN_INFO info) throws GDPException {
 
@@ -177,9 +175,9 @@ public class GDP_GIN {
     ///////////////////////////////////////////////////////////////////////
 
     /**
-     * Create a GCL.
+     * Create a GCL; requires an appropriate GDP_CREATE_INFO structure.
      * 
-     * @param gci a GDP_CREATE_INFO structure
+     * @param gci a GDP_CREATE_INFO structure; see {@link #GDP_CREATE_INFO}.
      * @param external_name   External name of the log to be created
      * @exception GDPException If a GDP C function returns a code great than or
      *            equal to Gdp21Library.EP_STAT_SEV_WARN.
@@ -187,11 +185,12 @@ public class GDP_GIN {
     public static void create(GDP_CREATE_INFO gci, String external_name) throws GDPException {
 
         EP_STAT estat;
-        // Just create a throwaway pointer.
-        PointerByReference tmp = new PointerByReference();
         
+        PointerByReference tmp = new PointerByReference();
+        tmp.setValue(Pointer.NULL);
         estat = Gdp21Library.INSTANCE.gdp_gin_create(
-                                gci.gdp_create_info_ptr, external_name, tmp);
+                                gci.gdp_create_info_ptr,
+                                external_name, tmp);
 
         GDP.check_EP_STAT(estat, "Creation of " + external_name + " failed.");
     }
@@ -212,7 +211,6 @@ public class GDP_GIN {
 
         EP_STAT estat;
         _checkGclh(this.ginh);
-
         if (prevhash == null) {
             estat = Gdp21Library.INSTANCE.gdp_gin_append(this.ginh,
                                 datum.gdp_datum_ptr, null);
@@ -240,7 +238,6 @@ public class GDP_GIN {
 
         EP_STAT estat;
         _checkGclh(this.ginh);
-        
         // FIXME for the moment, we only support one datum. A more general
         // memory management is yet to come.
         if (datums.size() > 1) {
@@ -403,14 +400,14 @@ public class GDP_GIN {
         // See https://gdp.cs.berkeley.edu/redmine/issues/83
 
         //  Added synchronization, see https://gdp.cs.berkeley.edu/redmine/issues/107
-        synchronized (ginh) {
-            if (ginh != null) {
+        synchronized (this.ginh) {
+            if (this.ginh != null) {
                 // Remove ourselves from the global list.
-                _allGclhs.remove(ginh);
+                _allGclhs.remove(this.ginh);
                 
                 // Free the associated gdp_gin_t.
-                Gdp21Library.INSTANCE.gdp_gin_close(ginh);
-                ginh = null;
+                Gdp21Library.INSTANCE.gdp_gin_close(this.ginh);
+                this.ginh = null;
             }
         }
     }
