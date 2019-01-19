@@ -38,33 +38,12 @@ There are also two images that are intended for use only from with
 
 Running `make` should be sufficient to build the standard set of
 images.  Note that it builds the image but does not push them to
-a registry.  *We should create a GDP registry for this.*
-A `make` variable `VER` is used as the tag of all of these images;
-this is normally the version version of the GDP release.
-For example, when building version 1.2.3 of the GDP, you **should**
-use:
+a registry by default (see below for details).
 
-	make VER=1.2.3
-
-This version number should match the version number defined in
-`gdp/Makefile` (variables `GDP_VERSION_MAJOR`, `GDP_VERION_MINOR`,
-and `GDP_VERSION_PATCH`) and have a `git` tag `r$VER` in the
-repository.  If these are not the same then you'll also have to
-specify a specific `BRANCH`.  If `VER` is not specified it defaults
-to `latest` and `BRANCH` defaults to `master`.  If `VER` is specified,
-then the tag `latest` is **not** included in the image, which may be
-confusing in the Docker world..
-*[[We should probably fix this.]]*
-*[[Ideally we would extract `VER` directly from the Makefile.]]*
-
-The source code used to build the instances is *not* based on what
-you have in the current directory: it pulls the code from the
-repository.  The git branch pulled depends on `VER` or `BRANCH`
-as described above.  Note that the following two commands produce
-equivalent results:
-
-	make VER=1.2.3
-	make VER=1.2.3 BRANCH=r1.2.3
+A `make` variable `DOCKER_TAG` is used as the tag of all of these
+images.  It defaults to the version number of the GDP (as defined
+in `gdp/Makefile` variables variables `GDP_VERSION_MAJOR`,
+`GDP_VERION_MINOR`, and `GDP_VERSION_PATCH`).
 
 ## Arguments
 
@@ -90,6 +69,35 @@ on the host system on which the image is run.
   but there probably should be until we come up with a scalable,
   federated solution.  In the meantime, there can be only one of
   these in any GDP cluster.  Inherited from `swarm.gdp.hongdb.host`.
+
+## Code
+
+The code in the container comes from the current workspace.  Although
+obvious personal cruft (e.g., `.BAK` files) is excluded from the
+container, some files (e.g., temporary files created during testing)
+may end up in the container.  For this reason, best practice for
+building a production container is to check out a new image from
+git and create containers from that.  For example:
+
+~~~
+    REPO="git://repo.eecs.berkeley.edu/projects/swarmlab/gdp.git"
+    git clone --depth=1 $REPO gdp-docker-build
+    (cd gdp-docker-build/adm/docker; make docker-push)
+    rm -rf gdp-docker-build
+~~~
+
+## GDP Docker Registry
+
+Docker images can be pushed to a registry using `make docker-push`.
+The details of that repo can be set with the following `make` variables:
+
+* `DOCKER_REG_HOST` — the host name of the registry.  Defaults to
+  `gdp.cs.berkeley.edu:5005`.
+* `DOCKER_REG_USER` — the user name on the registry.  Defaults to
+  `gdp`.
+
+The `docker-push` target will tag the image appropriately and then
+push it to that registry.
 
 
 # Running Docker Instances
@@ -121,13 +129,19 @@ a container.  For example, it examines the usual parameters files:
 for parameters.  In particular, it uses the following parameters:
 
 * `swarm.gdplogd.log.dir` is the Unix pathname of the directory
-  holding persistent log data.
-  Defaults to `/var/swarm/gdp/glogs`.
-* `swarm.gdp.routers` sets the default set of routers.  If set,
-  this will override the `GDP_ROUTER` parameter set when the image
+  holding persistent log data.  Defaults to `/var/swarm/gdp/glogs`.
+* `swarm.gdp.routers` sets the default set of routers.  It is
+  overridden by the `GDP_ROUTER` environment variable, which
+  defaults to the value of that parameter set when the image
   was built.
-* `swarm.gdp.hongdb.host` overrides `GDP_HONGD_SERVER`.  It has
-  no default.
-* `swarm.gdplogd.gdpname` overrides `GDPLOGD_NAME`.  Defaults
-  to the reversed name of the host on which the container is
-  being run with `.gdplogd` appended.
+* `swarm.gdp.hongdb.host` is the default name for the human-oriented
+  name to GDPname directory database server.  It is overridden by
+  the `GDP_HONGD_SERVER` environment variable.  It has no default.
+* `swarm.gdplogd.gdpname` is the default name for the log server.
+  It is overridden by the `GDPLOGD_NAME` environment variable.
+  Defaults to the reversed name of the host on which the container
+  is being run with `.gdplogd` appended.
+
+If the `-v` flag is set or the `VER` environment variable is set,
+the docker container invoked uses that as the version tag; otherwise
+it defaults to `latest`.

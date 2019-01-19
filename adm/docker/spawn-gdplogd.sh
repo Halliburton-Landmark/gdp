@@ -13,8 +13,8 @@
 #	and then tell docker to pick them up from the environment.
 #
 
-args=`getopt D $*`
-test $? != 0 && echo "Usage: $0 [-D]" >&2 && exit 1
+args=`getopt Dv: $*`
+test $? != 0 && echo "Usage: $0 [-D] [-v version]" >&2 && exit 1
 set -- $args
 debug=false
 : ${VER:=latest}
@@ -23,6 +23,10 @@ do
 	case "$1" in
 	  -D)
 		debug=true
+		;;
+	  -v)
+		VER=$1
+		shift
 		;;
 	  --)
 		shift
@@ -85,18 +89,22 @@ if [ -z "$swarm_gdplogd_gdpname" ]; then
 				tr '\n' '.' | \
 				sed 's/\.$//'`
 fi
-export GDPLOGD_NAME="${swarm_gdplogd_gdpname}"
+: ${GDPLOGD_NAME:=${swarm_gdplogd_gdpname}}
+export GDPLOGD_NAME
 args="$args -e GDPLOGD_NAME"
 
 # optional argument: routers
-export GDP_ROUTER="${swarm_gdp_routers}"
-test -z "${swarm_gdp_routers}" || args="$args -e GDP_ROUTER"
+: ${GDP_ROUTER:=${swarm_gdp_routers}}
+export GDP_ROUTER
+test -z "${GDP_ROUTER}" || args="$args -e GDP_ROUTER"
 
 # name of Human-Oriented Name to GDPname Directory server (IP address)
-export GDP_HONGD_SERVER="$swarm_gdp_hongdb_host"
-test -z "$swarm_gdp_hongdb_host" || args="$args -e GDP_HONGD_SERVER"
+: ${GDP_HONGD_SERVER:=${swarm_gdp_hongdb_host}}
+export GDP_HONGD_SERVER
+test -z "$GDP_HONGD_SERVER" || args="$args -e GDP_HONGD_SERVER"
 
 # additional arguments to gdplogd itself (passed in environment)
+# can also be passed on the command line (after "--")
 test -z "$GDPLOGD_ARGS" || args="$args -e GDPLOGD_ARGS"
 
 if $debug; then
@@ -110,7 +118,6 @@ if $debug; then
 	echo "=== Command ==="
 	echo "exec docker run $args $@ gdplogd:$VER"
 else
-	echo =$GDPLOGD_ARGS=
-	echo "exec docker run $args $@ gdplogd:$VER"
-	exec docker run $args "$@" gdplogd:$VER
+	echo "exec docker run $args gdplogd:$VER $@"
+	exec docker run $args gdplogd:$VER "$@"
 fi

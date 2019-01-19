@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
 #
-#  Script to fetch the GDP source code.
+#  Script to process the GDP source code into a docker container.
 #
 
 set -e
@@ -9,28 +9,16 @@ set -e
 # throttle debconf errors
 export DEBIAN_FRONTEND=noninteractive
 
-args=`getopt b:Dr:v: $*`
-test $? != 0 && echo "Usage $0 [-b branch] [-r repo] [-v ver]" >&2 && exit 64
+args=`getopt D $*`
+test $? != 0 && echo "Usage $0 [-D]" >&2 && exit 64
 set -- $args
 debug=false
 while true
 do
 	$debug && echo "Parsing $*"
 	case "$1" in
-	  -b)
-		BRANCH=$2
-		shift
-		;;
 	  -D)
 		debug=true
-		;;
-	  -r)
-		REPO=$2
-		shift
-		;;
-	  -v)
-		VER=$2
-		shift
 		;;
 	  --)
 		shift
@@ -39,43 +27,17 @@ do
 	shift
 done
 
-: ${VER:=latest}
-test "$BRANCH" = "default" && BRANCH="r$VER"
-test "$BRANCH" = "rlatest" && BRANCH=master
-test "$REPO" = "default" && REPO="git://repo.eecs.berkeley.edu/projects/swarmlab/gdp.git"
+cd /src
+ls -al gdp-src.tar
+mkdir gdp
+cd gdp
+tar xf ../gdp-src.tar
+#rm ../gdp-src.tar
 
-if $debug; then
-	echo VER=$VER BRANCH=$BRANCH REPO=$REPO
-	echo args=$*
-	exit 0
-fi
-
-
-# ideally this would leverage adm/gdp-setup.sh to avoid duplication
-PACKAGES=`sed -e 's/*.*//' << 'EOF'
-	apt-utils
-	git
-	libavahi-client-dev
-	libevent-dev
-	libevent-pthreads-2.0.5
-	libjansson-dev
-	libmariadb-client-lgpl-dev
-	libsqlite3-dev
-	libssl-dev
-	libsystemd-dev
-	protobuf-c-compiler
-	sudo
-	uuid-dev
-EOF
-`
-
-echo "Compiling and installing gdp-dev-c from" `pwd`
-apt-get update
-apt-get install -y $PACKAGES
-
-git clone --depth=1 -b ${BRANCH} ${REPO}
-cd gdp && make
-
+# make sure adm/gdp-version.{sh,txt} are created
+#cd gdp
+#make gdp_version.h
+make
 
 #
 #  Do setup for GDP clients.
@@ -85,8 +47,6 @@ cd gdp && make
 #				to GDPname server
 #	  GDP_CREATION_SERVICE	The GDPname of the creation service
 #
-
-set -e
 
 PARAMS=/etc/gdp/params
 mkdir -p $PARAMS

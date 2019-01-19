@@ -10,6 +10,6 @@
 set -e
 
 cd /src/gdp
-make install-client
-srcfiles=`ls | grep -v adm`
+make install-client install-doc
+srcfiles=`ls | grep -v '^adm$'`
 rm -r $srcfiles

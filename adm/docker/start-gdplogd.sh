@@ -10,8 +10,15 @@
 #
 
 : ${GDP_VER:=2}
+echo exec /usr/sbin/gdplogd${GDP_VER} \
+	-F \
+	-G "$GDP_ROUTER" \
+	-N "$GDPLOGD_NAME" \
+	$GDPLOGD_ARGS \
+	"$@"
 exec /usr/sbin/gdplogd${GDP_VER} \
 	-F \
 	-G "$GDP_ROUTER" \
 	-N "$GDPLOGD_NAME" \
-	$GDPLOGD_ARGS
+	$GDPLOGD_ARGS \
+	"$@"

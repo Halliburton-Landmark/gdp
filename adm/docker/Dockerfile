@@ -6,26 +6,40 @@
 ##  For example, to create just the C development environment:
 ##	docker build --target gdp-dev-c -t gdp-dev-c .
 ##
-##  There are also parameters you can set using --build-arg:
-##	VER			The version tag on the resulting image.
-##				Defaults to "latest".
-##	BRANCH			The source code branch to use.
-##				Defaults to "master".
-##	REPO			The URI of the source code repo (used to
-##				fetch the gdp-src-base code).
-##				Defaults to the Berkeley repo.
-##
-##  Others can also be set this way, but they are normally not defined
-##  at build time, since the usual approach is to pick these up at
-##  run time when the container starts.  They can be used for special
-##  circumstances (building custom images for special customers).
+##  Parameters can be set during build time, but they are usually
+##  deferred until run time when the container starts.  They can
+##  be used for special circumstances such as building custom images
+##  for special customers.
 ##	GDP_ROUTER		The default router for clients (IP address).
 ##	GDP_HONGD_SERVER	The Human to GDP name directory (IP address).
 ##	GDP_CREATION_SERVICE	The default creation service name (GDPname).
 ##	GDPLOGD_NAME		The default name for gdplogd (GDPname).
 ##				Can be changed at run time using
-##				  docker run -e GDPLOGD_NAME=xxx gdplogd.
+##				`docker run -e GDPLOGD_NAME=xxx gdplogd`.
 ##
+
+
+############################################################
+#
+#  The operating system base, including required packages.
+#  This is a separate step solely to avoid having to reinstall all of
+#  these just because the GDP source code has changed.
+#
+
+FROM ubuntu:16.04 AS gdp-system-base
+RUN apt-get update && apt-get install -y \
+	apt-utils \
+	libavahi-client-dev \
+	libevent-dev \
+	libevent-pthreads-2.0.5 \
+	libjansson-dev \
+	libmariadb-client-lgpl-dev \
+        libsqlite3-dev \
+        libssl-dev \
+        libsystemd-dev \
+        protobuf-c-compiler \
+        sudo \
+        uuid-dev
 
 
 ############################################################
@@ -47,7 +61,7 @@
 #  change several of them.
 #
 
-FROM ubuntu:16.04 as gdp-src-base
+FROM gdp-system-base as gdp-src-base
 
 #  Parameters:
 
@@ -68,40 +82,32 @@ ARG GDP_HONGD_SERVER
 ENV GDP_HONGD_SERVER=$GDP_HONGD_SERVER
 
 # The version number ("tag") of the resulting image.
-ARG VER=latest
+ARG DOCKER_TAG=latest
+
+# The location of a tar file containing the source tree
+ARG GDP_SRC_TAR
 
 # The major version number of the GDP code.  Should match GDP_VERSION_MAJOR
 # in gdp/Makefile.  Used for creating file names.  It is not well defined.
 ENV GDP_VER=2
 
-# The URI of the source code repo.  If "default" it uses the Berkeley repo.
-ARG REPO="default"
-
-# The branch in the source code repo.  If "default" it will use branch
-# "r$VER" (that is, the version number preceded by the letter "r", per
-# our convention for naming releases.  If "$VER" is "latest", then this
-# becomes "master".
-ARG BRANCH="default"
-
 # And now for the real work.
-COPY setup-src.sh /src/
+COPY setup-src.sh gdp-src.tar /src/
 WORKDIR /src
-RUN VER=$VER /src/setup-src.sh -r "${REPO}" -b "${BRANCH}" && \
-		cd / && rm /src/setup-src.sh
+RUN /src/setup-src.sh
 
 
 ############################################################
 #
 #  The C-based development environment.
 #	Compiles and installs the libraries (but no clients).
+#	Removes most of the source code when done.
 #  The intent is that this will be used as a base image for C-based
 #	application development.
 #
 
 FROM gdp-src-base AS gdp-dev-c
-
-COPY setup-dev-c.sh /src
-RUN /src/setup-dev-c.sh && rm /src/setup-dev-c.sh
+RUN /src/gdp/adm/docker/setup-dev-c.sh
 
 
 ############################################################
@@ -167,6 +173,11 @@ RUN rm -rf /src/gdp
 #	from the host system parameter files.
 #
 
+# first a large image with source code
+FROM gdp-src-base AS gdplogd-dev
+RUN cd /src/gdp && make install-gdplogd
+
+# then a smaller image to actually execute
 FROM gdp-run-base AS gdplogd
 ARG GDPLOGD_NAME
 ENV GDPLOGD_NAME=$GDPLOGD_NAME
@@ -174,14 +185,14 @@ ARG GDP_ROUTER=gdp-01.eecs.berkeley.edu
 ENV GDP_ROUTER=$GDP_ROUTER
 VOLUME /var/swarm/gdp/glogs
 
-COPY setup-gdplogd.sh /src/
 COPY start-gdplogd.sh /usr/sbin/
-COPY --from=gdp-src-base \
+COPY --from=gdplogd-dev \
 	/src/gdp/gdplogd/gdplogd2 \
 		/usr/sbin/
-
+COPY setup-gdplogd.sh /src
 RUN /src/setup-gdplogd.sh && rm /src/setup-gdplogd.sh
+
 USER gdp:gdp
 
-ENTRYPOINT [ "/bin/sh", "-c", "/usr/sbin/start-gdplogd.sh" ]
+ENTRYPOINT [ "/usr/sbin/start-gdplogd.sh" ]
 CMD [ "-D2" ]
