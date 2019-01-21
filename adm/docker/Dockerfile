@@ -39,7 +39,8 @@ RUN apt-get update && apt-get install -y \
         libsystemd-dev \
         protobuf-c-compiler \
         sudo \
-        uuid-dev
+        uuid-dev \
+	&& apt-get clean
 
 
 ############################################################
