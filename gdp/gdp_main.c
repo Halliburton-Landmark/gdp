@@ -1106,7 +1106,7 @@ gdp_lib_init(const char *progname, const char *myname)
 		gdp_pname_t pname;
 
 		estat = gdp_parse_name(myname, _GdpMyRoutingName);
-		ep_dbg_cprintf(Dbg, 19, "Setting my name:\n\t%s\n\t%s\n",
+		ep_dbg_cprintf(Dbg, 9, "Setting my name:\n\t%s\n\t%s\n",
 				myname, gdp_printable_name(_GdpMyRoutingName, pname));
 		if (EP_STAT_ISFAIL(estat))
 			myname = NULL;
