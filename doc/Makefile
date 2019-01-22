@@ -7,7 +7,7 @@
 # 	It would be nice to make .html versions of the .md files, but
 # 	pandoc is not installed on the Jenkins machine.
 PUBALL= \
-		gdp-gcl-metadata.html \
+		gdp-gob-metadata.html \
 		gdp-programmatic-api.html \
 		gdp-proto-v4-proposal.md \
 		gdp-protocol-v3.html \
@@ -27,9 +27,6 @@ DESTDIR=
 LOCALROOT=	/usr
 INSTALLROOT=	${DESTDIR}${LOCALROOT}
 DOCDIR=		${INSTALLROOT}/share/doc/gdp
-
-# remove this if pandoc gets installed on the Jenkins machine
-jenkins-all: ${PUBALL}
 
 all: ${ALL}
 
