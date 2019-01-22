@@ -75,6 +75,7 @@ static struct ep_stat_to_string	Stats[] =
     { EP_STAT_CRYPTO_TOOLARGE,	"key or password too long",		},
     { EP_STAT_CRYPTO_FAIL,	"unknown cryptographic failure",	},
     { EP_STAT_CRYPTO_HASHALG,	"unknown message digest algorithm",	},
+    { EP_STAT_CRYPTO_KEYFAIL,	"corrupt key",				},
 
     { EP_STAT_OK,		NULL,					}
 };
