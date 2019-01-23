@@ -395,20 +395,31 @@ gdp_exit_debug(void)
 	}
 }
 
+
 EP_STAT
 gdp_init(const char *router_addr)
+{
+	return gdp_init2(router_addr, 0);
+}
+
+
+EP_STAT
+gdp_init2(const char *router_addr, uint32_t flags)
 {
 	gdp_chan_x_t *chanx = NULL;
 	EP_STAT estat = EP_STAT_OK;
 	extern EP_FUNCLIST *_GdpDumpFuncs;
 
-	ep_dbg_cprintf(Dbg, 9, "gdp_init, initialized = %d\n", _GdpLibInitialized);
-	if (_GdpLibInitialized)				// set in gdp_lib_init
+	ep_dbg_cprintf(Dbg, 9, "gdp_init, state = %d\n", _GdpInitState);
+	if (_GdpInitState >= GDP_INIT_COMPLETE)
 		goto done;
 
 	// set up global state, event loop, etc. (shared with gdplogd)
-	estat = gdp_lib_init(NULL, NULL);
-	EP_STAT_CHECK(estat, goto fail0);
+	if (_GdpInitState < GDP_INIT_LIB)
+	{
+		estat = gdp_lib_init(NULL, NULL, flags);
+		EP_STAT_CHECK(estat, goto fail0);
+	}
 
 	ep_funclist_push(_GdpDumpFuncs, _gdp_event_dump_all, NULL);
 
@@ -440,7 +451,7 @@ gdp_init(const char *router_addr)
 	// do some optional status printing on exit
 	atexit(gdp_exit_debug);
 
-	_GdpLibInitialized = true;
+	_GdpInitState = GDP_INIT_COMPLETE;
 
 fail0:
 done:

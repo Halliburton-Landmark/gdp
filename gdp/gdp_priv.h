@@ -89,10 +89,16 @@ extern EP_THR		_GdpIoEventLoopThread;
 extern event_base_t	*_GdpIoEventBase;	// for all I/O events
 extern gdp_chan_t	*_GdpChannel;		// our primary app-level protocol port
 extern gdp_name_t	_GdpMyRoutingName;	// source name for PDUs
-extern bool			_GdpLibInitialized;	// are we initialized?
+extern int			_GdpInitState;		// initialization state, see below
+
+#define GDP_INIT_NONE		0	// uninitialized
+#define GDP_INIT_PHASE_0	10	// phase 0 complete
+#define GDP_INIT_LIB		20	// gdp_init_lib done
+#define GDP_INIT_COMPLETE	99	// all initialization complete
 
 #define GDP_CHECK_INITIALIZED											\
-					(_GdpLibInitialized ? EP_STAT_OK					\
+					((_GdpInitState >= GDP_INIT_COMPLETE)				\
+										? EP_STAT_OK					\
 										: gdp_init(NULL))
 
 #ifndef GDP_OPT_EXTENDED_CACHE_CHECK		//XXX DEBUG TEMPORARY

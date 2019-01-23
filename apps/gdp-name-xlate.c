@@ -142,7 +142,7 @@ main(int argc, char **argv)
 	// we do need the name lookup part of this --- cheat and use
 	// internal interfaces.
 	// DON'T TRY THIS AT HOME, KIDS!!!
-	gdp_init_phase_0(NULL);
+	gdp_init_phase_0(NULL, 0);
 	extern void _gdp_name_init(void);
 	_gdp_name_init();
 

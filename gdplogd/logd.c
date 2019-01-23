@@ -335,7 +335,7 @@ main(int argc, char **argv)
 
 	// initialize GDP and the EVENT library
 	phase = "gdp library";
-	estat = gdp_lib_init("gdplogd", myname);
+	estat = gdp_lib_init("gdplogd", myname, GDP_INIT_NO_HONGDS);
 	EP_STAT_CHECK(estat, goto fail0);
 
 	// initialize physical logs (expand this if multiple log implementations)

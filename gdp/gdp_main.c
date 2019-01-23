@@ -1010,9 +1010,12 @@ siginfo(int sig, short what, void *arg)
 */
 
 EP_STAT
-gdp_init_phase_0(const char *progname)
+gdp_init_phase_0(const char *progname, uint32_t flags)
 {
 	ep_dbg_cprintf(Dbg, 4, "gdp_init_phase_0: %s\n", GdpVersion);
+
+	if (_GdpInitState >= GDP_INIT_PHASE_0)
+		return EP_STAT_OK;
 
 	// initialize the EP library
 	ep_lib_init(EP_LIB_USEPTHREADS);
@@ -1035,6 +1038,12 @@ gdp_init_phase_0(const char *progname)
 	// register status strings
 	_gdp_stat_init();
 
+	// if not using Zeroconf, disable it
+	if (EP_UT_BITSET(GDP_INIT_NO_ZEROCONF, flags))
+		ep_adm_setparam("swarm.gdp.zeroconf.enable", "false");
+
+	_GdpInitState = GDP_INIT_PHASE_0;
+
 	return EP_STAT_OK;
 }
 
@@ -1049,9 +1058,10 @@ gdp_init_phase_0(const char *progname)
 
 // locks out multiple calls to gdp_lib_init
 static EP_THR_MUTEX		GdpInitMutex	EP_THR_MUTEX_INITIALIZER;
+int						_GdpInitState;
 
 EP_STAT
-gdp_lib_init(const char *progname, const char *myname)
+gdp_lib_init(const char *progname, const char *myname, uint32_t flags)
 {
 	EP_STAT estat = EP_STAT_OK;
 
@@ -1059,13 +1069,14 @@ gdp_lib_init(const char *progname, const char *myname)
 			myname == NULL ? "NULL" : myname);
 
 	ep_thr_mutex_lock(&GdpInitMutex);
-	if (_GdpLibInitialized)
+	if (_GdpInitState >= GDP_INIT_LIB)
 		goto done;
 
-	gdp_init_phase_0(progname);
+	gdp_init_phase_0(progname, flags);
 
 	// initialize external -> internal name mapping
-	_gdp_name_init();
+	if (!EP_UT_BITSET(GDP_INIT_NO_HONGDS, flags))
+		_gdp_name_init();
 
 	if (ep_dbg_test(EvlibDbg, 80))
 	{
@@ -1192,7 +1203,7 @@ fail0:
 					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 
-	_GdpLibInitialized = true;
+	_GdpInitState = GDP_INIT_LIB;
 	ep_thr_mutex_unlock(&GdpInitMutex);
 	return estat;
 }

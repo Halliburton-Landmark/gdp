@@ -203,16 +203,25 @@ typedef void			(*gdp_event_cbfunc_t)(	// the callback function
 extern EP_STAT	gdp_init(
 					const char *gdpd_addr);	// address of gdpd
 
+extern EP_STAT	gdp_init2(			// same, but two arguments
+					const char *gdpd_addr,	// address of gdpd
+					uint32_t flags);		// tweak operations, see below
+
 // pre-initialize the library (gdp_init does this -- rarely needed)
 // includes event loop setup (not run), cache setup, signal handling
 EP_STAT			gdp_lib_init(
 					const char *progname,
-					const char *my_routing_name);
+					const char *my_routing_name,
+					uint32_t flags);
 
 // pre-pre-initialize basic libraries (gdp_lib_init does this -- only
 // used by programs that don't actually talk to the GDP itself)
 EP_STAT			gdp_init_phase_0(
-					const char *progname);
+					const char *progname,
+					uint32_t flags);
+
+#define GDP_INIT_NO_HONGDS		0x00000001	// don't initialize HONGDS
+#define GDP_INIT_NO_ZEROCONF	0x00000002	// don't use zeroconf
 
 // run event loop (normally run from gdp_init; never returns)
 extern void		*gdp_run_accept_event_loop(
