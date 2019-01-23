@@ -97,6 +97,9 @@ extern bool		ep_adm_getboolparam(	// get boolean param value
 extern const char	*ep_adm_getstrparam(	// get string param value
 				const char *name,	// name of param
 				const char *def);	// default value
+extern void		ep_adm_setparam(	// set a single parameter
+				const char *name,	// name of param
+				const char *val);	// value
 
 extern FILE		*ep_fopen_smem(		// open a static memory buffer
 				void *buf,		// buffer

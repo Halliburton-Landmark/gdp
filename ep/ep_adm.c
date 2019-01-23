@@ -128,6 +128,24 @@ read_param_file(char *path)
 
 
 /*
+**  EP_ADM_SETPARAM --- set a single parameter.
+**	Useful for having command line flags override parameters.
+**	Note: must be called after the parameter files are read.
+*/
+
+void
+ep_adm_setparam(const char *np, const char *vp)
+{
+	char *op;
+
+	vp = ep_mem_strdup(vp);
+	op = (char *) ep_hash_insert(ParamHash, strlen(np), np, vp);
+	if (op != NULL)
+		ep_mem_free(op);
+}
+
+
+/*
 **  GET_PARAM_PATH --- create the search path
 **
 **	Instances of "~" are converted to refer to the home directory.
