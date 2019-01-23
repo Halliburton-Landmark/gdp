@@ -225,41 +225,105 @@ fail0:
 }
 
 
+/*
+**  Try a key of a particular type (writer or owner probably).
+**  Skip if we don't have a public key or can't find the secret key.
+*/
+
+static EP_STAT
+try_key(gdp_gob_t *gob,
+			gdp_md_id_t mdid,
+			const char *key_sfx,
+			EP_CRYPTO_KEY **publickey_p,
+			EP_CRYPTO_KEY **secretkey_p)
+{
+	EP_STAT estat;
+	EP_CRYPTO_KEY *publickey;
+	EP_CRYPTO_KEY *secretkey;
+	size_t pkbuflen;
+	const uint8_t *pkbuf;
+	int md_alg_id;
+
+	// see if we have a public key we can use
+	estat = gdp_md_find(gob->gob_md, mdid, &pkbuflen, (const void **)&pkbuf);
+	if (!EP_STAT_ISOK(estat))
+	{
+		ep_dbg_cprintf(Dbg, 30, "try_key: no public key\n");
+		return estat;
+	}
+	md_alg_id = pkbuf[0];
+	publickey = ep_crypto_key_read_mem(pkbuf + 4, pkbuflen - 4,
+			EP_CRYPTO_KEYFORM_DER, EP_CRYPTO_F_PUBLIC);
+	if (publickey == NULL)
+	{
+		ep_dbg_cprintf(Dbg, 10, "try_key: bad public key for %s%s\n",
+				gob->pname, key_sfx);
+		return EP_STAT_CRYPTO_KEYFAIL;
+	}
+
+	// yep, let's give a shot for the secret key
+	char skey_file_name[sizeof gob->pname + strlen(key_sfx) + 5];
+	snprintf(skey_file_name, sizeof skey_file_name, "%s%s.pem",
+			gob->pname, key_sfx);
+	secretkey = _gdp_crypto_skey_read(NULL, skey_file_name);
+	if (secretkey == NULL)
+	{
+		ep_dbg_cprintf(Dbg, 30, "try_key: no secret key\n");
+		ep_crypto_key_free(publickey);
+		return GDP_STAT_SKEY_REQUIRED;
+	}
+
+	// does the public key actually work?
+	estat = ep_crypto_key_compat(secretkey, publickey);
+	if (!EP_STAT_ISOK(estat))
+	{
+		ep_dbg_cprintf(Dbg, 10, "try_key: incompatible keys\n");
+		ep_crypto_key_free(publickey);
+		ep_crypto_key_free(secretkey);
+		return estat;
+	}
+
+	*secretkey_p = secretkey;
+	*publickey_p = publickey;
+	return EP_STAT_FROM_INT(md_alg_id);
+}
+
+
 static EP_STAT
 find_secret_key(gdp_gob_t *gob,
 			gdp_open_info_t *open_info)
 {
 	// We will write the log, and it does have a public key.  We need
 	// to find the secret to match it.
-	size_t pkbuflen;
-	const uint8_t *pkbuf;
 	int md_alg_id;
+	EP_CRYPTO_KEY *publickey;
 	EP_CRYPTO_KEY *secretkey = NULL;
 	bool my_secretkey = false;
+	const char *key_sfx;
 	EP_STAT estat;
 
 	// see if we have a public key; if not we're done
-	estat = gdp_md_find(gob->gob_md, GDP_MD_WRITERPUBKEY,
-				&pkbuflen, (const void **) &pkbuf);
+	key_sfx = "-writer";
+	estat = try_key(gob, GDP_MD_WRITERPUBKEY, key_sfx, &publickey, &secretkey);
 	if (!EP_STAT_ISOK(estat))
 	{
-		estat = gdp_md_find(gob->gob_md, GDP_MD_OWNERPUBKEY,
-					&pkbuflen, (const void **) &pkbuf);
+		key_sfx = "-owner";
+		estat = try_key(gob, GDP_MD_OWNERPUBKEY, key_sfx, &publickey, &secretkey);
 	}
 #if GDP_COMPAT_OLD_PUBKEYS
 	if (!EP_STAT_ISOK(estat))
 	{
-		estat = gdp_md_find(gob->gob_md, GDP_MD_PUBKEY,
-					&pkbuflen, (const void **) &pkbuf);
+		key_sfx = "";
+		estat = try_key(gob, GDP_MD_PUBKEY, key_sfx, &publickey, &secretkey);
 	}
 #endif
 	if (!EP_STAT_ISOK(estat))
 	{
-		ep_dbg_cprintf(Dbg, 30, "_gdp_gob_open: no public key\n");
+		_ep_crypto_error(estat, "_gdp_gob_open: no signing key available");
 		return EP_STAT_OK;
 	}
 
-	md_alg_id = pkbuf[0];
+	md_alg_id = EP_STAT_TO_INT(estat);
 
 	// get the secret key if needed
 	if (open_info != NULL)
@@ -277,7 +341,10 @@ find_secret_key(gdp_gob_t *gob,
 	// nothing from user; let's try a standard search
 	if (secretkey == NULL)
 	{
-		secretkey = _gdp_crypto_skey_read(gob->pname, "pem");
+		char key_file_name[sizeof gob->pname + strlen(key_sfx) + 1];
+		snprintf(key_file_name, sizeof key_file_name, "%s%s", gob->pname, key_sfx);
+		ep_dbg_cprintf(Dbg, 30, "find_secret_key: reading %s\n", key_file_name);
+		secretkey = _gdp_crypto_skey_read(NULL, key_file_name);
 
 		if (secretkey == NULL)
 		{
@@ -291,15 +358,12 @@ find_secret_key(gdp_gob_t *gob,
 
 	// validate the compatibility of the public and secret keys
 	{
-		EP_CRYPTO_KEY *pubkey = ep_crypto_key_read_mem(pkbuf + 4, pkbuflen - 4,
-				EP_CRYPTO_KEYFORM_DER, EP_CRYPTO_F_PUBLIC);
-
 		if (ep_dbg_test(Dbg, 40))
 		{
-			ep_crypto_key_print(pubkey, ep_dbg_getfile(), EP_CRYPTO_F_PUBLIC);
+			ep_crypto_key_print(publickey, ep_dbg_getfile(), EP_CRYPTO_F_PUBLIC);
 		}
-		estat = ep_crypto_key_compat(secretkey, pubkey);
-		ep_crypto_key_free(pubkey);
+		estat = ep_crypto_key_compat(secretkey, publickey);
+		ep_crypto_key_free(publickey);
 		if (!EP_STAT_ISOK(estat))
 		{
 			// XXX: cheat: use internal interface

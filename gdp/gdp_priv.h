@@ -597,10 +597,7 @@ void			_gdp_gob_pr_stats(			// print (debug) GOB statistics
 struct gdp_open_info
 {
 	EP_CRYPTO_KEY		*signkey;			// signing key
-	EP_STAT				(*signkey_cb)(		// callback to get signing key
-							gdp_name_t	name,
-							void *signkey_udata,
-							EP_CRYPTO_KEY **);
+	gdp_signkey_cb_t	*signkey_cb;		// callback to get signing key
 	void				*signkey_udata;		// passed to signkey_cb
 	uint32_t			flags;				// see below
 };
@@ -964,8 +961,8 @@ gdp_cmd_t		_gdp_acknak_from_estat(		// produce acknak code from status
 */
 
 EP_CRYPTO_KEY	*_gdp_crypto_skey_read(		// read a secret key
-						const char *basename,
-						const char *ext);
+						const char *searchpath,
+						const char *filename);
 void			_gdp_sign_metadata(			// sign the metadata
 						gdp_gin_t *gin);
 

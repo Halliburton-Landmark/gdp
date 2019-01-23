@@ -526,12 +526,14 @@ EP_STAT				gdp_open_info_set_signing_key(
 						EP_CRYPTO_KEY *skey);
 
 // set the callback function to read a signing key from a user
-EP_STAT				gdp_open_info_set_signkey_cb(
-						gdp_open_info_t *info,
-						EP_STAT (*signkey_cb)(
+typedef EP_STAT		gdp_signkey_cb_t(
 							gdp_name_t gname,
 							void *signkey_udata,
-							EP_CRYPTO_KEY **skey),
+							EP_CRYPTO_KEY **skey);
+
+EP_STAT				gdp_open_info_set_signkey_cb(
+						gdp_open_info_t *info,
+						gdp_signkey_cb_t *signkey_cb,
 						void *signkey_udata);
 
 // set the caching behavior

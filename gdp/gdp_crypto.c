@@ -193,48 +193,51 @@ gdp_sig_set(gdp_sig_t *sig, void *sigbytes, size_t siglen)
 */
 
 EP_CRYPTO_KEY *
-_gdp_crypto_skey_read(const char *basename, const char *ext)
+_gdp_crypto_skey_read(const char *searchpath, const char *filename)
 {
-	const char *path = ep_adm_getstrparam("swarm.gdp.crypto.key.path",
-			"."
-			":KEYS"
-			":~/.swarm/gdp/keys"
-			":/usr/local/etc/gdp/keys"
-			":/usr/local/etc/swarm/gdp/keys"
-			":/etc/gdp/keys"
-			":/etc/swarm/gdp/keys");
-	char pbuf[1024];
 	char *p = NULL;
 	char *dir;
 	int keyform = EP_CRYPTO_KEYFORM_PEM;
 	int i;
 
-	if ((i = strlen(basename)) > 4)
+	if ((i = strlen(filename)) > 4)
 	{
-		if (strcmp(&basename[i - 4], ".pem") == 0)
-		{
-			ext = NULL;
+		if (strcmp(&filename[i - 4], ".pem") == 0)
 			keyform = EP_CRYPTO_KEYFORM_PEM;
-		}
-		else if (strcmp(&basename[i - 4], ".der") == 0)
-		{
-			ext = NULL;
+		else if (strcmp(&filename[i - 4], ".der") == 0)
 			keyform = EP_CRYPTO_KEYFORM_DER;
-		}
 	}
 
-	strlcpy(pbuf, path, sizeof pbuf);
+	if (filename[0] == '/')
+	{
+		// absolute path name
+		searchpath = "";
+	}
+	else if (searchpath == NULL)
+	{
+		// get the default search path
+		searchpath = ep_adm_getstrparam("swarm.gdp.crypto.key.path",
+				"."
+				":KEYS"
+				":~/.swarm/gdp/keys"
+				":/usr/local/etc/gdp/keys"
+				":/usr/local/etc/swarm/gdp/keys"
+				":/etc/gdp/keys"
+				":/etc/swarm/gdp/keys");
+	}
+
+	char pbuf[strlen(searchpath) + 1];
+	strlcpy(pbuf, searchpath, sizeof pbuf);
 	for (dir = pbuf; dir != NULL; dir = p)
 	{
 		FILE *fp;
 		EP_CRYPTO_KEY *key;
 		char fnbuf[512];
-		const char *fmt;
 
 		p = strchr(dir, ':');
 		if (p != NULL)
 			*p++ = '\0';
-		if (*dir == '\0')
+		if (*dir == '\0' && filename[0] != '/')
 			continue;
 
 		// create the candidate filename
@@ -244,19 +247,11 @@ _gdp_crypto_skey_read(const char *basename, const char *ext)
 
 			if (home == NULL)
 				continue;
-			if (ext == NULL)
-				fmt = "%s%s/%s";
-			else
-				fmt = "%s%s/%s.%s";
-			snprintf(fnbuf, sizeof fnbuf, fmt, home, dir + 1, basename, ext);
+			snprintf(fnbuf, sizeof fnbuf, "%s%s/%s", home, dir + 1, filename);
 		}
 		else
 		{
-			if (ext == NULL)
-				fmt = "%s/%s";
-			else
-				fmt = "%s/%s.%s";
-			snprintf(fnbuf, sizeof fnbuf, fmt, dir, basename, ext);
+			snprintf(fnbuf, sizeof fnbuf, "%s/%s", dir, filename);
 		}
 
 		ep_dbg_cprintf(Dbg, 40,
