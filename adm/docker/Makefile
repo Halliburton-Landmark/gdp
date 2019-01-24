@@ -48,7 +48,8 @@ DOCKER_TAG=	`cat ${GDP_ADM}/gdp-version.txt`
 DOCKER=		docker
 DOCKERFLAGS=
 
-ALL=		 gdp-src-base gdp-dev-c gdp-run-base gdplogd
+ALL=		gdp-src-base gdp-dev-c gdp-run-base gdplogd
+CLEANALL=	${TMPTAR} `basename ${TMPTAR}`
 
 all: docker-build
 
@@ -110,6 +111,9 @@ gdp_router:	${GDP_ADM}/gdp-version.txt .FORCE
 	${DOCKER} build ${DOCKERFLAGS} --target gdp_router \
 		-t gdp_router:latest \
 		-t gdp_router:${DOCKER_TAG} .
+
+clean:
+	-rm -f ${CLEANALL} *.o *.core
 
 #
 #  Push images to our registry
