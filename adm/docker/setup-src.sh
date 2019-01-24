@@ -34,10 +34,13 @@ cd gdp
 tar xf ../gdp-src.tar
 #rm ../gdp-src.tar
 
+hongd_server="\"$GDP_HONGD_SERVER\""
+test "$hongd_server" = '""' && hongd_server='NULL'
+
 # make sure adm/gdp-version.{sh,txt} are created
 #cd gdp
 #make gdp_version.h
-make
+make GDP_DEFAULT_HONGDB_HOST=$hongd_server
 
 #
 #  Do setup for GDP clients.
