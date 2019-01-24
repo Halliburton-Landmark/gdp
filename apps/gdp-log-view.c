@@ -436,7 +436,7 @@ main(int argc, char *argv[])
 	argv += optind;
 
 	// initialization
-	estat = gdp_init_phase_0(NULL);
+	estat = gdp_init_phase_0(NULL, 0);
 	ep_adm_readparams("gdplogd");
 
 	// initialize logd_sqlite

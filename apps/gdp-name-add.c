@@ -203,7 +203,7 @@ main(int argc, char **argv)
 
 	// initialize the GDP library
 	phase = "initialization";
-	estat = gdp_init_phase_0(NULL);
+	estat = gdp_init_phase_0(NULL, 0);
 	if (!EP_STAT_ISOK(estat))
 	{
 		if (!quiet)
