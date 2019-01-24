@@ -73,7 +73,7 @@ _gdp_name_init(void)
 	if (db_host == NULL)
 	{
 		ep_dbg_cprintf(Dbg, 1, "_gdp_name_init: no name database available\n");
-		ep_app_warn("Human-Oriented Name to GDPname Directory not configured");
+		ep_app_error("Human-Oriented Name to GDPname Directory not configured");
 		return;
 	}
 	unsigned int db_port = 0;		//TODO: should parse db_host for this

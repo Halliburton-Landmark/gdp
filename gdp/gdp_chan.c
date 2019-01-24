@@ -36,6 +36,7 @@
 #include "gdp_priv.h"
 #include "gdp_zc_client.h"
 
+#include <ep/ep_app.h>
 #include <ep/ep_dbg.h>
 #include <ep/ep_hexdump.h>
 #include <ep/ep_log.h>
@@ -820,7 +821,10 @@ _gdp_chan_open(
 	if (EP_STAT_ISOK(estat))
 		*pchan = chan;
 	else
+	{
+		ep_app_message(estat, "Cannot open connection to GDP");
 		chan_do_close(chan, BEV_EVENT_ERROR);
+	}
 	return estat;
 }
 
