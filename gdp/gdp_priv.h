@@ -63,7 +63,7 @@
 # define GDP_DEFAULT_DATA_ROOT			"/var/swarm/gdp"
 #endif
 #ifndef GDP_DEFAULT_HONGDB_HOST
-# define GDP_DEFAULT_HONGDB_HOST		"gdp-hongd.cs.berkeley.edu"
+# define GDP_DEFAULT_HONGDB_HOST		NULL	// must provide explicitly
 #endif
 #ifndef GDP_DEFAULT_HONGD_USER
 # define GDP_DEFAULT_HONGD_USER			"gdp_user"
