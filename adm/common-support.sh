@@ -296,7 +296,7 @@ set_pkgmgr() {
     : ${PKGMGR:=$OS}
     INITguess=""
     case $PKGMGR in
-      "debian"|"ubuntu")
+      "ubuntu")
 	    PKGMGR=debian
 	    if expr $OSVER \>= 160400 > /dev/null
 	    then
@@ -304,6 +304,10 @@ set_pkgmgr() {
 	    else
 		    INITguess=upstart
 	    fi
+	    ;;
+
+      "debian")
+	    INITguess=systemd
 	    ;;
 
       "raspbian")
