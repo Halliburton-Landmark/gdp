@@ -34,6 +34,7 @@
 #include "gdp.h"
 #include "gdp_priv.h"
 
+#include <ep/ep_app.h>
 #include <ep/ep_b64.h>
 #include <ep/ep_dbg.h>
 #include <ep/ep_string.h>
@@ -72,6 +73,7 @@ _gdp_name_init(void)
 	if (db_host == NULL)
 	{
 		ep_dbg_cprintf(Dbg, 1, "_gdp_name_init: no name database available\n");
+		ep_app_warn("Human-Oriented Name to GDPname Directory not configured");
 		return;
 	}
 	unsigned int db_port = 0;		//TODO: should parse db_host for this
@@ -96,6 +98,9 @@ _gdp_name_init(void)
 	{
 		ep_dbg_cprintf(Dbg, 1,
 				"_gdp_name_init(%s@%s:%d db %s): cannot connect: %s\n",
+				db_user, db_host, db_port, db_name,
+				mysql_error(NameDb));
+		ep_app_error("Cannot connect to %s@%s:%d db %s: %s",
 				db_user, db_host, db_port, db_name,
 				mysql_error(NameDb));
 		mysql_close(NameDb);
