@@ -199,6 +199,16 @@
 # endif
 #endif
 
+#ifndef EP_OSCF_HAS_MCHECK
+# ifdef __has_include
+#  if __has_include("mcheck.h")
+#   define EP_OSCF_HAS_MCHECK		1	// do malloc checking
+#  else
+#   define EP_OSCF_HAS_MCHECK		0
+#  endif
+# endif
+#endif
+
 
 /*
 ** C Compiler configuration variables

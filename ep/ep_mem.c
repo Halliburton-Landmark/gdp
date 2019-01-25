@@ -123,6 +123,73 @@ system_mfree(void *p)
 
 
 /*
+**  MCHECK_INIT -- initialize memory subsystem
+**
+**	Only needed for debugging.
+**	Unfortunately, mcheck initialization always seems to fail,
+**	so we don't bother to compile this in.
+*/
+
+#undef EP_OSCF_HAS_MCHECK
+#if EP_OSCF_HAS_MCHECK
+# include <mcheck.h>
+# include <ep_assert.h>
+
+static void EP_ATTR_NORETURN
+mem_abort(enum mcheck_status mstatus)
+{
+	const char *msg;
+
+	switch (mstatus)
+	{
+	  case MCHECK_OK:
+		msg = "memory OK";
+		break;
+	  case MCHECK_DISABLED:
+		msg = "mcheck disabled";
+		break;
+	  case MCHECK_HEAD:
+		msg = "memory clobbered before block";
+		break;
+	  case MCHECK_TAIL:
+		msg = "memory clobbered after block";
+		break;
+	  case MCHECK_FREE:
+		msg = "double free";
+		break;
+	  default:
+		msg = NULL;
+		break;
+	}
+	if (msg == NULL)
+		EP_ASSERT_FAILURE("mcheck: bogus status %d", mstatus);
+	else
+		EP_ASSERT_FAILURE("mcheck error: %s", msg);
+}
+
+static void __attribute__((constructor))
+mcheck_init(void)
+{
+	bool enable_debugging = false;
+	static bool initialized = false;
+	if (initialized)
+		return;
+	int i = 0;
+	const char *m = getenv("EP_USE_MCHECK");
+	if (m != NULL)
+		enable_debugging = true;
+	if (m != NULL && strcmp(m, "pedantic") == 0)
+		i = mcheck_pedantic(mem_abort);
+	else if (enable_debugging)
+		i = mcheck(mem_abort);
+	if (i != 0)
+		fprintf(stderr, "Warning: mcheck initialization failed\n");
+	initialized = true;
+}
+#endif // EP_OSCF_HAS_MCHECK
+
+
+/*
 **  EP_MEM_IALLOC -- allocate memory from the heap (internal)
 **
 **	This is the routine that does all the real work.
