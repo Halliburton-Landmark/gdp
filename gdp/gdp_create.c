@@ -181,7 +181,7 @@ gci_new_key(
 			key_enc_alg_name);
 
 	// asymmetric key type (rsa, ec, etc.)
-	if (key_alg_name == NULL)
+	if (key_alg_name == NULL || strcmp(key_alg_name, "def") == 0)
 	{
 		key_alg_name = ep_adm_getstrparam("swarm.gdp.crypto.sign.alg", "ec");
 	}
@@ -223,7 +223,7 @@ gci_new_key(
 	}
 
 	// secret key on-disk crypto algorithm
-	if (key_enc_alg_name == NULL)
+	if (key_enc_alg_name == NULL || strcmp(key_enc_alg_name, "def") == 0)
 	{
 		key_enc_alg_name = ep_adm_getstrparam("swarm.gdp.crypto.keyenc.alg",
 								"aes192");
@@ -311,7 +311,7 @@ gci_set_key(
 	EP_STAT estat = EP_STAT_OK;
 
 	// message digest (hash) algorithm
-	if (dig_alg_name == NULL)
+	if (dig_alg_name == NULL || strcmp(dig_alg_name, "def") == 0)
 	{
 		dig_alg_name = ep_adm_getstrparam("swarm.gdp.crypto.digest.alg",
 								"sha256");

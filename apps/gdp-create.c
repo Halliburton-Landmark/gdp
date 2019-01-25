@@ -98,13 +98,13 @@ main(int argc, char **argv)
 	bool show_usage = false;
 	bool quiet = false;
 	bool skip_existence_test = false;
-	const char *dig_alg_name = NULL;
-	const char *key_alg_name = NULL;
+	const char *dig_alg_name = "def";
+	const char *key_alg_name = "def";
 	int key_bits = 0;
 	const char *key_curve = NULL;
 	const char *owner_keyfile = NULL;
 	const char *writer_keyfile = NULL;
-	const char *key_enc_alg_name = NULL;
+	const char *key_enc_alg_name = "def";
 	bool separate_writer_key = false;
 	const char *phase = NULL;
 
