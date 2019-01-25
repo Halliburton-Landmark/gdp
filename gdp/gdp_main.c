@@ -1068,6 +1068,9 @@ gdp_lib_init(const char *progname, const char *myname, uint32_t flags)
 	ep_dbg_cprintf(Dbg, 4, "_gdp_lib_init(%s)\n",
 			myname == NULL ? "NULL" : myname);
 
+	// need to initialize libep before using mutexes
+	ep_lib_init(EP_LIB_USEPTHREADS);
+
 	ep_thr_mutex_lock(&GdpInitMutex);
 	if (_GdpInitState >= GDP_INIT_LIB)
 		goto done;
