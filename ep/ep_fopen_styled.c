@@ -64,15 +64,40 @@ static IORESULT_T
 styled_write(void *cookie, const char *buf, IOBLOCK_T size)
 {
 	struct styleinfo *sinf = (struct styleinfo *) cookie;
-	IORESULT_T result;
+	IORESULT_T result = 0;
 
 	flockfile(sinf->underlying);
-	if (sinf->so != NULL)
-		fputs(sinf->so, sinf->underlying);
-	result = fwrite(buf, 1, size, sinf->underlying);
-	if (sinf->si != NULL)
-		fputs(sinf->si, sinf->underlying);
+	while (size > 0)
+	{
+		const char *p;
+		IOBLOCK_T tlen;
+
+		tlen = size;
+		p = memchr(buf, '\n', tlen);
+		if (p != NULL)
+			tlen = p - buf;
+		if (tlen > 0)
+		{
+			IORESULT_T tres;
+			if (sinf->so != NULL)
+				fputs(sinf->so, sinf->underlying);
+			tres = fwrite(buf, 1, tlen, sinf->underlying);
+			if (sinf->si != NULL)
+				fputs(sinf->si, sinf->underlying);
+			buf += tlen;
+			size -= tlen;
+			if (tres > 0)
+				result += tres;
+		}
+		if (size > 0 && *buf == '\n')
+		{
+			fputc(*buf++, sinf->underlying);
+			result++;
+			size--;
+		}
+	}
 	funlockfile(sinf->underlying);
+	fflush(sinf->underlying);
 	return result;
 }
 
