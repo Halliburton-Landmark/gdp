@@ -1244,11 +1244,10 @@ cmd_getmetadata(gdp_req_t *req)
 
 	// get the metadata into memory
 	estat = req->gob->x->physimpl->getmetadata(req->gob, &gmd);
-	EP_STAT_CHECK(estat, goto fail1);
 
-	// serialize it to the client
 	if (EP_STAT_ISOK(estat))
 	{
+		// serialize it to the client
 		uint8_t *mdbuf;
 		size_t mdlen = _gdp_md_serialize(gmd, &mdbuf);
 		_gdp_req_ack_resp(req, GDP_ACK_SUCCESS);
@@ -1263,7 +1262,6 @@ cmd_getmetadata(gdp_req_t *req)
 					"cannot get log metadata", estat);
 	}
 
-fail1:
 fail0:
 	return estat;
 }
