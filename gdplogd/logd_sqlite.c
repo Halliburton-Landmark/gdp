@@ -226,7 +226,7 @@ static struct pragma_name
 						{ "synchronous",			"OFF",				},
 						{ "journal_mode",			"TRUNCATE"			},
 						{ "temp_store",				NULL,				},
-						{ "locking_mode",			"EXCLUSIVE",		},
+						{ "locking_mode",			"NORMAL",			},
 						{ "cache_size",				NULL,				},
 						{ "page_size",				NULL,				},
 						{ "journal_size_limit",		NULL,				},
