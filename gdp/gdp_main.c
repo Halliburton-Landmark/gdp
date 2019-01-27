@@ -96,16 +96,12 @@ _gdp_acknak_from_estat(EP_STAT estat, gdp_cmd_t def)
 	{
 		resp = GDP_NAK_C_UNAUTH;
 	}
-	else
-	{
-		if (def < GDP_NAK_C_MIN || def > GDP_NAK_R_MAX)
-			resp = GDP_NAK_S_INTERNAL;		// default to panic code
-	}
-
-	// if the estat contains the detail, prefer that
-	if (EP_STAT_REGISTRY(estat) == EP_REGISTRY_UCB &&
+	else if (EP_STAT_IS_SAME(estat, GDP_STAT_NOT_IMPLEMENTED))
+		resp = GDP_NAK_S_NOTIMPL;
+	else if (EP_STAT_REGISTRY(estat) == EP_REGISTRY_UCB &&
 		EP_STAT_MODULE(estat) == GDP_MODULE)
 	{
+		// if the estat contains the detail, prefer that
 		int d = EP_STAT_DETAIL(estat);
 
 		if (!EP_STAT_ISFAIL(estat))
@@ -120,6 +116,8 @@ _gdp_acknak_from_estat(EP_STAT estat, gdp_cmd_t def)
 		else if (d >= 600 && d <= (600 + GDP_NAK_R_MAX - GDP_NAK_R_MIN))
 			resp = (gdp_cmd_t) (d - 600 + GDP_NAK_R_MIN);
 	}
+	else if (resp < GDP_NAK_C_MIN || resp > GDP_NAK_R_MAX)
+		resp = GDP_NAK_S_INTERNAL;		// default to panic code
 
 	if (ep_dbg_test(Dbg, 41))
 	{
