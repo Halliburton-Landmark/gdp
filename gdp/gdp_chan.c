@@ -153,6 +153,7 @@ static EP_PRFLAGS_DESC	L4Flags[] =
 	{ GDP_PKT_TYPE_ADVERTISE,	GDP_PKT_TYPE_MASK,		"ADVERTISE"		},
 	{ GDP_PKT_TYPE_WITHDRAW,	GDP_PKT_TYPE_MASK,		"WITHDRAW"		},
 	{ GDP_PKT_TYPE_NAK_NOROUTE,	GDP_PKT_TYPE_MASK,		"NAK_NOROUTE"	},
+	{ GDP_PKT_TYPE_SEQ_PACKET,	GDP_PKT_TYPE_MASK,		"SEQ_PACKET"	},
 	{ GDP_PKT_TYPE_NAK_PACKET,	GDP_PKT_TYPE_MASK,		"NAK_PACKET"	},
 	{ GDP_PKT_TYPE_ACK_PACKET,	GDP_PKT_TYPE_MASK,		"ACK_PACKET"	},
 
@@ -278,9 +279,17 @@ read_header(gdp_chan_t *chan,
 	{
 		if (ep_dbg_test(Dbg, 1))
 		{
-			ep_dbg_printf("read_header: PDU router type = ");
-			ep_prflags(flags & GDP_PKT_TYPE_MASK, L4Flags, NULL);
-			ep_dbg_printf("\n");
+			gdp_pname_t src_p, dst_p;
+			ep_dbg_printf("read_header(%zd): unxpected PDU router type\n"
+						"    ver %d ttl %d seqno %d off %d paylen %zd\n"
+						"    src %s\n"
+						"    dst %s\n"
+						"    flags ",
+					hdr_len, ver, ttl, seqno, frag_off, payload_len,
+					gdp_printable_name(*src, src_p),
+					gdp_printable_name(*dst, dst_p));
+				ep_prflags(flags, L4Flags, NULL);
+				ep_dbg_printf("\n");
 		}
 		estat = GDP_STAT_PDU_CORRUPT;
 		goto done;
