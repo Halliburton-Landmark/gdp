@@ -46,6 +46,7 @@ static EP_DBG	Dbg = EP_DBG_INIT("gdp.name", "GDP name resolution and processing"
 
 static char			*_GdpNameRoot;		// root of names ("current directory")
 static MYSQL		*NameDb;			// name mapping database
+static EP_THR_MUTEX	NameDbMutex			EP_THR_MUTEX_INITIALIZER;
 static const char	*DbTable;			// the name of the table with the mapping
 
 /*
@@ -55,8 +56,10 @@ static const char	*DbTable;			// the name of the table with the mapping
 static void
 _gdp_name_shutdown(void)
 {
+	ep_thr_mutex_lock(&NameDbMutex);
 	mysql_close(NameDb);
 	NameDb = NULL;
+	ep_thr_mutex_unlock(&NameDbMutex);
 }
 
 void
@@ -87,11 +90,12 @@ _gdp_name_init(void)
 	unsigned long db_flags = 0;
 	DbTable = ep_adm_getstrparam("swarm.gdp.hongdb.table", "human_to_gdp");
 
+	ep_thr_mutex_lock(&NameDbMutex);
 	NameDb = mysql_init(NULL);
 	if (NameDb == NULL)
 	{
 		ep_dbg_cprintf(Dbg, 1, "_gdp_name_init: mysql_init failure\n");
-		return;
+		goto fail0;
 	}
 	if (mysql_real_connect(NameDb, db_host, db_user, db_passwd,
 							db_name, db_port, NULL, db_flags) == NULL)
@@ -109,6 +113,8 @@ _gdp_name_init(void)
 
 	if (NameDb != NULL)
 		atexit(_gdp_name_shutdown);
+fail0:
+	ep_thr_mutex_unlock(&NameDbMutex);
 }
 
 
@@ -398,6 +404,7 @@ gdp_name_resolve(const char *hname, gdp_name_t gname)
 
 	ep_dbg_cprintf(Dbg, 19, "gdp_name_resolve(%s)\n", hname);
 
+	ep_thr_mutex_lock(&NameDbMutex);
 	if (NameDb == NULL)
 	{
 		ep_dbg_cprintf(Dbg, 19, "    ... no database\n");
@@ -458,10 +465,12 @@ fail1:
 		ep_dbg_cprintf(Dbg, 1,
 				"gdp_name_resolve(%s): %s\n",
 				phase, mysql_error(NameDb));
+		mysql_reset_connection(NameDb);
 		if (EP_STAT_ISOK(estat))
 			estat = GDP_STAT_MYSQL_ERROR;
 	}
 fail0:
+	ep_thr_mutex_unlock(&NameDbMutex);
 	if (ep_dbg_test(Dbg, 19))
 	{
 		char ebuf[100];
