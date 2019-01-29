@@ -216,7 +216,7 @@ gdp_name_root_get(void)
 */
 
 EP_STAT
-gdp_name_parse(const char *hname, gdp_name_t gname, char **xnamep)
+gdp_name_parse(const char *hname, gdp_name_t gname, const char **xnamep)
 {
 	EP_STAT estat = GDP_STAT_NAME_UNKNOWN;
 	char *xname = NULL;

@@ -401,7 +401,7 @@ EP_STAT			gdp_internal_name(
 EP_STAT			gdp_name_parse(
 					const char *hname,		// human text version of name
 					gdp_name_t gname,		// output: internal name
-					char **xnamep);			// output: extended version of hname
+					char const **xnamep);	// output: extended version of hname
 EP_STAT			gdp_parse_name(			// obsolete: back compat
 					const char *hname,
 					gdp_name_t gname);

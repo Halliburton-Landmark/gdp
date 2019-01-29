@@ -76,19 +76,36 @@ _gdp_gob_newname(gdp_gob_t *gob)
 */
 
 static const char *
-get_default_creation_service_name(void)
+get_default_creation_service_name(gdp_name_t gdpname)
 {
-	const char *p;
-	p = ep_adm_getstrparam("swarm.gdp.creation-service.name", NULL);
-	if (p != NULL)
-		return p;
-	p = ep_adm_getstrparam("swarm.gdp.create.service", NULL);	//BACK COMPAT
-	if (p != NULL)
-		return p;
-	p = ep_adm_getstrparam("swarm.gdp.create.server", NULL);	//BACK COMPAT
-	if (p != NULL)
-		return p;
-	return GDP_DEFAULT_CREATION_SERVICE;
+	static const char *hname = NULL;
+	static gdp_name_t gname = { 0 };
+
+	// do some basic caching
+	if (hname != NULL)
+		goto done;
+
+	hname = ep_adm_getstrparam("swarm.gdp.creation-service.name", NULL);
+
+	// following are for backward compatility only and will probably disappear
+	if (hname == NULL)
+		hname = ep_adm_getstrparam("swarm.gdp.create.service", NULL);
+	if (hname == NULL)
+		hname = ep_adm_getstrparam("swarm.gdp.create.server", NULL);
+	if (hname == NULL)
+		hname = GDP_DEFAULT_CREATION_SERVICE;
+
+	// let SHA256(human_name) warning slip through
+	if (hname == NULL || EP_STAT_ISFAIL(gdp_name_parse(hname, gname, &hname)))
+	{
+		ep_dbg_cprintf(Dbg, 1,
+				"get_default_creation_service_name(%s): cannot parse\n",
+				hname);
+		return NULL;
+	}
+done:
+	memcpy(gdpname, gname, sizeof (gdp_name_t));
+	return hname;
 }
 
 
@@ -120,19 +137,10 @@ _gdp_gob_create(
 
 	if (!gdp_name_is_valid(service_name))
 	{
-		const char *p = get_default_creation_service_name();
+		const char *p = get_default_creation_service_name(service_name);
 		if (p == NULL)
 		{
 			ep_dbg_cprintf(Dbg, 1, "_gdp_gob_create: no service name\n");
-			return GDP_STAT_SVC_NAME_REQ;
-		}
-		estat = gdp_name_parse(p, service_name, NULL);
-		// let SHA256(human_name) warning slip through
-		if (EP_STAT_ISFAIL(estat))
-		{
-			ep_dbg_cprintf(Dbg, 1,
-					"_gdp_gob_create: cannot parse service name %s\n",
-					p);
 			return GDP_STAT_SVC_NAME_REQ;
 		}
 	}

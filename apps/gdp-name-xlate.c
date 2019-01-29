@@ -146,7 +146,7 @@ main(int argc, char **argv)
 	extern void _gdp_name_init(void);
 	_gdp_name_init();
 
-	char *xname = argv[0];
+	const char *xname = argv[0];
 	estat = parse_hex(argv[0], gdpiname);
 	if (!EP_STAT_ISOK(estat))
 	{
