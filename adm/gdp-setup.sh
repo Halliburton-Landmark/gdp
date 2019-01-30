@@ -48,9 +48,11 @@ case "$OS" in
 	package libevent-dev
 	package libevent-pthreads
 	package libsqlite3-dev
-	if [ -f /etc/apt/sources.list.d/mariadb.list ]
+	if [ ! -f /etc/apt/sources.list.d/mariadb.list ]
 	then
 		curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | sudo bash
+		# clean out old cruft that gets in the way
+		sudo apt remove libmariadb-client-lgpl-dev libmysqlclient-dev
 	fi
 	package libmariadb3
 	package libmariadb-dev
