@@ -27,19 +27,21 @@
 #
 
 FROM ubuntu:16.04 AS gdp-system-base
-RUN apt-get update && apt-get install -y \
-	apt-utils \
-	libavahi-client-dev \
-	libevent-dev \
-	libevent-pthreads-2.0.5 \
-	libjansson-dev \
-	libmariadb-client-lgpl-dev \
-        libsqlite3-dev \
-        libssl-dev \
-        libsystemd-dev \
-        protobuf-c-compiler \
-        sudo \
-        uuid-dev \
+RUN apt-get update && apt-get install -y curl sudo && \
+	curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | sudo bash && \
+	apt-get install -y \
+		apt-utils \
+		libavahi-client-dev \
+		libevent-dev \
+		libevent-pthreads-2.0.5 \
+		libjansson-dev \
+		libmariadb3 \
+		libmariadb-dev \
+		libsqlite3-dev \
+		libssl-dev \
+		libsystemd-dev \
+		protobuf-c-compiler \
+		uuid-dev \
 	&& apt-get clean
 
 

@@ -53,6 +53,7 @@ case "$OS" in
 		curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | sudo bash
 	fi
 	package libmariadb3
+	package libmariadb-dev
 	package libssl-dev
 	package uuid-dev
 	package lighttpd
