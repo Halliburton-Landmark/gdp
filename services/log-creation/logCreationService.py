@@ -358,8 +358,9 @@ class logCreationService(GDPService):
         if not self.namedb_conn.is_connected():
             logging.warning("HONGD connection seems to be lost. Reconnecting")
             self.namedb_conn.reconnect(attempts=3, delay=1)
-        self.namedb_cur.execute(query, (humanname, logname))
-        self.namedb_conn.commit()
+        with self.lock:
+            self.namedb_cur.execute(query, (humanname, logname))
+            self.namedb_conn.commit()
 
 
 if __name__ == "__main__":
