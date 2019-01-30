@@ -48,7 +48,11 @@ case "$OS" in
 	package libevent-dev
 	package libevent-pthreads
 	package libsqlite3-dev
-	package libmariadb-client-lgpl-dev
+	if [ -f /etc/apt/sources.list.d/mariadb.list ]
+	then
+		curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | sudo bash
+	fi
+	package libmariadb3
 	package libssl-dev
 	package uuid-dev
 	package lighttpd
