@@ -174,7 +174,8 @@ int main(int argc, char **argv)
 			((otw_dir_len - offsetof(otw_dir_t, eguid[0])) %
 			 sizeof(gdp_name_t) != 0))
 		{
-			debug(INFO, "invalid length %d", otw_dir_len);
+			debug(INFO, "invalid length %d ver 0x%x cmd %d id 0x%x\n",
+				  otw_dir_len, otw_dir.ver, otw_dir.cmd, otw_dir.id);
 			continue;
 		}
 
