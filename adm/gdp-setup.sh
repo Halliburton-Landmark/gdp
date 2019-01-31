@@ -56,7 +56,6 @@ case "$OS" in
 	fi
 	package libmariadb3
 	package libmariadb-dev
-	package libmariadb-dev-compat	
 	package libssl-dev
 	package uuid-dev
 	package lighttpd
