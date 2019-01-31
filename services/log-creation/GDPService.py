@@ -255,7 +255,8 @@ class GDPProtocol(Protocol):
 
         msg_dict['ttl'] = ord(message[3]) & 0x3f
 
-        for i in xrange(4,10):
+        # message[4:5] contains the sequence number, which we can ignore
+        for i in xrange(6,10):
             if message[i] != '\x00':
                 logging.warning("Fragments not implemented yet")
 
