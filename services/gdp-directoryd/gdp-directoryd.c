@@ -81,7 +81,7 @@ char query[GDP_QUERY_STRING];
 
 otw_dir_t otw_dir;
 
-void fail(MYSQL *con, char *s)
+void fail(MYSQL *con, const char *s)
 {
 	perror(s);
 	if (con)
