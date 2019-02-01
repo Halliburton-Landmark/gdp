@@ -53,7 +53,8 @@
 char dguid_s[GDP_NAME_HEX_STRING];
 char eguid_s[GDP_NAME_HEX_STRING];
 
-#define EXPIRE_TIMEOUT_SEC 60
+// expiration chore moved to delete and flush procedures, timeout disabled (0)
+#define EXPIRE_TIMEOUT_SEC 0
 char query_expire[] = "call blackbox.drop_expired();";
 
 char call_add_nhop_pre[] = "call blackbox.add_nhop (x'";

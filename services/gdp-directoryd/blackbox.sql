@@ -179,6 +179,8 @@ begin
 	select id into @did from blackbox.guids where guid = dguid;
 	select id into @eid from blackbox.guids where guid = eguid;
 	delete from blackbox.nhops where origid = @eid and destid = @did;
+	delete from blackbox.nhops where (ts) < DATE_SUB(NOW(), INTERVAL 5 MINUTE);
+	delete from blackbox.guids where id not in (select origid from blackbox.nhops union select destid from blackbox.nhops);
 	end //
 delimiter ;
 
@@ -195,6 +197,8 @@ begin
 	set @eid = NULL;
 	select id into @eid from blackbox.guids where guid = eguid;
 	delete from blackbox.nhops where origid = @eid;
+	delete from blackbox.nhops where (ts) < DATE_SUB(NOW(), INTERVAL 5 MINUTE);
+	delete from blackbox.guids where id not in (select origid from blackbox.nhops union select destid from blackbox.nhops);
 	end //
 delimiter ;
 
