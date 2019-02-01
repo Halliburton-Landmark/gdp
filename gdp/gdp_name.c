@@ -97,6 +97,10 @@ _gdp_name_init(void)
 		ep_dbg_cprintf(Dbg, 1, "_gdp_name_init: mysql_init failure\n");
 		goto fail0;
 	}
+	int i = 1;
+	i = mysql_optionsv(NameDb, MYSQL_OPT_RECONNECT, (void *)&i);
+	if (i != 0)
+		ep_dbg_cprintf(Dbg, 1, "_gdp_name_init: RECONNECT => %d\n", i);
 	if (mysql_real_connect(NameDb, db_host, db_user, db_passwd,
 							db_name, db_port, NULL, db_flags) == NULL)
 	{
