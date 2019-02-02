@@ -99,6 +99,7 @@ extern void		_gdp_stat_init(void);
 #define GDP_STAT_OK_NAME_HONGD			GDP_STAT_NEW(OK, 50)
 #define GDP_STAT_OK_NAME_PNAME			GDP_STAT_NEW(OK, 51)
 #define GDP_STAT_OK_NAME_HEX			GDP_STAT_NEW(OK, 52)
+#define GDP_STAT_HONGD_UNAVAILABLE		GDP_STAT_NEW(ERROR, 53)
 
 
 /*

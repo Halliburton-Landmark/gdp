@@ -40,14 +40,164 @@
 #include <ep/ep_string.h>
 
 #include <mysql.h>
+#include <sys/param.h>
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdp.name", "GDP name resolution and processing");
 
 
 static char			*_GdpNameRoot;		// root of names ("current directory")
-static MYSQL		*NameDb;			// name mapping database
-static EP_THR_MUTEX	NameDbMutex			EP_THR_MUTEX_INITIALIZER;
-static const char	*DbTable;			// the name of the table with the mapping
+static const char	*HongdsTable;		// name of mapping table
+static bool			HongdsLive = false;
+
+struct conn
+{
+	STAILQ_ENTRY(conn)	next;			// next connection
+	MYSQL				*rconn;			// actual physical connection
+	const char			*phase;			// current operation in progress
+};
+
+STAILQ_HEAD(clist, conn);
+
+struct conn_pool
+{
+	EP_THR_MUTEX		mutex;
+	EP_THR_COND			cond;				// an idle connection is available
+	int					n_alloc;			// number of connections allocated
+	int					max_alloc;			// maximum number of connections
+	EP_STAT				(*open)(			// open a connection
+								struct conn *conn,
+								void *udata);
+	void				(*close)(			// close a connection
+								struct conn *conn,
+								void *udata);
+	void				(*reset)(			// reset to idle state
+								struct conn *conn,
+								void *udata);
+	void				*udata;
+	STAILQ_HEAD(cpool, conn)		pool;	// list of idle connections
+};
+
+static struct conn_pool		CPool;
+
+
+
+/*
+**  Manage connection pool.
+*/
+
+// get an idle connection
+static struct conn *
+conn_get(struct conn_pool *cpool, bool failfast)
+{
+	struct conn *conn = NULL;
+
+	ep_thr_mutex_lock(&cpool->mutex);
+
+	// if there are no connections at all, fail early...
+	if (cpool->max_alloc <= 0)
+		goto fail0;
+
+	// get a connection from the pool, creating new ones if we can,
+	// waiting if necessary.
+	for (;;)
+	{
+		EP_STAT estat;
+
+		if ((conn = STAILQ_FIRST(&cpool->pool)) != NULL)
+			STAILQ_REMOVE_HEAD(&cpool->pool, next);
+		if (conn != NULL)
+			break;
+
+		// if we are at our limit we have to wait
+		if (cpool->n_alloc >= cpool->max_alloc)
+		{
+			// wait for something to be freed
+			ep_dbg_cprintf(Dbg, 12, "conn_get: waiting (n_alloc = %d)\n",
+					cpool->n_alloc);
+			ep_thr_cond_wait(&cpool->cond, &cpool->mutex, NULL);
+			ep_dbg_cprintf(Dbg, 12, "conn_get: continuing\n");
+
+			// try again
+			continue;
+		}
+
+		// allocate and open another connection
+		ep_dbg_cprintf(Dbg, 11, "conn_get: allocating new connection\n");
+		conn = (struct conn *) ep_mem_zalloc(sizeof *conn);
+		conn->phase = "new";
+		estat = (*cpool->open)(conn, cpool->udata);
+		if (EP_STAT_ISOK(estat))
+		{
+			cpool->n_alloc++;
+			break;
+		}
+		ep_dbg_cprintf(Dbg, 9, "conn_get: open failure: %s\n",
+				mysql_error(conn->rconn));
+		ep_mem_free(conn);
+		if (failfast)
+			return NULL;
+		// try again
+	}
+
+fail0:
+	ep_thr_mutex_unlock(&cpool->mutex);
+	return conn;
+}
+
+
+// release a connection to a pool
+static void
+conn_rls(struct conn *conn, struct conn_pool *cpool)
+{
+	conn->phase = "idle";
+	ep_thr_mutex_lock(&cpool->mutex);
+	STAILQ_INSERT_TAIL(&cpool->pool, conn, next);
+	ep_thr_cond_signal(&cpool->cond);
+	ep_thr_mutex_unlock(&cpool->mutex);
+}
+
+
+// initialize a pool
+static void
+conn_pool_init(
+			struct conn_pool *cpool,
+			int maxconns,
+			EP_STAT (*open)(struct conn *, void *udata),
+			void (*close)(struct conn *, void *udata),
+			void (*reset)(struct conn *, void *udata),
+			void *udata)
+{
+	if (maxconns < 1)
+		maxconns = 1;
+	memset(cpool, 0, sizeof *cpool);
+	ep_thr_mutex_init(&cpool->mutex, EP_THR_MUTEX_DEFAULT);
+	ep_thr_cond_init(&cpool->cond);
+	STAILQ_INIT(&cpool->pool);
+	cpool->max_alloc = maxconns;
+	cpool->open = open;
+	cpool->close = close;
+	cpool->reset = reset;
+	cpool->udata = udata;
+}
+
+
+// free everything in a pool
+static void
+conn_pool_rls(struct conn_pool *cpool)
+{
+	struct conn *conn;
+
+	ep_thr_mutex_lock(&cpool->mutex);
+	while ((conn = STAILQ_FIRST(&cpool->pool)) != NULL)
+	{
+		STAILQ_REMOVE_HEAD(&cpool->pool, next);
+		(*cpool->close)(conn, cpool->udata);
+		ep_mem_free(conn);
+		cpool->n_alloc--;
+	}
+	ep_thr_mutex_unlock(&cpool->mutex);
+}
+
 
 /*
 **  _GDP_NAME_INIT, _SHUTDOWN --- initialize/shut down name subsystem
@@ -56,10 +206,75 @@ static const char	*DbTable;			// the name of the table with the mapping
 static void
 _gdp_name_shutdown(void)
 {
-	ep_thr_mutex_lock(&NameDbMutex);
-	mysql_close(NameDb);
-	NameDb = NULL;
-	ep_thr_mutex_unlock(&NameDbMutex);
+	conn_pool_rls(&CPool);
+}
+
+
+static EP_STAT
+hongdb_open(struct conn *conn, void *udata)
+{
+	ep_dbg_cprintf(Dbg, 11, "hongdb_open:\n");
+	conn->phase = "initialization";
+	conn->rconn = mysql_init(NULL);
+	if (conn->rconn == NULL)
+	{
+		ep_dbg_cprintf(Dbg, 1, "hongdb_open: mysql_init failure\n");
+		return GDP_STAT_MYSQL_ERROR;
+	}
+
+	// open a connection to the external => internal mapping database
+	const char *db_host = ep_adm_getstrparam("swarm.gdp.hongdb.host",
+											GDP_DEFAULT_HONGDB_HOST);
+	unsigned int db_port = 0;		//TODO: should parse db_host for this
+	const char *db_name = ep_adm_getstrparam("swarm.gdp.hongdb.database",
+											"gdp_hongd");
+	const char *db_user = ep_adm_getstrparam("swarm.gdp.hongdb.user",
+											GDP_DEFAULT_HONGD_USER);
+	const char *db_passwd = ep_adm_getstrparam("swarm.gdp.hongdb.passwd",
+											GDP_DEFAULT_HONGD_PASSWD);
+	HongdsTable = ep_adm_getstrparam("swarm.gdp.hongdb.table", "human_to_gdp");
+	conn->phase = "opening";
+	unsigned long db_flags = 0;
+	if (mysql_real_connect(conn->rconn, db_host, db_user, db_passwd,
+							db_name, db_port, NULL, db_flags) == NULL)
+	{
+		ep_dbg_cprintf(Dbg, 1,
+				"hongdb_open(%s@%s:%d db %s): cannot connect: %s\n",
+				db_user, db_host, db_port, db_name,
+				mysql_error(conn->rconn));
+//		ep_app_error("Cannot connect to %s@%s:%d db %s: %s",
+//				db_user, db_host, db_port, db_name,
+//				mysql_error(conn->rconn));
+		mysql_close(conn->rconn);
+		conn->rconn = NULL;
+		conn->phase = "dead";
+		return GDP_STAT_MYSQL_ERROR;
+	}
+
+	int i = 1;
+	i = mysql_optionsv(conn->rconn, MYSQL_OPT_RECONNECT, (void *)&i);
+	if (i != 0)
+		ep_dbg_cprintf(Dbg, 1, "hongdb_open: set RECONNECT => %d\n", i);
+	conn->phase = "open";
+	return EP_STAT_OK;
+}
+
+
+static void
+hongdb_close(struct conn *conn, void *udata)
+{
+	mysql_close(conn->rconn);
+	conn->rconn = NULL;
+	conn->phase = "closed";
+}
+
+static void
+hongdb_reset(struct conn *conn, void *udata)
+{
+	ep_dbg_cprintf(Dbg, 8, "hongdb_reset(%s): %s\n",
+				conn->phase, mysql_error(conn->rconn));
+	mysql_reset_connection(conn->rconn);
+	conn->phase = "reset";
 }
 
 void
@@ -70,55 +285,34 @@ _gdp_name_init(void)
 	ep_dbg_cprintf(Dbg, 17, "_gdp_name_init: GDP_NAME_ROOT=%s\n",
 			_GdpNameRoot == NULL ? "" : _GdpNameRoot);
 
-	// open a connection to the external => internal mapping database
 	const char *db_host = ep_adm_getstrparam("swarm.gdp.hongdb.host",
 											GDP_DEFAULT_HONGDB_HOST);
 	if (db_host == NULL)
 	{
 		ep_dbg_cprintf(Dbg, 1, "_gdp_name_init: no name database available\n");
 		ep_app_error("Human-Oriented Name to GDPname Directory not configured");
+		CPool.max_alloc = -1;
 		return;
 	}
-	unsigned int db_port = 0;		//TODO: should parse db_host for this
 
-	const char *db_name = ep_adm_getstrparam("swarm.gdp.hongdb.database",
-											"gdp_hongd");
-	const char *db_user = ep_adm_getstrparam("swarm.gdp.hongdb.user",
-											GDP_DEFAULT_HONGD_USER);
-	const char *db_passwd = ep_adm_getstrparam("swarm.gdp.hongdb.passwd",
-											GDP_DEFAULT_HONGD_PASSWD);
-	unsigned long db_flags = 0;
-	DbTable = ep_adm_getstrparam("swarm.gdp.hongdb.table", "human_to_gdp");
+	// maximum number of parallel connections
+	int maxconn = ep_adm_getintparam("swarm.gdp.hongdb.maxconns", 3);
+	conn_pool_init(&CPool, maxconn, &hongdb_open, &hongdb_close, &hongdb_reset, NULL);
 
-	ep_thr_mutex_lock(&NameDbMutex);
-	NameDb = mysql_init(NULL);
-	if (NameDb == NULL)
+	// open a connection to the external => internal mapping database.
+	// we do this preemptively to give an error report ASAP.
+	struct conn *conn = conn_get(&CPool, true);
+	if (conn == NULL)
 	{
-		ep_dbg_cprintf(Dbg, 1, "_gdp_name_init: mysql_init failure\n");
-		goto fail0;
+		ep_dbg_cprintf(Dbg, 1, "_gdp_name_init: cannot open HONGD database\n");
+		ep_app_error("Human-Oriented Name to GDPname Directory not available");
+		CPool.max_alloc = -1;
+		return;
 	}
-	int i = 1;
-	i = mysql_optionsv(NameDb, MYSQL_OPT_RECONNECT, (void *)&i);
-	if (i != 0)
-		ep_dbg_cprintf(Dbg, 1, "_gdp_name_init: RECONNECT => %d\n", i);
-	if (mysql_real_connect(NameDb, db_host, db_user, db_passwd,
-							db_name, db_port, NULL, db_flags) == NULL)
-	{
-		ep_dbg_cprintf(Dbg, 1,
-				"_gdp_name_init(%s@%s:%d db %s): cannot connect: %s\n",
-				db_user, db_host, db_port, db_name,
-				mysql_error(NameDb));
-		ep_app_error("Cannot connect to %s@%s:%d db %s: %s",
-				db_user, db_host, db_port, db_name,
-				mysql_error(NameDb));
-		mysql_close(NameDb);
-		NameDb = NULL;
-	}
+	conn_rls(conn, &CPool);
+	HongdsLive = true;
 
-	if (NameDb != NULL)
-		atexit(_gdp_name_shutdown);
-fail0:
-	ep_thr_mutex_unlock(&NameDbMutex);
+	atexit(_gdp_name_shutdown);
 }
 
 
@@ -400,46 +594,45 @@ gdp_internal_name(const gdp_pname_t external, gdp_name_t internal)
 **		This uses the external human-to-internal name database.
 */
 
-EP_STAT
-gdp_name_resolve(const char *hname, gdp_name_t gname)
+static EP_STAT
+try_name_query(struct conn *conn, const char *hname, gdp_name_t gname)
 {
 	EP_STAT estat = GDP_STAT_OK_NAME_HONGD;
-	const char *phase;
 
-	ep_dbg_cprintf(Dbg, 19, "gdp_name_resolve(%s)\n", hname);
+	ep_dbg_cprintf(Dbg, 19, "try_name_query(%s)\n", hname);
 
-	ep_thr_mutex_lock(&NameDbMutex);
-	if (NameDb == NULL)
+	if (!HongdsLive)
 	{
 		ep_dbg_cprintf(Dbg, 19, "    ... no database\n");
-		estat = GDP_STAT_NAME_UNKNOWN;
+		estat = GDP_STAT_HONGD_UNAVAILABLE;
 		goto fail0;
 	}
 
-	phase = "query";
+	conn->phase = "query";
 	{
 		int hname_len = strlen(hname);
 		char escaped_hname[2 * hname_len + 1];
-		mysql_real_escape_string(NameDb, escaped_hname, hname, hname_len);
-		int dbtable_len = strlen(DbTable);
+		mysql_real_escape_string(conn->rconn, escaped_hname, hname, hname_len);
+		int dbtable_len = strlen(HongdsTable);
 		char escaped_dbtable[2 * dbtable_len + 1];
-		mysql_real_escape_string(NameDb, escaped_dbtable, DbTable, dbtable_len);
+		mysql_real_escape_string(conn->rconn, escaped_dbtable, HongdsTable,
+								dbtable_len);
 		const char *q = "SELECT gname FROM `%s` WHERE hname = '%s' LIMIT 1;";
 		char qbuf[strlen(q) + sizeof escaped_dbtable + sizeof escaped_hname + 1];
 		snprintf(qbuf, sizeof qbuf, q, escaped_dbtable, escaped_hname);
-		if (mysql_query(NameDb, qbuf) != 0)
+		if (mysql_query(conn->rconn, qbuf) != 0)
 		{
 			ep_dbg_cprintf(Dbg, 1, "MySQL >>> %s\n", qbuf);
 			goto fail1;
 		}
 	}
 
-	phase = "results";
-	MYSQL_RES *res = mysql_store_result(NameDb);
+	conn->phase = "results";
+	MYSQL_RES *res = mysql_store_result(conn->rconn);
 	if (res == NULL)
 		goto fail1;
 
-	phase = "fetch";
+	conn->phase = "fetch";
 	MYSQL_ROW row = mysql_fetch_row(res);
 	if (row == NULL)
 	{
@@ -455,7 +648,7 @@ gdp_name_resolve(const char *hname, gdp_name_t gname)
 		else
 		{
 			ep_dbg_cprintf(Dbg, 1,
-					"gdp_name_resolve(%s): field len %ld, should be %zd\n",
+					"try_name_query(%s): field len %ld, should be %zd\n",
 					hname, len[0], sizeof (gdp_name_t));
 			estat = GDP_STAT_NAME_UNKNOWN;
 		}
@@ -467,19 +660,66 @@ gdp_name_resolve(const char *hname, gdp_name_t gname)
 	{
 fail1:
 		ep_dbg_cprintf(Dbg, 1,
-				"gdp_name_resolve(%s): %s\n",
-				phase, mysql_error(NameDb));
-		mysql_reset_connection(NameDb);
+				"try_name_query(%s): %s\n",
+				conn->phase, mysql_error(conn->rconn));
 		if (EP_STAT_ISOK(estat))
 			estat = GDP_STAT_MYSQL_ERROR;
 	}
 fail0:
-	ep_thr_mutex_unlock(&NameDbMutex);
 	if (ep_dbg_test(Dbg, 19))
 	{
 		char ebuf[100];
-		ep_dbg_printf("gdp_name_resolve => %s\n",
+		ep_dbg_printf("try_name_query => %s\n",
 			ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
+	return estat;
+}
+
+EP_STAT
+gdp_name_resolve(const char *hname, gdp_name_t gname)
+{
+	struct conn_pool *cpool = &CPool;
+	struct conn *conn;
+	EP_STAT estat = GDP_STAT_NAME_UNKNOWN;
+	int tries;
+	static long maxtries = 0;
+	static long backoff = 0;
+
+	if (cpool->max_alloc <= 0)
+	{
+		// couldn't initialize, just give up
+		return GDP_STAT_HONGD_UNAVAILABLE;
+	}
+	conn = conn_get(cpool, false);
+	EP_ASSERT_ELSE(conn != NULL, return GDP_STAT_HONGD_UNAVAILABLE);
+
+	if (maxtries <= 0)
+	{
+		maxtries = ep_adm_getlongparam("swarm.gdp.hongd.maxtries", 10);
+		if (maxtries <= 0)
+			maxtries = 1;
+	}
+	if (backoff <= 0)
+	{
+		backoff = ep_adm_getlongparam("swarm.gdp.hongd.backoff", 1);
+		if (backoff <= 0)
+			backoff = 1;
+	}
+
+	// loop around possible failure in database connection
+	for (tries = 0; tries < maxtries; tries++)
+	{
+		estat = try_name_query(conn, hname, gname);
+		if (!EP_STAT_IS_SAME(estat, GDP_STAT_MYSQL_ERROR))
+			break;
+
+		// exponential backoff (assumes tries isn't too large)
+		ep_time_nanosleep((INT64_C(1) << MIN(tries, 30)) * backoff MILLISECONDS);
+
+		// try resetting the connection
+		(*cpool->reset)(conn, cpool->udata);
+	}
+
+	conn_rls(conn, cpool);
 	return estat;
 }
