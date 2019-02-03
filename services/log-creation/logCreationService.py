@@ -75,24 +75,26 @@ class logCreationService(GDPService):
         ## Setup a connection to the backend database
         if os.path.exists(self.dbname):
             logging.info("Loading existing database, %r", self.dbname)
-            self.conn = sqlite3.connect(self.dbname, check_same_thread=False)
-            self.cur = self.conn.cursor()
+            self.dupdb_conn = sqlite3.connect(self.dbname,
+                                                check_same_thread=False)
+            self.dupdb_cur = self.dupdb_conn.cursor()
         else:
             logging.info("Creating new database, %r", self.dbname)
-            self.conn = sqlite3.connect(self.dbname, check_same_thread=False)
-            self.cur = self.conn.cursor()
+            self.dupdb_conn = sqlite3.connect(self.dbname,
+                                                check_same_thread=False)
+            self.dupdb_cur = self.dupdb_conn.cursor()
 
             ## Make table for bookkeeping
-            self.cur.execute("""CREATE TABLE logs(
+            self.dupdb_cur.execute("""CREATE TABLE logs(
                                     logname TEXT UNIQUE, srvname TEXT,
                                     ack_seen INTEGER DEFAULT 0,
                                     ts DATETIME DEFAULT CURRENT_TIMESTAMP,
                                     creator TEXT, rid INTEGER)""")
-            self.cur.execute("""CREATE UNIQUE INDEX logname_ndx
+            self.dupdb_cur.execute("""CREATE UNIQUE INDEX logname_ndx
                                                 ON logs(logname)""")
-            self.cur.execute("CREATE INDEX srvname_ndx ON logs(srvname)")
-            self.cur.execute("CREATE INDEX ack_seen_ndx ON logs(ack_seen)")
-            self.conn.commit()
+            self.dupdb_cur.execute("CREATE INDEX srvname_ndx ON logs(srvname)")
+            self.dupdb_cur.execute("CREATE INDEX ack_seen_ndx ON logs(ack_seen)")
+            self.dupdb_conn.commit()
 
         self.namedb_info = namedb_info
         if namedb_info.get("host", None) is not None:
@@ -122,7 +124,7 @@ class logCreationService(GDPService):
 
         ## Close database connections
         logging.info("Closing database connection to %r", self.dbname)
-        self.conn.close()
+        self.dupdb_conn.close()
 
 
     def request_handler(self, req):
@@ -149,7 +151,8 @@ class logCreationService(GDPService):
             ## First check for any error conditions. If any of the
             ## following occur, we ought to send back a NAK
             if req['src'] in self.logservers:
-                logging.warning("error: received cmd %d from server", payload.cmd)
+                logging.warning("error: received cmd %d from server",
+                                         payload.cmd)
                 return self.gen_nak(req, gdp_pb2.NAK_C_BADREQ)
 
             if payload.cmd != gdp_pb2.CMD_CREATE:
@@ -195,10 +198,11 @@ class logCreationService(GDPService):
 
                     logging.debug("inserting to database %r, %r, %r, %d",
                                 __logname, __srvname, __creator, rid)
-                    self.cur.execute("""INSERT INTO logs (logname, srvname,
-                                    creator, rid) VALUES(?,?,?,?);""",
+                    self.dupdb_cur.execute("""INSERT INTO logs
+                                              (logname, srvname, creator, rid)
+                                              VALUES(?,?,?,?);""",
                                     (__logname, __srvname, __creator, rid))
-                    self.conn.commit()
+                    self.dupdb_conn.commit()
 
                     spoofed_req = req.copy()
                     spoofed_req['src'] = req['dst']
@@ -206,7 +210,7 @@ class logCreationService(GDPService):
                     ## make a copy of payload so that we can change rid
                     __spoofed_payload = gdp_pb2.GdpMessage()
                     __spoofed_payload.ParseFromString(req['data'])
-                    __spoofed_payload.rid = self.cur.lastrowid
+                    __spoofed_payload.rid = self.dupdb_cur.lastrowid
                     spoofed_req['data'] = __spoofed_payload.SerializeToString()
 
                     # now return this spoofed request back to transport layer
@@ -233,9 +237,10 @@ class logCreationService(GDPService):
             with self.lock:
 
                 ## Fetch the original creator and rid from our database
-                self.cur.execute("""SELECT creator, rid, ack_seen FROM logs
-                                            WHERE rowid=?""", (payload.rid,))
-                dbrows = self.cur.fetchall()
+                self.dupdb_cur.execute("""SELECT creator, rid, ack_seen 
+                                          FROM logs WHERE rowid=?""",
+                                          (payload.rid,))
+                dbrows = self.dupdb_cur.fetchall()
 
             good_resp = len(dbrows) == 1
             if good_resp:
@@ -254,9 +259,9 @@ class logCreationService(GDPService):
                 with self.lock:
                     logging.debug("Setting ack_seen to 1 for row %d",
                                                               payload.rid)
-                    self.cur.execute("""UPDATE logs SET ack_seen=1
+                    self.dupdb_cur.execute("""UPDATE logs SET ack_seen=1
                                         WHERE rowid=?""", (payload.rid,))
-                    self.conn.commit()
+                    self.dupdb_conn.commit()
 
             # create a spoofed reply and send it to the client
             spoofed_reply = req.copy()
