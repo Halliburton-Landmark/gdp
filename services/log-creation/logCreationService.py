@@ -70,9 +70,31 @@ class logCreationService(GDPService):
         self.GDPaddrs = GDPaddrs
         self.logservers = logservers
         self.dbname = dbname
-        self.lock = threading.Lock()
+        self.namedb_info = namedb_info
 
-        ## Setup a connection to the backend database
+        self.lock = threading.Lock()
+        ## Connections/locks etc
+        self.__setup_dupdb()
+        self.__setup_namedb()
+
+
+    def __del__(self):
+
+        ## Close database connections
+        logging.info("Closing database connection to %r", self.dbname)
+        self.dupdb_conn.close()
+        self.namedb_conn.close()
+
+
+    def __setup_dupdb(self):
+        """
+        setup appropriate connection/cursor objects for
+        interacting with database for detecting duplicates.
+
+        At the end, variables 'self.dupdb_conn' and 'self.dupdb_cur'
+        are set appropriately.
+        """
+ 
         if os.path.exists(self.dbname):
             logging.info("Loading existing database, %r", self.dbname)
             self.dupdb_conn = sqlite3.connect(self.dbname,
@@ -96,7 +118,14 @@ class logCreationService(GDPService):
             self.dupdb_cur.execute("CREATE INDEX ack_seen_ndx ON logs(ack_seen)")
             self.dupdb_conn.commit()
 
-        self.namedb_info = namedb_info
+
+
+    def __setup_namedb(self):
+        """
+        Same as '__setup_dupdb', except for human=>internal name database
+        """
+        logging.info("Setting up connection to human=>internal name database")
+
         if namedb_info.get("host", None) is not None:
             logging.info("Initiating connection to directory server")
             _host = namedb_info.get("host", "gdp-hongd.cs.berkeley.edu")
@@ -120,11 +149,70 @@ class logCreationService(GDPService):
             self.namedb_cur = None
 
 
-    def __del__(self):
+    def add_to_hongd(self, humanname, logname):
+        """perform the database operation"""
 
-        ## Close database connections
-        logging.info("Closing database connection to %r", self.dbname)
-        self.dupdb_conn.close()
+        table = self.namedb_info.get("table", "human_to_gdp")
+        query = "insert into "+table+" (hname, gname) values (%s, %s)"
+        if not self.namedb_conn.is_connected():
+            logging.warning("HONGD connection seems to be lost. Reconnecting")
+            self.namedb_conn.reconnect(attempts=3, delay=1)
+        with self.lock:
+            self.namedb_cur.execute(query, (humanname, logname))
+            self.namedb_conn.commit()
+
+
+    def add_to_dupdb(self, __logname, __srvname, __creator, rid):
+        """Add new entry to dupdb"""
+
+        with self.lock:
+            logging.debug("inserting to database %r, %r, %r, %d",
+                        __logname, __srvname, __creator, rid)
+            self.dupdb_cur.execute("""INSERT INTO logs
+                                      (logname, srvname, creator, rid)
+                                      VALUES(?,?,?,?);""",
+                                      (__logname, __srvname, __creator, rid))
+            self.dupdb_conn.commit()
+            rid = self.dupdb_cur.lastrowid
+        return rid
+
+
+    def update_dubdb(self, rid):
+        """
+        When we received a response, lookup the specific row id in the
+        dupdb. Update the specific row to indicate that we have seen
+        a response for the given log.
+        Return appropriate information for creating a spoofed response
+        back to the creator.
+        """
+
+        ## XXX Locking here is less than ideal. This should be fixed
+        
+        with self.lock:
+            ## Fetch the original creator and rid from our database
+            self.dupdb_cur.execute("""SELECT creator, rid, ack_seen 
+                                     FROM logs WHERE rowid=?""", (rid,))
+            dbrows = self.dupdb_cur.fetchall()
+
+        good_resp = len(dbrows) == 1
+
+        if good_resp:
+            (__creator, orig_rid, ack_seen) = dbrows[0]
+            creator = gdp.GDP_NAME(__creator).internal_name()
+            if ack_seen != 0:
+                good_resp = False
+
+        if not good_resp:
+            ## XXX handling errors via exceptions is probably better
+            return False, None, None
+
+        with self.lock:
+            logging.debug("Setting ack_seen to 1 for row %d", rid)
+            self.dupdb_cur.execute("""UPDATE logs SET ack_seen=1
+                               WHERE rowid=?""", (rid,))
+            self.dupdb_conn.commit()
+
+        return (good_resp, creator, orig_rid)
 
 
     def request_handler(self, req):
@@ -164,8 +252,8 @@ class logCreationService(GDPService):
             ## figure out the data we need to insert in the database
             humanname, logname = self.extract_name(payload.cmd_create)
 
+            ## Add this to the humanname=>logname mapping directory
             if humanname is not None and self.namedb_conn is not None:
-                ## Add this to the humanname=>logname mapping directory
                 try:
                     # Note that logname is the internal 256-bit name
                     # (and not a printable name)
@@ -193,37 +281,34 @@ class logCreationService(GDPService):
                                 "picking server %r", __logname, __srvname)
 
             try:
+                ## Add this information to the dupdb, and get back the
+                ## row ID in the database that we will include in the spoofed
+                ## request to an actual log-server
+                __rid = self.add_to_dupdb(__logname, __srvname, __creator, rid)
 
-                with self.lock:
+               spoofed_req = req.copy()
+               spoofed_req['src'] = req['dst']
+               spoofed_req['dst'] = srvname
+               ## make a copy of payload so that we can change rid
+               __spoofed_payload = gdp_pb2.GdpMessage()
+               __spoofed_payload.ParseFromString(req['data'])
+               __spoofed_payload.rid = __rid
+               spoofed_req['data'] = __spoofed_payload.SerializeToString()
 
-                    logging.debug("inserting to database %r, %r, %r, %d",
-                                __logname, __srvname, __creator, rid)
-                    self.dupdb_cur.execute("""INSERT INTO logs
-                                              (logname, srvname, creator, rid)
-                                              VALUES(?,?,?,?);""",
-                                    (__logname, __srvname, __creator, rid))
-                    self.dupdb_conn.commit()
-
-                    spoofed_req = req.copy()
-                    spoofed_req['src'] = req['dst']
-                    spoofed_req['dst'] = srvname
-                    ## make a copy of payload so that we can change rid
-                    __spoofed_payload = gdp_pb2.GdpMessage()
-                    __spoofed_payload.ParseFromString(req['data'])
-                    __spoofed_payload.rid = self.dupdb_cur.lastrowid
-                    spoofed_req['data'] = __spoofed_payload.SerializeToString()
-
-                    # now return this spoofed request back to transport layer
-                    # Since we have overridden the destination, it will go
-                    # to a log server instead of the actual client
-                    return spoofed_req
+               # now return this spoofed request back to transport layer
+               # Since we have overridden the destination, it will go
+               # to a log server instead of the actual client
+               return spoofed_req
 
             except sqlite3.IntegrityError:
 
+                ## We reach here if we are trying to add a duplicate
+                ## entry in our database (which is the whole purpose
+                ## of such bookkeeping).
+                ## We send a NAK to the creator.
                 logging.warning("Log already exists")
                 return self.gen_nak(req, gdp_pb2.NAK_C_CONFLICT)
 
-            ## Send a spoofed request to the logserver
 
         else: ## response.
 
@@ -234,34 +319,11 @@ class logCreationService(GDPService):
 
             logging.info("Response from log-server, row %d", payload.rid)
 
-            with self.lock:
-
-                ## Fetch the original creator and rid from our database
-                self.dupdb_cur.execute("""SELECT creator, rid, ack_seen 
-                                          FROM logs WHERE rowid=?""",
-                                          (payload.rid,))
-                dbrows = self.dupdb_cur.fetchall()
-
-            good_resp = len(dbrows) == 1
-            if good_resp:
-                (__creator, orig_rid, ack_seen) = dbrows[0]
-                creator = gdp.GDP_NAME(__creator).internal_name()
-                if ack_seen != 0:
-                    good_resp = False
+            (good_resp, creator, orig_rid) = self.update_dubdb(payload.rid)
 
             if not good_resp:
-
                 logging.warning("error: bogus response")
                 return self.gen_nak(req, gdp_pb2.NAK_C_BADREQ)
-
-            else:
-
-                with self.lock:
-                    logging.debug("Setting ack_seen to 1 for row %d",
-                                                              payload.rid)
-                    self.dupdb_cur.execute("""UPDATE logs SET ack_seen=1
-                                        WHERE rowid=?""", (payload.rid,))
-                    self.dupdb_conn.commit()
 
             # create a spoofed reply and send it to the client
             spoofed_reply = req.copy()
@@ -279,6 +341,9 @@ class logCreationService(GDPService):
 
 
     def gen_nak(self, req, nak=gdp_pb2.NAK_C_BADREQ):
+
+        logging.info("sending a NAK(%d) [src:%r, dst:%r]" %
+                                    (nak, req['dst'], req['src'])
         resp = dict()
         resp['src'] = req['dst']
         resp['dst'] = req['src']
@@ -289,8 +354,8 @@ class logCreationService(GDPService):
         resp_payload.nak.ep_stat = 0
 
         resp['data'] = resp_payload.SerializeToString()
-
         return resp
+
 
     @staticmethod
     def extract_name(create_msg):
@@ -354,18 +419,6 @@ class logCreationService(GDPService):
         logging.info("Mapping '%s' => '%s'", humanname, __logname)
 
         return (humanname, logname) 
-
-
-    def add_to_hongd(self, humanname, logname):
-        """perform the database operation"""
-        table = self.namedb_info.get("table", "human_to_gdp")
-        query = "insert into "+table+" (hname, gname) values (%s, %s)"
-        if not self.namedb_conn.is_connected():
-            logging.warning("HONGD connection seems to be lost. Reconnecting")
-            self.namedb_conn.reconnect(attempts=3, delay=1)
-        with self.lock:
-            self.namedb_cur.execute(query, (humanname, logname))
-            self.namedb_conn.commit()
 
 
 if __name__ == "__main__":
