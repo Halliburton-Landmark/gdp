@@ -453,6 +453,22 @@ If it does not get a response in this many milliseconds
 it will retry.
 Defaults to 10000 (ten seconds).
 .
+.It swarm.gdp.hongd.backoff
+The base number of milliseconds to sleep between attempts to access
+the Human-Oriented Name to GDPname database.
+This is scaled by an exponential function based on the number of tries.
+For example, with the parameter set to one millisecond
+(the default)
+the back off is 1 msec, 2 msec, 4 msec, etc.
+See also
+.Va swarm.gdp.hongd.maxtries .
+.
+.It swarm.hongdb.maxtries
+The maximum number of times to retry a HONGD lookup.
+Defaults to 10.
+See also
+.Va swarm.gdp.hongd.backoff .
+.
 .It swarm.gdp.hongdb.database
 The name of the database holding the mappings
 from a human-oriented name to an internal GDPname.
@@ -463,6 +479,12 @@ Defaults to
 .It swarm.gdp.hongdb.host
 The DNS name of the host on which the database resides.
 Currently no default; this must be set.
+.
+.It swarm.gdp.hongdb.maxconns
+The maximum number of simultaneous connections
+an application will make to the HONGD database.
+This is only relevant in threaded applications.
+Defaults to 3.
 .
 .It swarm.gdp.hongdb.passwd
 The password for the database user
