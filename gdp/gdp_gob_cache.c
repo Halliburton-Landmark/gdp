@@ -499,10 +499,6 @@ _gdp_gob_cache_drop(gdp_gob_t *gob, bool cleanup)
 		EP_THR_MUTEX_ASSERT_ISLOCKED(&GobCacheMutex);
 		check_cache_consistency("_gdp_gob_cache_drop");
 	}
-	else
-	{
-		EP_THR_MUTEX_ASSERT_ISUNLOCKED(&GobCacheMutex);
-	}
 
 	// error if we're dropping something that's referenced from the cache
 	if (gob->refcnt != 0)
