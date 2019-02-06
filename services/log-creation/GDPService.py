@@ -250,8 +250,6 @@ class GDPProtocol(Protocol):
         if msg_dict['addr_format'] != 0:
             logging.warning("addr formats not implemented yet")
             return
-        if msg_dict['type'] != 0:
-            logging.warning('non-regular traffic; behavior undefined')
 
         msg_dict['ttl'] = ord(message[3]) & 0x3f
 
@@ -266,7 +264,24 @@ class GDPProtocol(Protocol):
         msg_dict['src'] = message[44:44+32]
 
         msg_dict['data'] = message[hdr_len:]
+
+        ## Do some sanity checks here on the PDU contents. Hopefully
+        ## we didn't run into any parsing issues so far
+
+        if msg_dict['type'] == 0:       # normal behavior
+            pass
+        elif msg_dict['type'] == 4:     # router NAK
+            ## just report the NAK and return immediately.
+            logging.warning('Router NAK; src: %r, dst: %r' %
+                                (msg_dict['src'], msg_dict['dst']))
+            return
+        else:
+            logging.warning('PDU type: %d, not implemented' % 
+                                msg_dict['type'])
+            return
+
         assert len(msg_dict['data']) == data_len
+
 
         # get the response dictionary
         # request_handler is to be supplied by GDPProtocolFactory,
