@@ -154,10 +154,10 @@ class logCreationService(GDPService):
 
         table = self.namedb_info.get("table", "human_to_gdp")
         query = "insert into "+table+" (hname, gname) values (%s, %s)"
-        if not self.namedb_conn.is_connected():
-            logging.warning("HONGD connection seems to be lost. Reconnecting")
-            self.namedb_conn.reconnect(attempts=3, delay=1)
         with self.lock:
+            if not self.namedb_conn.is_connected():
+                logging.warning("HONGD connection lost. Reconnecting")
+                self.namedb_conn.reconnect(attempts=3, delay=1)
             self.namedb_cur.execute(query, (humanname, logname))
             self.namedb_conn.commit()
 
@@ -194,19 +194,17 @@ class logCreationService(GDPService):
                                      FROM logs WHERE rowid=?""", (rid,))
             dbrows = self.dupdb_cur.fetchall()
 
-        good_resp = len(dbrows) == 1
+            good_resp = len(dbrows) == 1
+            if good_resp:
+                (__creator, orig_rid, ack_seen) = dbrows[0]
+                creator = gdp.GDP_NAME(__creator).internal_name()
+                if ack_seen != 0:
+                    good_resp = False
 
-        if good_resp:
-            (__creator, orig_rid, ack_seen) = dbrows[0]
-            creator = gdp.GDP_NAME(__creator).internal_name()
-            if ack_seen != 0:
-                good_resp = False
+            if not good_resp:
+                ## XXX handling errors via exceptions is probably better
+                return False, None, None
 
-        if not good_resp:
-            ## XXX handling errors via exceptions is probably better
-            return False, None, None
-
-        with self.lock:
             logging.debug("Setting ack_seen to 1 for row %d", rid)
             self.dupdb_cur.execute("""UPDATE logs SET ack_seen=1
                                WHERE rowid=?""", (rid,))
