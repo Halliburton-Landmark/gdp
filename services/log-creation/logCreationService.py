@@ -230,7 +230,8 @@ class logCreationService(GDPService):
         # sign)
         if payload.cmd >= GDP_NAK_R_MIN and \
                         payload.cmd <= GDP_NAK_R_MAX:
-            logger.warning("Routing error, src: %r", req['src'])
+            logger.warning("Routing error, src: %r",
+                            self.printable_name(req['src']))
             return
 
         # check if it's a request from a client or a response from a logd.
@@ -270,12 +271,9 @@ class logCreationService(GDPService):
 
             ## log this to our backend database. Generate printable
             ## names (except the null character, which causes problems)
-            __logname = gdp.GDP_NAME(logname,
-                                force_internal=True).printable_name()[:-1]
-            __srvname = gdp.GDP_NAME(srvname,
-                                force_internal=True).printable_name()[:-1]
-            __creator = gdp.GDP_NAME(creator,
-                                force_internal=True).printable_name()[:-1]
+            __logname = self.printable_name(logname)
+            __srvname = self.printable_name(srvname)
+            __creator = self.printable_name(creator)
 
             logging.info("Received Create request for logname %r, "
                                 "picking server %r", __logname, __srvname)
@@ -343,7 +341,8 @@ class logCreationService(GDPService):
     def gen_nak(self, req, nak=gdp_pb2.NAK_C_BADREQ):
 
         logging.info("sending a NAK(%d) [src:%r, dst:%r]" %
-                                    (nak, req['dst'], req['src']))
+                                    (nak, self.printable_name(req['dst']),
+                                          self.printable_name(req['src'])))
         resp = dict()
         resp['src'] = req['dst']
         resp['dst'] = req['src']
@@ -414,11 +413,16 @@ class logCreationService(GDPService):
             logname = _logname
 
         ## just for debugging
-        __logname = gdp.GDP_NAME(logname,
-                    force_internal=True).printable_name()[:-1]
+        __logname = self.printable_name(logname)
         logging.info("Mapping '%s' => '%s'", humanname, __logname)
 
         return (humanname, logname) 
+
+
+    @staticmethod
+    def printable_name(x):
+        """ return the printable name without the null character """
+        return gdp.GDP_NAME(x, force_internal=True).printable_name()[:-1]
 
 
 if __name__ == "__main__":
