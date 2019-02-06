@@ -114,8 +114,8 @@ class logCreationService(GDPService):
             self.dupdb_cur.execute("""CREATE UNIQUE INDEX logname_ndx
                                                         ON logs(logname)""")
             self.dupdb_cur.execute("CREATE INDEX srvname_ndx ON logs(srvname)")
-            self.dupdb_cur.execute("CREATE INDEX ack_seen_ndx
-                                                        ON logs(ack_seen)")
+            self.dupdb_cur.execute("""CREATE INDEX ack_seen_ndx
+                                                        ON logs(ack_seen)""")
             self.dupdb_conn.commit()
 
 
