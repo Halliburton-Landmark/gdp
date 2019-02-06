@@ -63,8 +63,7 @@ class logCreationService(GDPService):
         """
 
         ## First call the __init__ of GDPService
-        super(logCreationService, self).__init__(SERVICE_NAME,
-                                                        router, GDPaddrs)
+        super(logCreationService, self).__init__(SERVICE_NAME, router, GDPaddrs)
 
         ## Setup instance specific constants
         self.GDPaddrs = GDPaddrs
@@ -113,11 +112,11 @@ class logCreationService(GDPService):
                                     ts DATETIME DEFAULT CURRENT_TIMESTAMP,
                                     creator TEXT, rid INTEGER)""")
             self.dupdb_cur.execute("""CREATE UNIQUE INDEX logname_ndx
-                                                ON logs(logname)""")
+                                                        ON logs(logname)""")
             self.dupdb_cur.execute("CREATE INDEX srvname_ndx ON logs(srvname)")
-            self.dupdb_cur.execute("CREATE INDEX ack_seen_ndx ON logs(ack_seen)")
+            self.dupdb_cur.execute("CREATE INDEX ack_seen_ndx
+                                                        ON logs(ack_seen)")
             self.dupdb_conn.commit()
-
 
 
     def __setup_namedb(self):
@@ -191,7 +190,7 @@ class logCreationService(GDPService):
         with self.lock:
             ## Fetch the original creator and rid from our database
             self.dupdb_cur.execute("""SELECT creator, rid, ack_seen 
-                                     FROM logs WHERE rowid=?""", (rid,))
+                                         FROM logs WHERE rowid=?""", (rid,))
             dbrows = self.dupdb_cur.fetchall()
 
             good_resp = len(dbrows) == 1
@@ -227,7 +226,7 @@ class logCreationService(GDPService):
         # early exit if a router told us something (usually not a good
         # sign)
         if payload.cmd >= GDP_NAK_R_MIN and \
-                        payload.cmd <= GDP_NAK_R_MAX:
+                         payload.cmd <= GDP_NAK_R_MAX:
             logger.warning("Routing error, src: %r",
                             self.printable_name(req['src']))
             return
@@ -239,7 +238,7 @@ class logCreationService(GDPService):
             ## following occur, we ought to send back a NAK
             if req['src'] in self.logservers:
                 logging.warning("error: received cmd %d from server",
-                                         payload.cmd)
+                                                          payload.cmd)
                 return self.gen_nak(req, gdp_pb2.NAK_C_BADREQ)
 
             if payload.cmd != gdp_pb2.CMD_CREATE:
@@ -388,7 +387,7 @@ class logCreationService(GDPService):
 
             except struct.error as e:
                 logging.warning("%s", str(e))
-                logging.warning("Probably incomplete data when parsing metadata")
+                logging.warning("Incomplete data when parsing metadata")
                 ret = {}
 
             return ret
@@ -449,7 +448,7 @@ if __name__ == "__main__":
     parser.add_argument("--namedb_host", help="Hostname for namedb")
     parser.add_argument("--namedb_user", help="Username for namedb")
     parser.add_argument("--namedb_passwd", help="Password for namedb")
-    parser.add_argument("--namedb_pw_file", help="File containing namedb passwd")
+    parser.add_argument("--namedb_pw_file", help="File with namedb passwd")
     parser.add_argument("--namedb_database", help="Database name for namedb")
     parser.add_argument("--namedb_table", help="Table name for namedb")
 
@@ -490,8 +489,8 @@ if __name__ == "__main__":
     logging.info(">> Human name directory at %r", args.namedb_host)
 
     ## instantiate the service
-    service = logCreationService(args.dbname, router, addrs, servers,
-                                                            namedb_info)
+    service = logCreationService(args.dbname, router, addrs,
+                                                servers, namedb_info)
 
     ## all done, start the service (and sleep indefinitely)
     logging.info("Starting logcreationservice")
