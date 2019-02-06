@@ -354,8 +354,8 @@ class logCreationService(GDPService):
         return resp
 
 
-    @staticmethod
-    def extract_name(create_msg):
+    @classmethod
+    def extract_name(cls, create_msg):
         """
         returns a tuple (human name, internal name) from the Protobuf
         CmdCreate message. Any changes to the create message format
@@ -411,7 +411,7 @@ class logCreationService(GDPService):
             logname = _logname
 
         ## just for debugging
-        __logname = self.printable_name(logname)
+        __logname = cls.printable_name(logname)
         logging.info("Mapping '%s' => '%s'", humanname, __logname)
 
         return (humanname, logname) 
