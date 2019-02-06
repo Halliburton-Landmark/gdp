@@ -286,19 +286,19 @@ class logCreationService(GDPService):
                 ## request to an actual log-server
                 __rid = self.add_to_dupdb(__logname, __srvname, __creator, rid)
 
-               spoofed_req = req.copy()
-               spoofed_req['src'] = req['dst']
-               spoofed_req['dst'] = srvname
-               ## make a copy of payload so that we can change rid
-               __spoofed_payload = gdp_pb2.GdpMessage()
-               __spoofed_payload.ParseFromString(req['data'])
-               __spoofed_payload.rid = __rid
-               spoofed_req['data'] = __spoofed_payload.SerializeToString()
+                spoofed_req = req.copy()
+                spoofed_req['src'] = req['dst']
+                spoofed_req['dst'] = srvname
+                ## make a copy of payload so that we can change rid
+                __spoofed_payload = gdp_pb2.GdpMessage()
+                __spoofed_payload.ParseFromString(req['data'])
+                __spoofed_payload.rid = __rid
+                spoofed_req['data'] = __spoofed_payload.SerializeToString()
 
-               # now return this spoofed request back to transport layer
-               # Since we have overridden the destination, it will go
-               # to a log server instead of the actual client
-               return spoofed_req
+                # now return this spoofed request back to transport layer
+                # Since we have overridden the destination, it will go
+                # to a log server instead of the actual client
+                return spoofed_req
 
             except sqlite3.IntegrityError:
 
@@ -343,7 +343,7 @@ class logCreationService(GDPService):
     def gen_nak(self, req, nak=gdp_pb2.NAK_C_BADREQ):
 
         logging.info("sending a NAK(%d) [src:%r, dst:%r]" %
-                                    (nak, req['dst'], req['src'])
+                                    (nak, req['dst'], req['src']))
         resp = dict()
         resp['src'] = req['dst']
         resp['dst'] = req['src']
