@@ -24,13 +24,15 @@ import sys
 import struct
 from hashlib import sha256
 import mysql.connector as mariadb
+import Queue
 
 
-SERVICE_NAME = gdp.GDP_NAME('logcreationservice').internal_name()
+SVC_NAME = gdp.GDP_NAME('logcreationservice').internal_name()
 DEFAULT_ROUTER_PORT = 8007
 DEFAULT_ROUTER_HOST = "172.30.0.1"
 
-GDPROUTER_ADDRESS = (chr(255) + chr(0)) * 16
+
+########################################################
 ### these come from gdp/gdp_pdu.h from the GDP C library
 
 # Acks/Naks
@@ -45,33 +47,74 @@ GDP_NAK_R_MAX = 254
 GDP_NAK_C_CONFLICT = 201
 GDP_NAK_S_NOTIMPL = 225
 
-# specific commands
+# specific commands for our use
 GDP_CMD_CREATE = 66
 GDP_NAK_C_BADREQ = 192
+
+########################################################
+
+
+
+class SQLiteConnPool(object):
+
+    """
+    Implement a connection pool for SQLite connections. We cheat
+    a bit by telling SQLite to not check whether the connections
+    are being shared across threads. Instead, we ensure ourselves
+    that such connections are not shared across threads *at the
+    same time*.
+    """
+
+    def __init__(self, dbname, pool_size=10):
+        self.dbname = dbname
+        self.pool_size = pool_size
+        self.pool = Queue.Queue()
+        self.conn_list = [] ## list of all connections we created
+
+        ## fill the queue
+        for i in xrange(self.pool_size):
+            conn = sqlite3.connect(self.dbname, check_same_thread=False,
+                                            timeout=10)
+            self.pool.put(conn)
+            self.conn_list.append(conn)
+
+    def __del__(self):
+        ## close all the connections
+        for conn in self.conn_list:
+            conn.close() 
+
+    def get_connection(self):
+        """return a connection from the pool. Blocks indefinitely"""
+        return self.pool.get(block=True, timeout=None)
+
+    def return_connection(self, conn):
+        """
+        return a connection back to the pool. The caller may not
+        use the connection once they have returned it back to the pool
+        """
+        self.pool.put(conn)
 
 
 class logCreationService(GDPService):
 
     def __init__(self, dbname, router, GDPaddrs, logservers, namedb_info):
         """
-        router: a 'host:port' string representing the GDP router
-        GDPaddrs: a list of 256-bit addresses of this particular service
-        logservers: a list of log-servers on the backend that we use
-        dbname: sqlite database location
-        namedb_info: A remote database (mariadb) where we populate a
-                     human name => internal name mapping.
+        router:         a 'host:port' string representing the GDP router
+        GDPaddrs:       a list of 256-bit addresses of this particular service
+        logservers:     a list of log-servers on the backend that we use
+        dbname:         sqlite database location
+        namedb_info:    a remote database (mariadb) where we populate a
+                        human name => internal name mapping.
         """
 
         ## First call the __init__ of GDPService
-        super(logCreationService, self).__init__(SERVICE_NAME, router, GDPaddrs)
+        super(logCreationService, self).__init__(SVC_NAME, router, GDPaddrs)
 
         ## Setup instance specific constants
         self.GDPaddrs = GDPaddrs
         self.logservers = logservers
         self.dbname = dbname
         self.namedb_info = namedb_info
-
-        self.lock = threading.Lock()
 
         ## Connections/locks etc
         self.__setup_dupdb()
@@ -82,25 +125,20 @@ class logCreationService(GDPService):
 
         ## Close database connections
         logging.info("Closing database connection to %r", self.dbname)
-        self.dupdb_conn.close()
-        self.namedb_cpool.close()   ## Probably not accurate.
+        # self.dupdb_conn.close()
+        # self.namedb_cpool.close()   ## Probably not accurate.
 
 
     def __setup_dupdb(self):
         """
         setup appropriate connection/cursor objects for
         interacting with database for detecting duplicates.
-
-        At the end, variables 'self.dupdb_conn' and 'self.dupdb_cur'
-        are set appropriately.
         """
 
         logging.info("Opening database, %r", self.dbname)
         need_initializing = not os.path.exists(self.dbname)
 
-        self.dupdb_conn = sqlite3.connect(self.dbname, check_same_thread=False)
-        self.dupdb_cur = self.dupdb_conn.cursor()
-
+        self.dupdb_cpool = SQLiteConnPool(self.dbname, pool_size=10)
         if need_initializing:
             self.__initiate_dupdb()
 
@@ -109,17 +147,18 @@ class logCreationService(GDPService):
         """create required tables, indices, etc. """
 
         logging.info("Initializing database with tables and such")
-        self.dupdb_cur.execute("""CREATE TABLE logs(
-                                logname TEXT UNIQUE, srvname TEXT,
+
+        conn = sqlite3.connect(self.dbname)
+        cur = conn.cursor()
+        cur.execute("""CREATE TABLE logs(logname TEXT UNIQUE, srvname TEXT,
                                 ack_seen INTEGER DEFAULT 0,
                                 ts DATETIME DEFAULT CURRENT_TIMESTAMP,
                                 creator TEXT, rid INTEGER)""")
-        self.dupdb_cur.execute("""CREATE UNIQUE INDEX logname_ndx
-                                ON logs(logname)""")
-        self.dupdb_cur.execute("CREATE INDEX srvname_ndx ON logs(srvname)")
-        self.dupdb_cur.execute("""CREATE INDEX ack_seen_ndx
-                                ON logs(ack_seen)""")
-        self.dupdb_conn.commit()
+        cur.execute("CREATE UNIQUE INDEX logname_ndx ON logs(logname)")
+        cur.execute("CREATE INDEX srvname_ndx ON logs(srvname)")
+        cur.execute("CREATE INDEX ack_seen_ndx ON logs(ack_seen)")
+        conn.commit()
+        conn.close()
 
 
     def __setup_namedb(self):
@@ -165,6 +204,7 @@ class logCreationService(GDPService):
             conn.commit()
             conn.close()    # return back to the pool
         except mariadb.PoolError as e:
+            ## XXX This is not a rare condition and needs to be fixed
             logging.warning("No free connection to HONGD")
             raise e
 
@@ -172,15 +212,22 @@ class logCreationService(GDPService):
     def add_to_dupdb(self, __logname, __srvname, __creator, rid):
         """Add new entry to dupdb"""
 
-        with self.lock:
-            logging.debug("inserting to database %r, %r, %r, %d",
-                        __logname, __srvname, __creator, rid)
-            self.dupdb_cur.execute("""INSERT INTO logs
-                                      (logname, srvname, creator, rid)
-                                      VALUES(?,?,?,?);""",
-                                      (__logname, __srvname, __creator, rid))
-            self.dupdb_conn.commit()
-            rid = self.dupdb_cur.lastrowid
+        ## get a connection from the connection pool
+        conn = self.dupdb_cpool.get_connection()
+        cur = conn.cursor()
+
+        logging.debug("inserting to database %r, %r, %r, %d",
+                            __logname, __srvname, __creator, rid)
+        cur.execute("""INSERT INTO logs (logname, srvname, creator, rid)
+                            VALUES(?,?,?,?);""",
+                            (__logname, __srvname, __creator, rid))
+        conn.commit()
+        rid = cur.lastrowid
+        cur.close()
+
+        ## don't forget to return the connection
+        self.dupdb_cpool.return_connection(conn)
+
         return rid
 
 
@@ -194,30 +241,35 @@ class logCreationService(GDPService):
         back to the creator.
         """
 
-        ## XXX Locking here is less than ideal. This should be fixed
-        
-        with self.lock:
-            ## Fetch the original creator and rid from our database
-            self.dupdb_cur.execute("""SELECT creator, rid, ack_seen 
-                                         FROM logs WHERE rowid=?""", (rid,))
-            dbrows = self.dupdb_cur.fetchall()
+        ## first get a connection
+        conn = self.dupdb_cpool.get_connection()
+        cur = conn.cursor()
 
-            good_resp = len(dbrows) == 1
-            if good_resp:
-                (__creator, orig_rid, ack_seen) = dbrows[0]
-                creator = gdp.GDP_NAME(__creator).internal_name()
-                if ack_seen != 0:
-                    good_resp = False
+        ## Fetch the original creator and rid from our database
+        cur.execute("""SELECT creator, rid, ack_seen 
+                             FROM logs WHERE rowid=?""", (rid,))
+        dbrows = cur.fetchall()
+        good_resp = len(dbrows) == 1
+        if good_resp:
+            (__creator, orig_rid, ack_seen) = dbrows[0]
+            creator = gdp.GDP_NAME(__creator).internal_name()
+            if ack_seen != 0:
+                good_resp = False
 
-            if not good_resp:
-                ## XXX handling errors via exceptions is probably better
-                return False, None, None
+        if not good_resp:
+            ## XXX handling errors via exceptions is probably better
+            ## don't forget to return the connection back to the pool
+            cur.close()
+            self.dupdb_cpool.return_connection(conn)
+            return False, None, None
 
-            logging.debug("Setting ack_seen to 1 for row %d", rid)
-            self.dupdb_cur.execute("""UPDATE logs SET ack_seen=1
-                               WHERE rowid=?""", (rid,))
-            self.dupdb_conn.commit()
+        logging.debug("Setting ack_seen to 1 for row %d", rid)
+        cur.execute("UPDATE logs SET ack_seen=1 WHERE rowid=?", (rid,))
+        conn.commit()
 
+        ## don't forget to return the connection back to the pool
+        cur.close()
+        self.dupdb_cpool.return_connection(conn)
         return (good_resp, creator, orig_rid)
 
 
