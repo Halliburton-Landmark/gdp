@@ -72,6 +72,7 @@ class logCreationService(GDPService):
         self.namedb_info = namedb_info
 
         self.lock = threading.Lock()
+
         ## Connections/locks etc
         self.__setup_dupdb()
         self.__setup_namedb()
@@ -82,7 +83,7 @@ class logCreationService(GDPService):
         ## Close database connections
         logging.info("Closing database connection to %r", self.dbname)
         self.dupdb_conn.close()
-        self.namedb_conn.close()
+        self.namedb_cpool.close()
 
 
     def __setup_dupdb(self):
@@ -112,10 +113,10 @@ class logCreationService(GDPService):
                                     ts DATETIME DEFAULT CURRENT_TIMESTAMP,
                                     creator TEXT, rid INTEGER)""")
             self.dupdb_cur.execute("""CREATE UNIQUE INDEX logname_ndx
-                                                        ON logs(logname)""")
+                                    ON logs(logname)""")
             self.dupdb_cur.execute("CREATE INDEX srvname_ndx ON logs(srvname)")
             self.dupdb_cur.execute("""CREATE INDEX ack_seen_ndx
-                                                        ON logs(ack_seen)""")
+                                    ON logs(ack_seen)""")
             self.dupdb_conn.commit()
 
 
@@ -132,33 +133,34 @@ class logCreationService(GDPService):
             _password = namedb_info.get("passwd", "")
             _database = namedb_info.get("database", "gdp_hongd")
             logging.info("Opening database %r host %r user %r",
-                        _database, _host, _user)
-            self.namedb_conn = mariadb.connect(
-                        host=_host,
-                        user=_user,
-                        password=_password,
-                        database=_database)
-
-            ## XXX Not sure if we can share a single cursor, or whether
-            ## one ought to acquire a new cursor for each (potentially
-            ## concurrent) request. Check this later.
-            self.namedb_cur = self.namedb_conn.cursor()
+                                _database, _host, _user)
+            self.namedb_cpool = mariadb.pooling.MySQLConnectionPool(
+                                    pool_size=10,
+                                    host=_host, user=_user,
+                                    password=_password, database=_database)
         else:
-            self.namedb_conn = None
-            self.namedb_cur = None
+            self.namedb_cpool = None
 
 
     def add_to_hongd(self, humanname, logname):
         """perform the database operation"""
 
+        logging.info("Adding HONGD mapping %s => %s" % 
+                            (humanname, self.printable_name(logname)))
         table = self.namedb_info.get("table", "human_to_gdp")
         query = "insert into "+table+" (hname, gname) values (%s, %s)"
-        with self.lock:
-            if not self.namedb_conn.is_connected():
+        try:
+            conn = self.namedb_cpool.get_connection()
+            if not conn.is_connected():
                 logging.warning("HONGD connection lost. Reconnecting")
-                self.namedb_conn.reconnect(attempts=3, delay=1)
-            self.namedb_cur.execute(query, (humanname, logname))
-            self.namedb_conn.commit()
+                conn.reconnect(attempts=3, delay=1)
+            cur = conn.cursor()
+            cur.execute(query, (humanname, logname))
+            conn.commit()
+            conn.close()    # return back to the pool
+        except mariadb.PoolError as e:
+            logging.warning("No free connection to HONGD")
+            raise e
 
 
     def add_to_dupdb(self, __logname, __srvname, __creator, rid):
@@ -181,6 +183,7 @@ class logCreationService(GDPService):
         When we received a response, lookup the specific row id in the
         dupdb. Update the specific row to indicate that we have seen
         a response for the given log.
+
         Return appropriate information for creating a spoofed response
         back to the creator.
         """
@@ -251,7 +254,7 @@ class logCreationService(GDPService):
             humanname, logname = self.extract_name(payload.cmd_create)
 
             ## Add this to the humanname=>logname mapping directory
-            if humanname is not None and self.namedb_conn is not None:
+            if humanname is not None and self.namedb_cpool is not None:
                 try:
                     # Note that logname is the internal 256-bit name
                     # (and not a printable name)
