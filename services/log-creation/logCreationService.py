@@ -83,7 +83,7 @@ class logCreationService(GDPService):
         ## Close database connections
         logging.info("Closing database connection to %r", self.dbname)
         self.dupdb_conn.close()
-        self.namedb_cpool.close()
+        self.namedb_cpool.close()   ## Probably not accurate.
 
 
     def __setup_dupdb(self):
@@ -94,40 +94,44 @@ class logCreationService(GDPService):
         At the end, variables 'self.dupdb_conn' and 'self.dupdb_cur'
         are set appropriately.
         """
- 
-        if os.path.exists(self.dbname):
-            logging.info("Loading existing database, %r", self.dbname)
-            self.dupdb_conn = sqlite3.connect(self.dbname,
-                                                check_same_thread=False)
-            self.dupdb_cur = self.dupdb_conn.cursor()
-        else:
-            logging.info("Creating new database, %r", self.dbname)
-            self.dupdb_conn = sqlite3.connect(self.dbname,
-                                                check_same_thread=False)
-            self.dupdb_cur = self.dupdb_conn.cursor()
 
-            ## Make table for bookkeeping
-            self.dupdb_cur.execute("""CREATE TABLE logs(
-                                    logname TEXT UNIQUE, srvname TEXT,
-                                    ack_seen INTEGER DEFAULT 0,
-                                    ts DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                    creator TEXT, rid INTEGER)""")
-            self.dupdb_cur.execute("""CREATE UNIQUE INDEX logname_ndx
-                                    ON logs(logname)""")
-            self.dupdb_cur.execute("CREATE INDEX srvname_ndx ON logs(srvname)")
-            self.dupdb_cur.execute("""CREATE INDEX ack_seen_ndx
-                                    ON logs(ack_seen)""")
-            self.dupdb_conn.commit()
+        logging.info("Opening database, %r", self.dbname)
+        need_initializing = not os.path.exists(self.dbname)
+
+        self.dupdb_conn = sqlite3.connect(self.dbname, check_same_thread=False)
+        self.dupdb_cur = self.dupdb_conn.cursor()
+
+        if need_initializing:
+            self.__initiate_dupdb()
+
+
+    def __initiate_dupdb(self):
+        """create required tables, indices, etc. """
+
+        logging.info("Initializing database with tables and such")
+        self.dupdb_cur.execute("""CREATE TABLE logs(
+                                logname TEXT UNIQUE, srvname TEXT,
+                                ack_seen INTEGER DEFAULT 0,
+                                ts DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                creator TEXT, rid INTEGER)""")
+        self.dupdb_cur.execute("""CREATE UNIQUE INDEX logname_ndx
+                                ON logs(logname)""")
+        self.dupdb_cur.execute("CREATE INDEX srvname_ndx ON logs(srvname)")
+        self.dupdb_cur.execute("""CREATE INDEX ack_seen_ndx
+                                ON logs(ack_seen)""")
+        self.dupdb_conn.commit()
 
 
     def __setup_namedb(self):
         """
         Same as '__setup_dupdb', except for human=>internal name database
         """
+
         logging.info("Setting up connection to human=>internal name database")
 
         if namedb_info.get("host", None) is not None:
             logging.info("Initiating connection to directory server")
+
             _host = namedb_info.get("host", "gdp-hongd.cs.berkeley.edu")
             _user = namedb_info.get("user", "gdp_creation_service")
             _password = namedb_info.get("passwd", "")
@@ -139,6 +143,7 @@ class logCreationService(GDPService):
                                     host=_host, user=_user,
                                     password=_password, database=_database)
         else:
+            logging.info("No information provided for namedb. Skipping")
             self.namedb_cpool = None
 
 
@@ -154,6 +159,7 @@ class logCreationService(GDPService):
             if not conn.is_connected():
                 logging.warning("HONGD connection lost. Reconnecting")
                 conn.reconnect(attempts=3, delay=1)
+                # XXX what happens if conn.is_connected() is False here?
             cur = conn.cursor()
             cur.execute(query, (humanname, logname))
             conn.commit()
