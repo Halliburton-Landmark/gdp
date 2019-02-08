@@ -38,7 +38,7 @@
 struct ep_crypto_cipher_ctx
 {
 	EP_CRYPTO_KEY	*key;		// symmetric encryption/decryption key
-	EVP_CIPHER_CTX	ctx;		// OpenSSL cipher context
+	EVP_CIPHER_CTX	*ctx;		// OpenSSL cipher context
 //	uint8_t		iv[EVP_MAX_IV_LENGTH];
 };
 
@@ -107,8 +107,13 @@ ep_crypto_cipher_new(
 		return NULL;
 
 	ctx = (EP_CRYPTO_CIPHER_CTX *) ep_mem_zalloc(sizeof *ctx);
-	EVP_CIPHER_CTX_init(&ctx->ctx);
-	if (EVP_CipherInit_ex(&ctx->ctx, ciphertype, engine, key, iv, enc) <= 0)
+#if OPENSSL_VERSION_NUMBER >= 0x10100000	// version 1.1.0
+	ctx->ctx = EVP_CIPHER_CTX_new();
+#else
+	ctx->ctx = ep_mem_malloc(sizeof *ctx->ctx);
+	EVP_CIPHER_CTX_init(ctx->ctx);
+#endif
+	if (EVP_CipherInit_ex(ctx->ctx, ciphertype, engine, key, iv, enc) <= 0)
 	{
 		ep_crypto_cipher_free(ctx);
 		(void) _ep_crypto_error(EP_STAT_CRYPTO_CIPHER,
@@ -131,7 +136,14 @@ ep_crypto_cipher_new(
 void
 ep_crypto_cipher_free(EP_CRYPTO_CIPHER_CTX *ctx)
 {
-	if (EVP_CIPHER_CTX_cleanup(&ctx->ctx) <= 0)
+	int istat;
+#if OPENSSL_VERSION_NUMBER >= 0x10100000	// version 1.1.0
+	istat = EVP_CIPHER_CTX_free(ctx->ctx);
+#else
+	istat = EVP_CIPHER_CTX_cleanup(ctx->ctx);
+	ep_mem_free(ctx->ctx);
+#endif
+	if (istat <= 0)
 		(void) _ep_crypto_error(EP_STAT_CRYPTO_FAIL,
 				"cannot cleanup cipher context");
 	ep_mem_free(ctx);
@@ -165,16 +177,16 @@ ep_crypto_cipher_crypt(
 	int rval;
 
 	// must allow room for final padding in output buffer
-	if (outlen < inlen + EVP_CIPHER_CTX_key_length(&ctx->ctx))
+	if (outlen < inlen + EVP_CIPHER_CTX_key_length(ctx->ctx))
 	{
 		// potential buffer overflow
 		return _ep_crypto_error(EP_STAT_BUF_OVERFLOW,
 				"cp_crypto_cipher_crypt: "
 				"short output buffer (%d < %d + %d)",
-			outlen, inlen, EVP_CIPHER_CTX_key_length(&ctx->ctx));
+			outlen, inlen, EVP_CIPHER_CTX_key_length(ctx->ctx));
 	}
 
-	if (EVP_CipherUpdate(&ctx->ctx, (uint8_t *) out, &olen, (uint8_t *) in, inlen) <= 0)
+	if (EVP_CipherUpdate(ctx->ctx, (uint8_t *) out, &olen, (uint8_t *) in, inlen) <= 0)
 	{
 		return _ep_crypto_error(EP_STAT_CRYPTO_CIPHER,
 				"ep_crypto_cipher_crypt: "
@@ -182,7 +194,7 @@ ep_crypto_cipher_crypt(
 	}
 	rval = olen;
 	out += olen;
-	if (EVP_CipherFinal_ex(&ctx->ctx, out, &olen) <= 0)
+	if (EVP_CipherFinal_ex(ctx->ctx, out, &olen) <= 0)
 	{
 		return _ep_crypto_error(EP_STAT_CRYPTO_CIPHER,
 				"ep_crypto_cipher_crypt: "
@@ -207,7 +219,7 @@ ep_crypto_cipher_update(
 	uint8_t *out = (uint8_t *) _out;
 	int olen;
 
-	if (EVP_CipherUpdate(&ctx->ctx, out, &olen, in, inlen) <= 0)
+	if (EVP_CipherUpdate(ctx->ctx, out, &olen, in, inlen) <= 0)
 	{
 		return _ep_crypto_error(EP_STAT_CRYPTO_CIPHER,
 				"ep_crypto_cipher_update: "
@@ -229,16 +241,16 @@ ep_crypto_cipher_final(
 	int olen;
 
 	// allow room for possible final padding
-	if ((ssize_t) outlen < EVP_CIPHER_CTX_key_length(&ctx->ctx))
+	if ((ssize_t) outlen < EVP_CIPHER_CTX_key_length(ctx->ctx))
 	{
 		// potential buffer overflow
 		return _ep_crypto_error(EP_STAT_BUF_OVERFLOW,
 				"ep_crypto_cipher_final: "
 				"short output buffer (%d < %d)",
-				outlen, EVP_CIPHER_CTX_key_length(&ctx->ctx));
+				outlen, EVP_CIPHER_CTX_key_length(ctx->ctx));
 	}
 
-	if (EVP_CipherFinal_ex(&ctx->ctx, out, &olen) <= 0)
+	if (EVP_CipherFinal_ex(ctx->ctx, out, &olen) <= 0)
 	{
 		return _ep_crypto_error(EP_STAT_CRYPTO_CIPHER,
 				"ep_crypto_cipher_final: "
