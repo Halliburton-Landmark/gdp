@@ -271,9 +271,9 @@ check_os() {
 	    ;;
 
 	"ubuntu")
-	    if expr $OSVER \< 140400 > /dev/null
+	    if expr $OSVER \< 160400 > /dev/null
 	    then
-		    fatal_osver "Ubuntu 14.04"
+		    fatal_osver "Ubuntu 16.04"
 	    fi
 	    ;;
 
