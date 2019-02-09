@@ -56,6 +56,9 @@ GDP_NAK_C_BADREQ = 192
 class PoolExhausted(Exception):
     pass
 
+class UnknownResponse(Exception):
+    pass
+
 
 class MySQLConnectionPool(mariadb.pooling.MySQLConnectionPool):
     """
@@ -100,7 +103,7 @@ class SQLiteConnPool(object):
     same time*.
     """
 
-    def __init__(self, dbname, pool_size=2):
+    def __init__(self, dbname, pool_size=16):
         self.dbname = dbname
         self.pool_size = pool_size
         self.pool = Queue.Queue()
@@ -187,7 +190,7 @@ class logCreationService(GDPService):
         need_initializing = not os.path.exists(self.dbname)
 
         logging.info("Creating connection pool, %r", self.dbname)
-        self.dupdb_cpool = SQLiteConnPool(self.dbname, pool_size=2)
+        self.dupdb_cpool = SQLiteConnPool(self.dbname, pool_size=16)
         if need_initializing:
             self.__initiate_dupdb()
 
@@ -230,7 +233,7 @@ class logCreationService(GDPService):
             ## be larger than our local database because of the difference
             ## in latency
             self.namedb_cpool = MySQLConnectionPool(
-                                    pool_size=2, host=_host, user=_user,
+                                    pool_size=32, host=_host, user=_user,
                                     password=_password, database=_database)
         else:
             logging.info("No information provided for namedb. Skipping")
@@ -300,46 +303,51 @@ class logCreationService(GDPService):
         return rid
 
 
-    def update_dubdb(self, rid):
+    def fetch_creator(self, rid):
         """
         When we received a response, lookup the specific row id in the
-        dupdb. Update the specific row to indicate that we have seen
+        dupdb and return appropriate information for creating a spoofed
+        response back to the creator.
+
+        Also pdate the specific row to indicate that we have seen
         a response for the given log.
 
-        Return appropriate information for creating a spoofed response
-        back to the creator.
+        Raise an UnknownResponse exception in case something is wrong.
         """
 
         ## First get a connection from the pool
         conn = self.dupdb_cpool.get_connection()
         cur = conn.cursor()
 
-        ## Fetch the original creator and rid from our database
-        cur.execute("""SELECT creator, rid, ack_seen 
+        try:
+
+            ## Fetch the original creator and rid from our database
+            cur.execute("""SELECT creator, rid, ack_seen 
                              FROM logs WHERE rowid=?""", (rid,))
-        dbrows = cur.fetchall()
-        good_resp = len(dbrows) == 1
-        if good_resp:
+            dbrows = cur.fetchall()
+            ## We should know about this specific unique request ID
+            assert len(dbrows) == 1
+
             (__creator, orig_rid, ack_seen) = dbrows[0]
             creator = gdp.GDP_NAME(__creator).internal_name()
-            if ack_seen != 0:
-                good_resp = False
+            ## We should not have seen a response already for this rid
+            assert ack_seen == 0
 
-        if not good_resp:
+            logging.debug("Setting ack_seen to 1 for row %d", rid)
+            cur.execute("UPDATE logs SET ack_seen=1 WHERE rowid=?", (rid,))
+            conn.commit()
+
+            ## don't forget to return the connection back to the pool
+            cur.close()
+            self.dupdb_cpool.return_connection(conn)
+            return (creator, orig_rid)
+
+        except AssertionError as e:
             ## XXX handling errors via exceptions is probably better
             ## don't forget to return the connection back to the pool
             cur.close()
             self.dupdb_cpool.return_connection(conn)
-            return False, None, None
-
-        logging.debug("Setting ack_seen to 1 for row %d", rid)
-        cur.execute("UPDATE logs SET ack_seen=1 WHERE rowid=?", (rid,))
-        conn.commit()
-
-        ## don't forget to return the connection back to the pool
-        cur.close()
-        self.dupdb_cpool.return_connection(conn)
-        return (good_resp, creator, orig_rid)
+            raise UnknownResponse
 
 
     def request_handler(self, req):
@@ -388,13 +396,18 @@ class logCreationService(GDPService):
                     self.add_to_hongd(humanname, logname)
 
                 except mariadb.Error as error:
-
-                    ## XXX what is the correct behavior? exit?
+                    # XXX we should probably handle the situation where
+                    # this is simply a retransmit from an aggressive client.
                     logging.warning("Couldn't add mapping. %s", str(error))
                     return self.gen_nak(req, gdp_pb2.NAK_C_CONFLICT)
 
                 except PoolExhausted as error:
                     logging.warning("DB connection pool exhausted")
+                    return self.gen_nak(req, gdp_pb2.NAK_S_INTERNAL)
+
+                except Exception as e:
+                    ## report back to the client that something went wrong
+                    logging.warning("Generic exception: %r", e)
                     return self.gen_nak(req, gdp_pb2.NAK_S_INTERNAL)
 
             srvname = random.choice(self.logservers)
@@ -456,11 +469,23 @@ class logCreationService(GDPService):
 
             logging.info("Response from log-server, row %d", payload.rid)
 
-            (good_resp, creator, orig_rid) = self.update_dubdb(payload.rid)
-
-            if not good_resp:
+            try:
+                (creator, orig_rid) = self.fetch_creator(payload.rid)
+            except UnknownResponse as e:
+                ## this happens because either we don't know about the
+                ## specific request ID, or we have already received a
+                ## response for the said request ID. In any case, it is
+                ## appropriate to return a NAK back to the log-server
                 logging.warning("error: bogus response")
                 return self.gen_nak(req, gdp_pb2.NAK_C_BADREQ)
+            except Exception as e:
+                ## We shouldn't be returning any NAK back to a log-server.
+                ## Ideally, we should be returning a NAK back to the original
+                ## client, but we don't have a name for the client yet. The
+                ## most appropriate strategy is to simply report the error on
+                ## the console.
+                logging.warning("Generic exception: %r", e)
+                return None
 
             # create a spoofed reply and send it to the client
             spoofed_reply = req.copy()
