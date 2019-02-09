@@ -53,6 +53,41 @@ GDP_NAK_C_BADREQ = 192
 
 ########################################################
 
+class PoolExhausted(Exception):
+    pass
+
+
+class MySQLConnectionPool(mariadb.pooling.MySQLConnectionPool):
+    """
+    Subclass of default connection pool with our little
+    enhancements to 'get_connection' and a new function
+    'return_connection' to match the SQLiteConnPool
+    """
+
+    def get_connection(self, retries=3, timeout=0.500):
+        """
+        Attempt to get a connection from the pool. Retry if necessary,
+        but return a PoolExhausted error if it doesn't work.
+        """
+        retries_left = retries
+
+        while retries_left > 0:
+            try:
+                conn = super(MySQLConnectionPool, self).get_connection()
+                return conn
+            except (mariadb.PoolError, mariadb.Error) as e:
+                logging.debug("Waiting for a free connection to MySQL")
+                retries_left = retries_left - 1
+                time.sleep(timeout)
+                if retries_left <= 0:
+                    logging.warning("No free connection to MySQL")
+                    raise PoolExhausted
+
+        assert False    # should never get here
+        
+    def return_connection(self, conn):
+        """ simply return the connection back to the pool """
+        conn.close()
 
 
 class SQLiteConnPool(object):
@@ -65,7 +100,7 @@ class SQLiteConnPool(object):
     same time*.
     """
 
-    def __init__(self, dbname, pool_size=10):
+    def __init__(self, dbname, pool_size=2):
         self.dbname = dbname
         self.pool_size = pool_size
         self.pool = Queue.Queue()
@@ -78,14 +113,34 @@ class SQLiteConnPool(object):
             self.pool.put(conn)
             self.conn_list.append(conn)
 
+
     def __del__(self):
         ## close all the connections
         for conn in self.conn_list:
             conn.close() 
 
-    def get_connection(self):
-        """return a connection from the pool. Blocks indefinitely"""
-        return self.pool.get(block=True, timeout=None)
+
+    def get_connection(self, retries=3, timeout=0.500):
+        """
+        return a connection from the pool. Attempt some retries, but
+        raise a PoolExhausted error if we can't get it to work
+        """
+        retries_left = retries
+
+        while retries_left > 0:
+            try:
+                conn = self.pool.get(block=False)
+                return conn
+            except Queue.Empty:
+                logging.debug("Waiting for a free connection to SQLite")
+                retries_left = retries_left - 1
+                time.sleep(timeout)
+                if retries_left <= 0:
+                    logging.warning("No free connection to SQLite")
+                    raise PoolExhausted
+
+        assert False    # should never get here
+
 
     def return_connection(self, conn):
         """
@@ -93,6 +148,9 @@ class SQLiteConnPool(object):
         use the connection once they have returned it back to the pool
         """
         self.pool.put(conn)
+
+
+########################################################
 
 
 class logCreationService(GDPService):
@@ -116,29 +174,20 @@ class logCreationService(GDPService):
         self.dbname = dbname
         self.namedb_info = namedb_info
 
-        ## Connections/locks etc
+        ## Setup connection pools to the databases
         self.__setup_dupdb()
         self.__setup_namedb()
 
 
-    def __del__(self):
-
-        ## Close database connections
-        logging.info("Closing database connection to %r", self.dbname)
-        # self.dupdb_conn.close()
-        # self.namedb_cpool.close()   ## Probably not accurate.
-
-
     def __setup_dupdb(self):
         """
-        setup appropriate connection/cursor objects for
-        interacting with database for detecting duplicates.
+        Setup connection pool to our "duplicate detection" database.
+        Initialize the database tables if needed.
         """
-
-        logging.info("Opening database, %r", self.dbname)
         need_initializing = not os.path.exists(self.dbname)
 
-        self.dupdb_cpool = SQLiteConnPool(self.dbname, pool_size=10)
+        logging.info("Creating connection pool, %r", self.dbname)
+        self.dupdb_cpool = SQLiteConnPool(self.dbname, pool_size=2)
         if need_initializing:
             self.__initiate_dupdb()
 
@@ -148,6 +197,8 @@ class logCreationService(GDPService):
 
         logging.info("Initializing database with tables and such")
 
+        ## just create a completely separate connection, since we
+        ## haven't really started doing anything interesting yet
         conn = sqlite3.connect(self.dbname)
         cur = conn.cursor()
         cur.execute("""CREATE TABLE logs(logname TEXT UNIQUE, srvname TEXT,
@@ -162,9 +213,7 @@ class logCreationService(GDPService):
 
 
     def __setup_namedb(self):
-        """
-        Same as '__setup_dupdb', except for human=>internal name database
-        """
+        """ Setup connection pool to "human=>internal name" database. """
 
         logging.info("Setting up connection to human=>internal name database")
 
@@ -177,9 +226,11 @@ class logCreationService(GDPService):
             _database = namedb_info.get("database", "gdp_hongd")
             logging.info("Opening database %r host %r user %r",
                                 _database, _host, _user)
-            self.namedb_cpool = mariadb.pooling.MySQLConnectionPool(
-                                    pool_size=10,
-                                    host=_host, user=_user,
+            ## the max pool size is 32; this number should certainly
+            ## be larger than our local database because of the difference
+            ## in latency
+            self.namedb_cpool = MySQLConnectionPool(
+                                    pool_size=2, host=_host, user=_user,
                                     password=_password, database=_database)
         else:
             logging.info("No information provided for namedb. Skipping")
@@ -191,28 +242,46 @@ class logCreationService(GDPService):
 
         logging.info("Adding HONGD mapping %s => %s" % 
                             (humanname, self.printable_name(logname)))
+        assert self.namedb_cpool is not None
+
+        ## First get a connection from the pool
+        conn = self.namedb_cpool.get_connection()
+        assert conn is not None
+
         table = self.namedb_info.get("table", "human_to_gdp")
         query = "insert into "+table+" (hname, gname) values (%s, %s)"
-        try:
-            conn = self.namedb_cpool.get_connection()
-            if not conn.is_connected():
-                logging.warning("HONGD connection lost. Reconnecting")
-                conn.reconnect(attempts=3, delay=1)
-                # XXX what happens if conn.is_connected() is False here?
+
+        try: 
+
             cur = conn.cursor()
             cur.execute(query, (humanname, logname))
             conn.commit()
-            conn.close()    # return back to the pool
-        except mariadb.PoolError as e:
-            ## XXX This is not a rare condition and needs to be fixed
-            logging.warning("No free connection to HONGD")
+            self.namedb_cpool.return_connection(conn) # return back
+
+        except Exception as e:
+
+            ### XXX this is bad; we need to catch specific exceptions, but
+            ### I don't know what exact exception to catch.
+            logging.warning("Got exception: %r", e)
+
+            ## maybe the connection was lost. If so, attempt to reconnect
+            ## and give it another try
+            if not conn.is_connected():
+                logging.warning("HONGD connection lost. Reconnecting")
+                conn.reconnect(attempts=3, delay=1)
+                if not conn.is_connected():
+                    logging.warning("Could not reconnect with HONGD")
+
+            ## now we still raise the exception for this specific
+            ## request, but hopefully we repaired the connection if
+            ## that was the issue
             raise e
 
 
     def add_to_dupdb(self, __logname, __srvname, __creator, rid):
         """Add new entry to dupdb"""
 
-        ## get a connection from the connection pool
+        ## First get a connection from the pool
         conn = self.dupdb_cpool.get_connection()
         cur = conn.cursor()
 
@@ -241,7 +310,7 @@ class logCreationService(GDPService):
         back to the creator.
         """
 
-        ## first get a connection
+        ## First get a connection from the pool
         conn = self.dupdb_cpool.get_connection()
         cur = conn.cursor()
 
@@ -317,10 +386,16 @@ class logCreationService(GDPService):
                     # Note that logname is the internal 256-bit name
                     # (and not a printable name)
                     self.add_to_hongd(humanname, logname)
+
                 except mariadb.Error as error:
-                    logging.warning("Couldn't add mapping. %s", str(error))
+
                     ## XXX what is the correct behavior? exit?
+                    logging.warning("Couldn't add mapping. %s", str(error))
                     return self.gen_nak(req, gdp_pb2.NAK_C_CONFLICT)
+
+                except PoolExhausted as error:
+                    logging.warning("DB connection pool exhausted")
+                    return self.gen_nak(req, gdp_pb2.NAK_S_INTERNAL)
 
             srvname = random.choice(self.logservers)
             ## private information that we will need later
@@ -364,6 +439,12 @@ class logCreationService(GDPService):
                 ## We send a NAK to the creator.
                 logging.warning("Log already exists")
                 return self.gen_nak(req, gdp_pb2.NAK_C_CONFLICT)
+
+            except Exception as e:
+
+                ## Generic exception
+                logging.warning("Got generic exception %r", e)
+                return self.gen_nak(req, gdp_pb2.NAK_S_INTERNAL)
 
 
         else: ## response.
@@ -469,10 +550,6 @@ class logCreationService(GDPService):
         if _logname is not None and _logname != logname:
             logging.debug("Overriding hash of metadata with provided name")
             logname = _logname
-
-        ## just for debugging
-        __logname = cls.printable_name(logname)
-        logging.info("Mapping '%s' => '%s'", humanname, __logname)
 
         return (humanname, logname) 
 
