@@ -334,11 +334,15 @@ struct gdp_gob
 **  GOB functions
 */
 
+// Used to avoid compiler warnings on some versions of gcc ("value computed is
+// not used").  If "inline" doesn't work, use #define _gdp_bool_null(b) (b).
+static inline bool _gdp_bool_null(bool b) { return b; }
+
 #define GDP_GOB_ISGOOD(gob)												\
 				((gob) != NULL &&										\
 				 EP_UT_BITSET(GOBF_INUSE, (gob)->flags))
 #define GDP_GOB_ASSERT_ISLOCKED(gob)									\
-			(															\
+			_gdp_bool_null(												\
 				EP_ASSERT(GDP_GOB_ISGOOD(gob)) &&						\
 				EP_ASSERT(EP_UT_BITSET(GOBF_ISLOCKED, (gob)->flags)) &&	\
 				EP_THR_MUTEX_ASSERT_ISLOCKED(&(gob)->mutex)				\
@@ -495,7 +499,7 @@ EP_STAT			_gdp_gob_fwd_append(		// forward APPEND (replication)
 				 EP_UT_BITSET(GOBF_INUSE, (gin)->flags) &&				\
 				 GDP_GOB_ISGOOD((gin)->gob))
 #define GDP_GIN_ASSERT_ISLOCKED(gin)									\
-			(															\
+			_gdp_bool_null(												\
 				EP_ASSERT(GDP_GIN_ISGOOD(gin)) &&						\
 				EP_ASSERT(EP_UT_BITSET(GOBF_ISLOCKED, (gin)->flags)) &&	\
 				EP_THR_MUTEX_ASSERT_ISLOCKED(&(gin)->mutex) &&			\

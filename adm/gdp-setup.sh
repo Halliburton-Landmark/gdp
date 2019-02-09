@@ -50,17 +50,19 @@ case "$OS" in
 	package libsqlite3-dev
 	if [ ! -f /etc/apt/sources.list.d/mariadb.list ]
 	then
+		package curl
 		curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | sudo bash
 		# clean out old cruft that gets in the way
 		sudo apt remove libmariadb-client-lgpl-dev libmysqlclient-dev
 	fi
 	package libmariadb3
 	package libmariadb-dev
+	package zlib1g-dev
 	package libssl-dev
 	package uuid-dev
 	package lighttpd
 	package libjansson-dev
-	package protobuf-c-compiler
+	package libprotobuf-c-dev
 	package libavahi-common-dev
 	package libavahi-client-dev
 	package avahi-daemon

@@ -55,6 +55,16 @@
 #include <pwd.h>
 #include <sys/stat.h>
 
+#if _EP_CRYPTO_INCLUDE_RSA
+# include <openssl/rsa.h>
+#endif
+#if _EP_CRYPTO_INCLUDE_DSA
+# include <openssl/dsa.h>
+#endif
+#if _EP_CRYPTO_INCLUDE_DH
+# include <openssl/dh.h>
+#endif
+
 
 #define MINMDS		4		// minimum number of metadata entries (must be > 3)
 #ifndef GDP_MIN_KEY_BITS
@@ -680,19 +690,19 @@ gci_enter_key(struct gci_key *gcik,
 		{
 #if _EP_CRYPTO_INCLUDE_RSA
 		  case EP_CRYPTO_KEYTYPE_RSA:
-			  key_bits = RSA_bits(key);
+			  key_bits = RSA_bits(EVP_PKEY_get1_RSA(gcik->key));
 			  break;
 #endif
 
 #if _EP_CRYPTO_INCLUDE_DSA
 		  case EP_CRYPTO_KEYTYPE_DSA:
-			  key_bits = DSA_bits(key);
+			  key_bits = DSA_bits(EVP_PKEY_get1_DSA(gcik->key));
 			  break;
 #endif
 
 #if _EP_CRYPTO_INCLUDE_DH
 		  case EP_CRYPTO_KEYTYPE_DH:
-			  key_bits = DH_bits(key);
+			  key_bits = DH_bits(EVP_PKEY_get1_DH(gcik->key));
 			  break;
 #endif
 		}

@@ -66,8 +66,9 @@ static EP_DBG	Dbg = EP_DBG_INIT("libep.crypto.key", "Cryptographic key utilities
 static EP_STAT
 generate_rsa_key(EP_CRYPTO_KEY *key, int keylen, int keyexp)
 {
-	RSA *rsakey;
+	RSA *rsakey = NULL;
 	EP_STAT estat;
+	int istat;
 
 	if (keyexp <= 0)
 		keyexp = ep_adm_getintparam("libep.crypto.rsa.key.exponent",
@@ -79,8 +80,17 @@ generate_rsa_key(EP_CRYPTO_KEY *key, int keylen, int keyexp)
 				keylen, EP_CRYPTO_KEY_MINLEN_RSA);
 		goto fail0;
 	}
-	rsakey = RSA_generate_key(keylen, keyexp, NULL, NULL);
-	if (rsakey == NULL)
+	rsakey = RSA_new();
+	if (rsakey != NULL)
+	{
+		BIGNUM *bn_exp = BN_new();
+
+		istat = BN_set_word(bn_exp, keyexp);
+		if (istat == 1)
+			istat = RSA_generate_key_ex(rsakey, keylen, bn_exp, NULL);
+		BN_free(bn_exp);
+	}
+	if (rsakey == NULL || istat != 1)
 	{
 		estat = _ep_crypto_error(EP_STAT_CRYPTO_KEYCREATE,
 				"cannot generate RSA key");
@@ -96,6 +106,8 @@ generate_rsa_key(EP_CRYPTO_KEY *key, int keylen, int keyexp)
 	return EP_STAT_OK;
 
 fail0:
+	if (rsakey != NULL)
+		RSA_free(rsakey);
 	return estat;
 }
 #endif
@@ -706,7 +718,7 @@ ep_crypto_keytype_fromkey(EP_CRYPTO_KEY *key)
 	if (key == NULL)
 		return EP_CRYPTO_KEYTYPE_NULL;
 
-	int i = EVP_PKEY_type(key->type);
+	int i = EVP_PKEY_base_id(key);
 
 	switch (i)
 	{

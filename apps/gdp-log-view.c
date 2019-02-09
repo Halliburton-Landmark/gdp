@@ -343,17 +343,10 @@ list_logs(const char *gcl_dir_name, int plev)
 
 		for (;;)
 		{
-			struct dirent dentbuf;
 			struct dirent *dent;
 
 			// read the next directory entry
-			int i = readdir_r(dir, &dentbuf, &dent);
-			if (i != 0)
-			{
-				ep_log(ep_stat_from_errno(i),
-						"list_logs: readdir_r failed");
-				break;
-			}
+			dent = readdir(dir);
 			if (dent == NULL)
 				break;
 

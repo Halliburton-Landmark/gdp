@@ -136,16 +136,14 @@ ep_crypto_cipher_new(
 void
 ep_crypto_cipher_free(EP_CRYPTO_CIPHER_CTX *ctx)
 {
-	int istat;
 #if OPENSSL_VERSION_NUMBER >= 0x10100000	// version 1.1.0
-	istat = EVP_CIPHER_CTX_free(ctx->ctx);
+	EVP_CIPHER_CTX_free(ctx->ctx);
 #else
-	istat = EVP_CIPHER_CTX_cleanup(ctx->ctx);
-	ep_mem_free(ctx->ctx);
-#endif
-	if (istat <= 0)
+	if (EVP_CIPHER_CTX_cleanup(ctx->ctx) <= 0)
 		(void) _ep_crypto_error(EP_STAT_CRYPTO_FAIL,
 				"cannot cleanup cipher context");
+	ep_mem_free(ctx->ctx);
+#endif
 	ep_mem_free(ctx);
 }
 

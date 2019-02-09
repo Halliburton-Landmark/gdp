@@ -54,7 +54,7 @@
 
 static EP_DBG	Dbg = EP_DBG_INIT("gdplogd.sqlite", "GDP Log Daemon SQLite Physical Log");
 
-#define GOB_PATH_MAX		200			// max length of pathname
+#define GOB_PATH_MAX		260			// max length of pathname
 
 static bool			SQLiteInitialized = false;
 static int			GOBfilemode;		// the file mode on create
@@ -1003,17 +1003,10 @@ sqlite_remove(gdp_gob_t *gob)
 
 	for (;;)
 	{
-		struct dirent dentbuf;
 		struct dirent *dent;
 
 		// read the next directory entry
-		int i = readdir_r(dir, &dentbuf, &dent);
-		if (i != 0)
-		{
-			estat = ep_stat_from_errno(i);
-			ep_log(estat, "sqlite_remove: readdir_r(%s) failed", dbuf);
-			break;
-		}
+		dent = readdir(dir);
 		if (dent == NULL)
 			break;
 
@@ -1600,17 +1593,10 @@ sqlite_foreach(EP_STAT (*func)(gdp_name_t, void *), void *ctx)
 
 		for (;;)
 		{
-			struct dirent dentbuf;
 			struct dirent *dent;
 
 			// read the next directory entry
-			int i = readdir_r(dir, &dentbuf, &dent);
-			if (i != 0)
-			{
-				ep_log(ep_stat_from_errno(i),
-						"gob_physforeach: readdir_r(%s) failed", dbuf);
-				break;
-			}
+			dent = readdir(dir);
 			if (dent == NULL)
 				break;
 

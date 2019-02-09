@@ -43,7 +43,6 @@
 #   define IORESULT_T	ssize_t
 #   define IOBLOCK_T	size_t
 #   define _GNU_SOURCE	1	// required to get fopencookie
-#   include <libio.h>
 #else
 #   error Cannot determine use of funopen vs fopencookie
 #endif
