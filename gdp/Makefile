@@ -218,7 +218,7 @@ gdp_version.o: gdp_version.c ${OBJS_MOST} Makefile gdp_version.h
 		-D_VERSION_INFO_="\"`sh ../adm/get-version-info.sh`\"" \
 		-c gdp_version.c
 
-# make gdp_version.h, gdp-version.sh, and gdp-version.txt
+# make gdp_version.h, gdp-version.sh
 gdp_version.h: gdp_version.template gdp_version.sh Makefile
 	sh gdp_version.sh ${GDP_VERSION_MAJOR} ${GDP_VERSION_MINOR} ${GDP_VERSION_PATCH}
 

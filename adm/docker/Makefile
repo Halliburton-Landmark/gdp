@@ -44,7 +44,7 @@ GDP_SRC_ALL=	Makefile	\
 		util		\
 
 GDP_VER=	latest
-DOCKER_TAG=	`cat ${GDP_ADM}/gdp-version.txt`
+DOCKER_TAG=	`${GDP_ADM}/gdp-get-version.sh`
 DOCKER=		docker
 DOCKERFLAGS=
 
@@ -63,7 +63,7 @@ docker-build: ${ALL}
 # image containing source code and prerequisites
 TMPTAR=		/var/tmp/gdp-src.tar
 TAR=		tar
-gdp-src-base:	${GDP_ADM}/gdp-version.txt .FORCE
+gdp-src-base:	${GDP_ADM}/gdp-version.sh .FORCE
 	${DOCKER} build ${DOCKERFLAGS} \
 		--target gdp-system-base .
 	rm -f ${GDP_ADM}/docker/gdp-src.tar
@@ -83,31 +83,31 @@ gdp-src-base:	${GDP_ADM}/gdp-version.txt .FORCE
 		-t gdp-src-base:${DOCKER_TAG} .
 
 # image for application development in C
-gdp-dev-c:	${GDP_ADM}/gdp-version.txt .FORCE
+gdp-dev-c:	${GDP_ADM}/gdp-version.sh .FORCE
 	${DOCKER} build ${DOCKERFLAGS} --target gdp-dev-c \
 		-t gdp-dev-c:latest \
 		-t gdp-dev-c:${DOCKER_TAG} .
 
 # image for application development in Python
-gdp-dev-python:	${GDP_ADM}/gdp-version.txt .FORCE
+gdp-dev-python:	${GDP_ADM}/gdp-version.sh .FORCE
 	${DOCKER} build ${DOCKERFLAGS} --target gdp-dev-python \
 		-t gdp-dev-python:latest \
 		-t gdp-dev-python:${DOCKER_TAG} .
 
 # image for application execution (minimal OS, base for other images)
-gdp-run-base:	${GDP_ADM}/gdp-version.txt .FORCE
+gdp-run-base:	${GDP_ADM}/gdp-version.sh .FORCE
 	${DOCKER} build ${DOCKERFLAGS} --target gdp-run-base \
 		-t gdp-run-base:latest \
 		-t gdp-run-base:${DOCKER_TAG} .
 
 # image for GDP log server
-gdplogd:	${GDP_ADM}/gdp-version.txt .FORCE
+gdplogd:	${GDP_ADM}/gdp-version.sh .FORCE
 	${DOCKER} build ${DOCKERFLAGS} --target gdplogd \
 		-t gdplogd:latest \
 		-t gdplogd:${DOCKER_TAG} .
 
 # image for GDP router
-gdp_router:	${GDP_ADM}/gdp-version.txt .FORCE
+gdp_router:	${GDP_ADM}/gdp-version.sh .FORCE
 	${DOCKER} build ${DOCKERFLAGS} --target gdp_router \
 		-t gdp_router:latest \
 		-t gdp_router:${DOCKER_TAG} .
@@ -138,7 +138,7 @@ docker-push: ${ALL}
 		${DOCKER} push ${DOCKER_REG}/$${image}:${DOCKER_TAG}; \
 	done
 
-${GDP_ADM}/gdp-version.txt:
+${GDP_ADM}/gdp-version.sh:
 	cd ${GDP_SRC_ROOT}/gdp && make gdp_version.h
 
 .FORCE:
