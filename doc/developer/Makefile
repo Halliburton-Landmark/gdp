@@ -29,56 +29,44 @@
 # files that should be made public (installed in /usr/local/share/doc)
 # 	It would be nice to make .html versions of the .md files, but
 # 	pandoc is not installed on the Jenkins machine.
-PUBALL=
+PUBALL= \
+		api-v0-v2-changes.md \
+		gdp-gob-metadata.html \
+		gdp-programmatic-api.html \
+		gdp-rest-interface.html \
+		Libep.dbk \
+		Libep.pdf \
 
 # files that are auto-generated (should be cleaned)
 CLEANALL= \
-	  README.html
+		api-v0-v2-changes.html \
 
 ALL=		${CLEANALL} ${PUBALL}
 
 DESTDIR=
 LOCALROOT=	/usr
 INSTALLROOT=	${DESTDIR}${LOCALROOT}
-ADM=		../adm
+ADM=		../../adm
 DOCROOT=	${INSTALLROOT}/share/doc/gdp
-DOCDIR=		${DOCROOT}/`${ADM}/gdp-get-version.sh mm`
+DOCDIR=		${DOCROOT}/`${ADM}/gdp-get-version.sh mm`/developer
 
 all: ${ALL}
-	(cd admin &&		${MAKE} all)
-	(cd developer &&	${MAKE} all)
-	(cd internal &&		${MAKE} all)
 
 clean:
 	test -z "${CLEANALL}" || rm -f ${CLEANALL}
-	(cd admin &&		${MAKE} clean)
-	(cd developer &&	${MAKE} clean)
-	(cd internal &&		${MAKE} clean)
 
 ${DOCDIR}:
 	mkdir -p ${DOCDIR}
 
-install: ${DOCDIR} ${ALL}
-	# temporary check to clean out old cruft:
-	-(cd ${DOCROOT} && test -e gdp-programmatic-api.html && rm -r *)
-	# and now back to your regularly scheduled program...
-	-(cd ${DOCDIR} && rm -r *)
-	test -z "${PUBALL}" || cp ${PUBALL} ${DOCDIR}
-	cp ${CLEANALL} ${DOCDIR}
-	(cd admin &&		${MAKE} install)
-	(cd developer &&	${MAKE} install)
-	(cd internal &&		${MAKE} install)
+install: ${DOCDIR} ${PUBALL}
+	cp ${PUBALL} ${DOCDIR}
 
 UPDATE_LICENSE=	${ADM}/update-license.sh
-
 update-license:
 	${UPDATE_LICENSE} Makefile ${ALL}
-	(cd admin &&		${MAKE} update-license)
-	(cd developer &&	${MAKE} update-license)
-	(cd internal &&		${MAKE} update-license)
 
 PANDOC=		pandoc
-PANFLAGS=	-sS -c gdpdoc.css --self-contained
+PANFLAGS=	-sS -c ../gdpdoc.css --self-contained
 
 .SUFFIXES: .md .html
 

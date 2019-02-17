@@ -30,7 +30,8 @@
 DESTDIR=
 LOCALROOT=	/usr
 INSTALLROOT=	${DESTDIR}${LOCALROOT}
-DOCDIR=		${INSTALLROOT}/share/doc/gdp
+DOCROOT=	${INSTALLROOT}/share/doc/gdp
+DOCDIR=		${DOCROOT}/`${ADM}/gdp-get-version.sh mm`
 CLEANEXTRA=	gdp-client*.deb gdp-server*.deb python-gdp*.deb \
 		README*.html \
 		libs/*.a libs/*.so* libs/*.dylib \
@@ -90,13 +91,13 @@ install-gdplogd:
 
 install-doc:
 	(cd doc &&	${MAKE} install DESTDIR=${DESTDIR} LOCALROOT=${LOCALROOT})
+	mkdir -p ${DOCDIR}
+	cp -rp examples ${DOCDIR}
 
 # Split it into sub-targets to mimic our distribution, also
 #   used by the debian packaging scripts. So if you change it here,
 #   make sure you don't break the packaging.
 install: install-client install-gdplogd install-doc
-	mkdir -p ${DOCDIR}
-	cp -rp examples ${DOCDIR}
 
 install-local:
 	(cd ep &&	${MAKE} install-local)
