@@ -24,6 +24,7 @@ import sys
 import struct
 from hashlib import sha256
 import mysql.connector as mariadb
+import mysql.connector.pooling as mariadbpooling
 import Queue
 
 
@@ -60,7 +61,7 @@ class UnknownResponse(Exception):
     pass
 
 
-class MySQLConnectionPool(mariadb.pooling.MySQLConnectionPool):
+class MySQLConnectionPool(mariadbpooling.MySQLConnectionPool):
     """
     Subclass of default connection pool with our little
     enhancements to 'get_connection' and a new function
