@@ -63,8 +63,8 @@
 char dguid_s[GDP_NAME_HEX_STRING];
 char eguid_s[GDP_NAME_HEX_STRING];
 
-// expiration chore moved to delete and flush procedures, timeout disabled (0)
-#define EXPIRE_TIMEOUT_SEC 0
+// prevent mysql_con server-side closure when gdp-ribd is not being used at all
+#define MYSQL_CON_KEEPALIVE_SECS 570
 char query_expire[] = "call gdp_rib.drop_expired();";
 
 char call_add_nhop_pre[] = "call gdp_rib.add_nhop (x'";
@@ -102,7 +102,7 @@ void fail(MYSQL *con, const char *s)
 
 int main(int argc, char **argv)
 {
-	struct timeval tv = { .tv_sec = EXPIRE_TIMEOUT_SEC, .tv_usec = 0 };
+	struct timeval tv = { .tv_sec = MYSQL_CON_KEEPALIVE_SECS, .tv_usec = 0 };
 	struct sockaddr_in si_loc;
 	struct sockaddr_in si_rem;
 	socklen_t si_rem_len = sizeof(si_rem);
