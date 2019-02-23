@@ -29,7 +29,12 @@ cd `dirname $0`
 
 dockerargs=""
 if [ ! -d "$GDP_MARIADB_DATADIR" ]; then
-	fatal "$GDP_MARIADB_DATADIR must exist and be a directory" $EX_OSFILE
+	error "$GDP_MARIADB_DATADIR must exist and be a directory."
+	info "Create it using:"
+	info "    mkdir -p $GDP_MARIADB_DATADIR"
+	info "    chown \$GDP_MARIADB_USER $GDP_MARIADB_DATADIR"
+	info "where \$GDP_MARIADB_USER is a special system user of your choice."
+	fatal "Correct errors and try again." $EX_OSFILE
 fi
 
 if [ "$GDP_MARIADB_USER" = "UNKNOWN" ];then
@@ -39,17 +44,23 @@ fi
 
 if [ -d $GDP_MARIADB_DATADIR/mysql ]; then
 	# this database is already initialized
-	error "MariaDB/MySQL has already been initialized."
-	info "Data directory is $GDP_MARIADB_DATADIR/mysql"
+	warn "MariaDB/MySQL has already been initialized."
+	info "Data directory is $GDP_MARIADB_DATADIR/mysql."
+	owner=`ls -ld $GDP_MARIADB_DATADIR/mysql | awk '{ print $3 ":" $4 }'`
+	info "Owner is $owner."
+	info "Nothing more to do ... exiting with success status."
 	exit $EX_OK
 fi
 
-info "Initializing database in $GDP_MARIADB_DATADIR"
 if [ -z "$GDP_MARIADB_ROOT_PASSWORD" ]; then
-	fatal "Must set GDP_MARIADB_ROOT_PASSWORD in environment to initialize" $EX_USAGE
+	warn "GDP_MARIADB_ROOT_PASSWORD is not set.  Creating a new password."
+	GDP_MARIADB_ROOT_PASSWORD=`dd if=/dev/urandom bs=30 count=1 2>/dev/null | base64`
+	info "New MariaDB root password is '$GDP_MARIADB_ROOT_PASSWORD'."
+	info "Save this for possible use when doing database administration."
 fi
-export MYSQL_ROOT_PASSWORD=$GDP_MARIADB_ROOT_PASSWORD
 
+info "Initializing MariaDB in $GDP_MARIADB_DATADIR."
+export MYSQL_ROOT_PASSWORD="$GDP_MARIADB_ROOT_PASSWORD"
 docker run \
 	--name $GDP_MARIADB_DOCKERID \
 	--user $GDP_MARIADB_USER \
