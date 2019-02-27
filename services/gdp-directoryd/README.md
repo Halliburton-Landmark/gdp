@@ -1,3 +1,8 @@
+
+WARNING: ./gdp-directoryd has been deprecated, please use ../gdp-ribd instead.
+
+=========================================================================
+
 # GDP Directory Daemon (Interim Version 2)
 
 This service contains the routing information for the GDP.  ***[[Check
