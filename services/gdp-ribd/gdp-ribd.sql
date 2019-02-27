@@ -1,5 +1,5 @@
 # ==============================================================================
-# Usage: sudo mysql -v --show-warnings < gdp-ribd.sql
+# Usage: sudo mysql -p -v --show-warnings < gdp-ribd.sql
 # ==============================================================================
 #
 #	----- BEGIN LICENSE BLOCK -----
@@ -27,6 +27,10 @@
 #	OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS,
 #	OR MODIFICATIONS.
 #	----- END LICENSE BLOCK -----
+
+# install oqgraph engine (provided by mariadb-plugin-oqgraph package)
+install soname 'ha_oqgraph';
+show engines;
 
 #
 # front-end daemon expects this specific database name
