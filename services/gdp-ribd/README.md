@@ -128,12 +128,37 @@ for GDP Router communication on UDP port 9001.
 
 # GDP RIB Installation on Docker
 
-[Under construction - stay tuned for updates]
-
 ## Step 4-on-Docker: Build GDP RIB Docker Container
 
 ```
 	$ make docker
+```
+## Step 5-on-Docker: Run GDP RIB in Docker
+
+```
 	$ docker run --network=host gdp-ribd:latest
 ```
+
+***Note: mysql_secure_installation usage is not YET supported, but if
+   invoked within the container instance, be careful not to disable
+   remote root access as 'root'@'localhost' will be unavailable and
+   there is no 'root'@'127.0.0.1' account in the MariaDB docker base
+   image by default.***
+
+The GDP RIB on Docker is ready for use in a GDP Trust Domain, listening
+for GDP Router communication on UDP port 9001.
+
+## Step 6-on-Docker: Database Access
+
+From a "docker exec -it <id> bash" attachment to the gdp-ribd:latest
+id, run:
+
+```
+	root@dockerhost:/# mysql -p
+```
+
+...and provide the password listed in the "docker run" display output
+(search for "GENERATED ROOT PASSWORD:"). The root password can be
+changed using the mysql_secure_installation script, with the caveat
+noted above.
 
