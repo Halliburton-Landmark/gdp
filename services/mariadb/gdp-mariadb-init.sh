@@ -75,5 +75,6 @@ docker run \
 sleep 5
 docker stop $GDP_MARIADB_DOCKERID
 
+sudo cp gdp-mariadb-start.sh /usr/sbin/gdp-mariadb-start.sh
 sudo $GDP_ADM/customize.sh gdp-mariadb.service /etc/systemd/system
 sudo systemctl daemon-reload
