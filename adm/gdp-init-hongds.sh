@@ -157,12 +157,6 @@ create_hongd_db() {
 	fi
 
 	info "Setting up Human-Oriented Name to GDPname Directory database."
-#	info "This will ask for a password for the Log Creation Service."
-#	local pw
-#	while ! read_new_password pw
-#	do
-#		error "Try again"
-#	done
 	creation_service_name="gdp_creation_service"
 	creation_service_password=`dd if=/dev/random bs=1 count=9 | base64`
 	gdp_user_name="gdp_user"
@@ -193,7 +187,7 @@ create_hongd_db() {
 
 set_fqdn
 $debug && echo fqdn = $fqdn
-$skip_install && install_mariadb_packages
+$install_mariadb && install_mariadb_packages
 create_hongd_db
 
 info "Please read the following instructions."
@@ -213,34 +207,3 @@ cat <<- EOF
 EOF
 echo ${Reset}
 info "Thank you for your attention."
-
-
-#------------------------#  CUT HERE  #------------------------#
-exit 0
-
-
-#
-#  After MariaDB (or MySQL) is installed, the system databases need
-#  to be set up, including setting a root password.  If the database
-#  has already been set up, this fails in confusing ways, so it's
-#  best not to call it unless you know it's needed.
-#
-#  See also `mysql_secure_installation` (part of the MariaDB and
-#  MySQL distributions).
-#
-initialize_mariadb() {
-	warn "Attempting to initialize MariaDB."
-	info "You will need to create a new root password for the database."
-	info "This is not the same as your system root password."
-	while ! read_new_password root_passwd
-	do
-		echo "Try again -- Enter new root password for database"
-	done
-	info "Be sure you save this password!!"
-	: ${mariadb_user:=mysql}
-	mysql_install_db --user=$mariadb_user
-
-	# default root accounts are set up for both localhost and $fqdn
-	mysqladmin --user=root --host=localhost password "$root_passwd"
-	mysqladmin --user=root --host=$fqdn password "$root_passwd"
-}

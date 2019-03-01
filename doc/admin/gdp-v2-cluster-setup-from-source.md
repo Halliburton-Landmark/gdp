@@ -86,6 +86,12 @@ on the host system).
     cd $root/gdp/services/mariadb
     env GDP_MARIADB_ROOT_PASSWORD="$rootpw" services/mariadb/gdp-mariadb-init.sh
 
+Once this is complete you should be able to run `adm/gdp-init-hongds.sh`
+to initialize the necessary database tables:
+
+    cd $root/gdp
+    sh adm/gdp-init-hongds.sh
+
 ## Set Up GDP Router(s)
 
 ***Rick, please fill in***
