@@ -386,11 +386,10 @@ gci_key_file_name(const char *key_dir_path,
 	char key_dir_name[PATH_MAX];
 	estat = ep_file_search(key_dir_path, NULL, sizeof key_dir_name, key_dir_name);
 	if (!EP_STAT_ISOK(estat))
-		strcpy(".", key_dir_name);
+		strcpy(key_dir_name, ".");
 
 	// now get the rest of the file name
 	//XXX should this use the "/_xx/" path like GOB data files?
-	char *key_file_name;
 	gdp_pname_t pbuf;
 	gdp_printable_name(gname, pbuf);
 	size_t len = strlen(key_dir_name) + sizeof pbuf + 6;
@@ -399,7 +398,7 @@ gci_key_file_name(const char *key_dir_path,
 	if (key_suffix == NULL)
 		key_suffix = "";
 	len += strlen(key_suffix);
-	key_file_name = (char *) ep_mem_malloc(len);
+	char *key_file_name = (char *) ep_mem_malloc(len);
 	if (key_scope != NULL)
 		snprintf(key_file_name, len, "%s/%s-%s.pem%s",
 				key_dir_name, pbuf, key_scope, key_suffix);
