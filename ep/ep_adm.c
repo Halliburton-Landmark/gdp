@@ -50,6 +50,7 @@
 ***********************************************************************/
 
 #include <ep.h>
+#include <ep_dbg.h>
 #include <ep_hash.h>
 #include <ep_string.h>
 
@@ -67,6 +68,7 @@
 # define EP_CONF_ADM_ENV_OVERRIDE	1
 #endif
 
+static EP_DBG	Dbg = EP_DBG_INIT("libep.dbg", "Administrative routines");
 static EP_HASH	*ParamHash;
 
 
@@ -80,6 +82,7 @@ read_param_file(char *path)
 	FILE *fp = NULL;
 	char lbuf[200];
 
+	ep_dbg_cprintf(Dbg, 14, "read_param_file(%s)\n", path);
 	if (path == NULL || (fp = fopen(path, "r")) == NULL)
 	{
 		errno = 0;		// avoid misleading error messages
@@ -118,6 +121,7 @@ read_param_file(char *path)
 		vp = ep_mem_strdup(vp);
 
 		// store it into the hash table
+		ep_dbg_cprintf(Dbg, 18, " ... adding %s=%s\n", np, vp);
 		op = (char *) ep_hash_insert(ParamHash, strlen(np), np, vp);
 		if (op != NULL)
 			ep_mem_free(op);
