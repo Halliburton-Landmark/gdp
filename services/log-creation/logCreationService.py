@@ -260,7 +260,6 @@ class logCreationService(GDPService):
             cur = conn.cursor()
             cur.execute(query, (humanname, logname))
             conn.commit()
-            self.namedb_cpool.return_connection(conn) # return back
 
         except Exception as e:
 
@@ -280,6 +279,9 @@ class logCreationService(GDPService):
             ## request, but hopefully we repaired the connection if
             ## that was the issue
             raise e
+
+        finally:
+            self.namedb_cpool.return_connection(conn)
 
 
     def add_to_dupdb(self, __logname, __srvname, __creator, rid):
