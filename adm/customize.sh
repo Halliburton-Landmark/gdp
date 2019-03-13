@@ -8,14 +8,14 @@
 #	Usage: adm/customize.sh source-file target-dir
 #
 
-if [ $# != 2 ]
+if [ $# -lt 1 -o $# -gt 2 ]
 then
-	echo 1>&2 "Usage: $0 source-file target-dir"
+	echo 1>&2 "Usage: $0 source-file [target-dir]"
 	exit 1
 fi
 
 source_file=$1
-target_dir=$2
+target_dir=${2:-}
 
 source_dir=`dirname $source_file`
 source_root=`basename $source_file .template`
@@ -52,6 +52,13 @@ fi
 : ${SCGI_DEBUG:=1}
 : ${SCGI_PORT:=8001}
 
+if [ -z "$target_dir" ]
+then
+	target=/dev/stdout
+else
+	target=$target_dir/$source_root
+fi
+
 (
 	echo "# Generated" `date +"%F %T %z"` from $source_file
 	sed \
@@ -74,4 +81,4 @@ fi
 		-e "s;@SCGI_PORT@;$SCGI_PORT;g" \
 
 	echo "# End of generated text" $1
-) < $source_file > $target_dir/$source_root
+) < $source_file > $target
