@@ -22,13 +22,19 @@ Whi='[0;37m';     BWhi='[1;37m';    UWhi='[4;37m';    IWhi='[0;97m';    BIWh
 
 # matches sysexits.h (see man sysexits)
 EX_OK=0
-EX_USAGE=64
-EX_UNAVAILABLE=69
-EX_SOFTWARE=70
-EX_OSFILE=72
-EX_CANTCREATE=73
-EX_NOPERM=77
-EX_CONFIG=78
+EX_USAGE=64		# command line usage error
+EX_DATAERR=65		# data format error
+EX_NOINPUT=66		# cannot open input
+EX_UNAVAILABLE=69	# service unavailable (a catch-all status)
+EX_SOFTWARE=70		# internal software error
+EX_OSERR=71		# system error (e.g., out of memory)
+EX_OSFILE=72		# system file missing
+EX_CANTCREATE=73	# cannot create (user) output file
+EX_IOERR=74		# input/output error
+EX_TEMPFAIL=75		# temp fail, try again sometime soon
+EX_PROTOCOL=76		# remote error in protocol
+EX_NOPERM=77		# permission denied
+EX_CONFIG=78		# configuration error
 
 #################### FUNCTIONS ####################
 
