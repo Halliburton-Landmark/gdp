@@ -1,4 +1,6 @@
-# Setting Up a Version 2 GDP Cluster From Source
+% Setting Up a Version 2 GDP Cluster From Source
+%
+% 2019-03-01
 
 This describes how to set up a private GDP version 2 cluster.
 It assumes that you are:
@@ -18,6 +20,9 @@ Note that many of the included scripts assume you are using the
 Berkeley infrastructure and reference Berkeley-specific hosts.  You
 will probably have to hand edit some scripts.  A `grep -i` for
 `berkeley.edu` will probably find most of them.
+
+These instructions also assume that you are running on a fresh
+Ubuntu system.
 
 The basic outline is:
 
@@ -41,6 +46,31 @@ on the same machine you may need to duplicate configuration steps.
 In the future we will have many of these components packaged as
 precompiled Docker containers, but for now you have to compile
 yourself.
+
+## Warning about DNS Configuration
+
+When you install Ubuntu it will create a host name in `/etc/hostname`.
+However, some of this installation requires that you have a fully
+qualified domain name (i.e., one with dots in it) that are known to
+your DNS server.  To test this, use `hostname -f`.  If it returns
+a name that contains at least one dot which ends with one of the
+"well known" names such as `.com`, `.edu`, or your country code,
+then everything is fine.
+
+If it has no dots, or it ends up with `.local` or `.localdomain`
+then you'll probably need to edit `/etc/hosts` to provide a real
+domain name.  There are instructions available on how to do that on
+the net ___which we should provide here___.
+
+If you are not connected to any network, then names ending in
+`.local` or `.localdomain` are fine.  The rest of these instructions
+assume that you _are_ connected to an Internet-connected network.
+Virtual machines and containers such as Docker make this distinction
+fuzzy.  In most cases VMs and containers can connect to the outside
+world, but the rest of the world cannot connect to them unless you
+make special arrangements.  Describing these in detail depends on
+what technology you are using and is beyond the scope of this
+document.
 
 ## Gathering Information
 
