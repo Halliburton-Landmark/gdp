@@ -43,9 +43,11 @@ ALL=		${CLEANALL} ${PUBALL}
 DESTDIR=
 LOCALROOT=	/usr
 INSTALLROOT=	${DESTDIR}${LOCALROOT}
-ADM=		../../adm
+GDP_SRC_ROOT=	../..
+GDP_ADM=	${GDP_SRC_ROOT}/adm
+GDP_DOC=	${GDP_SRC_ROOT}/doc
 DOCROOT=	${INSTALLROOT}/share/doc/gdp
-DOCDIR=		${DOCROOT}/`${ADM}/gdp-get-version.sh mm`/admin
+DOCDIR=		${DOCROOT}/`${GDP_ADM}/gdp-get-version.sh mm`/admin
 
 all: ${ALL}
 
@@ -58,14 +60,14 @@ ${DOCDIR}:
 install: ${DOCDIR} ${PUBALL}
 	cp ${PUBALL} ${DOCDIR}
 
-UPDATE_LICENSE=	${ADM}/update-license.sh
+UPDATE_LICENSE=	${GDP_ADM}/update-license.sh
 update-license:
 	${UPDATE_LICENSE} Makefile ${ALL}
 
 PANDOC=		pandoc
-PANFLAGS=	-sS -c ../gdpdoc.css --self-contained
+PANFLAGS=	-sS -c ${GDP_DOC}/gdpdoc.css --self-contained
 
-.SUFFIXES: .md .html
+.SUFFIXES: .md .html .pdf
 
-.md.html:
+.md.html .md.pdf:
 	${PANDOC} ${PANFLAGS} -o $@ $<
