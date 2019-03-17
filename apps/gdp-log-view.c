@@ -267,6 +267,7 @@ show_log(gdp_name_t log_name, int plev)
 	// figure out what we want to actually print
 	if (plev == 1)
 	{
+		// show log name, number of records, external name if known
 		size_t md_len;
 		const void *md_data;
 
@@ -280,9 +281,76 @@ show_log(gdp_name_t log_name, int plev)
 				log_pname, gob->nrecs, (int) md_len, (const char *) md_data);
 		goto done;
 	}
+	if (plev == 2)
+	{
+		// show log name, nrecs, brief metadata overview
+		printf("%s %" PRIgdp_recno "\n", log_pname, gob->nrecs);
+		gdp_md_t *md = gob->gob_md;
+		if (md == NULL)
+			goto done;
+		int mdx = 0;
+		for (;; mdx++)
+		{
+			gdp_md_id_t md_id;
+			size_t md_len;
+			const uint8_t *md_data;
+
+			estat = gdp_md_get(md, mdx, &md_id, &md_len, (const void **) &md_data);
+			EP_STAT_CHECK(estat, break);
+
+			int ptype = 0;
+			printf("    ");
+			switch (md_id)
+			{
+				case GDP_MD_XID:
+					printf("external id");
+					ptype = 1;
+					break;
+				case GDP_MD_NONCE:
+					printf("nonce");
+					break;
+				case GDP_MD_CTIME:
+					printf("creation time");
+					ptype = 1;
+					break;
+				case GDP_MD_EXPIRE:
+					printf("expiration time");
+					ptype = 1;
+					break;
+				case GDP_MD_CREATOR:
+					printf("creator");
+					ptype = 1;
+					break;
+				case GDP_MD_PUBKEY:
+					printf("public key, deprecated");
+					break;
+				case GDP_MD_OWNERPUBKEY:
+					printf("owner public key");
+					break;
+				case GDP_MD_WRITERPUBKEY:
+					printf("writer public key");
+					break;
+				default:
+					printf("0x%08x len %zd", md_id, md_len);
+					break;
+			}
+			switch (ptype)
+			{
+			case 1:
+				printf(" %s", EpChar->lquote);
+				ep_xlate_out(md_data, md_len, stdout, "",
+						EP_XLATE_PLUS | EP_XLATE_NPRINT);
+				printf("%s", EpChar->rquote);
+				break;
+			}
+			printf("\n");
+		}
+		goto done;
+	}
+
 	if (plev >= 3)
-		printf("\n----------------------------------------------------------\n");
-	printf("Log %s: %" PRIgdp_recno " recs\n", log_pname, gob->nrecs);
+		printf("\n\n----------------------------------------------------------\n");
+	printf("%s: %" PRIgdp_recno " recs\n", log_pname, gob->nrecs);
 	uint32_t pflags = GDP_DATUM_PRMETAONLY;
 	if (plev >= 3)
 	{
