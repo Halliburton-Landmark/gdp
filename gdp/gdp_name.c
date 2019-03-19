@@ -515,11 +515,13 @@ done:
 		char ebuf[100];
 		ep_dbg_printf("gdp_name_parse: %s", hname);
 		if (xname != NULL && xname != hname)
-			ep_dbg_printf(" => %s", xname);
+			ep_dbg_printf("\n             => %s", xname);
 		if (EP_STAT_ISOK(estat))
-			ep_dbg_printf(" => %s\n", gdp_printable_name(gname, pname));
+			ep_dbg_printf("\n             => %s\n",
+					gdp_printable_name(gname, pname));
 		else
-			ep_dbg_printf(": %s\n", ep_stat_tostr(estat, ebuf, sizeof ebuf));
+			ep_dbg_printf(":\n               %s\n",
+					ep_stat_tostr(estat, ebuf, sizeof ebuf));
 	}
 	return estat;
 }
@@ -722,5 +724,104 @@ gdp_name_resolve(const char *hname, gdp_name_t gname)
 	}
 
 	conn_rls(conn, cpool);
+	return estat;
+}
+
+
+/*
+**  Get the human name from the internal name in HONGD
+*/
+
+EP_STAT
+_gdp_name_gethname(gdp_name_t gname, char *hnbuf, size_t hnblen)
+{
+	struct conn_pool *cpool = &CPool;
+	struct conn *conn = NULL;
+	EP_STAT estat = EP_STAT_OK;
+
+	if (!HongDsLive)
+	{
+		ep_dbg_cprintf(Dbg, 19, "_gdp_name_gethname: no database\n");
+		estat = GDP_STAT_HONGD_UNAVAILABLE;
+		goto fail0;
+	}
+	if (cpool->max_alloc <= 0)
+	{
+		// couldn't initialize, just give up
+		ep_dbg_cprintf(Dbg, 19, "_gdp_name_gethname: no connections in pool\n");
+		estat = GDP_STAT_HONGD_UNAVAILABLE;
+		goto fail0;
+	}
+	conn = conn_get(cpool, false);
+	EP_ASSERT_ELSE(conn != NULL, return GDP_STAT_HONGD_UNAVAILABLE);
+
+	conn->phase = "query";
+	{
+		char hexbuf[2 * sizeof (gdp_name_t) + 1];
+		int i;
+		for (i = 0; i < sizeof (gdp_name_t); i++)
+			snprintf(&hexbuf[i * 2], sizeof hexbuf, "%02x", gname[i]);
+
+		int dbtable_len = strlen(HongDbTable);
+		char escaped_dbtable[2 * dbtable_len + 1];
+		mysql_real_escape_string(conn->rconn, escaped_dbtable, HongDbTable,
+								dbtable_len);
+		const char *q = "SELECT hname FROM `%s`\n"
+						" WHERE gname = CAST(X'%s' AS BINARY(32))\n"
+						" LIMIT 1;";
+		char qbuf[strlen(q) + sizeof escaped_dbtable + sizeof hexbuf + 1];
+		snprintf(qbuf, sizeof qbuf, q, escaped_dbtable, hexbuf);
+		ep_dbg_cprintf(Dbg, 30, "_gdp_name_gethname: %s\n", qbuf);
+		if (mysql_query(conn->rconn, qbuf) != 0)
+		{
+			ep_dbg_cprintf(Dbg, 1, "_gdp_name_gethname: mysql(%s)\n", qbuf);
+			goto fail1;
+		}
+	}
+
+	conn->phase = "results";
+	{
+		MYSQL_RES *res = mysql_store_result(conn->rconn);
+		if (res == NULL)
+		{
+			ep_dbg_cprintf(Dbg, 19, "_gdp_name_gethname: no results\n");
+			goto fail1;
+		}
+		conn->phase = "fetch";
+		MYSQL_ROW row = mysql_fetch_row(res);
+		if (row == NULL)
+		{
+			ep_dbg_cprintf(Dbg, 19, "_gdp_name_gethname: cannot find name: %s\n",
+							mysql_error(conn->rconn));
+			estat = GDP_STAT_NAME_UNKNOWN;
+		}
+		else
+		{
+			unsigned long *len = mysql_fetch_lengths(res);
+			snprintf(hnbuf, hnblen, "%.*s", (int) len[0], row[0]);
+		}
+
+		mysql_free_result(res);
+	}
+
+	if (false)
+	{
+fail1:
+		ep_dbg_cprintf(Dbg, 1,
+				"_gdp_name_gethname(%s): %s\n",
+				conn->phase, mysql_error(conn->rconn));
+		if (EP_STAT_ISOK(estat))
+			estat = GDP_STAT_MYSQL_ERROR;
+	}
+fail0:
+	if (ep_dbg_test(Dbg, 19))
+	{
+		char ebuf[100];
+		ep_dbg_printf("_gdp_name_gethname => %s\n",
+			ep_stat_tostr(estat, ebuf, sizeof ebuf));
+	}
+
+	if (conn != NULL)
+		conn_rls(conn, cpool);
 	return estat;
 }

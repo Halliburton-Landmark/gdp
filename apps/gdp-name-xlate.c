@@ -146,6 +146,8 @@ main(int argc, char **argv)
 	extern void _gdp_name_init(void);
 	_gdp_name_init();
 
+	// Do conversion of external name (in many possible forms) to the
+	// internal 256-bit binary form of the GDPname.
 	const char *xname = argv[0];
 	estat = parse_hex(argv[0], gdpiname);
 	if (!EP_STAT_ISOK(estat))
@@ -172,6 +174,21 @@ main(int argc, char **argv)
 		gdp_psha = &gdp_psha_buf;
 	}
 
+	// As a serious hack, see if you can look up the GDPname and
+	// turn it back into an original, human-oriented name.  That's the
+	// arbitrary string assigned by the creator of the object.
+	// This violates layering in many ways.  If it's actually useful
+	// for more than just developers, the guts should be moved into
+	// the library.
+
+	// look up in HONGD,
+	char hbuf[200];
+	extern EP_STAT _gdp_name_gethname(gdp_name_t, char[], size_t);
+	estat = _gdp_name_gethname(gdpiname, hbuf, sizeof hbuf);
+	EP_STAT_CHECK(estat, hbuf[0] = '\0');
+
+	// Now we can print the internal names in various formats.
+	// This is the easy part.
 	if (show_b64)
 	{
 		fprintf(stdout, "%s\n", gdppname);
@@ -194,15 +211,23 @@ main(int argc, char **argv)
 	else
 	{
 		char ebuf[64];
+		char *method = "HONGD";
+		if (!EP_STAT_ISOK(estat))
+			method = "SHA256";
 		fprintf(stdout,
-				"method:    %s\n"
-				"human:     %s\n"
+				"fqhn:      %s\n"
+				"method:    %s (%s)\n"
 				"printable: %s\n"
 				"old form:  %s\n"
 				"hex:       ",
-				ep_stat_tostr_terse(estat, ebuf, sizeof ebuf),
-				xname, gdppname, *gdp_psha);
+				xname,
+				method, ep_stat_tostr_terse(estat, ebuf, sizeof ebuf),
+				gdppname, *gdp_psha);
 		ep_hexdump(gdpiname, sizeof gdpiname, stdout, EP_HEXDUMP_TERSE, 0);
+		if (hbuf[0] != '\0')
+			fprintf(stdout,
+				"hongd:     %s\n",
+				hbuf);
 	}
 	exit(EX_OK);
 }
